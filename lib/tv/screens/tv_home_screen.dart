@@ -8,6 +8,8 @@ import '../../provider/recently_watched_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../app/tv_design.dart';
 import '../controllers/tv_home_controller.dart';
+import '../focus/tv_focus_memory.dart';
+import '../focus/tv_screen_focus_controller.dart';
 import '../models/tv_media_item.dart';
 import '../widgets/tv_content_row.dart';
 import '../widgets/tv_continue_watching_menu.dart';
@@ -20,12 +22,14 @@ class TvHomeScreen extends StatefulWidget {
     required this.metrics,
     required this.onOpenMedia,
     required this.onContinueWatching,
+    this.focusController,
     super.key,
   });
 
   final TvShellMetrics metrics;
   final ValueChanged<TvMediaItem> onOpenMedia;
   final ValueChanged<TvMediaItem> onContinueWatching;
+  final TvScreenFocusController? focusController;
 
   @override
   State<TvHomeScreen> createState() => _TvHomeScreenState();
@@ -34,8 +38,52 @@ class TvHomeScreen extends StatefulWidget {
 class _TvHomeScreenState extends State<TvHomeScreen> {
   static const _controller = TvHomeController();
 
+  /// Focus-memory scope holding the row that last had focus, so returning to
+  /// Home lands where the user left off rather than wherever is level with
+  /// the rail.
+  static const _lastRowScope = 'tv-home-row';
+
+  final Map<String, TvContentRowController> _rowControllers =
+      <String, TvContentRowController>{};
   Future<TvHomeData>? _homeData;
   String? _configurationKey;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusController?.attach(this, _requestEntryFocus);
+  }
+
+  @override
+  void didUpdateWidget(TvHomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.focusController, widget.focusController)) {
+      oldWidget.focusController?.detach(this);
+      widget.focusController?.attach(this, _requestEntryFocus);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusController?.detach(this);
+    super.dispose();
+  }
+
+  /// Without a remembered row the shell falls back to the nearest control,
+  /// which on a fresh Home is the hero.
+  bool _requestEntryFocus() {
+    final rowId = TvFocusMemoryScope.maybeOf(context)?.recall(_lastRowScope);
+    return rowId != null && (_rowControllers[rowId]?.requestFocus() ?? false);
+  }
+
+  void _rememberFocusedRow(String? scopeId) {
+    final memory = TvFocusMemoryScope.maybeOf(context);
+    if (scopeId == null) {
+      memory?.forget(_lastRowScope);
+    } else {
+      memory?.remember(scopeId: _lastRowScope, itemId: scopeId);
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -110,10 +158,17 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              TvHero(
-                item: data.hero!,
-                compact: widget.metrics.compact,
-                onOpenDetails: () => widget.onOpenMedia(data.hero!),
+              Focus(
+                canRequestFocus: false,
+                skipTraversal: true,
+                onFocusChange: (hasFocus) {
+                  if (hasFocus) _rememberFocusedRow(null);
+                },
+                child: TvHero(
+                  item: data.hero!,
+                  compact: widget.metrics.compact,
+                  onOpenDetails: () => widget.onOpenMedia(data.hero!),
+                ),
               ),
               SizedBox(height: widget.metrics.compact ? 4 : 8),
               _mediaRow(
@@ -172,19 +227,30 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     final visibleItems = items.take(16).toList(growable: false);
     return Padding(
       padding: EdgeInsets.only(bottom: widget.metrics.compact ? 16 : 24),
-      child: TvContentRow<TvMediaItem>(
-        title: title,
-        scopeId: scopeId,
-        items: visibleItems,
-        itemId: (item) => item.stableId,
-        semanticLabel: (item) => item.title,
-        itemBuilder: (_, item) => TvMediaCard(
-          item: item,
-          width: widget.metrics.mediaCardWidth,
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onFocusChange: (hasFocus) {
+          if (hasFocus) _rememberFocusedRow(scopeId);
+        },
+        child: TvContentRow<TvMediaItem>(
+          controller: _rowControllers.putIfAbsent(
+            scopeId,
+            TvContentRowController.new,
+          ),
+          title: title,
+          scopeId: scopeId,
+          items: visibleItems,
+          itemId: (item) => item.stableId,
+          semanticLabel: (item) => item.title,
+          itemBuilder: (_, item) => TvMediaCard(
+            item: item,
+            width: widget.metrics.mediaCardWidth,
+          ),
+          onItemActivated: onItemActivated ?? widget.onOpenMedia,
+          onItemMenu: onItemMenu,
+          itemMenuHint: itemMenuHint,
         ),
-        onItemActivated: onItemActivated ?? widget.onOpenMedia,
-        onItemMenu: onItemMenu,
-        itemMenuHint: itemMenuHint,
       ),
     );
   }

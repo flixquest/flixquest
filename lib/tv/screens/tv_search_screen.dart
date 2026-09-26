@@ -93,15 +93,12 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
         : KeyEventResult.ignored;
   }
 
-  void _requestEntryFocus() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted ||
-          _queryFocusNode.context == null ||
-          !_queryFocusNode.canRequestFocus) {
-        return;
-      }
-      _queryFocusNode.requestFocus();
-    });
+  bool _requestEntryFocus() {
+    if (_queryFocusNode.context == null || !_queryFocusNode.canRequestFocus) {
+      return false;
+    }
+    _queryFocusNode.requestFocus();
+    return true;
   }
 
   void _requestSearchActionFocus() {

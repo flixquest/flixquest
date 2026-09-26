@@ -449,14 +449,13 @@ class _ProfileFocusEntryState extends State<_ProfileFocusEntry> {
     }
   }
 
-  void _requestFocus() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted &&
-          _signOutFocusNode.context != null &&
-          _signOutFocusNode.canRequestFocus) {
-        _signOutFocusNode.requestFocus();
-      }
-    });
+  bool _requestFocus() {
+    if (_signOutFocusNode.context == null ||
+        !_signOutFocusNode.canRequestFocus) {
+      return false;
+    }
+    _signOutFocusNode.requestFocus();
+    return true;
   }
 
   @override

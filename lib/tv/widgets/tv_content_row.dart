@@ -25,6 +25,7 @@ class TvContentRow<T> extends StatefulWidget {
     this.itemMenuHint,
     this.autofocus = false,
     this.itemSpacing = 14,
+    this.controller,
     super.key,
   });
 
@@ -47,9 +48,18 @@ class TvContentRow<T> extends StatefulWidget {
 
   final bool autofocus;
   final double itemSpacing;
+  final TvContentRowController? controller;
 
   @override
   State<TvContentRow<T>> createState() => _TvContentRowState<T>();
+}
+
+class TvContentRowController {
+  _TvContentRowState<dynamic>? _state;
+
+  /// Focuses the remembered item, or the first one, and returns whether focus
+  /// moved.
+  bool requestFocus() => _state?._focusPreferredItem() ?? false;
 }
 
 class _TvContentRowState<T> extends State<TvContentRow<T>> {
@@ -75,6 +85,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
   void initState() {
     super.initState();
     _syncFocusNodes();
+    widget.controller?._state = this;
   }
 
   @override
@@ -86,6 +97,12 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
   @override
   void didUpdateWidget(TvContentRow<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      if (identical(oldWidget.controller?._state, this)) {
+        oldWidget.controller?._state = null;
+      }
+      widget.controller?._state = this;
+    }
     if (oldWidget.scopeId != widget.scopeId) {
       _cancelHold();
       for (final node in _focusNodes.values) {
@@ -171,11 +188,12 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
     if (_scheduledInitialFocus || widget.items.isEmpty) {
       return;
     }
-    final memory = TvFocusMemoryScope.maybeOf(context);
-    final rememberedId = memory?.recall(widget.scopeId);
-    if (!widget.autofocus && rememberedId == null) {
+    // Only an explicit autofocus takes focus on mount; see TvContentGrid.
+    if (!widget.autofocus) {
       return;
     }
+    final memory = TvFocusMemoryScope.maybeOf(context);
+    final rememberedId = memory?.recall(widget.scopeId);
     _scheduledInitialFocus = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -187,8 +205,24 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
     });
   }
 
+  bool _focusPreferredItem() {
+    if (widget.items.isEmpty) return false;
+    final rememberedId =
+        TvFocusMemoryScope.maybeOf(context)?.recall(widget.scopeId);
+    final node = _focusNodes[rememberedId] ??
+        _focusNodes[widget.itemId(widget.items.first)];
+    if (node == null || node.context == null || !node.canRequestFocus) {
+      return false;
+    }
+    node.requestFocus();
+    return true;
+  }
+
   @override
   void dispose() {
+    if (identical(widget.controller?._state, this)) {
+      widget.controller?._state = null;
+    }
     _cancelHold();
     for (final node in _focusNodes.values) {
       node.dispose();

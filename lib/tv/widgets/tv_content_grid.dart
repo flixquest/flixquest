@@ -58,26 +58,35 @@ class TvContentGrid<T> extends StatefulWidget {
 class TvContentGridController {
   _TvContentGridState<dynamic>? _state;
   bool _pendingRequest = false;
+  FocusNode? _pendingOrigin;
 
-  void requestFocus() {
+  /// Focuses the remembered item, or the first one, and returns whether focus
+  /// moved. A grid that is not mounted yet (its screen is still loading) takes
+  /// the request once it is, unless focus has moved on in the meantime.
+  bool requestFocus() {
     final state = _state;
     if (state == null) {
       _pendingRequest = true;
-      return;
+      _pendingOrigin = FocusManager.instance.primaryFocus;
+      return false;
     }
-    state._requestPreferredFocus();
+    return state._focusPreferredItem();
   }
 
   void _attach(_TvContentGridState<dynamic> state) {
     _state = state;
-    if (_pendingRequest) {
-      _pendingRequest = false;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (identical(_state, state) && state.mounted) {
-          state._requestPreferredFocus();
-        }
-      });
-    }
+    if (!_pendingRequest) return;
+    _pendingRequest = false;
+    final origin = _pendingOrigin;
+    _pendingOrigin = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!identical(_state, state) || !state.mounted) return;
+      final focused = FocusManager.instance.primaryFocus;
+      // A scope means nothing concrete holds focus, so there is nothing to
+      // take it away from.
+      if (focused != origin && focused is! FocusScopeNode) return;
+      state._focusPreferredItem();
+    });
   }
 
   void _detach(_TvContentGridState<dynamic> state) {
@@ -179,29 +188,35 @@ class _TvContentGridState<T> extends State<TvContentGrid<T>> {
     }
   }
 
+  // Only an explicit autofocus takes focus on mount. A remembered item is
+  // restored when the user enters the grid, never by mounting it: that pulled
+  // focus off the rail whenever a destination was selected.
   void _scheduleInitialFocus() {
     if (_scheduledInitialFocus || widget.items.isEmpty) return;
-    final memory = TvFocusMemoryScope.maybeOf(context);
-    final rememberedId = memory?.recall(widget.scopeId);
-    if (!widget.autofocus && rememberedId == null) return;
+    if (!widget.autofocus) return;
     _scheduledInitialFocus = true;
     _requestPreferredFocus();
   }
 
   void _requestPreferredFocus() {
-    if (widget.items.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusPreferredItem();
+    });
+  }
+
+  /// Returns whether focus moved, or is on its way once the grid scrolls the
+  /// item into view.
+  bool _focusPreferredItem() {
+    if (widget.items.isEmpty) return false;
     final memory = TvFocusMemoryScope.maybeOf(context);
     final rememberedId = memory?.recall(widget.scopeId);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (widget.items.isEmpty) return;
-      final index = widget.items
-          .indexWhere((item) => widget.itemId(item) == rememberedId);
-      unawaited(_revealAndFocus(
-          targetIndex: index < 0 ? 0 : index,
-          columnCount: _columnCount,
-          itemHeight: _itemHeight));
-    });
+    final index =
+        widget.items.indexWhere((item) => widget.itemId(item) == rememberedId);
+    return _revealAndFocus(
+      targetIndex: index < 0 ? 0 : index,
+      columnCount: _columnCount,
+      itemHeight: _itemHeight,
+    );
   }
 
   @override
@@ -245,29 +260,41 @@ class _TvContentGridState<T> extends State<TvContentGrid<T>> {
       }
       return KeyEventResult.ignored;
     }
-    unawaited(
-      _revealAndFocus(
-        targetIndex: targetIndex,
-        itemHeight: itemHeight,
-        columnCount: columnCount,
-      ),
+    _revealAndFocus(
+      targetIndex: targetIndex,
+      itemHeight: itemHeight,
+      columnCount: columnCount,
     );
     return KeyEventResult.handled;
   }
 
-  Future<void> _revealAndFocus({
+  /// Focuses the item now when it is built, otherwise scrolls it into view
+  /// first. Returns false only when the grid has not been laid out yet.
+  bool _revealAndFocus({
     required int targetIndex,
     required int columnCount,
     required double itemHeight,
-  }) async {
+  }) {
     final targetId = widget.itemId(widget.items[targetIndex]);
     final targetNode = _focusNodes[targetId];
     if (targetNode?.context != null) {
       targetNode?.requestFocus();
-      return;
+      return true;
     }
-    if (!_scrollController.hasClients) return;
-    final targetRow = targetIndex ~/ columnCount;
+    if (!_scrollController.hasClients) return false;
+    unawaited(_scrollToAndFocus(
+      targetId: targetId,
+      targetRow: targetIndex ~/ columnCount,
+      itemHeight: itemHeight,
+    ));
+    return true;
+  }
+
+  Future<void> _scrollToAndFocus({
+    required String targetId,
+    required int targetRow,
+    required double itemHeight,
+  }) async {
     final desiredOffset = widget.padding.top +
         (targetRow * (itemHeight + widget.verticalSpacing)) -
         (itemHeight * 0.35);

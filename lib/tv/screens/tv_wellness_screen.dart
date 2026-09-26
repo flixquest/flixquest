@@ -67,7 +67,7 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
   @override
   void initState() {
     super.initState();
-    widget.focusController?.attach(this, _entry.requestFocus);
+    widget.focusController?.attach(this, _requestEntryFocus);
   }
 
   @override
@@ -75,7 +75,7 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.focusController != widget.focusController) {
       oldWidget.focusController?.detach(this);
-      widget.focusController?.attach(this, _entry.requestFocus);
+      widget.focusController?.attach(this, _requestEntryFocus);
     }
   }
 
@@ -84,6 +84,12 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
     widget.focusController?.detach(this);
     _entry.dispose();
     super.dispose();
+  }
+
+  bool _requestEntryFocus() {
+    if (_entry.context == null || !_entry.canRequestFocus) return false;
+    _entry.requestFocus();
+    return true;
   }
 
   void _jumpTo(String section) {

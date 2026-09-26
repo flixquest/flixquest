@@ -3,6 +3,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../app/tv_design.dart';
 import '../controllers/tv_catalog_controller.dart';
+import '../focus/tv_screen_focus_controller.dart';
 import '../models/tv_media_item.dart';
 import '../widgets/tv_content_grid.dart';
 import '../widgets/tv_media_card.dart';
@@ -12,11 +13,18 @@ class TvLibraryScreen extends StatefulWidget {
   const TvLibraryScreen({
     required this.metrics,
     required this.onOpenMedia,
+    this.revision = 0,
+    this.focusController,
     super.key,
   });
 
   final TvShellMetrics metrics;
   final ValueChanged<TvMediaItem> onOpenMedia;
+
+  /// Bumped when a bookmark may have changed; the list reloads in place so
+  /// the card the user came back to can take focus again.
+  final int revision;
+  final TvScreenFocusController? focusController;
 
   @override
   State<TvLibraryScreen> createState() => _TvLibraryScreenState();
@@ -24,12 +32,33 @@ class TvLibraryScreen extends StatefulWidget {
 
 class _TvLibraryScreenState extends State<TvLibraryScreen> {
   static const _controller = TvCatalogController();
+  final TvContentGridController _gridFocusController =
+      TvContentGridController();
   late Future<List<TvMediaItem>> _items;
 
   @override
   void initState() {
     super.initState();
     _items = _controller.loadLibrary();
+    widget.focusController?.attach(this, _gridFocusController.requestFocus);
+  }
+
+  @override
+  void didUpdateWidget(TvLibraryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.focusController, widget.focusController)) {
+      oldWidget.focusController?.detach(this);
+      widget.focusController?.attach(this, _gridFocusController.requestFocus);
+    }
+    if (oldWidget.revision != widget.revision) {
+      _items = _controller.loadLibrary();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusController?.detach(this);
+    super.dispose();
   }
 
   void _refresh() {
@@ -69,7 +98,10 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
             child: FutureBuilder<List<TvMediaItem>>(
               future: _items,
               builder: (context, snapshot) {
-                if (snapshot.connectionState != ConnectionState.done) {
+                // A reload keeps the previous list on screen (FutureBuilder
+                // carries its data over) so the grid and its focus survive.
+                if (snapshot.connectionState != ConnectionState.done &&
+                    !snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (snapshot.hasError) {
@@ -87,6 +119,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
                   );
                 }
                 return TvContentGrid<TvMediaItem>(
+                  controller: _gridFocusController,
                   scopeId: 'tv-library',
                   items: items,
                   itemId: (item) => item.stableId,

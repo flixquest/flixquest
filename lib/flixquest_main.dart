@@ -33,6 +33,7 @@ import 'services/app_session_state_store.dart';
 import 'services/app_remote_config.dart';
 import 'screens/common/downloads_screen.dart';
 import 'tv/platform/device_presentation.dart';
+import 'tv/navigation/tv_back_key_guard.dart';
 import 'tv/widgets/tv_update_gate.dart';
 
 class FlixQuest extends StatefulWidget {
@@ -211,7 +212,7 @@ class _FlixQuestState extends State<FlixQuest>
               unawaited(
                 HomeWidgetService.instance.syncResolvedTheme(appTheme),
               );
-              return MaterialApp(
+              final app = MaterialApp(
                 restorationScopeId: 'flixquest',
                 navigatorKey: InAppMessagingService.navigatorKey,
                 localizationsDelegates: context.localizationDelegates,
@@ -253,6 +254,11 @@ class _FlixQuestState extends State<FlixQuest>
                   devicePresentation: widget.devicePresentation,
                 ),
               );
+              // Wraps the app itself: it has to hear about system Backs
+              // before the navigator does.
+              return widget.devicePresentation == DevicePresentation.television
+                  ? TvBackKeyGuard(child: app)
+                  : app;
             },
           );
         }));

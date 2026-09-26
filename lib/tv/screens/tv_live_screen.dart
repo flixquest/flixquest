@@ -74,7 +74,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   String _query = '';
   String? _error;
   bool _loading = true;
-  bool _initialChannelFocusRequested = false;
   Timer? _searchAnalyticsDebounce;
 
   @override
@@ -91,12 +90,15 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
     });
   }
 
-  void _requestContentFocus() {
-    if (_mode == _TvLiveMode.channels && _visible.isNotEmpty) {
-      _channelGrid.requestFocus();
-    } else if (_browseFocus.context != null) {
-      _browseFocus.requestFocus();
+  bool _requestContentFocus() {
+    if (_mode == _TvLiveMode.channels &&
+        _visible.isNotEmpty &&
+        _channelGrid.requestFocus()) {
+      return true;
     }
+    if (_browseFocus.context == null) return false;
+    _browseFocus.requestFocus();
+    return true;
   }
 
   KeyEventResult _handleSearchKeyEvent(FocusNode node, KeyEvent event) {
@@ -189,7 +191,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         _recent = recent;
         _loading = false;
       });
-      _focusInitialChannelResult();
       _analytics.trackLiveTVCatalogLoad(
         surface: _analyticsSurface,
         refresh: refresh,
@@ -209,7 +210,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         _loading = false;
         _error = cached.isEmpty ? friendlyLiveTvError(error) : null;
       });
-      _focusInitialChannelResult();
       _analytics.trackLiveTVCatalogLoad(
         surface: _analyticsSurface,
         refresh: refresh,
@@ -432,12 +432,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
     });
   }
 
-  void _focusInitialChannelResult() {
-    if (_initialChannelFocusRequested || _visible.isEmpty) return;
-    _initialChannelFocusRequested = true;
-    _focusFirstChannelResult();
-  }
-
   void _focusFirstChannelResult() {
     if (_mode != _TvLiveMode.channels || _visible.isEmpty) return;
     _channelGrid.requestFocus();
@@ -463,7 +457,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   //     _selectedDayIndex = 0;
   //     _channels = const <Channel>[];
   //     _epg = null;
-  //     _initialChannelFocusRequested = false;
   //   });
   //   _load();
   // }
@@ -582,64 +575,58 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
     );
   }
 
+  /// One line: title, the LIVE NOW / PROGRAM GUIDE badge and the count, so
+  /// the grid starts a full row higher than with a stacked header.
   Widget _buildTitle(bool isSchedule) {
     final colors = Theme.of(context).colorScheme;
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
       children: <Widget>[
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  if (!isSchedule) ...<Widget>[
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                        color: Color(0xffe50914),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  Text(
-                    isSchedule ? 'PROGRAM GUIDE' : 'LIVE NOW',
-                    style: TextStyle(
-                      color:
-                          isSchedule ? colors.primary : const Color(0xfff05a62),
-                      fontFamily: 'FigtreeSB',
-                      fontSize: 12,
-                      letterSpacing: 1.8,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Text(
-                isSchedule ? 'Schedule' : 'Live TV',
-                style: const TextStyle(
-                  color: TvDesign.foreground,
-                  fontFamily: 'FigtreeSB',
-                  fontSize: 34,
-                  height: .95,
-                  letterSpacing: -.6,
-                ),
-              ),
-              const SizedBox(height: 7),
-              Text(
-                isSchedule
-                    ? '$_visibleEventCount events  •  Select an event to watch'
-                    : '${_visible.length} channels  •  Hold OK to save a favorite',
-                style: const TextStyle(
-                  color: TvDesign.mutedText,
-                  fontSize: 15,
-                ),
-              ),
-            ],
+        Text(
+          isSchedule ? 'Schedule' : 'Live TV',
+          style: const TextStyle(
+            color: TvDesign.foreground,
+            fontFamily: 'FigtreeSB',
+            fontSize: 34,
+            height: .95,
+            letterSpacing: -.6,
           ),
         ),
+        const SizedBox(width: 16),
+        if (!isSchedule) ...<Widget>[
+          Container(
+            width: 7,
+            height: 7,
+            decoration: const BoxDecoration(
+              color: Color(0xffe50914),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Text(
+          isSchedule ? 'PROGRAM GUIDE' : 'LIVE NOW',
+          style: TextStyle(
+            color: isSchedule ? colors.primary : const Color(0xfff05a62),
+            fontFamily: 'FigtreeSB',
+            fontSize: 12,
+            letterSpacing: 1.8,
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(
+            isSchedule
+                ? '$_visibleEventCount events  •  Select an event to watch'
+                : '${_visible.length} channels  •  Hold OK to save a favorite',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: TvDesign.mutedText,
+              fontSize: 15,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
         TvFocusable(
           focusNode: _browseFocus,
           semanticLabel: 'Search channels',

@@ -683,15 +683,12 @@ class _TvSettingsFocusEntryState extends State<_TvSettingsFocusEntry> {
     }
   }
 
-  void _requestFocus() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted ||
-          _themeFocusNode.context == null ||
-          !_themeFocusNode.canRequestFocus) {
-        return;
-      }
-      _themeFocusNode.requestFocus();
-    });
+  bool _requestFocus() {
+    if (_themeFocusNode.context == null || !_themeFocusNode.canRequestFocus) {
+      return false;
+    }
+    _themeFocusNode.requestFocus();
+    return true;
   }
 
   @override
