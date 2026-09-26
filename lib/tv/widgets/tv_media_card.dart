@@ -136,7 +136,7 @@ class TvMediaCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: colors.onSurface,
+              color: TvDesign.foreground,
               fontFamily: 'FigtreeSB',
               fontSize: 16,
               height: 1.1,
@@ -226,16 +226,15 @@ class _ImageFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final icon = Icon(
       item.kind == TvMediaKind.movie
           ? PhosphorIcons.filmSlate()
           : PhosphorIcons.television(),
-      color: colors.onSurfaceVariant,
+      color: TvDesign.mutedText,
       size: 42,
     );
     return ColoredBox(
-      color: colors.surfaceContainerHighest,
+      color: TvDesign.raisedSurface,
       child: Center(
         child: !showTitle
             ? icon
@@ -252,7 +251,7 @@ class _ImageFallback extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: colors.onSurface,
+                        color: TvDesign.foreground,
                         fontFamily: 'FigtreeSB',
                         fontSize: 14,
                         height: 1.15,

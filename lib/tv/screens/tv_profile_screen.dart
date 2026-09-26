@@ -6,9 +6,10 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../services/auth_navigation_service.dart';
 import '../../services/flixquest_auth_service.dart';
 import '../app/tv_design.dart';
-import '../focus/tv_focusable.dart';
 import '../focus/tv_screen_focus_controller.dart';
 import '../widgets/tv_dialog.dart';
+import '../widgets/tv_page_header.dart';
+import '../widgets/tv_pill_button.dart';
 
 class TvProfileScreen extends StatelessWidget {
   const TvProfileScreen({
@@ -116,17 +117,14 @@ class _ProfileLayout extends StatelessWidget {
   final bool isGuest;
   final TvScreenFocusController? focusController;
 
-  Widget _profileImage({
-    required ColorScheme colors,
-    required double size,
-  }) {
+  Widget _profileImage({required double size}) {
     final fallback = Container(
       width: size,
       height: size,
-      color: colors.surfaceContainerHighest,
+      color: TvDesign.raisedSurface,
       child: Icon(
         PhosphorIcons.user(),
-        color: colors.onSurfaceVariant,
+        color: TvDesign.mutedText,
         size: 54,
       ),
     );
@@ -147,239 +145,108 @@ class _ProfileLayout extends StatelessWidget {
             errorBuilder: (_, __, ___) => fallback,
           );
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(TvDesign.cardRadius),
       child: image,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final compact = metrics.compact;
     return _ProfileFocusEntry(
       focusController: focusController,
-      builder: (signOutFocusNode) => Stack(
-        children: <Widget>[
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: <Color>[
-                    TvDesign.pageBackground,
-                    colors.primary.withValues(alpha: 0.045),
-                    TvDesign.pageBackground,
-                  ],
-                  stops: const <double>[0, 0.72, 1],
-                ),
+      builder: (signOutFocusNode) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          metrics.contentPadding,
+          0,
+          metrics.contentPadding,
+          metrics.contentPadding,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.only(left: TvDesign.focusOutset + 4),
+              child: TvPageHeader(
+                kicker: 'ACCOUNT',
+                title: 'Profile',
+                compact: compact,
               ),
             ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(metrics.contentPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'ACCOUNT',
-                  style: TextStyle(
-                    color: colors.primary,
-                    fontFamily: 'FigtreeBold',
-                    fontSize: 13,
-                    letterSpacing: 2.2,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  'Profile',
-                  style: TextStyle(
-                    color: TvDesign.foreground,
-                    fontFamily: 'FigtreeBold',
-                    fontSize: metrics.compact ? 31 : 37,
-                    letterSpacing: -0.8,
-                  ),
-                ),
-                SizedBox(height: metrics.compact ? 18 : 28),
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: TvDesign.surfaceFor(context, emphasis: 0.005),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: TvDesign.hairline),
-                    ),
-                    child: Row(
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.only(left: TvDesign.focusOutset + 4),
+              child: Row(
+                children: <Widget>[
+                  _profileImage(size: compact ? 132 : 180),
+                  SizedBox(width: compact ? 28 : 40),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Expanded(
-                          flex: 5,
-                          child: Padding(
-                            padding: EdgeInsets.all(
-                              metrics.compact ? 26 : 42,
+                        _AccountStatus(isGuest: isGuest, compact: compact),
+                        const SizedBox(height: 10),
+                        if (loading)
+                          const SizedBox(
+                            width: 240,
+                            child: LinearProgressIndicator(
+                              color: TvDesign.mutedText,
+                              backgroundColor: TvDesign.raisedSurface,
                             ),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: Row(
-                                children: <Widget>[
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(11),
-                                      border: Border.all(
-                                        color: colors.primary
-                                            .withValues(alpha: 0.55),
-                                      ),
-                                    ),
-                                    child: _profileImage(
-                                      colors: colors,
-                                      size: metrics.compact ? 126 : 174,
-                                    ),
-                                  ),
-                                  SizedBox(width: metrics.compact ? 26 : 38),
-                                  Expanded(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: <Widget>[
-                                        if (loading)
-                                          SizedBox(
-                                            width: 240,
-                                            child: LinearProgressIndicator(
-                                              color: colors.primary,
-                                              backgroundColor:
-                                                  TvDesign.raisedSurface,
-                                            ),
-                                          )
-                                        else ...<Widget>[
-                                          Text(
-                                            name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: TvDesign.foreground,
-                                              fontFamily: 'FigtreeBold',
-                                              fontSize:
-                                                  metrics.compact ? 34 : 44,
-                                              letterSpacing: -1.1,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 7),
-                                          Text(
-                                            subtitle,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: colors.onSurfaceVariant,
-                                              fontSize:
-                                                  metrics.compact ? 17 : 20,
-                                              height: 1.35,
-                                            ),
-                                          ),
-                                        ],
-                                        const SizedBox(height: 22),
-                                        _AccountStatus(
-                                          isGuest: isGuest,
-                                          compact: metrics.compact,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          )
+                        else ...<Widget>[
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: TvDesign.foreground,
+                              fontFamily: 'FigtreeBold',
+                              fontSize: compact ? 34 : 46,
+                              height: 1.05,
+                              letterSpacing: -1,
                             ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: TvDesign.mutedText,
+                              fontSize: compact ? 16 : 19,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Text(
+                          isGuest
+                              ? 'Your list and history stay on this TV.'
+                              : 'Your list and history stay in sync across '
+                                  'your devices.',
+                          style: TextStyle(
+                            color: TvDesign.mutedText,
+                            fontSize: compact ? 14 : 16,
+                            height: 1.35,
                           ),
                         ),
-                        Container(
-                          width: 1,
-                          margin: EdgeInsets.symmetric(
-                            vertical: metrics.compact ? 22 : 34,
-                          ),
-                          color: TvDesign.hairline,
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Padding(
-                            padding: EdgeInsets.all(
-                              metrics.compact ? 22 : 34,
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Text(
-                                  isGuest ? 'GUEST SESSION' : 'YOUR ACCOUNT',
-                                  style: const TextStyle(
-                                    color: TvDesign.mutedText,
-                                    fontFamily: 'FigtreeBold',
-                                    fontSize: 12,
-                                    letterSpacing: 1.7,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  isGuest
-                                      ? 'Your activity stays on this device.'
-                                      : 'Your profile and watch activity stay in sync.',
-                                  style: TextStyle(
-                                    color: colors.onSurfaceVariant,
-                                    fontSize: metrics.compact ? 16 : 18,
-                                    height: 1.42,
-                                  ),
-                                ),
-                                const SizedBox(height: 25),
-                                TvFocusable(
-                                  focusNode: signOutFocusNode,
-                                  semanticLabel: 'Sign out',
-                                  onActivate: onSignOut,
-                                  focusScale: 1.02,
-                                  borderRadius: BorderRadius.circular(7),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                      vertical: 13,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          colors.error.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(5),
-                                      border: Border.all(
-                                        color: colors.error
-                                            .withValues(alpha: 0.45),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: <Widget>[
-                                        Icon(
-                                          PhosphorIcons.signOut(),
-                                          color: colors.error,
-                                          size: 22,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Text(
-                                          'Sign out',
-                                          style: TextStyle(
-                                            color: colors.onSurface,
-                                            fontFamily: 'FigtreeSB',
-                                            fontSize: 18,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        SizedBox(height: compact ? 18 : 26),
+                        TvPillButton(
+                          focusNode: signOutFocusNode,
+                          label: 'Sign out',
+                          icon: PhosphorIcons.signOut(),
+                          onActivate: onSignOut,
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+            const Spacer(flex: 2),
+          ],
+        ),
       ),
     );
   }
@@ -393,7 +260,6 @@ class _AccountStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
@@ -401,7 +267,7 @@ class _AccountStatus extends StatelessWidget {
           width: 7,
           height: 7,
           decoration: BoxDecoration(
-            color: isGuest ? colors.onSurfaceVariant : colors.primary,
+            color: isGuest ? TvDesign.mutedText : TvDesign.foreground,
             shape: BoxShape.circle,
           ),
         ),
@@ -409,7 +275,7 @@ class _AccountStatus extends StatelessWidget {
         Text(
           isGuest ? 'LOCAL PROFILE' : 'SIGNED IN',
           style: TextStyle(
-            color: colors.onSurfaceVariant,
+            color: TvDesign.mutedText,
             fontFamily: 'FigtreeBold',
             fontSize: compact ? 12 : 13,
             letterSpacing: 1.35,

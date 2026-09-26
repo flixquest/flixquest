@@ -9,6 +9,7 @@ import '../../services/auth_navigation_service.dart';
 import '../../services/bookmark_sync_service.dart';
 import '../app/tv_design.dart';
 import '../focus/tv_focusable.dart';
+import '../widgets/tv_pill_button.dart';
 
 enum TvAuthMode { signIn, createAccount }
 
@@ -254,8 +255,8 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                         _isSignIn
                                             ? PhosphorIcons.signIn()
                                             : PhosphorIcons.userPlus(),
-                                        color: colors.primary,
-                                        size: 32,
+                                        color: TvDesign.mutedText,
+                                        size: 30,
                                       ),
                                       const SizedBox(width: 13),
                                       Text(
@@ -297,7 +298,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                           children: <Widget>[
                                             Icon(
                                               PhosphorIcons.googleLogo(),
-                                              color: colors.onSurface,
+                                              color: TvDesign.foreground,
                                               size: 24,
                                             ),
                                             const SizedBox(width: 13),
@@ -305,7 +306,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                               child: Text(
                                                 'Continue with Google',
                                                 style: TextStyle(
-                                                  color: colors.onSurface,
+                                                  color: TvDesign.foreground,
                                                   fontFamily: 'FigtreeSB',
                                                   fontSize: 18,
                                                 ),
@@ -313,7 +314,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                             ),
                                             Icon(
                                               PhosphorIcons.caretRight(),
-                                              color: colors.onSurfaceVariant,
+                                              color: TvDesign.mutedText,
                                               size: 21,
                                             ),
                                           ],
@@ -325,7 +326,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                       children: <Widget>[
                                         Expanded(
                                           child: Divider(
-                                            color: colors.outlineVariant,
+                                            color: TvDesign.hairline,
                                           ),
                                         ),
                                         Padding(
@@ -335,7 +336,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                           child: Text(
                                             'or',
                                             style: TextStyle(
-                                              color: colors.onSurfaceVariant,
+                                              color: TvDesign.mutedText,
                                               fontFamily: 'FigtreeSB',
                                               fontSize: 16,
                                             ),
@@ -343,7 +344,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                         ),
                                         Expanded(
                                           child: Divider(
-                                            color: colors.outlineVariant,
+                                            color: TvDesign.hairline,
                                           ),
                                         ),
                                       ],
@@ -455,61 +456,22 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                   const SizedBox(height: 20),
                                   Align(
                                     alignment: Alignment.centerLeft,
-                                    child: TvFocusable(
+                                    child: TvPillButton(
+                                      label: _submitting
+                                          ? 'Please wait…'
+                                          : _isSignIn
+                                              ? 'Sign in'
+                                              : 'Create account',
                                       semanticLabel: _isSignIn
                                           ? 'Sign in'
                                           : 'Create account',
+                                      icon: _isSignIn
+                                          ? PhosphorIcons.signIn()
+                                          : PhosphorIcons.userPlus(),
                                       enabled: !_submitting,
+                                      prominent: true,
+                                      height: 52,
                                       onActivate: _submit,
-                                      focusScale: 1.025,
-                                      child: Container(
-                                        height: 56,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 26,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: <Color>[
-                                              colors.primary,
-                                              Color.lerp(
-                                                colors.primary,
-                                                colors.primaryContainer,
-                                                0.3,
-                                              )!,
-                                            ],
-                                          ),
-                                          borderRadius:
-                                              BorderRadius.circular(9),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: <Widget>[
-                                            if (_submitting) ...<Widget>[
-                                              SizedBox.square(
-                                                dimension: 22,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                  color: colors.onPrimary,
-                                                  strokeWidth: 2,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                            ],
-                                            Text(
-                                              _submitting
-                                                  ? 'Please wait…'
-                                                  : _isSignIn
-                                                      ? 'Sign in'
-                                                      : 'Create account',
-                                              style: TextStyle(
-                                                color: colors.onPrimary,
-                                                fontFamily: 'FigtreeSB',
-                                                fontSize: 19,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
                                     ),
                                   ),
                                 ],
@@ -586,7 +548,6 @@ class _TvAuthFieldState extends State<_TvAuthField> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       decoration: BoxDecoration(
@@ -595,18 +556,9 @@ class _TvAuthFieldState extends State<_TvAuthField> {
         border: Border.all(
           color: _focused
               ? Colors.white
-              : colors.onSurface.withValues(alpha: 0.09),
+              : TvDesign.foreground.withValues(alpha: 0.09),
           width: _focused ? 3 : 1,
         ),
-        boxShadow: _focused
-            ? <BoxShadow>[
-                BoxShadow(
-                  color: colors.primary.withValues(alpha: 0.32),
-                  blurRadius: 18,
-                  spreadRadius: 1,
-                ),
-              ]
-            : null,
       ),
       child: TextFormField(
         controller: widget.controller,
@@ -624,12 +576,12 @@ class _TvAuthFieldState extends State<_TvAuthField> {
             widget.onSubmitted?.call(value);
           }
         },
-        style: TextStyle(color: colors.onSurface, fontSize: 19),
+        style: TextStyle(color: TvDesign.foreground, fontSize: 19),
         decoration: InputDecoration(
           border: InputBorder.none,
-          prefixIcon: Icon(widget.icon, color: colors.onSurfaceVariant),
+          prefixIcon: Icon(widget.icon, color: TvDesign.mutedText),
           labelText: widget.label,
-          labelStyle: TextStyle(color: colors.onSurfaceVariant),
+          labelStyle: TextStyle(color: TvDesign.mutedText),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 18, vertical: 17),
         ),
@@ -646,14 +598,13 @@ class _ProfilePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
           'Choose a profile image',
           style: TextStyle(
-            color: colors.onSurface,
+            color: TvDesign.foreground,
             fontFamily: 'FigtreeSB',
             fontSize: 18,
           ),
@@ -672,7 +623,7 @@ class _ProfilePicker extends StatelessWidget {
                 child: Container(
                   padding: EdgeInsets.all(selectedId == id ? 3 : 0),
                   decoration: BoxDecoration(
-                    color: selectedId == id ? colors.primary : null,
+                    color: selectedId == id ? TvDesign.foreground : null,
                     borderRadius: BorderRadius.circular(11),
                   ),
                   child: ClipRRect(
@@ -700,7 +651,6 @@ class _BackAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return TvFocusable(
       semanticLabel: 'Back',
       onActivate: onActivate,
@@ -710,19 +660,19 @@ class _BackAction extends StatelessWidget {
         decoration: BoxDecoration(
           color: TvDesign.raisedSurface,
           border: Border.all(
-            color: colors.onSurface.withValues(alpha: 0.09),
+            color: TvDesign.foreground.withValues(alpha: 0.09),
           ),
           borderRadius: BorderRadius.circular(9),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(PhosphorIcons.caretLeft(), color: colors.onSurface),
+            Icon(PhosphorIcons.caretLeft(), color: TvDesign.foreground),
             const SizedBox(width: 8),
             Text(
               'Back',
               style: TextStyle(
-                color: colors.onSurface,
+                color: TvDesign.foreground,
                 fontFamily: 'FigtreeSB',
                 fontSize: 18,
               ),

@@ -134,8 +134,6 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
     return Scaffold(
       key: TvLandingScreen.screenKey,
       backgroundColor: TvDesign.surfaceFor(context),
@@ -234,7 +232,7 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
                                   Text(
                                     'Use your remote to choose how you want to continue.',
                                     style: TextStyle(
-                                      color: colors.onSurfaceVariant,
+                                      color: TvDesign.mutedText,
                                       fontSize: compact ? 16 : 19,
                                       height: 1.3,
                                     ),
@@ -354,7 +352,7 @@ class _TvLandingIntro extends StatelessWidget {
   }
 }
 
-class _TvLandingAction extends StatelessWidget {
+class _TvLandingAction extends StatefulWidget {
   const _TvLandingAction({
     required this.label,
     required this.icon,
@@ -372,64 +370,61 @@ class _TvLandingAction extends StatelessWidget {
   final bool enabled;
 
   @override
+  State<_TvLandingAction> createState() => _TvLandingActionState();
+}
+
+/// Translucent at rest and white under focus, like every TV button; the main
+/// action only rests a little brighter.
+class _TvLandingActionState extends State<_TvLandingAction> {
+  bool _focused = false;
+
+  @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final foreground = _focused ? Colors.black : TvDesign.foreground;
     return TvFocusable(
-      semanticLabel: label,
-      autofocus: autofocus,
-      enabled: enabled,
-      onActivate: onActivate,
-      focusScale: 1.025,
-      borderRadius: BorderRadius.circular(13),
+      semanticLabel: widget.label,
+      autofocus: widget.autofocus,
+      enabled: widget.enabled,
+      onActivate: widget.onActivate,
+      onFocusChanged: (hasFocus) {
+        if (hasFocus != _focused) setState(() => _focused = hasFocus);
+      },
+      focusScale: 1.02,
+      focusColor: Colors.transparent,
+      borderRadius: BorderRadius.circular(TvDesign.cardRadius),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 150),
-        opacity: enabled ? 1 : 0.58,
-        child: Container(
-          height: 58,
+        opacity: widget.enabled ? 1 : 0.58,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 130),
+          height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            gradient: primary
-                ? LinearGradient(
-                    colors: <Color>[
-                      colors.primary,
-                      Color.lerp(
-                        colors.primary,
-                        colors.primaryContainer,
-                        0.3,
-                      )!,
-                    ],
-                  )
-                : null,
-            color: primary ? null : TvDesign.raisedSurface,
-            border: Border.all(
-              color: primary
-                  ? colors.primary.withValues(alpha: 0.55)
-                  : Colors.white.withValues(alpha: 0.08),
-            ),
-            borderRadius: BorderRadius.circular(9),
+            color: _focused
+                ? const Color(0xf2ffffff)
+                : widget.primary
+                    ? const Color(0x40ffffff)
+                    : const Color(0x1fffffff),
+            borderRadius: BorderRadius.circular(TvDesign.cardRadius),
           ),
           child: Row(
             children: <Widget>[
-              Icon(
-                icon,
-                color: primary ? colors.onPrimary : colors.onSurface,
-                size: 25,
-              ),
+              Icon(widget.icon, color: foreground, size: 24),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  label,
+                  widget.label,
                   style: TextStyle(
-                    color: primary ? colors.onPrimary : colors.onSurface,
+                    color: foreground,
                     fontFamily: 'FigtreeSB',
-                    fontSize: 20,
+                    fontSize: 19,
                   ),
                 ),
               ),
               Icon(
                 PhosphorIcons.caretRight(),
-                color: primary ? colors.onPrimary : colors.onSurfaceVariant,
-                size: 21,
+                color: _focused ? Colors.black54 : TvDesign.mutedText,
+                size: 20,
               ),
             ],
           ),

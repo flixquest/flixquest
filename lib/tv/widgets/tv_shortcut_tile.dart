@@ -12,6 +12,7 @@ class TvBrowseShortcut {
     required this.onActivate,
     this.facts = const <String>[],
     this.logoAsset,
+    this.icon,
   });
 
   final String id;
@@ -25,6 +26,10 @@ class TvBrowseShortcut {
 
   /// A service's logo; without one the tile shows [title].
   final String? logoAsset;
+
+  /// Drawn above the title on a tile without a logo, such as a recent
+  /// search's magnifier.
+  final IconData? icon;
   final VoidCallback onActivate;
 }
 
@@ -102,7 +107,7 @@ class TvShortcutTile extends StatelessWidget {
                   ),
                 )
               else
-                _TileTitle(shortcut.title),
+                _TileTitle(shortcut.title, icon: shortcut.icon),
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 color: dimmed ? const Color(0x8c000000) : Colors.transparent,
@@ -116,28 +121,34 @@ class TvShortcutTile extends StatelessWidget {
 }
 
 class _TileTitle extends StatelessWidget {
-  const _TileTitle(this.title);
+  const _TileTitle(this.title, {this.icon});
 
   final String title;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(12),
-      child: Align(
-        alignment: Alignment.bottomLeft,
-        child: Text(
-          title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: TvDesign.foreground,
-            fontFamily: 'FigtreeBold',
-            fontSize: 18,
-            height: 1.1,
-            letterSpacing: -0.2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          if (icon case final icon?)
+            Icon(icon, color: TvDesign.mutedText, size: 20),
+          const Spacer(),
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: TvDesign.foreground,
+              fontFamily: 'FigtreeBold',
+              fontSize: 18,
+              height: 1.1,
+              letterSpacing: -0.2,
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

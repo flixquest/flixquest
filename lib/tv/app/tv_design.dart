@@ -64,8 +64,9 @@ abstract final class TvDesign {
     final base = theme.brightness == Brightness.dark
         ? surface
         : theme.colorScheme.surface;
+    // A neutral lift: the accent is kept for the brand, not for surfaces.
     return Color.alphaBlend(
-      theme.colorScheme.primary.withValues(alpha: 0.025 + emphasis),
+      Colors.white.withValues(alpha: 0.012 + emphasis),
       base,
     );
   }

@@ -154,6 +154,11 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   Timer? _tvNextEpisodeTimer;
   EpisodeMetadata? _tvNextEpisode;
   int? _tvNextEpisodeCountdown;
+  int _tvNextEpisodeCountdownTotal = 10;
+
+  /// The prompt came up at the credits rather than the end, so declining it
+  /// means watching them.
+  bool _tvNextEpisodeAtCredits = false;
   _TvPlayerMenuData? _tvMenu;
   int? _portraitBrowsedSeasonNumber;
   bool _portraitSeasonLoading = false;
@@ -325,7 +330,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         playIcon: PhosphorIcons.play(),
         showControlsOnInitialize: widget.useTvControls,
         controlsHideTime: widget.useTvControls
-            ? const Duration(seconds: 5)
+            ? const Duration(seconds: 4)
             : const Duration(milliseconds: 300),
         playerTheme: widget.useTvControls ? BetterPlayerTheme.custom : null,
         customControlsBuilder: widget.useTvControls
@@ -337,7 +342,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                   onExit: _exitPlayer,
                 )
             : null,
-        loadingColor: widget.colors.first,
+        // On TV only the timeline's played part carries the brand colour.
+        loadingColor: _tvNeutral ?? widget.colors.first,
         loadingWidget: SizedBox(
           width: 60,
           height: 3,
@@ -345,8 +351,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
             borderRadius: BorderRadius.circular(99),
             child: LinearProgressIndicator(
               minHeight: 3,
-              color: widget.colors.first,
-              backgroundColor: widget.colors.first.withValues(alpha: .24),
+              color: _tvNeutral ?? widget.colors.first,
+              backgroundColor:
+                  (_tvNeutral ?? widget.colors.first).withValues(alpha: .24),
             ),
           ),
         ),
@@ -603,6 +610,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     if (code == null || code.trim().isEmpty) return null;
     return _providerDisplayName(code);
   }
+
+  /// White in place of the accent on TV, where the brand colour is kept for
+  /// the timeline alone.
+  Color? get _tvNeutral => widget.useTvControls ? Colors.white : null;
 
   String get _analyticsSurface => widget.useTvControls ? 'tv' : 'standard';
 
@@ -877,7 +888,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               betterPlayerControlsConfiguration.enableNextEpisodeButton) {
             _showNextEpisodeButton = true;
             if (widget.useTvControls) {
-              _showTvNextEpisodePrompt(startCountdown: false);
+              // IntroDB's credits mark are trusted to count down to the next
+              // episode; the percentage fallback only offers it.
+              _showTvNextEpisodePrompt(
+                startCountdown: introDbOutroReached,
+                atCredits: true,
+              );
             } else {
               _showNextEpisodeOverlay();
             }
@@ -1000,7 +1016,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         !_showNextEpisodeButton) {
       _showNextEpisodeButton = true;
       if (widget.useTvControls) {
-        _showTvNextEpisodePrompt(startCountdown: false);
+        _showTvNextEpisodePrompt(startCountdown: true, atCredits: true);
       } else {
         _showNextEpisodeOverlay();
       }
@@ -1064,6 +1080,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final segment = _activeIntroDbSegment;
     if (segment == null || !_canSkipIntroDbSegment()) {
       return const SizedBox.shrink();
+    }
+    if (widget.useTvControls) {
+      return _TvSkipButton(
+        label: _introDbLabel(segment.type),
+        onPressed: _skipActiveIntroDbSegment,
+      );
     }
     return FilledButton.icon(
       onPressed: _skipActiveIntroDbSegment,
@@ -1990,11 +2012,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         final nextEpisode = episodes[currentIndex + 1];
 
         if (widget.useTvControls) {
-          if (_nextEpisodeButtonDismissed) {
-            _showTvEpisodeMenu();
-          } else {
-            _showTvNextEpisodePrompt(startCountdown: true);
-          }
+          // Having chosen to watch the credits, the end still moves on, as
+          // Netflix does; the count leaves time to stop it.
+          _showTvNextEpisodePrompt(startCountdown: true);
         } else {
           // Show countdown dialog for next episode
           debugPrint(
@@ -2335,7 +2355,15 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     return episodes[currentIndex + 1];
   }
 
-  void _showTvNextEpisodePrompt({required bool startCountdown}) {
+  /// Netflix's pace: a longer count at the credits, where the episode is
+  /// still playing, and a short one once it has ended.
+  static const _creditsCountdown = 15;
+  static const _endCountdown = 10;
+
+  void _showTvNextEpisodePrompt({
+    required bool startCountdown,
+    bool atCredits = false,
+  }) {
     final nextEpisode = _nextTvEpisode;
     _logNextEpisodeState(
       startCountdown ? 'tv_countdown_requested' : 'tv_prompt_requested',
@@ -2349,10 +2377,13 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       return;
     }
     _tvNextEpisodeTimer?.cancel();
+    final seconds = atCredits ? _creditsCountdown : _endCountdown;
     setState(() {
       _tvMenu = null;
       _tvNextEpisode = nextEpisode;
-      _tvNextEpisodeCountdown = startCountdown ? 10 : null;
+      _tvNextEpisodeAtCredits = atCredits;
+      _tvNextEpisodeCountdownTotal = seconds;
+      _tvNextEpisodeCountdown = startCountdown ? seconds : null;
     });
     _tvControlsController.hide(preserveFocus: true);
     if (!startCountdown) return;
@@ -2875,7 +2906,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                 child: _TvNextEpisodeOverlay(
                   episode: nextEpisode,
                   countdown: _tvNextEpisodeCountdown,
-                  accentColor: widget.colors.first,
+                  countdownTotal: _tvNextEpisodeCountdownTotal,
+                  cancelLabel: _tvNextEpisodeAtCredits
+                      ? tr('watch_credits')
+                      : tr('cancel'),
                   onCancel: _dismissTvNextEpisodePrompt,
                   onPlay: () => _playTvEpisode(nextEpisode),
                 ),
@@ -3637,23 +3671,31 @@ class _TvPlayerMenuData {
   final List<BetterPlayerTvMenuItem> items;
 }
 
+/// Netflix's next-episode card: bottom right, over the picture rather than
+/// dimming it, with the countdown filling the Next episode button.
 class _TvNextEpisodeOverlay extends StatelessWidget {
   const _TvNextEpisodeOverlay({
     required this.episode,
-    required this.accentColor,
     required this.onCancel,
     required this.onPlay,
+    required this.cancelLabel,
     this.countdown,
+    this.countdownTotal = 10,
   });
 
   final EpisodeMetadata episode;
   final int? countdown;
-  final Color accentColor;
+  final int countdownTotal;
+  final String cancelLabel;
   final VoidCallback onCancel;
   final VoidCallback onPlay;
 
   @override
   Widget build(BuildContext context) {
+    final seconds = countdown;
+    final elapsed = seconds == null
+        ? null
+        : ((countdownTotal - seconds + 1) / countdownTotal).clamp(0.0, 1.0);
     return Focus(
       onKeyEvent: (_, event) {
         if (event is KeyDownEvent &&
@@ -3665,131 +3707,90 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
         }
         return KeyEventResult.ignored;
       },
-      child: ColoredBox(
-        color: Colors.black38,
+      child: DecoratedBox(
+        // Only the corner the card sits in is shaded.
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment.bottomRight,
+            radius: 1.1,
+            colors: [Color(0xb3000000), Color(0x00000000)],
+          ),
+        ),
         child: SafeArea(
-          minimum: const EdgeInsets.all(36),
+          minimum: const EdgeInsets.fromLTRB(48, 30, 48, 36),
           child: Align(
             alignment: Alignment.bottomRight,
-            child: Container(
-              width: 570,
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: const Color(0xf5161716),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white12),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black54,
-                    blurRadius: 28,
-                    offset: Offset(0, 12),
-                  ),
-                ],
-              ),
+            child: SizedBox(
+              width: 440,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    children: [
-                      Icon(
-                        PhosphorIcons.skipForward(PhosphorIconsStyle.fill),
-                        color: accentColor,
-                        size: 28,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          tr('next_episode'),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      if (countdown case final seconds?)
-                        Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            SizedBox(
-                              width: 46,
-                              height: 46,
-                              child: CircularProgressIndicator(
-                                value: seconds / 10,
-                                strokeWidth: 4,
-                                color: accentColor,
-                                backgroundColor: Colors.white12,
-                              ),
-                            ),
-                            Text(
-                              '$seconds',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(5),
                         child: SizedBox(
-                          width: 190,
-                          height: 108,
+                          width: 160,
+                          height: 90,
                           child: episode.stillPath == null
                               ? const ColoredBox(
-                                  color: Color(0xff292a28),
+                                  color: Color(0xff1b1c1c),
                                   child: Icon(
                                     PhosphorIconsRegular.filmStrip,
                                     color: Colors.white54,
-                                    size: 34,
+                                    size: 30,
                                   ),
                                 )
                               : Image.network(
-                                  'https://image.tmdb.org/t/p/w780${episode.stillPath}',
+                                  'https://image.tmdb.org/t/p/w300${episode.stillPath}',
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) =>
                                       const ColoredBox(
-                                    color: Color(0xff292a28),
-                                    child: Icon(
-                                      PhosphorIconsRegular.filmStrip,
-                                      color: Colors.white54,
-                                    ),
+                                    color: Color(0xff1b1c1c),
                                   ),
                                 ),
                         ),
                       ),
-                      const SizedBox(width: 18),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${episode.episodeNumber}. ${episode.episodeName}',
+                              tr('next_episode').toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'S${episode.seasonNumber}:E${episode.episodeNumber}  '
+                              '${episode.episodeName}',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 21,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
                               ),
                             ),
                             if (episode.overview?.trim().isNotEmpty ==
                                 true) ...[
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Text(
                                 episode.overview!.trim(),
-                                maxLines: 3,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Colors.white70,
-                                  height: 1.35,
+                                  fontSize: 13,
+                                  height: 1.3,
                                 ),
                               ),
                             ],
@@ -3798,24 +3799,23 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       _TvPromptButton(
-                        label: tr('cancel'),
-                        icon: PhosphorIcons.x(),
-                        accentColor: accentColor,
-                        onPressed: onCancel,
-                      ),
-                      const SizedBox(width: 12),
-                      _TvPromptButton(
-                        label: tr('play_now'),
+                        label: seconds == null
+                            ? tr('next_episode')
+                            : '${tr('next_episode')}  $seconds',
                         icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
-                        accentColor: accentColor,
-                        primary: true,
+                        progress: elapsed,
                         autofocus: true,
                         onPressed: onPlay,
+                      ),
+                      const SizedBox(width: 10),
+                      _TvPromptButton(
+                        label: cancelLabel,
+                        icon: PhosphorIcons.x(),
+                        onPressed: onCancel,
                       ),
                     ],
                   ),
@@ -3829,21 +3829,21 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
   }
 }
 
+/// A prompt action: translucent at rest, white under focus. [progress]
+/// fills it from the left, for a countdown.
 class _TvPromptButton extends StatefulWidget {
   const _TvPromptButton({
     required this.label,
     required this.icon,
-    required this.accentColor,
     required this.onPressed,
-    this.primary = false,
+    this.progress,
     this.autofocus = false,
   });
 
   final String label;
   final IconData icon;
-  final Color accentColor;
   final VoidCallback onPressed;
-  final bool primary;
+  final double? progress;
   final bool autofocus;
 
   @override
@@ -3855,6 +3855,7 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
 
   @override
   Widget build(BuildContext context) {
+    final foreground = _focused ? Colors.black : Colors.white;
     return FocusableActionDetector(
       autofocus: widget.autofocus,
       onFocusChange: (focused) => setState(() => _focused = focused),
@@ -3874,37 +3875,99 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
       },
       child: GestureDetector(
         onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 130),
-          padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 13),
-          decoration: BoxDecoration(
-            color: widget.primary
-                ? widget.accentColor
-                : _focused
-                    ? const Color(0xff30312f)
-                    : const Color(0xff242523),
-            borderRadius: BorderRadius.circular(11),
-            border: Border.all(
-              color: _focused ? Colors.white : Colors.transparent,
-              width: 3,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(5),
+          child: Stack(
             children: [
-              Icon(widget.icon, color: Colors.white, size: 22),
-              const SizedBox(width: 9),
-              Text(
-                widget.label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                color: _focused
+                    ? const Color(0xf2ffffff)
+                    : const Color(0x40ffffff),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(widget.icon, color: foreground, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.label,
+                      style: TextStyle(
+                        color: foreground,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              if (widget.progress case final progress?)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween<double>(end: progress),
+                      duration: const Duration(seconds: 1),
+                      builder: (_, value, __) => FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: value,
+                        child: ColoredBox(
+                          color: _focused
+                              ? const Color(0x26000000)
+                              : const Color(0x33ffffff),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// IntroDB's skip action on TV: a white-edged pill over the picture that
+/// fills white under focus.
+class _TvSkipButton extends StatelessWidget {
+  const _TvSkipButton({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(PhosphorIcons.skipForward(PhosphorIconsStyle.fill), size: 18),
+      label: Text(label),
+      style: ButtonStyle(
+        minimumSize: const WidgetStatePropertyAll(Size(0, 44)),
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 18),
+        ),
+        textStyle: const WidgetStatePropertyAll(
+          TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        ),
+        side: const WidgetStatePropertyAll(
+          BorderSide(color: Colors.white, width: 1.5),
+        ),
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.focused)
+              ? const Color(0xf2ffffff)
+              : const Color(0x99000000),
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.focused)
+              ? Colors.black
+              : Colors.white,
+        ),
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       ),
     );
   }

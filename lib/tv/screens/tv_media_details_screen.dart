@@ -832,10 +832,58 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
         },
       ),
     ];
+    _actionOrder = <String>[
+      if (canWatch) 'play',
+      if (canWatch && resuming) 'restart',
+      if (!_isMovie && (_loaded?.seasons.isNotEmpty ?? false)) 'episodes',
+      'list',
+    ];
+    // One line, even when the buttons run wider than the text above them: a
+    // wrapped second line sent Right from the first line's end off to
+    // whatever lay below and to the right, the season picker.
     return FocusTraversalGroup(
-      policy: _ActionsTraversalPolicy(),
-      child: Wrap(spacing: 12, runSpacing: 12, children: buttons),
+      policy: _actionsPolicy,
+      child: SizedBox(
+        height: 56,
+        child: OverflowBox(
+          alignment: Alignment.centerLeft,
+          maxWidth: double.infinity,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              for (var index = 0; index < buttons.length; index++) ...<Widget>[
+                if (index > 0) const SizedBox(width: 12),
+                buttons[index],
+              ],
+            ],
+          ),
+        ),
+      ),
     );
+  }
+
+  /// The action buttons in the order Left and Right step through them.
+  List<String> _actionOrder = const <String>[];
+  late final _actionsPolicy = _ActionsTraversalPolicy(_stepAction);
+
+  /// Moves focus [delta] buttons along from [node], skipping any that cannot
+  /// take focus (My List while it loads), or reports that the row ends there.
+  bool _stepAction(FocusNode node, int delta) {
+    final nodes = <FocusNode>[
+      for (final id in _actionOrder)
+        if (_actionNodes[id] case final actionNode?) actionNode,
+    ];
+    var index = nodes.indexOf(node);
+    if (index < 0) return false;
+    while (true) {
+      index += delta;
+      if (index < 0 || index >= nodes.length) return false;
+      final target = nodes[index];
+      if (target.context != null && target.canRequestFocus) {
+        target.requestFocus();
+        return true;
+      }
+    }
   }
 
   List<Widget> _buildSections(TvShellMetrics metrics, TvResumePoint? resume) {
@@ -1017,13 +1065,21 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
 
 /// Left and Right stay on the action buttons; Down and Up belong to the page.
 class _ActionsTraversalPolicy extends ReadingOrderTraversalPolicy {
+  _ActionsTraversalPolicy(this._step);
+
+  final bool Function(FocusNode node, int delta) _step;
+
+  /// Left and Right follow the buttons' order rather than geometry, which
+  /// would search the whole page for the nearest thing in that direction.
   @override
   bool inDirection(FocusNode currentNode, TraversalDirection direction) {
-    if (direction == TraversalDirection.up ||
-        direction == TraversalDirection.down) {
-      return false;
-    }
-    return super.inDirection(currentNode, direction);
+    return switch (direction) {
+      TraversalDirection.left => _step(currentNode, -1),
+      TraversalDirection.right => _step(currentNode, 1),
+      // Up and Down are the page's to route; they only get here when the
+      // page has nothing of its own below, such as a Retry.
+      _ => super.inDirection(currentNode, direction),
+    };
   }
 }
 

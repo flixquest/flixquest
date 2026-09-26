@@ -7,8 +7,9 @@ import '../../models/wellness_time_series.dart';
 import '../../provider/wellness_provider.dart';
 import '../../widgets/wellness_charts.dart';
 import '../app/tv_design.dart';
-import '../focus/tv_focusable.dart';
 import '../focus/tv_screen_focus_controller.dart';
+import '../widgets/tv_page_header.dart';
+import '../widgets/tv_pill_button.dart';
 
 class TvWellnessScreen extends StatelessWidget {
   const TvWellnessScreen(
@@ -105,21 +106,19 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
     final insights = widget.insights;
     final series = WellnessTimeSeries.forRange(insights, widget.range);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: <Color>[
-            colors.primary.withValues(alpha: 0.045),
-            TvDesign.pageBackground,
-            TvDesign.pageBackground,
-          ],
-        ),
+    // The charts are shared with the phone and draw in the theme's accent;
+    // on TV they read in greys, and the accent stays with the brand.
+    final chartTheme = theme.copyWith(
+      colorScheme: theme.colorScheme.copyWith(
+        primary: _chartMark,
+        secondary: TvDesign.mutedText,
       ),
+    );
+    return Theme(
+      data: chartTheme,
       child: FocusTraversalGroup(
         policy: ReadingOrderTraversalPolicy(),
         child: SingleChildScrollView(
@@ -127,24 +126,16 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                'YOUR VIEWING STORY',
-                style: TextStyle(
-                  color: colors.primary,
-                  fontFamily: 'FigtreeBold',
-                  fontSize: 13,
-                  letterSpacing: 2.2,
+              // The header keeps the real accent; the charts below do not.
+              Theme(
+                data: theme,
+                child: TvPageHeader(
+                  kicker: 'YOUR VIEWING STORY',
+                  title: 'Viewing Insights',
+                  compact: widget.metrics.compact,
                 ),
               ),
-              const SizedBox(height: 5),
-              Text(
-                'Viewing Insights',
-                style: TextStyle(
-                  color: TvDesign.foreground,
-                  fontFamily: 'FigtreeBold',
-                  fontSize: widget.metrics.compact ? 31 : 37,
-                ),
-              ),
+              const SizedBox(height: 8),
               const Text(
                 'Active playback only · private to this profile',
                 style: TextStyle(color: TvDesign.mutedText, fontSize: 15),
@@ -155,36 +146,17 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
                 runSpacing: 10,
                 children: <Widget>[
                   for (final range in WellnessRange.values)
-                    TvFocusable(
+                    TvPillButton(
                       key: Key('tv-insights-range-${range.name}'),
                       focusNode: range == WellnessRange.week ? _entry : null,
-                      semanticLabel: '${_rangeLabel(range)} viewing range',
-                      selected: widget.range == range,
+                      label: _rangeLabel(range),
+                      semanticLabel: '${_rangeLabel(range)} viewing range'
+                          '${widget.range == range ? ', selected' : ''}',
+                      icon: widget.range == range
+                          ? PhosphorIcons.check(PhosphorIconsStyle.bold)
+                          : null,
+                      prominent: widget.range == range,
                       onActivate: () => widget.onRangeSelected(range),
-                      focusScale: 1,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        constraints: const BoxConstraints(minWidth: 108),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 11,
-                        ),
-                        decoration: BoxDecoration(
-                          color: widget.range == range
-                              ? colors.primary.withValues(alpha: 0.23)
-                              : TvDesign.raisedSurface,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Text(
-                          _rangeLabel(range),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: TvDesign.foreground,
-                            fontFamily: 'FigtreeBold',
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
                     ),
                 ],
               ),
@@ -192,7 +164,9 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
               if (widget.loading)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 100),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(
+                    child: CircularProgressIndicator(color: TvDesign.mutedText),
+                  ),
                 )
               else if (insights.isEmpty)
                 const _InsightPanel(
@@ -225,7 +199,7 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
                             ),
                         ],
                         averageMs: series.averageMs,
-                        color: colors.primary,
+                        color: _chartMark,
                         height: widget.metrics.compact ? 156 : 190,
                       ),
                       const SizedBox(height: 8),
@@ -247,24 +221,10 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
                   runSpacing: 10,
                   children: <Widget>[
                     for (final section in _sections.keys)
-                      TvFocusable(
+                      TvPillButton(
+                        label: section,
                         semanticLabel: 'Jump to $section insights',
                         onActivate: () => _jumpTo(section),
-                        focusScale: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 17,
-                            vertical: 12,
-                          ),
-                          color: TvDesign.raisedSurface,
-                          child: Text(
-                            section,
-                            style: const TextStyle(
-                              color: TvDesign.foreground,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
                       ),
                   ],
                 ),
@@ -377,6 +337,9 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
   }
 }
 
+/// Chart bars and heat: a light grey that reads on the dark panels.
+const _chartMark = Color(0xffd6d7d7);
+
 const _weekdays = <String>[
   'Monday',
   'Tuesday',
@@ -471,8 +434,7 @@ Widget _statGrid(WellnessInsights insights) => LayoutBuilder(
                   title: stat.$1,
                   child: Row(
                     children: <Widget>[
-                      Icon(stat.$3,
-                          color: Theme.of(context).colorScheme.primary),
+                      Icon(stat.$3, color: TvDesign.mutedText),
                       const SizedBox(width: 12),
                       Text(
                         stat.$2,
@@ -572,7 +534,7 @@ class _InsightPanelState extends State<_InsightPanel> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: TvDesign.surfaceFor(context),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(TvDesign.cardRadius),
             border: Border.all(
               color: _focused ? Colors.white : TvDesign.hairline,
               width: _focused ? 2 : 1,

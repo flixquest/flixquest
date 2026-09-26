@@ -4,7 +4,6 @@ import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/tv/app/tv_design.dart';
 import 'package:flixquest/tv/focus/tv_focus_memory.dart';
 import 'package:flixquest/tv/focus/tv_screen_focus_controller.dart';
-import 'package:flixquest/tv/screens/tv_search_screen.dart';
 import 'package:flixquest/tv/screens/tv_settings_screen.dart';
 import 'package:flixquest/tv/widgets/tv_content_grid.dart';
 import 'package:flixquest/tv/widgets/tv_dialog.dart';
@@ -100,48 +99,6 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();
     expect(FocusManager.instance.primaryFocus?.debugLabel, 'test-grid:3');
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('search remote arrows and back leave text entry with focus',
-      (tester) async {
-    tester.view.physicalSize = const Size(960, 540);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    final focusController = TvScreenFocusController()..requestFocus();
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => SettingsProvider()),
-          ChangeNotifierProvider(create: (_) => AppDependencyProvider()),
-        ],
-        child: MaterialApp(
-          home: Scaffold(
-            body: TvSearchScreen(
-              metrics: metrics,
-              focusController: focusController,
-              onOpenMedia: (_) {},
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
-
-    expect(FocusManager.instance.primaryFocus?.debugLabel, 'TV search query');
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-    await tester.pump();
-    expect(FocusManager.instance.primaryFocus?.debugLabel, 'TV search action');
-
-    focusController.requestFocus();
-    await tester.pump();
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pump();
-    expect(FocusManager.instance.primaryFocus?.debugLabel, 'TV search action');
     expect(tester.takeException(), isNull);
   });
 

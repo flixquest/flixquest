@@ -342,7 +342,7 @@ class _LivePlayerState extends State<LivePlayer> {
       playIcon: PhosphorIcons.play(),
       showControlsOnInitialize: widget.useTvControls,
       controlsHideTime: widget.useTvControls
-          ? const Duration(seconds: 5)
+          ? const Duration(seconds: 4)
           : const Duration(milliseconds: 300),
       playerTheme: widget.useTvControls ? BetterPlayerTheme.custom : null,
       customControlsBuilder: widget.useTvControls

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/tv_design.dart';
-import '../focus/tv_focusable.dart';
+import 'tv_pill_button.dart';
 import '../focus/tv_keymap.dart';
 
 class TvDialogAction {
@@ -127,7 +127,6 @@ class _TvDialogState extends State<TvDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final hasExplicitAutofocus =
         widget.actions.any((action) => action.autofocus);
 
@@ -168,7 +167,7 @@ class _TvDialogState extends State<TvDialog> {
                     const SizedBox(height: 18),
                     DefaultTextStyle(
                       style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
+                        color: TvDesign.mutedText,
                         fontFamily: 'Figtree',
                         fontSize: 22,
                         height: 1.35,
@@ -188,56 +187,16 @@ class _TvDialogState extends State<TvDialog> {
                             Builder(
                               builder: (context) {
                                 final action = widget.actions[index];
-                                return TvFocusable(
-                                  semanticLabel: action.label,
+                                return TvPillButton(
+                                  label: action.label,
                                   focusNode: _actionFocusNodes[index],
                                   autofocus: action.autofocus ||
                                       (widget.autofocusFirstAction &&
                                           !hasExplicitAutofocus &&
                                           index == 0),
+                                  prominent: action.isPrimary,
+                                  height: 48,
                                   onActivate: action.onPressed,
-                                  focusScale: 1.03,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 26,
-                                      vertical: 15,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      gradient: action.isPrimary
-                                          ? LinearGradient(
-                                              colors: <Color>[
-                                                colorScheme.primary,
-                                                Color.lerp(
-                                                  colorScheme.primary,
-                                                  colorScheme.primaryContainer,
-                                                  0.3,
-                                                )!,
-                                              ],
-                                            )
-                                          : null,
-                                      color: action.isPrimary
-                                          ? null
-                                          : TvDesign.raisedSurface,
-                                      border: Border.all(
-                                        color: action.isPrimary
-                                            ? colorScheme.primary
-                                                .withValues(alpha: 0.5)
-                                            : colorScheme.onSurface
-                                                .withValues(alpha: 0.09),
-                                      ),
-                                      borderRadius: BorderRadius.circular(9),
-                                    ),
-                                    child: Text(
-                                      action.label,
-                                      style: TextStyle(
-                                        color: action.isPrimary
-                                            ? colorScheme.onPrimary
-                                            : colorScheme.onSurface,
-                                        fontSize: 21,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
                                 );
                               },
                             ),

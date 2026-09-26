@@ -53,7 +53,13 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
   late final List<TvNavigationDestination> _destinations;
 
   /// Browse pages whose artwork runs under the rail to the screen edge.
-  static const _fullBleedDestinations = <String>{'home', 'movies', 'series'};
+  static const _fullBleedDestinations = <String>{
+    'home',
+    'search',
+    'movies',
+    'series',
+    'library',
+  };
   late final AppSessionStateStore _sessionState;
   late final RestorableString _selectedDestinationId;
   int _libraryRevision = 0;
@@ -412,6 +418,7 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
       'search' => TvSearchScreen(
           metrics: metrics,
           onOpenMedia: _openMedia,
+          onOpenCollection: _openCollection,
           focusController: focusController,
         ),
       'movies' => TvCatalogScreen(
@@ -435,6 +442,8 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
       'library' => TvLibraryScreen(
           metrics: metrics,
           onOpenMedia: _openMedia,
+          onContinueWatching: _continueWatching,
+          onOpenCollection: _openCollection,
           revision: _libraryRevision,
           focusController: focusController,
         ),

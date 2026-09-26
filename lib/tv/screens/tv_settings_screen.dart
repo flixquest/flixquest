@@ -11,6 +11,8 @@ import '../app/tv_design.dart';
 import '../focus/tv_screen_focus_controller.dart';
 import '../focus/tv_focusable.dart';
 import '../widgets/tv_dialog.dart';
+import '../widgets/tv_list_row.dart';
+import '../widgets/tv_page_header.dart';
 
 class TvSettingsScreen extends StatelessWidget {
   const TvSettingsScreen({
@@ -24,7 +26,6 @@ class TvSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final appDependencies = context.watch<AppDependencyProvider>();
     final occasionalCatalog = appDependencies.occasionalThemeCatalog;
@@ -146,23 +147,12 @@ class TvSettingsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                'PREFERENCES',
-                style: TextStyle(
-                  color: colors.primary,
-                  fontFamily: 'FigtreeBold',
-                  fontSize: 13,
-                  letterSpacing: 2.2,
-                ),
-              ),
-              const SizedBox(height: 5),
-              const Text(
-                'Settings',
-                style: TextStyle(
-                  color: TvDesign.foreground,
-                  fontFamily: 'FigtreeBold',
-                  fontSize: 34,
-                  letterSpacing: -0.7,
+              Padding(
+                padding: const EdgeInsets.only(left: TvDesign.focusOutset + 4),
+                child: TvPageHeader(
+                  kicker: 'PREFERENCES',
+                  title: 'Settings',
+                  compact: metrics.compact,
                 ),
               ),
               SizedBox(height: metrics.compact ? 12 : 18),
@@ -170,27 +160,34 @@ class TvSettingsScreen extends StatelessWidget {
                 child: SingleChildScrollView(
                   clipBehavior: Clip.hardEdge,
                   padding: const EdgeInsets.all(TvDesign.focusOutset),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      _TvSettingsSection(
-                        title: 'APPEARANCE',
-                        subtitle: 'Theme, backdrop, and seasonal details.',
-                        children: appearanceTiles,
+                  // A readable column rather than rows the width of the TV.
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 760),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          _TvSettingsSection(
+                            title: 'APPEARANCE',
+                            subtitle: 'Theme, backdrop, and seasonal details.',
+                            children: appearanceTiles,
+                          ),
+                          const SizedBox(height: 22),
+                          _TvSettingsSection(
+                            title: 'STREAMING & PLAYBACK',
+                            subtitle: 'Quality, sources, and subtitles.',
+                            children: playbackTiles,
+                          ),
+                          const SizedBox(height: 22),
+                          _TvSettingsSection(
+                            title: 'ABOUT FLIXQUEST',
+                            subtitle: 'Keep the TV experience current.',
+                            children: aboutTiles,
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 22),
-                      _TvSettingsSection(
-                        title: 'STREAMING & PLAYBACK',
-                        subtitle: 'Quality, sources, and subtitles.',
-                        children: playbackTiles,
-                      ),
-                      const SizedBox(height: 22),
-                      _TvSettingsSection(
-                        title: 'ABOUT FLIXQUEST',
-                        subtitle: 'Keep the TV experience current.',
-                        children: aboutTiles,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -590,7 +587,6 @@ class _TvSubtitleOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TvFocusable(
@@ -615,7 +611,7 @@ class _TvSubtitleOption extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: color,
                     shape: BoxShape.circle,
-                    border: Border.all(color: colors.outline),
+                    border: Border.all(color: const Color(0x66ffffff)),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -624,7 +620,7 @@ class _TvSubtitleOption extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: colors.onSurface,
+                    color: TvDesign.foreground,
                     fontFamily: 'FigtreeSB',
                     fontSize: 21,
                   ),
@@ -633,14 +629,14 @@ class _TvSubtitleOption extends StatelessWidget {
               Text(
                 value,
                 style: TextStyle(
-                  color: colors.onSurfaceVariant,
+                  color: TvDesign.mutedText,
                   fontSize: 20,
                 ),
               ),
               const SizedBox(width: 12),
               Icon(
                 PhosphorIcons.caretRight(),
-                color: colors.onSurfaceVariant,
+                color: TvDesign.mutedText,
                 size: 20,
               ),
             ],
@@ -735,7 +731,6 @@ class _TvColorThemePickerState extends State<_TvColorThemePicker> {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final colors = Theme.of(context).colorScheme;
     final isDark = settings.appTheme == 'dark' || settings.appTheme == 'amoled';
     final palette = AppColorsList().appColors(isDark,
         customColor:
@@ -792,7 +787,7 @@ class _TvColorThemePickerState extends State<_TvColorThemePicker> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: colors.onSurface,
+                        color: TvDesign.foreground,
                         fontFamily: 'FigtreeSB',
                         fontSize: 14,
                       ),
@@ -815,66 +810,27 @@ class _TvSettingsSection extends StatelessWidget {
   });
 
   final String title;
+
+  /// Read out with the section; the rows say enough on screen.
   final String subtitle;
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: <Widget>[
-            Text(
-              title,
-              style: TextStyle(
-                color: colors.onSurface,
-                fontFamily: 'FigtreeBold',
-                fontSize: 15,
-                letterSpacing: 1.25,
-              ),
+    return Semantics(
+      container: true,
+      label: '$title. $subtitle',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          TvSectionLabel(title),
+          for (final child in children)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: child,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 1),
-                child: Text(
-                  subtitle,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colors.onSurfaceVariant,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: TvDesign.surfaceFor(context, emphasis: 0.004),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: TvDesign.hairline),
-          ),
-          child: Column(
-            children: <Widget>[
-              for (var index = 0; index < children.length; index++) ...<Widget>[
-                children[index],
-                if (index != children.length - 1)
-                  const Divider(
-                    height: 1,
-                    thickness: 1,
-                    indent: 68,
-                    color: TvDesign.hairline,
-                  ),
-              ],
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -897,53 +853,12 @@ class _TvSettingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return TvFocusable(
+    return TvListRow(
       focusNode: focusNode,
-      semanticLabel: '$label, $value',
+      label: label,
+      value: value,
+      icon: icon,
       onActivate: onActivate,
-      focusScale: 1.008,
-      borderRadius: BorderRadius.circular(5),
-      child: Container(
-        height: 70,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(4)),
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 34,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: colors.primary.withValues(alpha: 0.09),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Icon(icon, color: colors.primary, size: 21),
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: colors.onSurface,
-                  fontFamily: 'FigtreeSB',
-                  fontSize: 19,
-                ),
-              ),
-            ),
-            Text(
-              value,
-              style: TextStyle(
-                color: colors.onSurfaceVariant,
-                fontSize: 18,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Icon(PhosphorIcons.caretRight(),
-                color: colors.onSurfaceVariant, size: 19),
-          ],
-        ),
-      ),
     );
   }
 }

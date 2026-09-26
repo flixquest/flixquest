@@ -5,6 +5,7 @@ import '../focus/tv_keymap.dart';
 
 import '../app/tv_design.dart';
 import '../focus/tv_focusable.dart';
+import 'tv_pill_button.dart';
 
 class TvUpdateAction extends StatelessWidget {
   const TvUpdateAction(
@@ -22,31 +23,13 @@ class TvUpdateAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return TvFocusable(
-      semanticLabel: label,
+    return TvPillButton(
+      label: label,
       focusNode: focusNode,
       autofocus: autofocus,
+      prominent: primary,
+      height: 48,
       onActivate: onPressed,
-      focusScale: 1,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-        decoration: BoxDecoration(
-          color: primary
-              ? colors.primary
-              : TvDesign.surfaceFor(context, emphasis: 0.012),
-          borderRadius: BorderRadius.circular(5),
-          border: primary ? null : Border.all(color: TvDesign.hairline),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 19,
-            fontFamily: 'FigtreeSB',
-            color: primary ? colors.onPrimary : colors.onSurface,
-          ),
-        ),
-      ),
     );
   }
 }
@@ -65,7 +48,6 @@ class TvUpdateChangelog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return TvFocusable(
       semanticLabel: 'What’s new',
       focusNode: focusNode,
@@ -76,8 +58,7 @@ class TvUpdateChangelog extends StatelessWidget {
         decoration: BoxDecoration(
           color: TvDesign.surface,
           borderRadius: BorderRadius.circular(TvDesign.cardRadius),
-          border:
-              Border.all(color: colors.outlineVariant.withValues(alpha: .6)),
+          border: Border.all(color: TvDesign.hairline.withValues(alpha: .6)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,7 +68,7 @@ class TvUpdateChangelog extends StatelessWidget {
                 Container(
                   width: 3,
                   height: 24,
-                  color: colors.primary,
+                  color: TvDesign.mutedText,
                 ),
                 const SizedBox(width: 12),
                 Text(
@@ -140,10 +121,7 @@ class TvUpdateLayout extends StatelessWidget {
                   begin: Alignment.topRight,
                   end: Alignment.bottomLeft,
                   colors: <Color>[
-                    Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.055),
+                    const Color(0x0dffffff),
                     TvDesign.pageBackground,
                     TvDesign.pageBackground,
                   ],

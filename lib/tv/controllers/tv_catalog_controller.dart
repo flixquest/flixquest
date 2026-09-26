@@ -70,8 +70,75 @@ class TvCollection {
   final Future<List<TvMediaItem>> Function(int page) loadPage;
 }
 
+/// What Search shows before anything is typed.
+class TvSearchSuggestions {
+  const TvSearchSuggestions({
+    required this.topSearches,
+    required this.movieGenres,
+    required this.seriesGenres,
+  });
+
+  static const empty = TvSearchSuggestions(
+    topSearches: <TvMediaItem>[],
+    movieGenres: <Genres>[],
+    seriesGenres: <Genres>[],
+  );
+
+  /// Today's most watched, movies and series in turn.
+  final List<TvMediaItem> topSearches;
+  final List<Genres> movieGenres;
+  final List<Genres> seriesGenres;
+}
+
 class TvCatalogController {
   const TvCatalogController();
+
+  /// Each part fails on its own, so a missing one leaves the rest standing.
+  Future<TvSearchSuggestions> loadSearchSuggestions({
+    required SettingsProvider settings,
+    required AppDependencyProvider dependencies,
+  }) async {
+    final language = settings.appLanguage;
+    List<Genres> named(List<Genres> genres) => genres
+        .where((genre) => genre.genreID != null && genre.genreName != null)
+        .toList(growable: false);
+    final results = await Future.wait<Object>(<Future<Object>>[
+      _fetch(
+        TvMediaKind.movie,
+        Endpoints.trendingMoviesTodayUrl(language),
+        settings,
+        dependencies,
+      ),
+      _fetch(
+        TvMediaKind.series,
+        Endpoints.trendingTVTodayUrl(language),
+        settings,
+        dependencies,
+      ),
+      _orEmpty(fetchGenre(
+        Endpoints.movieGenresUrl(language),
+        settings.enableProxy,
+        dependencies.tmdbProxy,
+      )),
+      _orEmpty(fetchGenre(
+        Endpoints.tvGenresUrl(language),
+        settings.enableProxy,
+        dependencies.tmdbProxy,
+      )),
+    ]);
+    final movies = results[0] as List<TvMediaItem>;
+    final series = results[1] as List<TvMediaItem>;
+    return TvSearchSuggestions(
+      topSearches: <TvMediaItem>[
+        for (var i = 0; i < 5; i++) ...<TvMediaItem>[
+          if (i < movies.length) movies[i],
+          if (i < series.length) series[i],
+        ],
+      ].take(10).toList(growable: false),
+      movieGenres: named(results[2] as List<Genres>),
+      seriesGenres: named(results[3] as List<Genres>),
+    );
+  }
 
   /// The services given their own row on each page, by TMDB provider id.
   static const _movieShelfProviders = <int>[8, 9, 337, 384];

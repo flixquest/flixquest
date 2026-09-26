@@ -75,9 +75,15 @@ class TvShortcutRow extends TvBrowseRow {
     required super.title,
     required super.scopeId,
     required this.shortcuts,
+    this.onShortcutMenu,
+    this.menuHint,
   });
 
   final List<TvBrowseShortcut> shortcuts;
+
+  /// Holding OK on a tile, such as removing a recent search.
+  final ValueChanged<TvBrowseShortcut>? onShortcutMenu;
+  final String? menuHint;
 
   @override
   bool get isEmpty => shortcuts.isEmpty;
@@ -101,6 +107,7 @@ class TvBrowseView extends StatefulWidget {
     required this.focusMemoryScope,
     this.focusController,
     this.badgeFor,
+    this.showBillboard = true,
     super.key,
   });
 
@@ -117,6 +124,11 @@ class TvBrowseView extends StatefulWidget {
   /// The page's own label for a card, such as [TvMediaBadge.top10]. Cards it
   /// leaves unlabelled are marked [TvMediaBadge.recent] when they are.
   final String? Function(TvMediaItem item)? badgeFor;
+
+  /// Without the billboard the page is only rows: [featured] fills the
+  /// spotlight until a card has focus, entering lands in the rows, and Up off
+  /// the first row and Back are left to the screen around the view.
+  final bool showBillboard;
 
   @override
   State<TvBrowseView> createState() => _TvBrowseViewState();
@@ -164,8 +176,10 @@ class _TvBrowseViewState extends State<TvBrowseView> {
   late final ValueNotifier<TvMediaItem> _backdrop =
       ValueNotifier<TvMediaItem>(widget.featured);
 
-  TvSpotlightData get _featuredSpotlight =>
-      TvSpotlightData.forItem(widget.featured, featured: true);
+  TvSpotlightData get _featuredSpotlight => TvSpotlightData.forItem(
+        widget.featured,
+        featured: widget.showBillboard,
+      );
 
   void _showItem(TvMediaItem item) {
     _spotlight.value = TvSpotlightData.forItem(item);
@@ -243,6 +257,12 @@ class _TvBrowseViewState extends State<TvBrowseView> {
       oldWidget.focusController?.detach(this);
       widget.focusController?.attach(this, _requestEntryFocus);
     }
+    // Rows gone for good leave their controllers and keys behind otherwise;
+    // Search replaces its rows with every query.
+    final scopeIds = widget.rows.map((row) => row.scopeId).toSet();
+    _rowControllers.removeWhere((id, _) => !scopeIds.contains(id));
+    _rowKeys.removeWhere((id, _) => !scopeIds.contains(id));
+
     if (_focusedRowId == null) {
       _spotlight.value = _featuredSpotlight;
       _backdrop.value = widget.featured;
@@ -284,10 +304,19 @@ class _TvBrowseViewState extends State<TvBrowseView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final focused = FocusManager.instance.primaryFocus;
-      if (focused != null && focused is! FocusScopeNode) return;
+      if (focused != null && focused is! FocusScopeNode) {
+        // Focus is elsewhere (Search's keyboard): start the new rows afresh.
+        if (_focusedRowId != null &&
+            !_rows.any((r) => r.scopeId == _focusedRowId)) {
+          setState(() => _focusedRowId = null);
+          _spotlight.value = _featuredSpotlight;
+          _backdrop.value = widget.featured;
+        }
+        return;
+      }
       final rows = _rows;
       if (rows.isEmpty || removedIndex < 0) {
-        _featuredFocus.requestFocus();
+        if (widget.showBillboard) _featuredFocus.requestFocus();
         return;
       }
       _focusRow(rows[removedIndex.clamp(0, rows.length - 1)].scopeId);
@@ -298,6 +327,10 @@ class _TvBrowseViewState extends State<TvBrowseView> {
     final rowId =
         TvFocusMemoryScope.maybeOf(context)?.recall(widget.focusMemoryScope);
     if (rowId != null && _focusRow(rowId)) return true;
+    if (!widget.showBillboard) {
+      final first = _rows.firstOrNull;
+      return first != null && _focusRow(first.scopeId);
+    }
     if (_featuredFocus.context == null) return false;
     _featuredFocus.requestFocus();
     return true;
@@ -361,12 +394,14 @@ class _TvBrowseViewState extends State<TvBrowseView> {
     if (key == LogicalKeyboardKey.arrowUp) {
       if (index > 0) {
         _focusRow(rows[index - 1].scopeId);
-      } else {
+      } else if (widget.showBillboard) {
         _featuredFocus.requestFocus();
       }
       return KeyEventResult.handled;
     }
-    if (_backKeys.contains(key) && event is KeyDownEvent) {
+    if (widget.showBillboard &&
+        _backKeys.contains(key) &&
+        event is KeyDownEvent) {
       _featuredFocus.requestFocus();
       return KeyEventResult.handled;
     }
@@ -384,13 +419,14 @@ class _TvBrowseViewState extends State<TvBrowseView> {
         final rows = _rows;
         final focusedIndex =
             rows.indexWhere((row) => row.scopeId == _focusedRowId);
-        final browsing = focusedIndex >= 0;
+        // Without a billboard the page is always laid out for browsing.
+        final browsing = focusedIndex >= 0 || !widget.showBillboard;
         final rowsTop = insets.top +
             (browsing
                 ? (innerHeight - _focusedRowExtent * (1 + _nextRowPeek))
                     .clamp(innerHeight * 0.3, innerHeight * 0.5)
                 : innerHeight * _billboardRowsTop);
-        final rowsShift = rowsTop - (browsing ? _focusedRowTop : 0);
+        final rowsShift = rowsTop - (focusedIndex >= 0 ? _focusedRowTop : 0);
 
         return Focus(
           canRequestFocus: false,
@@ -476,29 +512,30 @@ class _TvBrowseViewState extends State<TvBrowseView> {
               ),
               // Stays mounted while browsing so Up and Back can focus it; it is
               // only folded away.
-              FocusTraversalGroup(
-                policy: _BillboardTraversalPolicy(),
-                // Faded rather than clipped, so nothing cuts the focus ring.
-                child: AnimatedOpacity(
-                  duration: _motion,
-                  opacity: browsing ? 0 : 1,
-                  child: AnimatedAlign(
+              if (widget.showBillboard)
+                FocusTraversalGroup(
+                  policy: _BillboardTraversalPolicy(),
+                  // Faded rather than clipped, so nothing cuts the focus ring.
+                  child: AnimatedOpacity(
                     duration: _motion,
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment.topLeft,
-                    heightFactor: browsing ? 0 : 1,
-                    child: Padding(
-                      padding: EdgeInsets.only(top: compact ? 12 : 16),
-                      child: _MoreInfoButton(
-                        focusNode: _featuredFocus,
-                        title: widget.featured.title,
-                        onFocused: _handleFeaturedFocused,
-                        onActivate: () => widget.onOpenMedia(widget.featured),
+                    opacity: browsing ? 0 : 1,
+                    child: AnimatedAlign(
+                      duration: _motion,
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.topLeft,
+                      heightFactor: browsing ? 0 : 1,
+                      child: Padding(
+                        padding: EdgeInsets.only(top: compact ? 12 : 16),
+                        child: _MoreInfoButton(
+                          focusNode: _featuredFocus,
+                          title: widget.featured.title,
+                          onFocused: _handleFeaturedFocused,
+                          onActivate: () => widget.onOpenMedia(widget.featured),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -659,6 +696,8 @@ class _TvBrowseViewState extends State<TvBrowseView> {
       itemSpacing: _cardSpacing,
       itemFocusScale: _cardFocusScale,
       onItemActivated: (shortcut) => shortcut.onActivate(),
+      onItemMenu: row.onShortcutMenu,
+      itemMenuHint: row.menuHint,
       onItemFocused: _showShortcut,
       pinFocusedItem: true,
     );
@@ -688,7 +727,6 @@ class _MoreInfoButton extends StatelessWidget {
       },
       onActivate: onActivate,
       focusScale: 1.035,
-      focusColor: Theme.of(context).colorScheme.primary,
       borderRadius: BorderRadius.circular(5),
       scrollAlignment: null,
       child: Container(
