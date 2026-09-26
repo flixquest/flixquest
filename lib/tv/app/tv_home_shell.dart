@@ -224,9 +224,16 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
 
   Future<void> _openMedia(TvMediaItem item) async {
     final previousFocus = FocusManager.instance.primaryFocus;
+    final logos = _titleLogos;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => TvMediaDetailsScreen(item: item),
+        // Routes sit beside the shell, not under it, so the logos go along.
+        builder: (_) => logos == null
+            ? TvMediaDetailsScreen(item: item)
+            : TvTitleLogoScope(
+                logos: logos,
+                child: TvMediaDetailsScreen(item: item),
+              ),
       ),
     );
     if (mounted) {

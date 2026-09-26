@@ -83,9 +83,10 @@ class TvContentRow<T> extends StatefulWidget {
 class TvContentRowController {
   _TvContentRowState<dynamic>? _state;
 
-  /// Focuses the remembered item, or the first one, and returns whether focus
-  /// moved.
-  bool requestFocus() => _state?._focusPreferredItem() ?? false;
+  /// Focuses [itemId] when the row has it, else the remembered item or the
+  /// first one, and returns whether focus moved.
+  bool requestFocus([String? itemId]) =>
+      _state?._focusPreferredItem(itemId) ?? false;
 }
 
 class _TvContentRowState<T> extends State<TvContentRow<T>> {
@@ -241,11 +242,12 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
     });
   }
 
-  bool _focusPreferredItem() {
+  bool _focusPreferredItem([String? itemId]) {
     if (widget.items.isEmpty) return false;
     final rememberedId =
         TvFocusMemoryScope.maybeOf(context)?.recall(widget.scopeId);
-    final node = _focusNodes[rememberedId] ??
+    final node = _focusNodes[itemId] ??
+        _focusNodes[rememberedId] ??
         _focusNodes[widget.itemId(widget.items.first)];
     if (node == null || node.context == null || !node.canRequestFocus) {
       return false;
@@ -520,4 +522,18 @@ class _PinnedRowTraversalPolicy extends ReadingOrderTraversalPolicy {
       _ => super.inDirection(currentNode, direction),
     };
   }
+}
+
+/// Clips only the leading edge, where a pinned row scrolls earlier items
+/// away, and leaves the focused item's growth and shadow free to spill past
+/// the other three.
+class TvLeadingEdgeClipper extends CustomClipper<Rect> {
+  const TvLeadingEdgeClipper();
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(0, -size.height, size.width * 2, size.height * 2);
+
+  @override
+  bool shouldReclip(TvLeadingEdgeClipper oldClipper) => false;
 }

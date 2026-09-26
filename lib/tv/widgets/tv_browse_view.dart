@@ -423,7 +423,7 @@ class _TvBrowseViewState extends State<TvBrowseView> {
                   right: 0,
                   bottom: 0,
                   child: ClipRect(
-                    clipper: const _LeadingEdgeClipper(),
+                    clipper: const TvLeadingEdgeClipper(),
                     child: _buildRows(
                       rows: rows,
                       focusedIndex: focusedIndex,
@@ -727,17 +727,4 @@ class _BillboardTraversalPolicy extends ReadingOrderTraversalPolicy {
     if (direction != TraversalDirection.up) return false;
     return super.inDirection(currentNode, direction);
   }
-}
-
-/// Clips only the leading edge, leaving the focused card's growth and shadow
-/// free to spill past the other three.
-class _LeadingEdgeClipper extends CustomClipper<Rect> {
-  const _LeadingEdgeClipper();
-
-  @override
-  Rect getClip(Size size) =>
-      Rect.fromLTRB(0, -size.height, size.width * 2, size.height * 2);
-
-  @override
-  bool shouldReclip(_LeadingEdgeClipper oldClipper) => false;
 }
