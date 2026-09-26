@@ -65,7 +65,8 @@ class TvShellLayout extends StatefulWidget {
   State<TvShellLayout> createState() => TvShellLayoutState();
 }
 
-class TvShellLayoutState extends State<TvShellLayout> {
+class TvShellLayoutState extends State<TvShellLayout>
+    with SingleTickerProviderStateMixin {
   final GlobalKey<TvNavigationRailState> _railKey =
       GlobalKey<TvNavigationRailState>();
   final Map<String, TvScreenFocusController> _focusControllers =
@@ -91,6 +92,24 @@ class TvShellLayoutState extends State<TvShellLayout> {
 
   static const _railMotion = Duration(milliseconds: 220);
 
+  /// A new destination fades in over the one it replaces. Only the incoming
+  /// screen is faded, so the crossfade costs one offscreen layer, not two.
+  late final AnimationController _pageFade = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 240),
+    value: 1,
+  );
+  late final Animation<double> _pageOpacity =
+      CurvedAnimation(parent: _pageFade, curve: Curves.easeOut);
+
+  /// Each mounted screen's key, so a screen keeps its state while it moves
+  /// in and out of the fade's wrappers.
+  final Map<String, GlobalKey> _screenKeys = <String, GlobalKey>{};
+
+  /// The screen being faded out, as last built, and the one showing now.
+  Widget? _outgoingScreen;
+  Widget? _currentScreen;
+
   /// Tracks focus in the rail rather than reading it while building, so the
   /// rail widens and the scrim fades in the frame focus arrives.
   bool _railExpanded = false;
@@ -112,6 +131,9 @@ class TvShellLayoutState extends State<TvShellLayout> {
   @override
   void initState() {
     super.initState();
+    // Created up front: a lazy one first read in dispose() would look up
+    // TickerMode on a deactivated element.
+    _pageFade.value = 1;
     _railRegion.addListener(_syncRailExpanded);
   }
 
@@ -123,7 +145,31 @@ class TvShellLayoutState extends State<TvShellLayout> {
   }
 
   @override
+  void didUpdateWidget(TvShellLayout oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final previousId = oldWidget.selectedId;
+    if (previousId == widget.selectedId) return;
+    // A switch during a fade drops the screen already on its way out.
+    final dropped = _outgoingScreen?.key;
+    _outgoingScreen = _currentScreen;
+    _screenKeys.removeWhere(
+      (id, key) => identical(key, dropped) && id != widget.selectedId,
+    );
+    _pageFade.forward(from: 0).whenCompleteOrCancel(() {
+      if (!mounted || _pageFade.isAnimating) return;
+      setState(() {
+        _screenKeys.removeWhere(
+          (id, key) =>
+              identical(key, _outgoingScreen?.key) && id != widget.selectedId,
+        );
+        _outgoingScreen = null;
+      });
+    });
+  }
+
+  @override
   void dispose() {
+    _pageFade.dispose();
     _railRegion.removeListener(_syncRailExpanded);
     _railRegion.dispose();
     _contentRegion.dispose();
@@ -201,6 +247,13 @@ class TvShellLayoutState extends State<TvShellLayout> {
       widget.selectedId,
       _controllerFor(widget.selectedId),
     );
+    final current = _currentScreen = KeyedSubtree(
+      key: _screenKeys.putIfAbsent(widget.selectedId, GlobalKey.new),
+      child: widget.fullBleedDestinations.contains(widget.selectedId)
+          ? TvShellInsets(insets: contentInsets, child: screen)
+          : Padding(padding: contentInsets, child: screen),
+    );
+    final outgoing = _outgoingScreen;
 
     return Stack(
       fit: StackFit.expand,
@@ -208,13 +261,19 @@ class TvShellLayoutState extends State<TvShellLayout> {
         FocusScope.withExternalFocusNode(
           focusScopeNode: _contentRegion,
           child: ClipRect(
-            // Only the active destination stays mounted; keeping every
-            // screen alive held their images and controllers in TV RAM.
-            child: KeyedSubtree(
-              key: ValueKey<String>(widget.selectedId),
-              child: widget.fullBleedDestinations.contains(widget.selectedId)
-                  ? TvShellInsets(insets: contentInsets, child: screen)
-                  : Padding(padding: contentInsets, child: screen),
+            // Only the active destination stays mounted, apart from the one
+            // fading out; keeping every screen alive held their images and
+            // controllers in TV RAM.
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                if (outgoing != null)
+                  ExcludeFocus(child: IgnorePointer(child: outgoing)),
+                if (outgoing != null)
+                  FadeTransition(opacity: _pageOpacity, child: current)
+                else
+                  current,
+              ],
             ),
           ),
         ),
@@ -228,13 +287,15 @@ class TvShellLayoutState extends State<TvShellLayout> {
             child: const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
+                  // Opaque under the labels, where the screen's own text would
+                  // otherwise ghost through them, then a dim over the rest.
                   colors: <Color>[
-                    Color(0xf5050606),
-                    Color(0xe6050606),
-                    Color(0x8c050606),
+                    Color(0xff050606),
+                    Color(0xf7050606),
+                    Color(0x99050606),
                     Color(0x73050606),
                   ],
-                  stops: <double>[0, 0.2, 0.45, 1],
+                  stops: <double>[0, 0.27, 0.5, 1],
                 ),
               ),
             ),

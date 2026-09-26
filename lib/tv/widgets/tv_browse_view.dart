@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../app/tv_design.dart';
 import '../app/tv_shell_layout.dart';
+import '../controllers/tv_title_logos.dart';
 import '../focus/tv_focus_memory.dart';
 import '../focus/tv_focusable.dart';
 import '../focus/tv_screen_focus_controller.dart';
@@ -12,6 +15,7 @@ import 'tv_content_row.dart';
 import 'tv_media_card.dart';
 import 'tv_shortcut_tile.dart';
 import 'tv_spotlight.dart';
+import 'tv_top_ten_rank.dart';
 
 sealed class TvBrowseRow {
   const TvBrowseRow({required this.title, required this.scopeId});
@@ -32,14 +36,34 @@ class TvMediaRow extends TvBrowseRow {
     this.onItemActivated,
     this.onItemMenu,
     this.itemMenuHint,
+    this.showBadges = true,
   });
 
   final List<TvMediaItem> items;
+
+  /// Whether the cards carry [TvBrowseView.badgeFor]'s corner labels; a row
+  /// that says the same thing itself, such as Continue watching, leaves them
+  /// out.
+  final bool showBadges;
 
   /// Replaces the view's `onOpenMedia` for this row's items.
   final ValueChanged<TvMediaItem>? onItemActivated;
   final ValueChanged<TvMediaItem>? onItemMenu;
   final String? itemMenuHint;
+
+  @override
+  bool get isEmpty => items.isEmpty;
+}
+
+/// The ten most watched titles, each poster led by its rank.
+class TvTopTenRow extends TvBrowseRow {
+  TvTopTenRow({
+    required super.title,
+    required super.scopeId,
+    required List<TvMediaItem> items,
+  }) : items = items.take(10).toList(growable: false);
+
+  final List<TvMediaItem> items;
 
   @override
   bool get isEmpty => items.isEmpty;
@@ -76,6 +100,7 @@ class TvBrowseView extends StatefulWidget {
     required this.onOpenMedia,
     required this.focusMemoryScope,
     this.focusController,
+    this.badgeFor,
     super.key,
   });
 
@@ -88,6 +113,10 @@ class TvBrowseView extends StatefulWidget {
   /// the page lands where the user left off.
   final String focusMemoryScope;
   final TvScreenFocusController? focusController;
+
+  /// The page's own label for a card, such as [TvMediaBadge.top10]. Cards it
+  /// leaves unlabelled are marked [TvMediaBadge.recent] when they are.
+  final String? Function(TvMediaItem item)? badgeFor;
 
   @override
   State<TvBrowseView> createState() => _TvBrowseViewState();
@@ -143,6 +172,29 @@ class _TvBrowseViewState extends State<TvBrowseView> {
     _backdrop.value = item;
   }
 
+  String? _badgeFor(TvMediaItem item) =>
+      widget.badgeFor?.call(item) ?? TvMediaBadge.recencyOf(item);
+
+  /// How many cards past the focused one have their logo looked up ahead of
+  /// time, so moving along a row finds logos ready rather than swapping text
+  /// for artwork a moment after each move.
+  static const _logoLookahead = 3;
+
+  TvTitleLogos? _logos;
+  Timer? _logoPrefetch;
+
+  void _prefetchLogos(List<TvMediaItem> items, TvMediaItem focused) {
+    final logos = _logos;
+    if (logos == null) return;
+    _logoPrefetch?.cancel();
+    _logoPrefetch = Timer(const Duration(milliseconds: 400), () {
+      final index = items.indexOf(focused);
+      for (final item in items.skip(index + 1).take(_logoLookahead)) {
+        logos.resolve(item);
+      }
+    });
+  }
+
   void _showShortcut(TvBrowseShortcut shortcut) {
     _spotlight.value = TvSpotlightData(
       id: 'shortcut:${shortcut.id}',
@@ -164,6 +216,24 @@ class _TvBrowseViewState extends State<TvBrowseView> {
   void initState() {
     super.initState();
     widget.focusController?.attach(this, _requestEntryFocus);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final logos = TvTitleLogoScope.maybeOf(context);
+    if (identical(logos, _logos)) return;
+    _logos = logos;
+    // The billboard's own lookup starts with it; the first row's opening
+    // cards are where Down lands.
+    final first = _rows.firstOrNull;
+    final opening = switch (first) {
+      TvMediaRow(:final items) || TvTopTenRow(:final items) => items,
+      _ => const <TvMediaItem>[],
+    };
+    for (final item in opening.take(_logoLookahead)) {
+      logos?.resolve(item);
+    }
   }
 
   @override
@@ -201,6 +271,7 @@ class _TvBrowseViewState extends State<TvBrowseView> {
   @override
   void dispose() {
     widget.focusController?.detach(this);
+    _logoPrefetch?.cancel();
     _featuredFocus.dispose();
     _spotlight.dispose();
     _backdrop.dispose();
@@ -493,6 +564,7 @@ class _TvBrowseViewState extends State<TvBrowseView> {
           },
           child: switch (row) {
             TvMediaRow() => _buildMediaRow(row, dimmed: dimmed),
+            TvTopTenRow() => _buildTopTenRow(row, dimmed: dimmed),
             TvShortcutRow() => _buildShortcutRow(row, dimmed: dimmed),
           },
         ),
@@ -517,13 +589,53 @@ class _TvBrowseViewState extends State<TvBrowseView> {
         width: widget.metrics.mediaCardWidth,
         artworkOnly: true,
         dimmed: dimmed,
+        badge: row.showBadges ? _badgeFor(item) : null,
       ),
       itemSpacing: _cardSpacing,
       itemFocusScale: _cardFocusScale,
       onItemActivated: row.onItemActivated ?? widget.onOpenMedia,
-      onItemFocused: _showItem,
+      onItemFocused: (item) {
+        _showItem(item);
+        _prefetchLogos(row.items, item);
+      },
       onItemMenu: row.onItemMenu,
       itemMenuHint: row.itemMenuHint,
+      pinFocusedItem: true,
+    );
+  }
+
+  Widget _buildTopTenRow(TvTopTenRow row, {required bool dimmed}) {
+    final width = widget.metrics.mediaCardWidth;
+    return TvContentRow<TvMediaItem>(
+      controller: _controllerFor(row),
+      title: row.title,
+      scopeId: row.scopeId,
+      items: row.items,
+      itemId: (item) => item.stableId,
+      semanticLabel: (item) =>
+          'Number ${row.items.indexOf(item) + 1}, ${item.title}',
+      // The rank already says it; a Top 10 badge here would repeat it.
+      itemBuilder: (_, item) => TvMediaCard(
+        item: item,
+        width: width,
+        artworkOnly: true,
+        dimmed: dimmed,
+      ),
+      itemLeadingBuilder: (_, item, index) => TvTopTenRank(
+        rank: index + 1,
+        cardWidth: width,
+        // The poster plus the focus padding around it in the row.
+        height: width / TvMediaCard.artworkAspectRatio + 8,
+        bottomInset: 4,
+        dimmed: dimmed,
+      ),
+      itemSpacing: _cardSpacing,
+      itemFocusScale: _cardFocusScale,
+      onItemActivated: widget.onOpenMedia,
+      onItemFocused: (item) {
+        _showItem(item);
+        _prefetchLogos(row.items, item);
+      },
       pinFocusedItem: true,
     );
   }

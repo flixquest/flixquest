@@ -18,6 +18,7 @@ import '../focus/tv_screen_focus_controller.dart';
 import '../models/tv_media_item.dart';
 import '../navigation/tv_back_dispatcher.dart';
 import '../controllers/tv_catalog_controller.dart';
+import '../controllers/tv_title_logos.dart';
 import '../screens/tv_catalog_screen.dart';
 import '../screens/tv_collection_screen.dart';
 import '../screens/tv_home_screen.dart';
@@ -56,6 +57,30 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
   late final AppSessionStateStore _sessionState;
   late final RestorableString _selectedDestinationId;
   int _libraryRevision = 0;
+
+  /// Title logos found this session, shared by every browse page; a new
+  /// language or proxy starts over, since both change what TMDB returns.
+  TvTitleLogos? _titleLogos;
+
+  TvTitleLogos _titleLogosFor({
+    required String language,
+    required bool proxyEnabled,
+    required String proxyUrl,
+  }) {
+    final current = _titleLogos;
+    if (current != null &&
+        current.language == TvTitleLogos.languageCode(language) &&
+        current.proxyEnabled == proxyEnabled &&
+        current.proxyUrl == proxyUrl) {
+      return current;
+    }
+    current?.dispose();
+    return _titleLogos = TvTitleLogos(
+      language: language,
+      proxyEnabled: proxyEnabled,
+      proxyUrl: proxyUrl,
+    );
+  }
 
   @override
   String get restorationId => 'television_home';
@@ -149,6 +174,7 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
   void dispose() {
     _selectedDestinationId.dispose();
     _shellFocusScope.dispose();
+    _titleLogos?.dispose();
     super.dispose();
   }
 
@@ -313,36 +339,49 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
 
   @override
   Widget build(BuildContext context) {
-    final showLiveTv = context.watch<AppDependencyProvider>().displayLiveTV;
+    final dependencies = context.watch<AppDependencyProvider>();
+    final showLiveTv = dependencies.displayLiveTV;
     final destinations = _visibleDestinations(showLiveTv: showLiveTv);
     final selectedId = _resolveSelectedId(destinations);
-    return TvFocusMemoryScope(
-      memory: _focusMemory,
-      child: TvBackDispatcher(
-        onBack: _handleBack,
-        child: FocusScope(
-          node: _shellFocusScope,
-          child: Scaffold(
-            key: TvHomeShell.shellKey,
-            backgroundColor: TvDesign.pageBackground,
-            body: ColoredBox(
-              color: TvDesign.pageBackground,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final metrics = TvShellMetrics.fromConstraints(constraints);
-                  // The layout keeps its controls inside the TV-safe margins
-                  // itself, so full-bleed artwork can still reach the edges.
-                  return TvShellLayout(
-                    key: _layoutKey,
-                    destinations: destinations,
-                    selectedId: selectedId,
-                    metrics: metrics,
-                    fullBleedDestinations: _fullBleedDestinations,
-                    onDestinationSelected: _selectDestination,
-                    screenBuilder: (context, id, focusController) =>
-                        _buildScreen(id, metrics, focusController),
-                  );
-                },
+    final titleLogos = _titleLogosFor(
+      language: context.select<SettingsProvider, String>(
+        (settings) => settings.appLanguage,
+      ),
+      proxyEnabled: context.select<SettingsProvider, bool>(
+        (settings) => settings.enableProxy,
+      ),
+      proxyUrl: dependencies.tmdbProxy,
+    );
+    return TvTitleLogoScope(
+      logos: titleLogos,
+      child: TvFocusMemoryScope(
+        memory: _focusMemory,
+        child: TvBackDispatcher(
+          onBack: _handleBack,
+          child: FocusScope(
+            node: _shellFocusScope,
+            child: Scaffold(
+              key: TvHomeShell.shellKey,
+              backgroundColor: TvDesign.pageBackground,
+              body: ColoredBox(
+                color: TvDesign.pageBackground,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final metrics = TvShellMetrics.fromConstraints(constraints);
+                    // The layout keeps its controls inside the TV-safe margins
+                    // itself, so full-bleed artwork can still reach the edges.
+                    return TvShellLayout(
+                      key: _layoutKey,
+                      destinations: destinations,
+                      selectedId: selectedId,
+                      metrics: metrics,
+                      fullBleedDestinations: _fullBleedDestinations,
+                      onDestinationSelected: _selectDestination,
+                      screenBuilder: (context, id, focusController) =>
+                          _buildScreen(id, metrics, focusController),
+                    );
+                  },
+                ),
               ),
             ),
           ),

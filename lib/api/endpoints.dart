@@ -82,6 +82,20 @@ class Endpoints {
         '&language=$l';
   }
 
+  static String trendingMoviesTodayUrl(String l) {
+    return '$TMDB_API_BASE_URL'
+        '/trending/movie/day?api_key='
+        '$TMDB_API_KEY'
+        '&language=$l';
+  }
+
+  static String trendingTVTodayUrl(String l) {
+    return '$TMDB_API_BASE_URL'
+        '/trending/tv/day?api_key='
+        '$TMDB_API_KEY'
+        '&language=$l';
+  }
+
   static String upcomingMoviesUrl(String l) {
     return '$TMDB_API_BASE_URL'
         '/movie/upcoming?api_key='

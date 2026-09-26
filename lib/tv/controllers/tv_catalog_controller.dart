@@ -20,6 +20,7 @@ class TvServiceShelf {
 class TvCatalogData {
   const TvCatalogData({
     required this.kind,
+    required this.topTen,
     required this.trending,
     required this.popular,
     required this.topRated,
@@ -29,6 +30,9 @@ class TvCatalogData {
   });
 
   final TvMediaKind kind;
+
+  /// Today's ten most watched.
+  final List<TvMediaItem> topTen;
   final List<TvMediaItem> trending;
   final List<TvMediaItem> popular;
   final List<TvMediaItem> topRated;
@@ -115,9 +119,13 @@ class TvCatalogController {
       row(isMovie
           ? Endpoints.upcomingMoviesUrl(language)
           : Endpoints.onTheAirUrl(language)),
+      row(isMovie
+          ? Endpoints.trendingMoviesTodayUrl(language)
+          : Endpoints.trendingTVTodayUrl(language)),
     ]);
     return TvCatalogData(
       kind: kind,
+      topTen: lists[4].take(10).toList(growable: false),
       trending: lists[0],
       popular: lists[1],
       topRated: lists[2],

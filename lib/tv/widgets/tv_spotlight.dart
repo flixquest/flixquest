@@ -12,6 +12,7 @@ import '../../functions/function.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../app/tv_design.dart';
+import '../controllers/tv_title_logos.dart';
 import '../models/tv_media_item.dart';
 
 /// Full-bleed artwork for the item in the spotlight.
@@ -155,6 +156,7 @@ class TvSpotlightData {
     this.overview = '',
     this.kicker,
     this.kickerIcon,
+    this.item,
   });
 
   /// The billboard's [featured] treatment adds the "Featured movie" kicker.
@@ -176,6 +178,7 @@ class TvSpotlightData {
       kickerIcon: featured
           ? (isMovie ? PhosphorIcons.filmSlate() : PhosphorIcons.television())
           : null,
+      item: item,
     );
   }
 
@@ -185,6 +188,9 @@ class TvSpotlightData {
   final String overview;
   final String? kicker;
   final IconData? kickerIcon;
+
+  /// The title whose logo stands in for [title], when it has one.
+  final TvMediaItem? item;
 }
 
 /// Title, facts and synopsis for the tile in the spotlight.
@@ -201,6 +207,41 @@ class TvSpotlightInfo extends StatelessWidget {
   final TvSpotlightData data;
   final bool featured;
   final bool compact;
+
+  Widget _buildTitle() {
+    final text = Text(
+      data.title,
+      maxLines: featured ? 2 : 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: TvDesign.foreground,
+        fontFamily: 'FigtreeBold',
+        fontSize: switch ((featured, compact)) {
+          (true, true) => 34,
+          (true, false) => 46,
+          (false, true) => 26,
+          (false, false) => 34,
+        },
+        height: 1.02,
+        letterSpacing: -0.6,
+      ),
+    );
+    final item = data.item;
+    if (item == null) return text;
+    return TvTitleLogo(
+      item: item,
+      maxHeight: switch ((featured, compact)) {
+        (true, true) => 92,
+        (true, false) => 124,
+        (false, true) => 56,
+        (false, false) => 72,
+      },
+      // The billboard's title is looked up at once; a card's waits for focus
+      // to settle, so sweeping a row does not fire a lookup per card.
+      settleDelay: featured ? Duration.zero : const Duration(milliseconds: 250),
+      fallback: text,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -231,23 +272,7 @@ class TvSpotlightInfo extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        Text(
-          data.title,
-          maxLines: featured ? 2 : 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: TvDesign.foreground,
-            fontFamily: 'FigtreeBold',
-            fontSize: switch ((featured, compact)) {
-              (true, true) => 34,
-              (true, false) => 46,
-              (false, true) => 26,
-              (false, false) => 34,
-            },
-            height: 1.02,
-            letterSpacing: -0.6,
-          ),
-        ),
+        _buildTitle(),
         if (data.facts.isNotEmpty) ...<Widget>[
           const SizedBox(height: 8),
           Text(
@@ -276,6 +301,137 @@ class TvSpotlightInfo extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// [item]'s logo artwork from TMDB, or [fallback] (its name as text) until the
+/// logo is found, or when it has none.
+///
+/// Logos are drawn in the space the text would take, left aligned and never
+/// wider than the spotlight, so a wide wordmark and a stacked one read at a
+/// similar size.
+class TvTitleLogo extends StatefulWidget {
+  const TvTitleLogo({
+    required this.item,
+    required this.maxHeight,
+    required this.fallback,
+    this.settleDelay = Duration.zero,
+    super.key,
+  });
+
+  final TvMediaItem item;
+  final double maxHeight;
+  final Widget fallback;
+
+  /// How long [item] must stay put before its logo is looked up. A logo
+  /// already found shows at once.
+  final Duration settleDelay;
+
+  @override
+  State<TvTitleLogo> createState() => _TvTitleLogoState();
+}
+
+class _TvTitleLogoState extends State<TvTitleLogo> {
+  /// Sharp enough at the billboard's size on a 1080p panel, and a fraction of
+  /// `original`.
+  static const _imageSize = 'w500';
+
+  TvTitleLogos? _logos;
+  String? _path;
+  Timer? _settleTimer;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final logos = TvTitleLogoScope.maybeOf(context);
+    if (!identical(logos, _logos)) {
+      _logos = logos;
+      _lookUp();
+    }
+  }
+
+  @override
+  void didUpdateWidget(TvTitleLogo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.kind != widget.item.kind ||
+        oldWidget.item.id != widget.item.id) {
+      _lookUp();
+    }
+  }
+
+  void _lookUp() {
+    _settleTimer?.cancel();
+    final logos = _logos;
+    final item = widget.item;
+    _path = logos != null && logos.isKnown(item) ? logos.known(item) : null;
+    if (logos == null || logos.isKnown(item)) return;
+    void resolve() {
+      logos.resolve(item).then((path) {
+        if (!mounted || path == null) return;
+        if (!identical(widget.item, item) || !identical(_logos, logos)) return;
+        setState(() => _path = path);
+      });
+    }
+
+    if (widget.settleDelay == Duration.zero) {
+      resolve();
+    } else {
+      _settleTimer = Timer(widget.settleDelay, resolve);
+    }
+  }
+
+  @override
+  void dispose() {
+    _settleTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final path = _path;
+    if (path == null) return widget.fallback;
+    final settings = context.watch<SettingsProvider>();
+    final proxy = context.watch<AppDependencyProvider>().tmdbProxy;
+    final baseUrl = buildImageUrl(
+      TMDB_BASE_IMAGE_URL,
+      proxy,
+      settings.enableProxy,
+      context,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = math.min(constraints.maxWidth, widget.maxHeight * 5);
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: maxWidth,
+            maxHeight: widget.maxHeight,
+          ),
+          child: CachedNetworkImage(
+            cacheManager: cacheProp(),
+            imageUrl: '$baseUrl$_imageSize$path',
+            memCacheWidth:
+                (maxWidth * MediaQuery.devicePixelRatioOf(context)).round(),
+            fit: BoxFit.contain,
+            alignment: Alignment.bottomLeft,
+            fadeInDuration: const Duration(milliseconds: 220),
+            fadeOutDuration: Duration.zero,
+            // The name holds the space until the artwork has decoded, and
+            // stays if it never does.
+            placeholder: (_, __) => widget.fallback,
+            errorWidget: (_, __, ___) => widget.fallback,
+            imageBuilder: (_, image) => Semantics(
+              label: widget.item.title,
+              image: true,
+              child: Image(
+                image: image,
+                fit: BoxFit.contain,
+                alignment: Alignment.bottomLeft,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

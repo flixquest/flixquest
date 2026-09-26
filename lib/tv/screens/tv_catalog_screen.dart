@@ -11,7 +11,9 @@ import '../app/tv_shell_layout.dart';
 import '../controllers/tv_catalog_controller.dart';
 import '../focus/tv_screen_focus_controller.dart';
 import '../models/tv_media_item.dart';
+import '../widgets/tv_browse_skeleton.dart';
 import '../widgets/tv_browse_view.dart';
+import '../widgets/tv_media_card.dart' show TvMediaBadge;
 import '../widgets/tv_shortcut_tile.dart';
 import '../widgets/tv_state_panel.dart';
 
@@ -93,37 +95,58 @@ class _TvCatalogScreenState extends State<TvCatalogScreen> {
     return FutureBuilder<TvCatalogData>(
       future: _data,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return Padding(
-            padding: insets,
-            child: const Center(child: CircularProgressIndicator()),
-          );
-        }
         final data = snapshot.data;
-        final featured = data?.featured;
-        if (snapshot.hasError || data == null || featured == null) {
-          return Padding(
-            padding: insets,
-            child: TvStatePanel(
-              title: _isMovie ? 'No movies to show' : 'No series to show',
-              message: 'FlixQuest could not load this page. Try again.',
-              icon: _isMovie
-                  ? PhosphorIcons.filmSlate()
-                  : PhosphorIcons.television(),
-              actionLabel: 'Retry',
-              onAction: _retry,
+        final loading = snapshot.connectionState != ConnectionState.done;
+        return AnimatedSwitcher(
+          // The page fades in over its skeleton rather than cutting to it.
+          duration: const Duration(milliseconds: 280),
+          switchInCurve: Curves.easeOut,
+          child: KeyedSubtree(
+            key: ValueKey<Object>(
+              loading ? 'loading' : data?.featured?.stableId ?? 'error',
             ),
-          );
-        }
-        return TvBrowseView(
-          featured: featured,
-          rows: _rows(data),
-          metrics: widget.metrics,
-          onOpenMedia: widget.onOpenMedia,
-          focusController: widget.focusController,
-          focusMemoryScope: 'tv-${widget.kind.name}-row',
+            child: loading
+                ? TvBrowseSkeleton(metrics: widget.metrics)
+                : _buildLoaded(snapshot, insets),
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildLoaded(
+      AsyncSnapshot<TvCatalogData> snapshot, EdgeInsets insets) {
+    final data = snapshot.data;
+    final featured = data?.featured;
+    if (snapshot.hasError || data == null || featured == null) {
+      return Padding(
+        padding: insets,
+        child: TvStatePanel(
+          title: _isMovie ? 'No movies to show' : 'No series to show',
+          message: 'FlixQuest could not load this page. Try again.',
+          icon:
+              _isMovie ? PhosphorIcons.filmSlate() : PhosphorIcons.television(),
+          actionLabel: 'Retry',
+          onAction: _retry,
+        ),
+      );
+    }
+    String key(TvMediaItem item) => '${item.kind.name}:${item.id}';
+    final topTen = data.topTen.map(key).toSet();
+    // Series on the air right now; upcoming movies have nothing new yet.
+    final airing = _isMovie ? const <String>{} : data.fresh.map(key).toSet();
+    return TvBrowseView(
+      featured: featured,
+      rows: _rows(data),
+      metrics: widget.metrics,
+      onOpenMedia: widget.onOpenMedia,
+      focusController: widget.focusController,
+      focusMemoryScope: 'tv-${widget.kind.name}-row',
+      badgeFor: (item) => topTen.contains(key(item))
+          ? TvMediaBadge.top10
+          : airing.contains(key(item))
+              ? TvMediaBadge.newEpisodes
+              : null,
     );
   }
 
@@ -131,6 +154,11 @@ class _TvCatalogScreenState extends State<TvCatalogScreen> {
     final kind = widget.kind.name;
     final noun = _isMovie ? 'movies' : 'series';
     return <TvBrowseRow>[
+      TvTopTenRow(
+        title: 'Top 10 $noun today',
+        scopeId: '$kind-top-ten',
+        items: data.topTen,
+      ),
       TvMediaRow(
         title: 'Trending now',
         scopeId: '$kind-trending',
@@ -166,6 +194,8 @@ class _TvCatalogScreenState extends State<TvCatalogScreen> {
         title: _isMovie ? 'Coming soon' : 'New episodes',
         scopeId: '$kind-fresh',
         items: data.fresh,
+        // Every card here would say New episodes.
+        showBadges: _isMovie,
       ),
       TvShortcutRow(
         title: 'Genres',

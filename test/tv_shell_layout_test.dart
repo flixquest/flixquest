@@ -211,6 +211,71 @@ void main() {
     expect(_focused, 'series-grid:3');
   });
 
+  group('switching destinations', () {
+    Finder entry(String id) => find.bySemanticsLabel('$id entry');
+
+    Future<GlobalKey<TvShellLayoutState>> selectSeries(
+      WidgetTester tester,
+    ) async {
+      final layout = await _pumpLayout(tester);
+      layout.currentState!.focusRail('series');
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+      return layout;
+    }
+
+    testWidgets('fades the new screen in over the old one', (tester) async {
+      await selectSeries(tester);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(entry('series'), findsOneWidget);
+      expect(entry('movies'), findsOneWidget);
+      final fade = tester.widget<FadeTransition>(
+        find
+            .ancestor(
+                of: entry('series'), matching: find.byType(FadeTransition))
+            .first,
+      );
+      expect(fade.opacity.value, inExclusiveRange(0, 1));
+
+      await tester.pumpAndSettle();
+      expect(entry('movies'), findsNothing);
+      expect(entry('series'), findsOneWidget);
+      expect(_focused, 'TV nav series');
+    });
+
+    testWidgets('the screen fading out cannot take focus', (tester) async {
+      final layout = await selectSeries(tester);
+      await tester.pump(const Duration(milliseconds: 60));
+
+      final reachable = FocusManager.instance.rootScope.traversalDescendants
+          .map((node) => node.debugLabel);
+      expect(reachable, contains('series entry'));
+      expect(reachable, isNot(contains('movies entry')));
+      expect(layout.currentState!.enterContent(), isTrue);
+      await tester.pump();
+      expect(_focused, 'series entry');
+      await tester.pumpAndSettle();
+      expect(_focused, 'series entry');
+    });
+
+    testWidgets('switching back mid-fade keeps the screen it left',
+        (tester) async {
+      final layout = await selectSeries(tester);
+      final movies = tester.state(find.byType(_StubScreen).first);
+      await tester.pump(const Duration(milliseconds: 60));
+
+      layout.currentState!.focusRail('movies');
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pumpAndSettle();
+
+      expect(entry('series'), findsNothing);
+      expect(tester.state(find.byType(_StubScreen)), same(movies));
+    });
+  });
+
   group('right while the screen is still loading', () {
     late ValueNotifier<List<int>> catalog;
 

@@ -122,7 +122,11 @@ class _TvCollectionScreenState extends State<TvCollectionScreen> {
       targetItemWidth: metrics.mediaCardWidth,
       itemAspectRatio: TvMediaCard.artworkAspectRatio,
       itemDetailsExtent: TvMediaCard.detailsHeight,
-      itemBuilder: (_, item, width) => TvMediaCard(item: item, width: width),
+      itemBuilder: (_, item, width) => TvMediaCard(
+        item: item,
+        width: width,
+        badge: TvMediaBadge.recencyOf(item),
+      ),
       onItemActivated: widget.onOpenMedia,
       onItemFocused: _handleItemFocused,
     );

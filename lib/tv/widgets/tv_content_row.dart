@@ -12,6 +12,12 @@ typedef TvContentItemBuilder<T> = Widget Function(
   T item,
 );
 
+typedef TvContentItemLeadingBuilder<T> = Widget Function(
+  BuildContext context,
+  T item,
+  int index,
+);
+
 class TvContentRow<T> extends StatefulWidget {
   const TvContentRow({
     required this.title,
@@ -24,6 +30,7 @@ class TvContentRow<T> extends StatefulWidget {
     this.onItemMenu,
     this.itemMenuHint,
     this.onItemFocused,
+    this.itemLeadingBuilder,
     this.pinFocusedItem = false,
     this.autofocus = false,
     this.itemSpacing = 14,
@@ -50,6 +57,11 @@ class TvContentRow<T> extends StatefulWidget {
   final String? itemMenuHint;
 
   final ValueChanged<T>? onItemFocused;
+
+  /// Draws something ahead of each item that is not part of it and takes no
+  /// focus, such as a Top 10 rank. A pinned row lines this up with the leading
+  /// edge instead of the item.
+  final TvContentItemLeadingBuilder<T>? itemLeadingBuilder;
 
   /// Scrolls the focused item to the row's leading edge, the way Netflix rows
   /// move, instead of only keeping it in view. The row then owns its scrolling
@@ -94,6 +106,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
   ];
 
   final Map<String, FocusNode> _focusNodes = <String, FocusNode>{};
+  final Map<String, GlobalKey> _leadingKeys = <String, GlobalKey>{};
   final ScrollController _scrollController = ScrollController();
   late final _pinnedPolicy = _PinnedRowTraversalPolicy(_stepFrom);
   final GlobalKey _trackKey = GlobalKey();
@@ -176,6 +189,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
         _focusNodes.keys.where((id) => !currentIds.contains(id)).toList();
     for (final id in removedIds) {
       _focusNodes.remove(id)?.dispose();
+      _leadingKeys.remove(id);
     }
   }
 
@@ -334,7 +348,9 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
   }
 
   void _pinItem(String id) {
-    final itemBox = _focusNodes[id]?.context?.findRenderObject();
+    final itemBox =
+        (_leadingKeys[id]?.currentContext ?? _focusNodes[id]?.context)
+            ?.findRenderObject();
     final trackBox = _trackKey.currentContext?.findRenderObject();
     if (itemBox is! RenderBox ||
         trackBox is! RenderBox ||
@@ -430,6 +446,14 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
               key: _trackKey,
               children: <Widget>[
                 for (var index = 0; index < widget.items.length; index++) ...[
+                  if (widget.itemLeadingBuilder case final leading?)
+                    KeyedSubtree(
+                      key: _leadingKeys.putIfAbsent(
+                        widget.itemId(widget.items[index]),
+                        GlobalKey.new,
+                      ),
+                      child: leading(context, widget.items[index], index),
+                    ),
                   Builder(
                     builder: (context) {
                       final item = widget.items[index];

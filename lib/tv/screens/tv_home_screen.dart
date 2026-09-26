@@ -11,8 +11,10 @@ import '../app/tv_shell_layout.dart';
 import '../controllers/tv_home_controller.dart';
 import '../focus/tv_screen_focus_controller.dart';
 import '../models/tv_media_item.dart';
+import '../widgets/tv_browse_skeleton.dart';
 import '../widgets/tv_browse_view.dart';
 import '../widgets/tv_continue_watching_menu.dart';
+import '../widgets/tv_media_card.dart' show TvMediaBadge;
 import '../widgets/tv_state_panel.dart';
 
 class TvHomeScreen extends StatefulWidget {
@@ -90,54 +92,90 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     ].where((item) => item.id >= 0).take(16).toList(growable: false);
     return FutureBuilder<TvHomeData>(
       future: _homeData,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return Padding(padding: insets, child: const _TvHomeLoading());
-        }
-        if (snapshot.hasError) {
-          return Padding(
-            padding: insets,
-            child: TvStatePanel.error(onRetry: _retry),
-          );
-        }
-        final data = snapshot.data;
-        if (data == null || data.isEmpty || data.hero == null) {
-          return Padding(
-            padding: insets,
-            child: TvStatePanel(
-              title: 'Nothing to show yet',
-              message: 'FlixQuest could not find content for this region.',
-              icon: PhosphorIcons.filmStrip(),
-              actionLabel: 'Retry',
-              onAction: _retry,
-            ),
-          );
-        }
+      builder: (context, snapshot) => AnimatedSwitcher(
+        // The page fades in over its skeleton rather than cutting to it.
+        duration: const Duration(milliseconds: 280),
+        switchInCurve: Curves.easeOut,
+        child: KeyedSubtree(
+          key: ValueKey<Object>(
+            snapshot.connectionState != ConnectionState.done
+                ? 'loading'
+                : snapshot.hasError
+                    ? 'error'
+                    : snapshot.data?.hero?.stableId ?? 'empty',
+          ),
+          child: _buildState(snapshot, insets, continueWatching),
+        ),
+      ),
+    );
+  }
 
-        return TvBrowseView(
-          featured: data.hero!,
-          metrics: widget.metrics,
-          onOpenMedia: widget.onOpenMedia,
-          focusController: widget.focusController,
-          focusMemoryScope: 'tv-home-row',
-          rows: <TvBrowseRow>[
-            TvMediaRow(
-              title: 'Continue watching',
-              scopeId: 'home-continue-watching',
-              items: continueWatching,
-              onItemActivated: widget.onContinueWatching,
-              onItemMenu: _removeFromContinueWatching,
-              itemMenuHint: 'Hold OK to remove',
-            ),
-            _row(
-                'Trending movies', 'home-trending-movies', data.trendingMovies),
-            _row('Popular movies', 'home-popular-movies', data.popularMovies),
-            _row(
-                'Trending series', 'home-trending-series', data.trendingSeries),
-            _row('Popular series', 'home-popular-series', data.popularSeries),
-          ],
-        );
-      },
+  Widget _buildState(
+    AsyncSnapshot<TvHomeData> snapshot,
+    EdgeInsets insets,
+    List<TvMediaItem> continueWatching,
+  ) {
+    if (snapshot.connectionState != ConnectionState.done) {
+      return TvBrowseSkeleton(metrics: widget.metrics);
+    }
+    if (snapshot.hasError) {
+      return Padding(
+        padding: insets,
+        child: TvStatePanel.error(onRetry: _retry),
+      );
+    }
+    final data = snapshot.data;
+    if (data == null || data.isEmpty || data.hero == null) {
+      return Padding(
+        padding: insets,
+        child: TvStatePanel(
+          title: 'Nothing to show yet',
+          message: 'FlixQuest could not find content for this region.',
+          icon: PhosphorIcons.filmStrip(),
+          actionLabel: 'Retry',
+          onAction: _retry,
+        ),
+      );
+    }
+
+    final topTen = <String>{
+      for (final item in <TvMediaItem>[...data.topMovies, ...data.topSeries])
+        '${item.kind.name}:${item.id}',
+    };
+    return TvBrowseView(
+      featured: data.hero!,
+      metrics: widget.metrics,
+      onOpenMedia: widget.onOpenMedia,
+      focusController: widget.focusController,
+      focusMemoryScope: 'tv-home-row',
+      badgeFor: (item) => topTen.contains('${item.kind.name}:${item.id}')
+          ? TvMediaBadge.top10
+          : null,
+      rows: <TvBrowseRow>[
+        TvMediaRow(
+          title: 'Continue watching',
+          scopeId: 'home-continue-watching',
+          items: continueWatching,
+          onItemActivated: widget.onContinueWatching,
+          onItemMenu: _removeFromContinueWatching,
+          itemMenuHint: 'Hold OK to remove',
+          showBadges: false,
+        ),
+        TvTopTenRow(
+          title: 'Top 10 movies today',
+          scopeId: 'home-top-movies',
+          items: data.topMovies,
+        ),
+        _row('Trending movies', 'home-trending-movies', data.trendingMovies),
+        _row('Popular movies', 'home-popular-movies', data.popularMovies),
+        TvTopTenRow(
+          title: 'Top 10 series today',
+          scopeId: 'home-top-series',
+          items: data.topSeries,
+        ),
+        _row('Trending series', 'home-trending-series', data.trendingSeries),
+        _row('Popular series', 'home-popular-series', data.popularSeries),
+      ],
     );
   }
 
@@ -159,30 +197,5 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     );
     if (!confirmed || !mounted) return;
     await removal.apply(context.read<RecentProvider>());
-  }
-}
-
-class _TvHomeLoading extends StatelessWidget {
-  const _TvHomeLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          CircularProgressIndicator(color: colors.primary),
-          const SizedBox(height: 18),
-          Text(
-            'Loading FlixQuest',
-            style: TextStyle(
-              color: colors.onSurfaceVariant,
-              fontSize: 19,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

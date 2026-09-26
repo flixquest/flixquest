@@ -19,6 +19,7 @@ class TvMediaCard extends StatelessWidget {
     required this.width,
     this.artworkOnly = false,
     this.dimmed = false,
+    this.badge,
     super.key,
   });
 
@@ -31,6 +32,9 @@ class TvMediaCard extends StatelessWidget {
 
   /// Shades the artwork, for cards outside the row being browsed.
   final bool dimmed;
+
+  /// A short label over the artwork's top corner, such as [TvMediaBadge.top10].
+  final String? badge;
 
   static const artworkAspectRatio = 2 / 3;
   static const detailsHeight = 46.0;
@@ -83,6 +87,16 @@ class TvMediaCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   border: Border.all(color: TvDesign.hairline),
                   borderRadius: BorderRadius.circular(TvDesign.cardRadius),
+                ),
+              ),
+            if (badge case final badge?)
+              Positioned(
+                left: 6,
+                top: 6,
+                right: 6,
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: TvMediaBadge(label: badge),
                 ),
               ),
             if (item.progress case final progress?)
@@ -146,6 +160,57 @@ class TvMediaCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A card's corner label: small white capitals on a dark plate, legible over
+/// any poster without competing with the accent colour.
+class TvMediaBadge extends StatelessWidget {
+  const TvMediaBadge({required this.label, super.key});
+
+  static const top10 = 'TOP 10';
+  static const newEpisodes = 'NEW EPISODES';
+  static const recent = 'NEW';
+
+  /// How long after release a title still counts as new.
+  static const recentWindow = Duration(days: 30);
+
+  final String label;
+
+  /// [recent] for a title released (or, for a series, first aired) within
+  /// [recentWindow] of [now]; nothing for older or upcoming titles.
+  static String? recencyOf(TvMediaItem item, {DateTime? now}) {
+    final released = DateTime.tryParse(item.releaseDate ?? '');
+    if (released == null) return null;
+    final today = now ?? DateTime.now();
+    if (released.isAfter(today)) return null;
+    return today.difference(released) <= recentWindow ? recent : null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xd9050606),
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(6, 3, 5, 3),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.clip,
+          softWrap: false,
+          style: const TextStyle(
+            color: TvDesign.foreground,
+            fontFamily: 'FigtreeBold',
+            fontSize: 11,
+            height: 1.1,
+            letterSpacing: 1.1,
+          ),
+        ),
       ),
     );
   }
