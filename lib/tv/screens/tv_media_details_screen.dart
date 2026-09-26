@@ -36,6 +36,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
   static const _controller = TvMediaDetailsController();
   Future<TvMediaDetailsData>? _details;
   Future<bool>? _bookmarked;
+  bool _bookmarkBusy = false;
   Future<List<EpisodeList>>? _episodes;
   int? _selectedSeason;
   String? _configurationKey;
@@ -81,14 +82,21 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
   }
 
   Future<void> _toggleBookmark(bool current) async {
-    final updated = await _controller.toggleBookmark(widget.item, current);
-    if (mounted) {
-      setState(() => _bookmarked = Future<bool>.value(updated));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(updated ? 'Added to My List' : 'Removed from My List'),
-        ),
-      );
+    if (_bookmarkBusy) return;
+    setState(() => _bookmarkBusy = true);
+    try {
+      final updated = await _controller.toggleBookmark(widget.item, current);
+      if (mounted) {
+        setState(() => _bookmarked = Future<bool>.value(updated));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(updated ? 'Added to My List' : 'Removed from My List'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _bookmarkBusy = false);
     }
   }
 
@@ -168,6 +176,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                 data: snapshot.data!,
                 metrics: metrics,
                 bookmarked: _bookmarked!,
+                bookmarkBusy: _bookmarkBusy,
                 selectedSeason: _selectedSeason,
                 episodes: _episodes,
                 onBack: () => Navigator.of(context).pop(),
@@ -189,6 +198,7 @@ class _DetailsBody extends StatelessWidget {
     required this.data,
     required this.metrics,
     required this.bookmarked,
+    required this.bookmarkBusy,
     required this.selectedSeason,
     required this.episodes,
     required this.onBack,
@@ -201,6 +211,7 @@ class _DetailsBody extends StatelessWidget {
   final TvMediaDetailsData data;
   final TvShellMetrics metrics;
   final Future<bool> bookmarked;
+  final bool bookmarkBusy;
   final int? selectedSeason;
   final Future<List<EpisodeList>>? episodes;
   final VoidCallback onBack;
@@ -374,6 +385,7 @@ class _DetailsBody extends StatelessWidget {
                                       )
                                     : PhosphorIcons.bookmarkSimple(),
                                 onActivate: () => onToggleBookmark(saved),
+                                enabled: snapshot.hasData && !bookmarkBusy,
                                 primary: !showPlay,
                               );
                             },
@@ -543,6 +555,7 @@ class _DetailAction extends StatelessWidget {
     required this.icon,
     required this.onActivate,
     this.autofocus = false,
+    this.enabled = true,
     this.primary = false,
   });
 
@@ -550,6 +563,7 @@ class _DetailAction extends StatelessWidget {
   final IconData icon;
   final VoidCallback onActivate;
   final bool autofocus;
+  final bool enabled;
   final bool primary;
 
   @override
@@ -558,6 +572,7 @@ class _DetailAction extends StatelessWidget {
     return TvFocusable(
       semanticLabel: label,
       autofocus: autofocus,
+      enabled: enabled,
       onActivate: onActivate,
       focusScale: 1.025,
       child: Container(

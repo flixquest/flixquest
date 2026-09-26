@@ -23,6 +23,8 @@ class TvContentRow<T> extends StatefulWidget {
     required this.onItemActivated,
     this.onItemMenu,
     this.itemMenuHint,
+    this.onItemFocused,
+    this.pinFocusedItem = false,
     this.autofocus = false,
     this.itemSpacing = 14,
     this.controller,
@@ -46,6 +48,13 @@ class TvContentRow<T> extends StatefulWidget {
   /// invisible until someone is told about it. Ignored without [onItemMenu].
   final String? itemMenuHint;
 
+  final ValueChanged<T>? onItemFocused;
+
+  /// Scrolls the focused item to the row's leading edge, the way Netflix rows
+  /// move, instead of only keeping it in view. The row then owns its scrolling
+  /// and leaves any vertical scrollable around it alone.
+  final bool pinFocusedItem;
+
   final bool autofocus;
   final double itemSpacing;
   final TvContentRowController? controller;
@@ -67,6 +76,11 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
   /// playback instead of tripping the secondary action.
   static const _holdDuration = Duration(milliseconds: 500);
 
+  static const _itemFocusPadding = 4.0;
+
+  /// Lines the title up with the artwork rather than the focus ring around it.
+  static const _titleInset = TvDesign.focusOutset + _itemFocusPadding;
+
   static const _activationKeys = <LogicalKeyboardKey>[
     LogicalKeyboardKey.select,
     LogicalKeyboardKey.enter,
@@ -75,6 +89,9 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
   ];
 
   final Map<String, FocusNode> _focusNodes = <String, FocusNode>{};
+  final ScrollController _scrollController = ScrollController();
+  late final _pinnedPolicy = _PinnedRowTraversalPolicy(_stepFrom);
+  final GlobalKey _trackKey = GlobalKey();
   bool _scheduledInitialFocus = false;
   bool _rowHasFocus = false;
   Timer? _holdTimer;
@@ -227,6 +244,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
     for (final node in _focusNodes.values) {
       node.dispose();
     }
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -297,6 +315,42 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
     _holdReached = false;
   }
 
+  /// Moves focus [delta] items along from [node], or reports that the row
+  /// ends there.
+  bool _stepFrom(FocusNode node, int delta) {
+    final ids = widget.items.map(widget.itemId).toList(growable: false);
+    final index = ids.indexWhere((id) => identical(_focusNodes[id], node));
+    final target = index + delta;
+    if (index < 0 || target < 0 || target >= ids.length) return false;
+    final targetNode = _focusNodes[ids[target]];
+    if (targetNode == null || targetNode.context == null) return false;
+    targetNode.requestFocus();
+    return true;
+  }
+
+  void _pinItem(String id) {
+    final itemBox = _focusNodes[id]?.context?.findRenderObject();
+    final trackBox = _trackKey.currentContext?.findRenderObject();
+    if (itemBox is! RenderBox ||
+        trackBox is! RenderBox ||
+        !_scrollController.hasClients) {
+      return;
+    }
+    // The track's leading padding already clears the focus ring, so an item's
+    // offset along the track is the scroll that puts it at the leading edge.
+    final position = _scrollController.position;
+    final target = itemBox
+        .localToGlobal(Offset.zero, ancestor: trackBox)
+        .dx
+        .clamp(position.minScrollExtent, position.maxScrollExtent);
+    if ((target - position.pixels).abs() < 0.5) return;
+    unawaited(_scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    ));
+  }
+
   void _handleItemFocusChanged({required String id, required bool hasFocus}) {
     if (!hasFocus && _holdItemId == id) _cancelHold();
     final rowHasFocus = _focusNodes.values.any((node) => node.hasFocus);
@@ -317,6 +371,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
       children: <Widget>[
         Row(
           children: <Widget>[
+            const SizedBox(width: _titleInset),
             Flexible(
               child: Text(
                 widget.title,
@@ -353,8 +408,11 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
         ),
         const SizedBox(height: 5),
         FocusTraversalGroup(
-          policy: ReadingOrderTraversalPolicy(),
+          policy: widget.pinFocusedItem
+              ? _pinnedPolicy
+              : ReadingOrderTraversalPolicy(),
           child: SingleChildScrollView(
+            controller: _scrollController,
             scrollDirection: Axis.horizontal,
             clipBehavior: Clip.hardEdge,
             padding: const EdgeInsets.symmetric(
@@ -362,6 +420,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
               horizontal: TvDesign.focusOutset,
             ),
             child: Row(
+              key: _trackKey,
               children: <Widget>[
                 for (var index = 0; index < widget.items.length; index++) ...[
                   Builder(
@@ -378,14 +437,16 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
                               scopeId: widget.scopeId,
                               itemId: id,
                             );
+                            widget.onItemFocused?.call(item);
+                            if (widget.pinFocusedItem) _pinItem(id);
                           }
                           _handleItemFocusChanged(id: id, hasFocus: hasFocus);
                         },
                         onActivate: () => widget.onItemActivated(item),
                         onLongPress:
                             onItemMenu == null ? null : () => onItemMenu(item),
-                        padding: const EdgeInsets.all(4),
-                        scrollAlignment: 0.6,
+                        padding: const EdgeInsets.all(_itemFocusPadding),
+                        scrollAlignment: widget.pinFocusedItem ? null : 0.6,
                         borderRadius: BorderRadius.circular(
                           TvDesign.cardRadius + 2,
                         ),
@@ -402,5 +463,26 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
         ),
       ],
     );
+  }
+}
+
+/// Keeps Left and Right on a pinned row's own cards.
+///
+/// A pinned row scrolls earlier cards off past its leading edge, where
+/// geometric traversal would find them, or another row's, before the rail.
+/// Off either end there is no move, so Left from the first card reaches
+/// whatever the row's parent does with an unhandled Left.
+class _PinnedRowTraversalPolicy extends ReadingOrderTraversalPolicy {
+  _PinnedRowTraversalPolicy(this._step);
+
+  final bool Function(FocusNode node, int delta) _step;
+
+  @override
+  bool inDirection(FocusNode currentNode, TraversalDirection direction) {
+    return switch (direction) {
+      TraversalDirection.left => _step(currentNode, -1),
+      TraversalDirection.right => _step(currentNode, 1),
+      _ => super.inDirection(currentNode, direction),
+    };
   }
 }

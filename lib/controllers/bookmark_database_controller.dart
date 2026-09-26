@@ -57,7 +57,13 @@ class MovieDatabaseController {
   // this method will be used to insert movies in the database.
   Future<int> insertMovie(Movie movie) async {
     Database db = await database;
-    var result = await db.insert(tableName, movie.toMap());
+    // A bookmark may already have been saved by another screen or cloud sync.
+    // Keep its original date_added when the same movie is saved again.
+    var result = await db.insert(
+      tableName,
+      movie.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
     return result;
   }
 
@@ -164,7 +170,13 @@ class TVDatabaseController {
   // this method will be used to insert tv in the database.
   Future<int> insertTV(TV tv) async {
     Database db = await database;
-    var result = await db.insert(tableName, tv.toMap());
+    // A bookmark may already have been saved by another screen or cloud sync.
+    // Keep its original date_added when the same show is saved again.
+    var result = await db.insert(
+      tableName,
+      tv.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
     return result;
   }
 

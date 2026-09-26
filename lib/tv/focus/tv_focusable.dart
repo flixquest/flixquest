@@ -38,7 +38,10 @@ class TvFocusable extends StatefulWidget {
   final double focusScale;
   final Color? focusColor;
   final EdgeInsetsGeometry padding;
-  final double scrollAlignment;
+
+  /// Where focus scrolls this widget to in its scrollables; null leaves
+  /// scrolling to a parent that positions focused items itself.
+  final double? scrollAlignment;
   final KeyEventResult Function(FocusNode node, KeyEvent event)? onKeyEvent;
 
   @override
@@ -86,14 +89,15 @@ class _TvFocusableState extends State<TvFocusable> {
       setState(() => _hasFocus = hasFocus);
     }
     widget.onFocusChanged?.call(hasFocus);
-    if (hasFocus) {
+    final scrollAlignment = widget.scrollAlignment;
+    if (hasFocus && scrollAlignment != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _focusNode.hasFocus) {
           Scrollable.ensureVisible(
             context,
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
-            alignment: widget.scrollAlignment,
+            alignment: scrollAlignment,
             alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
           );
         }

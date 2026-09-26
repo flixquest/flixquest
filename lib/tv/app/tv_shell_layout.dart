@@ -39,17 +39,20 @@ class TvShellLayoutState extends State<TvShellLayout> {
   final Map<String, TvScreenFocusController> _focusControllers =
       <String, TvScreenFocusController>{};
 
-  // Flutter's arrow-key traversal searches the whole focus scope, so the rail
-  // and the screen beside it would otherwise leak into each other at their
-  // edges. Whichever side does not hold focus is kept out of traversal.
-  final FocusNode _railRegion = FocusNode(
+  // Flutter's arrow-key traversal searches the nearest focus scope, so giving
+  // the rail and the screen a scope each keeps them from leaking into each
+  // other at their edges; crossing between them is always explicit.
+  //
+  // Toggling `descendantsAreTraversable` on one shared scope did the same job
+  // but broke traversal for good: a `Focus` given a node copies the node's
+  // inherited skip-traversal state into it whenever it rebuilds, so anything
+  // rebuilt while its side was switched off stayed unreachable.
+  final FocusScopeNode _railRegion = FocusScopeNode(
     debugLabel: 'TV shell rail',
-    canRequestFocus: false,
     skipTraversal: true,
   );
-  late final FocusNode _contentRegion = FocusNode(
+  late final FocusScopeNode _contentRegion = FocusScopeNode(
     debugLabel: 'TV shell content',
-    canRequestFocus: false,
     skipTraversal: true,
     onKeyEvent: _handleContentKey,
   );
@@ -69,27 +72,10 @@ class TvShellLayoutState extends State<TvShellLayout> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    FocusManager.instance.addListener(_syncTraversableRegion);
-  }
-
-  @override
   void dispose() {
-    FocusManager.instance.removeListener(_syncTraversableRegion);
     _railRegion.dispose();
     _contentRegion.dispose();
     super.dispose();
-  }
-
-  // Runs after the focus manager has finished notifying nodes; flipping
-  // traversability from a node's own focus callback would mutate the set the
-  // manager is iterating.
-  void _syncTraversableRegion() {
-    final railFocused = _railRegion.hasFocus;
-    if (!railFocused && !_contentRegion.hasFocus) return;
-    _railRegion.descendantsAreTraversable = railFocused;
-    _contentRegion.descendantsAreTraversable = !railFocused;
   }
 
   /// Sees every key the focused screen left unhandled. Left with nowhere to go
@@ -120,12 +106,29 @@ class TvShellLayoutState extends State<TvShellLayout> {
     // Screens without an entry point (or with nothing to enter yet) take the
     // nearest control to the right, like any other directional move.
     final focused = FocusManager.instance.primaryFocus;
-    if (focused == null) return false;
-    final wasTraversable = _contentRegion.descendantsAreTraversable;
-    _contentRegion.descendantsAreTraversable = true;
-    final moved = focused.focusInDirection(TraversalDirection.right);
-    if (!moved) _contentRegion.descendantsAreTraversable = wasTraversable;
-    return moved;
+    if (focused == null || focused.context == null) return false;
+    final target = _nearestContentNode(focused.rect);
+    target?.requestFocus();
+    return target != null;
+  }
+
+  /// The content control a move right from [origin] lands on: the leftmost
+  /// one level with it, else the closest. Directional traversal cannot find it
+  /// itself, since it stays inside the rail's scope.
+  FocusNode? _nearestContentNode(Rect origin) {
+    final candidates = _contentRegion.traversalDescendants
+        .where((node) => node is! FocusScopeNode && node.context != null)
+        .toList(growable: false);
+    if (candidates.isEmpty) return null;
+    final level = candidates.where(
+      (node) => node.rect.top < origin.bottom && node.rect.bottom > origin.top,
+    );
+    if (level.isNotEmpty) {
+      return level.reduce((a, b) => b.rect.left < a.rect.left ? b : a);
+    }
+    double distance(FocusNode node) =>
+        (node.rect.center - origin.center).distanceSquared;
+    return candidates.reduce((a, b) => distance(b) < distance(a) ? b : a);
   }
 
   @override
@@ -133,8 +136,8 @@ class TvShellLayoutState extends State<TvShellLayout> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Focus(
-          focusNode: _railRegion,
+        FocusScope.withExternalFocusNode(
+          focusScopeNode: _railRegion,
           child: TvNavigationRail(
             key: _railKey,
             destinations: widget.destinations,
@@ -147,8 +150,8 @@ class TvShellLayoutState extends State<TvShellLayout> {
         ),
         SizedBox(width: widget.metrics.railGap),
         Expanded(
-          child: Focus(
-            focusNode: _contentRegion,
+          child: FocusScope.withExternalFocusNode(
+            focusScopeNode: _contentRegion,
             child: ClipRect(
               // Only the active destination stays mounted; keeping every
               // screen alive held their images and controllers in TV RAM.

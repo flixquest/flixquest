@@ -256,6 +256,116 @@ void main() {
       expect(_focused, 'TV nav series');
     });
   });
+  group('a region rebuilt while the other holds focus', () {
+    testWidgets('keeps its content reachable by the D-pad', (tester) async {
+      final revision = ValueNotifier<int>(0);
+      addTearDown(revision.dispose);
+      final layout = await _pumpLayout(
+        tester,
+        screen: (id, controller) => ValueListenableBuilder<int>(
+          valueListenable: revision,
+          builder: (_, value, __) => _RowScreen(
+            id: id,
+            focusController: controller,
+            revision: value,
+          ),
+        ),
+      );
+      layout.currentState!.focusRail();
+      await tester.pumpAndSettle();
+
+      // Data arriving while the rail holds focus rebuilds the whole screen.
+      revision.value++;
+      await tester.pumpAndSettle();
+
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+      expect(_focused, 'movies card 0');
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+      expect(_focused, 'movies card 1');
+      await _press(tester, LogicalKeyboardKey.arrowLeft);
+      expect(_focused, 'movies card 0');
+    });
+
+    testWidgets('keeps the rail reachable by the D-pad', (tester) async {
+      final layout = await _pumpLayout(tester, selectedId: 'movies');
+      layout.currentState!.focusRail();
+      await tester.pumpAndSettle();
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+      expect(_focused, 'movies entry');
+
+      // The shell rebuilds while the content holds focus, as it does when a
+      // details page closes.
+      tester
+          .state<TvShellLayoutState>(find.byType(TvShellLayout))
+          .setState(() {});
+      tester
+          .state<TvNavigationRailState>(find.byType(TvNavigationRail))
+          .setState(() {});
+      await tester.pumpAndSettle();
+
+      await _press(tester, LogicalKeyboardKey.arrowLeft);
+      expect(_focused, 'TV nav movies');
+      await _press(tester, LogicalKeyboardKey.arrowDown);
+      expect(_focused, 'TV nav series');
+      await _press(tester, LogicalKeyboardKey.arrowUp);
+      await _press(tester, LogicalKeyboardKey.arrowUp);
+      expect(_focused, 'TV nav search');
+    });
+  });
+}
+
+/// A row of cards moved between by plain directional traversal, the way
+/// most TV screens move focus. [revision] only forces a rebuild.
+class _RowScreen extends StatefulWidget {
+  const _RowScreen({
+    required this.id,
+    required this.revision,
+    this.focusController,
+  });
+
+  final String id;
+  final int revision;
+  final TvScreenFocusController? focusController;
+
+  @override
+  State<_RowScreen> createState() => _RowScreenState();
+}
+
+class _RowScreenState extends State<_RowScreen> {
+  late final List<FocusNode> _cards = <FocusNode>[
+    for (var i = 0; i < 3; i++) FocusNode(debugLabel: '${widget.id} card $i'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusController?.attach(this, () {
+      _cards.first.requestFocus();
+      return true;
+    });
+  }
+
+  @override
+  void dispose() {
+    widget.focusController?.detach(this);
+    for (final node in _cards) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        for (final node in _cards)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: _button(node.debugLabel!, node: node, height: 120),
+          ),
+      ],
+    );
+  }
 }
 
 /// A catalog-shaped screen: a chip across the top, an entry card in the
