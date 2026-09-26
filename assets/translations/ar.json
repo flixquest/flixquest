@@ -642,5 +642,12 @@
   "google_signin_failed": "تعذّر تسجيل الدخول باستخدام Google. يرجى المحاولة مرة أخرى.",
   "link_unavailable": "غير موجود على TMDB",
   "link_unavailable_message": "لا يوجد سجل لهذا الرابط على TMDB. ربما تم حذفه.",
-  "link_unreadable": "لم يتم العثور على رابط TMDB أو IMDb فيما شاركته"
+  "link_unreadable": "لم يتم العثور على رابط TMDB أو IMDb فيما شاركته",
+  "home": "الرئيسية",
+  "new_and_hot": "جديد ورائج",
+  "my_flixquest": "FlixQuest الخاص بي",
+  "home_movies": "الرئيسية: أفلام",
+  "home_series": "الرئيسية: مسلسلات",
+  "my_list": "قائمتي",
+  "downloads": "التنزيلات"
 }

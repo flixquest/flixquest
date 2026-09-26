@@ -642,5 +642,12 @@
   "google_signin_failed": "Google sign-in failed. Please try again.",
   "link_unavailable": "Not on TMDB",
   "link_unavailable_message": "TMDB has no record of this link. It may have been removed.",
-  "link_unreadable": "No TMDB or IMDb link found in what you shared"
+  "link_unreadable": "No TMDB or IMDb link found in what you shared",
+  "home": "Home",
+  "new_and_hot": "New & Hot",
+  "my_flixquest": "My FlixQuest",
+  "home_movies": "Home: Movies",
+  "home_series": "Home: Series",
+  "my_list": "My List",
+  "downloads": "Downloads"
 }

@@ -9,11 +9,21 @@ class AppSessionStateStore {
       'app_session.television_destination.v1';
 
   static const handheldDestinations = <String>{
-    'movies',
-    'series',
-    'discover',
-    'downloads',
-    'profile',
+    'home',
+    'new',
+    'search',
+    'mine',
+  };
+
+  /// Tabs the phone had before Movies and Series became Home filters, and
+  /// where each one's content lives now.
+  static const legacyHandheldDestinations = <String, String>{
+    'movies': 'home',
+    'series': 'home',
+    'discover': 'home',
+    'downloads': 'mine',
+    'profile': 'mine',
+    'bookmarks': 'mine',
   };
 
   static const televisionDestinations = <String>{
@@ -30,10 +40,11 @@ class AppSessionStateStore {
 
   final SharedPreferences _preferences;
 
-  String? get handheldDestination => _validatedDestination(
-        handheldDestinationKey,
-        handheldDestinations,
-      );
+  String? get handheldDestination {
+    final stored = _preferences.getString(handheldDestinationKey);
+    return legacyHandheldDestinations[stored] ??
+        (handheldDestinations.contains(stored) ? stored : null);
+  }
 
   String? get televisionDestination => _validatedDestination(
         televisionDestinationKey,
@@ -52,11 +63,6 @@ class AppSessionStateStore {
 
   String? _validatedDestination(String key, Set<String> validDestinations) {
     final destinationId = _preferences.getString(key);
-    // Keep users on the same fourth tab after the navbar destination swap.
-    if (destinationId == 'bookmarks' &&
-        validDestinations.contains('downloads')) {
-      return 'downloads';
-    }
     return validDestinations.contains(destinationId) ? destinationId : null;
   }
 }

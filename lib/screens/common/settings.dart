@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flixquest/models/app_colors.dart';
+import 'package:flixquest/models/default_home.dart';
 import 'package:flixquest/services/globle_method.dart';
 
 import '../../functions/function.dart';
@@ -342,18 +343,19 @@ class _SettingsState extends State<Settings> {
                   onChanged: (value) =>
                       setState(() => settingsValues.defaultView = value),
                 ),
-                _SettingsChoiceTile<int>(
+                _SettingsChoiceTile<DefaultHome>(
                   icon: PhosphorIcons.deviceMobile(),
                   title: tr('default_home_screen'),
-                  value: settingsValues.defaultValue,
+                  value: settingsValues.defaultHome,
                   options: {
-                    0: tr('movies'),
-                    1: tr('tv_shows'),
-                    2: tr('discover'),
-                    3: tr('profile'),
+                    DefaultHome.home: tr('home'),
+                    DefaultHome.homeMovies: tr('home_movies'),
+                    DefaultHome.homeSeries: tr('home_series'),
+                    DefaultHome.search: tr('search'),
+                    DefaultHome.mine: tr('my_flixquest'),
                   },
                   onChanged: (value) =>
-                      setState(() => settingsValues.defaultValue = value),
+                      setState(() => settingsValues.defaultHome = value),
                 ),
                 ListTile(
                   onTap: (() {

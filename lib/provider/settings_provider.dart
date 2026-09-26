@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../functions/subtitle_style.dart';
+import '../models/default_home.dart';
 import '../preferences/setting_preferences.dart';
 import '../services/analytics_service.dart';
 import '../video_providers/names.dart';
@@ -16,8 +17,8 @@ class SettingsProvider with ChangeNotifier {
   String _appTheme = 'amoled';
   String get appTheme => _appTheme;
 
-  int _defaultValue = 0;
-  int get defaultValue => _defaultValue;
+  DefaultHome _defaultHome = DefaultHome.home;
+  DefaultHome get defaultHome => _defaultHome;
 
   String _imageQuality = 'w500/';
   String get imageQuality => _imageQuality;
@@ -152,13 +153,14 @@ class SettingsProvider with ChangeNotifier {
 
   // screen preference
   Future<void> getCurrentDefaultScreen() async {
-    defaultValue = await _settingsPreferences.getDefaultHome();
+    _defaultHome = await _settingsPreferences.getDefaultHome();
+    notifyListeners();
   }
 
-  set defaultValue(int value) {
-    _defaultValue = value;
+  set defaultHome(DefaultHome value) {
+    _defaultHome = value;
     _settingsPreferences.setDefaultHome(value);
-    _trackSetting('Default Screen', value);
+    _trackSetting('Default Screen', value.id);
     notifyListeners();
   }
 

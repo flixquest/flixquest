@@ -12,6 +12,8 @@ import '../../services/flixquest_auth_service.dart';
 import '../../ui_components/app_ui_components.dart';
 import '../../widgets/app_logo.dart';
 import '../common/about.dart';
+import '../common/bookmark_screen.dart';
+import '../common/downloads_screen.dart';
 import '../common/server_status_screen.dart';
 import '../common/settings.dart' as app_settings;
 import '../common/update_screen.dart';
@@ -333,6 +335,16 @@ class _UserInfoState extends State<UserInfo> {
 
   Widget _profileActions({required bool authenticated}) {
     final actions = <Widget>[
+      _ProfileAction(
+        icon: PhosphorIcons.bookmarkSimple(),
+        title: tr('my_list'),
+        onTap: () => _push(const BookmarkScreen()),
+      ),
+      _ProfileAction(
+        icon: PhosphorIcons.downloadSimple(),
+        title: tr('downloads'),
+        onTap: () => _push(const DownloadsScreen()),
+      ),
       if (authenticated)
         _ProfileAction(
           icon: PhosphorIcons.user(),

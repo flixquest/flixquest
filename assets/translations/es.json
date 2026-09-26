@@ -642,5 +642,12 @@
   "google_signin_failed": "No se pudo iniciar sesión con Google. Inténtalo de nuevo.",
   "link_unavailable": "No está en TMDB",
   "link_unavailable_message": "TMDB no tiene ningún registro de este enlace. Puede que se haya eliminado.",
-  "link_unreadable": "No se encontró ningún enlace de TMDB o IMDb en lo que compartiste"
+  "link_unreadable": "No se encontró ningún enlace de TMDB o IMDb en lo que compartiste",
+  "home": "Inicio",
+  "new_and_hot": "Novedades",
+  "my_flixquest": "Mi FlixQuest",
+  "home_movies": "Inicio: Películas",
+  "home_series": "Inicio: Series",
+  "my_list": "Mi lista",
+  "downloads": "Descargas"
 }

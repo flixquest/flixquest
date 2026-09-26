@@ -1,5 +1,6 @@
 // ignore_for_file: constant_identifier_names
 import 'package:flixquest/constants/app_constants.dart';
+import 'package:flixquest/models/default_home.dart';
 
 class SettingsPreferences {
   static const ADULT_MODE_STATUS = 'adultStatus-v2';
@@ -22,14 +23,12 @@ class SettingsPreferences {
     return sharedPrefsSingleton.getString(COUNTRY_STATUS) ?? 'US';
   }
 
-  static const DEFAULT_SCREEN_STATUS = 'defaultStatus';
-  setDefaultHome(int deafultHomeValue) async {
-    sharedPrefsSingleton.setInt(DEFAULT_SCREEN_STATUS, deafultHomeValue);
+  setDefaultHome(DefaultHome value) async {
+    await value.save(sharedPrefsSingleton);
   }
 
-  Future<int> getDefaultHome() async {
-    return sharedPrefsSingleton.getInt(DEFAULT_SCREEN_STATUS) ?? 0;
-  }
+  Future<DefaultHome> getDefaultHome() async =>
+      DefaultHome.load(sharedPrefsSingleton);
 
   static const IMAGE_QUALITY_STATUS = 'w500/';
   setImageQuality(String imageQuality) async {

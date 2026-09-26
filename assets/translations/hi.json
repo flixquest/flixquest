@@ -642,5 +642,12 @@
   "google_signin_failed": "Google से साइन इन करना विफल रहा। कृपया पुनः प्रयास करें।",
   "link_unavailable": "TMDB पर उपलब्ध नहीं",
   "link_unavailable_message": "TMDB पर इस लिंक का कोई रिकॉर्ड नहीं है। इसे हटाया जा चुका हो सकता है।",
-  "link_unreadable": "आपने जो साझा किया उसमें TMDB या IMDb का कोई लिंक नहीं मिला"
+  "link_unreadable": "आपने जो साझा किया उसमें TMDB या IMDb का कोई लिंक नहीं मिला",
+  "home": "होम",
+  "new_and_hot": "नया और लोकप्रिय",
+  "my_flixquest": "मेरा FlixQuest",
+  "home_movies": "होम: फिल्में",
+  "home_series": "होम: सीरीज़",
+  "my_list": "मेरी सूची",
+  "downloads": "डाउनलोड"
 }

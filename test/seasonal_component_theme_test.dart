@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('seasonal accent reaches every Material control theme',
+  testWidgets('seasonal accent reaches the accent controls; the rest stay ink',
       (tester) async {
     late ThemeData seasonalTheme;
     final occasionalTheme = OccasionalTheme.fromJson(<String, dynamic>{
@@ -37,13 +37,8 @@ void main() {
     );
 
     final accent = occasionalTheme.primaryColor;
+    // The accent is kept for selection, progress and small marks.
     expect(seasonalTheme.colorScheme.primary, accent);
-    expect(seasonalTheme.iconTheme.color, accent);
-    expect(
-      seasonalTheme.iconButtonTheme.style?.foregroundColor
-          ?.resolve(<WidgetState>{}),
-      accent,
-    );
     expect(
       seasonalTheme.radioTheme.fillColor?.resolve(<WidgetState>{}),
       accent,
@@ -57,12 +52,19 @@ void main() {
     expect(seasonalTheme.sliderTheme.activeTrackColor, accent);
     expect(seasonalTheme.sliderTheme.thumbColor, accent);
     expect(seasonalTheme.textSelectionTheme.cursorColor, accent);
-    expect(seasonalTheme.floatingActionButtonTheme.backgroundColor, accent);
-    expect(seasonalTheme.bottomNavigationBarTheme.selectedItemColor, accent);
-    expect(seasonalTheme.navigationRailTheme.selectedIconTheme?.color, accent);
     expect(seasonalTheme.badgeTheme.backgroundColor, accent);
 
-    expect(seasonalTheme.iconTheme.color, isNot(Colors.deepPurple));
+    // Icons, buttons and navigation are ink, whatever the season.
+    const ink = Color(0xFFF7F7F7);
+    expect(seasonalTheme.iconTheme.color, ink);
+    expect(
+      seasonalTheme.iconButtonTheme.style?.foregroundColor
+          ?.resolve(<WidgetState>{}),
+      ink,
+    );
+    expect(seasonalTheme.floatingActionButtonTheme.foregroundColor, ink);
+    expect(seasonalTheme.bottomNavigationBarTheme.selectedItemColor, ink);
+    expect(seasonalTheme.navigationRailTheme.selectedIconTheme?.color, ink);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -87,14 +89,11 @@ void main() {
     await tester.pumpAndSettle();
     final shareContext = tester.element(find.byIcon(Icons.share));
     expect(Theme.of(shareContext).useMaterial3, seasonalTheme.useMaterial3);
-    expect(Theme.of(shareContext).iconTheme.color, accent);
-    expect(
-      IconTheme.of(shareContext).color,
-      accent,
-    );
+    expect(Theme.of(shareContext).iconTheme.color, ink);
+    expect(IconTheme.of(shareContext).color, ink);
     expect(
       IconTheme.of(tester.element(find.byIcon(Icons.bookmark))).color,
-      accent,
+      isNot(Colors.deepPurple),
     );
   });
 }
