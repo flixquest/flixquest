@@ -197,6 +197,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: TvDesign.surfaceFor(context),
@@ -222,21 +223,21 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                         padding: const EdgeInsets.all(TvDesign.focusOutset),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
+                            gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: <Color>[
-                                Color(0xff191a19),
-                                Color(0xff111211),
+                                palette.raisedSurface,
+                                palette.surface,
                               ],
                             ),
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.09),
-                            ),
+                            border: Border.all(color: palette.hairline),
                             boxShadow: <BoxShadow>[
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.34),
+                                color: Colors.black.withValues(
+                                  alpha: palette.dark ? 0.34 : 0.1,
+                                ),
                                 blurRadius: 30,
                                 offset: const Offset(0, 16),
                               ),
@@ -255,7 +256,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                         _isSignIn
                                             ? PhosphorIcons.signIn()
                                             : PhosphorIcons.userPlus(),
-                                        color: TvDesign.mutedText,
+                                        color: palette.mutedText,
                                         size: 30,
                                       ),
                                       const SizedBox(width: 13),
@@ -264,7 +265,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                             ? 'Sign in to FlixQuest'
                                             : 'Create your account',
                                         style: TextStyle(
-                                          color: TvDesign.foreground,
+                                          color: palette.foreground,
                                           fontFamily: 'FigtreeBold',
                                           fontSize: compact ? 28 : 34,
                                           letterSpacing: -0.45,
@@ -286,10 +287,9 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                           horizontal: 18,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: TvDesign.raisedSurface,
+                                          color: palette.raisedSurface,
                                           border: Border.all(
-                                            color: Colors.white
-                                                .withValues(alpha: 0.08),
+                                            color: palette.hairline,
                                           ),
                                           borderRadius:
                                               BorderRadius.circular(9),
@@ -298,7 +298,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                           children: <Widget>[
                                             Icon(
                                               PhosphorIcons.googleLogo(),
-                                              color: TvDesign.foreground,
+                                              color: palette.foreground,
                                               size: 24,
                                             ),
                                             const SizedBox(width: 13),
@@ -306,7 +306,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                               child: Text(
                                                 'Continue with Google',
                                                 style: TextStyle(
-                                                  color: TvDesign.foreground,
+                                                  color: palette.foreground,
                                                   fontFamily: 'FigtreeSB',
                                                   fontSize: 18,
                                                 ),
@@ -314,7 +314,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                             ),
                                             Icon(
                                               PhosphorIcons.caretRight(),
-                                              color: TvDesign.mutedText,
+                                              color: palette.mutedText,
                                               size: 21,
                                             ),
                                           ],
@@ -326,7 +326,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                       children: <Widget>[
                                         Expanded(
                                           child: Divider(
-                                            color: TvDesign.hairline,
+                                            color: palette.hairline,
                                           ),
                                         ),
                                         Padding(
@@ -336,7 +336,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                           child: Text(
                                             'or',
                                             style: TextStyle(
-                                              color: TvDesign.mutedText,
+                                              color: palette.mutedText,
                                               fontFamily: 'FigtreeSB',
                                               fontSize: 16,
                                             ),
@@ -344,7 +344,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                         ),
                                         Expanded(
                                           child: Divider(
-                                            color: TvDesign.hairline,
+                                            color: palette.hairline,
                                           ),
                                         ),
                                       ],
@@ -548,15 +548,16 @@ class _TvAuthFieldState extends State<_TvAuthField> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       decoration: BoxDecoration(
-        color: TvDesign.raisedSurface,
+        color: palette.raisedSurface,
         borderRadius: BorderRadius.circular(9),
         border: Border.all(
           color: _focused
-              ? Colors.white
-              : TvDesign.foreground.withValues(alpha: 0.09),
+              ? palette.foreground
+              : palette.foreground.withValues(alpha: 0.09),
           width: _focused ? 3 : 1,
         ),
       ),
@@ -576,12 +577,12 @@ class _TvAuthFieldState extends State<_TvAuthField> {
             widget.onSubmitted?.call(value);
           }
         },
-        style: TextStyle(color: TvDesign.foreground, fontSize: 19),
+        style: TextStyle(color: palette.foreground, fontSize: 19),
         decoration: InputDecoration(
           border: InputBorder.none,
-          prefixIcon: Icon(widget.icon, color: TvDesign.mutedText),
+          prefixIcon: Icon(widget.icon, color: palette.mutedText),
           labelText: widget.label,
-          labelStyle: TextStyle(color: TvDesign.mutedText),
+          labelStyle: TextStyle(color: palette.mutedText),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 18, vertical: 17),
         ),
@@ -598,13 +599,14 @@ class _ProfilePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
           'Choose a profile image',
           style: TextStyle(
-            color: TvDesign.foreground,
+            color: palette.foreground,
             fontFamily: 'FigtreeSB',
             fontSize: 18,
           ),
@@ -623,7 +625,7 @@ class _ProfilePicker extends StatelessWidget {
                 child: Container(
                   padding: EdgeInsets.all(selectedId == id ? 3 : 0),
                   decoration: BoxDecoration(
-                    color: selectedId == id ? TvDesign.foreground : null,
+                    color: selectedId == id ? palette.foreground : null,
                     borderRadius: BorderRadius.circular(11),
                   ),
                   child: ClipRRect(
@@ -651,6 +653,7 @@ class _BackAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return TvFocusable(
       semanticLabel: 'Back',
       onActivate: onActivate,
@@ -658,21 +661,21 @@ class _BackAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
         decoration: BoxDecoration(
-          color: TvDesign.raisedSurface,
+          color: palette.raisedSurface,
           border: Border.all(
-            color: TvDesign.foreground.withValues(alpha: 0.09),
+            color: palette.foreground.withValues(alpha: 0.09),
           ),
           borderRadius: BorderRadius.circular(9),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(PhosphorIcons.caretLeft(), color: TvDesign.foreground),
+            Icon(PhosphorIcons.caretLeft(), color: palette.foreground),
             const SizedBox(width: 8),
             Text(
               'Back',
               style: TextStyle(
-                color: TvDesign.foreground,
+                color: palette.foreground,
                 fontFamily: 'FigtreeSB',
                 fontSize: 18,
               ),

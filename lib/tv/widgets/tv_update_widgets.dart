@@ -48,6 +48,7 @@ class TvUpdateChangelog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return TvFocusable(
       semanticLabel: 'What’s new',
       focusNode: focusNode,
@@ -56,9 +57,9 @@ class TvUpdateChangelog extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 22),
         decoration: BoxDecoration(
-          color: TvDesign.surface,
+          color: palette.surface,
           borderRadius: BorderRadius.circular(TvDesign.cardRadius),
-          border: Border.all(color: TvDesign.hairline.withValues(alpha: .6)),
+          border: Border.all(color: palette.hairline.withValues(alpha: .6)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,13 +69,13 @@ class TvUpdateChangelog extends StatelessWidget {
                 Container(
                   width: 3,
                   height: 24,
-                  color: TvDesign.mutedText,
+                  color: palette.mutedText,
                 ),
                 const SizedBox(width: 12),
                 Text(
                   'What’s new',
-                  style: const TextStyle(
-                    color: TvDesign.foreground,
+                  style: TextStyle(
+                    color: palette.foreground,
                     fontFamily: 'FigtreeBold',
                     fontSize: 21,
                     letterSpacing: -0.25,
@@ -85,8 +86,8 @@ class TvUpdateChangelog extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               changeLog,
-              style: const TextStyle(
-                color: TvDesign.mutedText,
+              style: TextStyle(
+                color: palette.mutedText,
                 fontSize: 19,
                 height: 1.45,
               ),
@@ -110,8 +111,9 @@ class TvUpdateLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Scaffold(
-      backgroundColor: TvDesign.pageBackground,
+      backgroundColor: palette.page,
       body: Stack(
         children: <Widget>[
           Positioned.fill(
@@ -121,9 +123,9 @@ class TvUpdateLayout extends StatelessWidget {
                   begin: Alignment.topRight,
                   end: Alignment.bottomLeft,
                   colors: <Color>[
-                    const Color(0x0dffffff),
-                    TvDesign.pageBackground,
-                    TvDesign.pageBackground,
+                    palette.foreground.withValues(alpha: 0.05),
+                    palette.page,
+                    palette.page,
                   ],
                 ),
               ),
@@ -154,8 +156,8 @@ class TvUpdateLayout extends StatelessWidget {
                         const SizedBox(height: 7),
                         Text(
                           title,
-                          style: const TextStyle(
-                            color: TvDesign.foreground,
+                          style: TextStyle(
+                            color: palette.foreground,
                             fontFamily: 'FigtreeBold',
                             fontSize: 38,
                             letterSpacing: -0.8,
@@ -164,8 +166,8 @@ class TvUpdateLayout extends StatelessWidget {
                         const SizedBox(height: 10),
                         Text(
                           message,
-                          style: const TextStyle(
-                            color: TvDesign.mutedText,
+                          style: TextStyle(
+                            color: palette.mutedText,
                             fontSize: 20,
                             height: 1.4,
                           ),
@@ -237,6 +239,7 @@ class _TvChangelogViewState extends State<TvChangelogView> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return TvKeymap(
       onBack: () => Navigator.of(context).pop(),
       child: Focus(
@@ -244,7 +247,7 @@ class _TvChangelogViewState extends State<TvChangelogView> {
         autofocus: true,
         onKeyEvent: _onKey,
         child: Scaffold(
-          backgroundColor: TvDesign.pageBackground,
+          backgroundColor: palette.page,
           body: SafeArea(
             minimum: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
             child: Center(
@@ -265,19 +268,19 @@ class _TvChangelogViewState extends State<TvChangelogView> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
+                      Text(
                         'What’s new',
                         style: TextStyle(
-                          color: TvDesign.foreground,
+                          color: palette.foreground,
                           fontFamily: 'FigtreeBold',
                           fontSize: 36,
                           letterSpacing: -0.7,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text('Use ↑ ↓ to scroll',
+                      Text('Use ↑ ↓ to scroll',
                           style: TextStyle(
-                              color: TvDesign.mutedText, fontSize: 16)),
+                              color: palette.mutedText, fontSize: 16)),
                       const SizedBox(height: 24),
                       Expanded(
                           child: Scrollbar(
@@ -288,8 +291,8 @@ class _TvChangelogViewState extends State<TvChangelogView> {
                                 padding: const EdgeInsets.only(
                                     right: 24, bottom: 16),
                                 child: Text(widget.changeLog,
-                                    style: const TextStyle(
-                                        color: Colors.white,
+                                    style: TextStyle(
+                                        color: palette.foreground,
                                         fontSize: 21,
                                         height: 1.6)),
                               ))),

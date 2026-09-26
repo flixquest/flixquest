@@ -231,6 +231,7 @@ class TvShellLayoutState extends State<TvShellLayout>
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final metrics = widget.metrics;
     final system = MediaQuery.paddingOf(context);
     double safe(double systemInset) =>
@@ -284,18 +285,18 @@ class TvShellLayoutState extends State<TvShellLayout>
             opacity: _railExpanded ? 1 : 0,
             duration: _railMotion,
             curve: Curves.easeOut,
-            child: const DecoratedBox(
+            child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   // Opaque under the labels, where the screen's own text would
                   // otherwise ghost through them, then a dim over the rest.
                   colors: <Color>[
-                    Color(0xff050606),
-                    Color(0xf7050606),
-                    Color(0x99050606),
-                    Color(0x73050606),
+                    palette.scrim(1),
+                    palette.scrim(0.97),
+                    palette.scrim(0.6),
+                    palette.scrim(0.45),
                   ],
-                  stops: <double>[0, 0.27, 0.5, 1],
+                  stops: const <double>[0, 0.27, 0.5, 1],
                 ),
               ),
             ),

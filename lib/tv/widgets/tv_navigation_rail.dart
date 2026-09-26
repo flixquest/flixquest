@@ -203,6 +203,7 @@ class TvNavigationRailState extends State<TvNavigationRail> {
     required TvFocusMemory? memory,
     required bool autofocus,
   }) {
+    final palette = TvPalette.of(context);
     final colors = Theme.of(context).colorScheme;
     final metrics = widget.metrics;
     final selected = destination.id == widget.selectedId;
@@ -210,12 +211,12 @@ class TvNavigationRailState extends State<TvNavigationRail> {
     // Focus reads as a filled pill, the strongest signal at ten feet; the
     // selected destination keeps its accent bar either way.
     final foreground = focused
-        ? Colors.black
+        ? palette.onFocus
         : selected
-            ? TvDesign.foreground
+            ? palette.foreground
             : widget.expanded
-                ? TvDesign.mutedText
-                : TvDesign.mutedText.withValues(alpha: 0.75);
+                ? palette.mutedText
+                : palette.mutedText.withValues(alpha: 0.75);
 
     return TvFocusable(
       focusNode: _focusNodes[destination.id],
@@ -240,7 +241,7 @@ class TvNavigationRailState extends State<TvNavigationRail> {
         duration: const Duration(milliseconds: 150),
         height: metrics.navItemHeight,
         decoration: BoxDecoration(
-          color: focused ? const Color(0xf2ffffff) : Colors.transparent,
+          color: focused ? palette.focusFill : Colors.transparent,
           borderRadius: BorderRadius.circular(metrics.navItemHeight / 2),
         ),
         child: Stack(

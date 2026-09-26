@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app/tv_design.dart';
+
 class TvFocusable extends StatefulWidget {
   const TvFocusable({
     required this.child,
@@ -111,10 +113,12 @@ class _TvFocusableState extends State<TvFocusable> {
 
   @override
   Widget build(BuildContext context) {
-    // White is the clearest focus boundary against both very dark posters and
-    // bright artwork. Keep the effect neutral so the poster remains the visual
-    // focus and low-power TV GPUs only have one small shadow to rasterize.
-    final effectiveFocusColor = widget.focusColor ?? Colors.white;
+    // The theme's text colour is the clearest boundary on its own page:
+    // white on a dark one, near-black on a light one. Keep the effect neutral
+    // so the poster remains the visual focus and low-power TV GPUs only have
+    // one small shadow to rasterize.
+    final palette = TvPalette.of(context);
+    final effectiveFocusColor = widget.focusColor ?? palette.foreground;
     final focusable = Semantics(
       container: true,
       excludeSemantics: true,
@@ -168,7 +172,9 @@ class _TvFocusableState extends State<TvFocusable> {
                 boxShadow: _hasFocus
                     ? <BoxShadow>[
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.5),
+                          color: Colors.black.withValues(
+                            alpha: palette.dark ? 0.5 : 0.1,
+                          ),
                           blurRadius: 14,
                           offset: const Offset(0, 6),
                         ),

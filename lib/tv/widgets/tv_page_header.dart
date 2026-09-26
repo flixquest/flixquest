@@ -25,6 +25,7 @@ class TvPageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final trailing = this.trailing;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -49,7 +50,7 @@ class TvPageHeader extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: TvDesign.foreground,
+                  color: palette.foreground,
                   fontFamily: 'FigtreeBold',
                   fontSize: compact ? 30 : 38,
                   height: 1,
@@ -73,12 +74,13 @@ class TvSectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Padding(
       padding: const EdgeInsets.only(left: 16, bottom: 6),
       child: Text(
         text,
-        style: const TextStyle(
-          color: TvDesign.mutedText,
+        style: TextStyle(
+          color: palette.mutedText,
           fontFamily: 'FigtreeSB',
           fontSize: 12,
           letterSpacing: 1.5,

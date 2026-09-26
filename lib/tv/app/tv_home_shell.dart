@@ -352,6 +352,7 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final dependencies = context.watch<AppDependencyProvider>();
     final showLiveTv = dependencies.displayLiveTV;
     final destinations = _visibleDestinations(showLiveTv: showLiveTv);
@@ -375,9 +376,9 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
             node: _shellFocusScope,
             child: Scaffold(
               key: TvHomeShell.shellKey,
-              backgroundColor: TvDesign.pageBackground,
+              backgroundColor: palette.page,
               body: ColoredBox(
-                color: TvDesign.pageBackground,
+                color: palette.page,
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final metrics = TvShellMetrics.fromConstraints(constraints);

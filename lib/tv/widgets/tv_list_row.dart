@@ -39,8 +39,9 @@ class _TvListRowState extends State<TvListRow> {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = _focused ? Colors.black : TvDesign.foreground;
-    final secondary = _focused ? Colors.black54 : TvDesign.mutedText;
+    final palette = TvPalette.of(context);
+    final foreground = _focused ? palette.onFocus : palette.foreground;
+    final secondary = _focused ? palette.onFocusMuted : palette.mutedText;
     final icon = widget.icon;
     final value = widget.value;
     return TvFocusable(
@@ -60,7 +61,7 @@ class _TvListRowState extends State<TvListRow> {
         height: 56,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: _focused ? const Color(0xf2ffffff) : Colors.transparent,
+          color: _focused ? palette.focusFill : Colors.transparent,
           borderRadius: BorderRadius.circular(TvDesign.cardRadius),
         ),
         child: Row(

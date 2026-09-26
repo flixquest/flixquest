@@ -134,6 +134,7 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Scaffold(
       key: TvLandingScreen.screenKey,
       backgroundColor: TvDesign.surfaceFor(context),
@@ -146,30 +147,30 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
             alignment: Alignment.topCenter,
             opacity: const AlwaysStoppedAnimation<double>(0.3),
           ),
-          const DecoratedBox(
+          DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 colors: <Color>[
-                  Color(0xff0d0e0d),
-                  Color(0xf20d0e0d),
-                  Color(0xa60d0e0d),
+                  palette.scrim(1),
+                  palette.scrim(0.95),
+                  palette.scrim(0.65),
                 ],
               ),
             ),
           ),
-          const DecoratedBox(
+          DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: <Color>[
-                  Color(0x12000000),
-                  Color(0x28000000),
-                  Color(0xc9000000),
+                  palette.scrim(0.07),
+                  palette.scrim(0.16),
+                  palette.scrim(0.8),
                 ],
-                stops: <double>[0, 0.55, 1],
+                stops: const <double>[0, 0.55, 1],
               ),
             ),
           ),
@@ -191,21 +192,21 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
                         constraints: const BoxConstraints(maxWidth: 460),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
+                            gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: <Color>[
-                                Color(0xf2171817),
-                                Color(0xf20e0f0e),
+                                palette.raisedSurface.withValues(alpha: 0.95),
+                                palette.surface.withValues(alpha: 0.95),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.1),
-                            ),
+                            border: Border.all(color: palette.hairline),
                             boxShadow: <BoxShadow>[
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.44),
+                                color: Colors.black.withValues(
+                                  alpha: palette.dark ? 0.44 : 0.12,
+                                ),
                                 blurRadius: 34,
                                 offset: const Offset(0, 18),
                               ),
@@ -222,7 +223,7 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
                                   Text(
                                     'Ready to watch?',
                                     style: TextStyle(
-                                      color: TvDesign.foreground,
+                                      color: palette.foreground,
                                       fontFamily: 'FigtreeBold',
                                       fontSize: compact ? 26 : 32,
                                       letterSpacing: -0.45,
@@ -232,7 +233,7 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
                                   Text(
                                     'Use your remote to choose how you want to continue.',
                                     style: TextStyle(
-                                      color: TvDesign.mutedText,
+                                      color: palette.mutedText,
                                       fontSize: compact ? 16 : 19,
                                       height: 1.3,
                                     ),
@@ -303,6 +304,7 @@ class _TvLandingIntro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -329,7 +331,7 @@ class _TvLandingIntro extends StatelessWidget {
         Text(
           'FlixQuest TV',
           style: TextStyle(
-            color: Colors.white,
+            color: palette.foreground,
             fontFamily: 'FigtreeBold',
             fontSize: compact ? 44 : 58,
             height: 1,
@@ -341,7 +343,7 @@ class _TvLandingIntro extends StatelessWidget {
           child: Text(
             'Movies, series, and your watchlist—designed for the big screen.',
             style: TextStyle(
-              color: Colors.white70,
+              color: palette.secondaryText,
               fontSize: compact ? 20 : 24,
               height: 1.35,
             ),
@@ -380,7 +382,8 @@ class _TvLandingActionState extends State<_TvLandingAction> {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = _focused ? Colors.black : TvDesign.foreground;
+    final palette = TvPalette.of(context);
+    final foreground = _focused ? palette.onFocus : palette.foreground;
     return TvFocusable(
       semanticLabel: widget.label,
       autofocus: widget.autofocus,
@@ -401,10 +404,10 @@ class _TvLandingActionState extends State<_TvLandingAction> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
             color: _focused
-                ? const Color(0xf2ffffff)
+                ? palette.focusFill
                 : widget.primary
-                    ? const Color(0x40ffffff)
-                    : const Color(0x1fffffff),
+                    ? palette.idleFillStrong
+                    : palette.idleFill,
             borderRadius: BorderRadius.circular(TvDesign.cardRadius),
           ),
           child: Row(
@@ -423,7 +426,7 @@ class _TvLandingActionState extends State<_TvLandingAction> {
               ),
               Icon(
                 PhosphorIcons.caretRight(),
-                color: _focused ? Colors.black54 : TvDesign.mutedText,
+                color: _focused ? palette.onFocusMuted : palette.mutedText,
                 size: 20,
               ),
             ],

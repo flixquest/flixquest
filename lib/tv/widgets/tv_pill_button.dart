@@ -49,11 +49,12 @@ class _TvPillButtonState extends State<TvPillButton> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final foreground = !widget.enabled
-        ? TvDesign.mutedText.withValues(alpha: 0.5)
+        ? palette.mutedText.withValues(alpha: 0.5)
         : _focused
-            ? Colors.black
-            : TvDesign.foreground;
+            ? palette.onFocus
+            : palette.foreground;
     final icon = widget.icon;
     return TvFocusable(
       focusNode: widget.focusNode,
@@ -75,10 +76,10 @@ class _TvPillButtonState extends State<TvPillButton> {
         padding: const EdgeInsets.symmetric(horizontal: 18),
         decoration: BoxDecoration(
           color: _focused
-              ? const Color(0xf2ffffff)
+              ? palette.focusFill
               : widget.prominent
-                  ? const Color(0x40ffffff)
-                  : const Color(0x24ffffff),
+                  ? palette.idleFillStrong
+                  : palette.idleFill,
           borderRadius: BorderRadius.circular(TvDesign.cardRadius),
         ),
         child: Row(

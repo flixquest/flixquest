@@ -77,8 +77,9 @@ class _TvCollectionScreenState extends State<TvCollectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Scaffold(
-      backgroundColor: TvDesign.pageBackground,
+      backgroundColor: palette.page,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final metrics = TvShellMetrics.fromConstraints(constraints);
@@ -141,6 +142,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final colors = Theme.of(context).colorScheme;
     final logo = collection.logoAsset;
     return Row(
@@ -153,7 +155,7 @@ class _Header extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: TvDesign.raisedSurface,
+              color: palette.raisedSurface,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -176,7 +178,9 @@ class _Header extends StatelessWidget {
             width: (metrics.compact ? 48 : 60) * 16 / 9,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: TvDesign.raisedSurface,
+              // The same dark plate as the service's tile: most logos are drawn
+              // for one, in every theme.
+              color: const Color(0xff1e1f22),
               borderRadius: BorderRadius.circular(TvDesign.cardRadius),
             ),
             child: Image.asset(logo, fit: BoxFit.contain),
@@ -203,7 +207,7 @@ class _Header extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: TvDesign.foreground,
+                  color: palette.foreground,
                   fontFamily: 'FigtreeBold',
                   fontSize: metrics.compact ? 30 : 38,
                   height: 1,

@@ -384,6 +384,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final memory = TvFocusMemoryScope.maybeOf(context);
     final onItemMenu = widget.onItemMenu;
     final hint = onItemMenu == null ? null : widget.itemMenuHint;
@@ -398,7 +399,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
               child: Text(
                 widget.title,
                 style: TextStyle(
-                  color: TvDesign.foreground,
+                  color: palette.foreground,
                   fontFamily: 'FigtreeSB',
                   fontSize: 21,
                   letterSpacing: -0.15,
@@ -418,7 +419,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: TvDesign.mutedText,
+                        color: palette.mutedText,
                         fontFamily: 'Figtree',
                         fontSize: 14,
                       ),

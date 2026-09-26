@@ -32,10 +32,8 @@ class _TvBrowseSkeletonState extends State<TvBrowseSkeleton>
     duration: const Duration(milliseconds: 1100),
   )..repeat(reverse: true);
 
-  late final Animation<Color?> _color = ColorTween(
-    begin: TvDesign.surface,
-    end: const Color(0xff202122),
-  ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut));
+  late final Animation<double> _breath =
+      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut);
 
   @override
   void dispose() {
@@ -45,6 +43,7 @@ class _TvBrowseSkeletonState extends State<TvBrowseSkeleton>
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final metrics = widget.metrics;
     final compact = metrics.compact;
     final insets = TvShellInsets.of(context);
@@ -62,9 +61,15 @@ class _TvBrowseSkeletonState extends State<TvBrowseSkeleton>
                   .clamp(0.0, compact ? 430.0 : 580.0);
 
           return AnimatedBuilder(
-            animation: _color,
+            animation: _breath,
             builder: (context, _) {
-              final color = _color.value ?? TvDesign.surface;
+              // Between the panel colour and the one a step above, so the
+              // pulse is as quiet on a light page as on a dark one.
+              final color = Color.lerp(
+                palette.surface,
+                palette.raisedSurface,
+                _breath.value,
+              )!;
               Widget block(double width, double height) => Container(
                     width: width,
                     height: height,

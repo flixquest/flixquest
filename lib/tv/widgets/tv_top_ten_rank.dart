@@ -40,14 +40,20 @@ class TvTopTenRank extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
+    // A grey between the page and the text, so the hollow number reads as an
+    // outline in any theme; stepping back, it sinks toward the page.
+    final outlineColor = Color.lerp(
+      palette.page,
+      palette.foreground,
+      dimmed ? 0.16 : 0.42,
+    )!;
     return SizedBox(
       width: extentFor(rank, cardWidth),
       height: height,
       child: ExcludeSemantics(
         child: TweenAnimationBuilder<Color?>(
-          tween: ColorTween(
-            end: dimmed ? const Color(0xff2e2f30) : const Color(0xff6d6e6f),
-          ),
+          tween: ColorTween(end: outlineColor),
           duration: const Duration(milliseconds: 200),
           builder: (_, outline, __) => CustomPaint(
             painter: _RankPainter(
@@ -55,7 +61,8 @@ class TvTopTenRank extends StatelessWidget {
               fontSize: cardWidth * 1.5,
               tuck: cardWidth * _tuck,
               bottomInset: bottomInset,
-              outline: outline ?? const Color(0xff6d6e6f),
+              fill: palette.page,
+              outline: outline ?? outlineColor,
             ),
           ),
         ),
@@ -70,6 +77,7 @@ class _RankPainter extends CustomPainter {
     required this.fontSize,
     required this.tuck,
     required this.bottomInset,
+    required this.fill,
     required this.outline,
   });
 
@@ -77,6 +85,9 @@ class _RankPainter extends CustomPainter {
   final double fontSize;
   final double tuck;
   final double bottomInset;
+
+  /// Inside the digits: the page, so they read as hollow.
+  final Color fill;
   final Color outline;
 
   TextPainter _layout(TextStyle style) => TextPainter(
@@ -94,7 +105,7 @@ class _RankPainter extends CustomPainter {
       // Pulls "10" together so it stays close to a single digit's width.
       letterSpacing: rank >= 10 ? -fontSize * 0.1 : 0,
     );
-    final fill = _layout(base.copyWith(color: TvDesign.pageBackground));
+    final fillText = _layout(base.copyWith(color: fill));
     final stroke = _layout(base.copyWith(
       foreground: Paint()
         ..style = PaintingStyle.stroke
@@ -102,16 +113,16 @@ class _RankPainter extends CustomPainter {
         ..strokeJoin = StrokeJoin.round
         ..color = outline,
     ));
-    final baseline = fill.computeDistanceToActualBaseline(
+    final baseline = fillText.computeDistanceToActualBaseline(
       TextBaseline.alphabetic,
     );
     final offset = Offset(
-      size.width + tuck - fill.width,
+      size.width + tuck - fillText.width,
       size.height - bottomInset - baseline,
     );
-    fill.paint(canvas, offset);
+    fillText.paint(canvas, offset);
     stroke.paint(canvas, offset);
-    fill.dispose();
+    fillText.dispose();
     stroke.dispose();
   }
 
@@ -121,5 +132,6 @@ class _RankPainter extends CustomPainter {
       fontSize != oldDelegate.fontSize ||
       tuck != oldDelegate.tuck ||
       bottomInset != oldDelegate.bottomInset ||
+      fill != oldDelegate.fill ||
       outline != oldDelegate.outline;
 }

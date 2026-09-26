@@ -35,19 +35,20 @@ class TvStatePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Icon(icon, color: TvDesign.mutedText, size: 50),
+            Icon(icon, color: palette.mutedText, size: 50),
             const SizedBox(height: 18),
             Text(
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: TvDesign.foreground,
+                color: palette.foreground,
                 fontFamily: 'FigtreeBold',
                 fontSize: 30,
                 letterSpacing: -0.4,
@@ -58,7 +59,7 @@ class TvStatePanel extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: TvDesign.mutedText,
+                color: palette.mutedText,
                 fontSize: 20,
                 height: 1.35,
               ),

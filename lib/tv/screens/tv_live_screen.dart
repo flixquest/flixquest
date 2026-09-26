@@ -578,13 +578,14 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   /// One line: title, the LIVE NOW / PROGRAM GUIDE badge and the count, so
   /// the grid starts a full row higher than with a stacked header.
   Widget _buildTitle(bool isSchedule) {
+    final palette = TvPalette.of(context);
     final colors = Theme.of(context).colorScheme;
     return Row(
       children: <Widget>[
         Text(
           isSchedule ? 'Schedule' : 'Live TV',
-          style: const TextStyle(
-            color: TvDesign.foreground,
+          style: TextStyle(
+            color: palette.foreground,
             fontFamily: 'FigtreeSB',
             fontSize: 34,
             height: .95,
@@ -620,8 +621,8 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
                 : '${_visible.length} channels  •  Hold OK to save a favorite',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: TvDesign.mutedText,
+            style: TextStyle(
+              color: palette.mutedText,
               fontSize: 15,
             ),
           ),
@@ -657,6 +658,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   }
 
   Widget _buildControls(bool isSchedule) {
+    final palette = TvPalette.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -746,7 +748,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
               onSubmitted: (_) => _focusFirstChannelResult(),
               textInputAction: TextInputAction.search,
               style: TextStyle(
-                color: TvDesign.foreground,
+                color: palette.foreground,
                 fontSize: 20,
               ),
               decoration: InputDecoration(
@@ -766,7 +768,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
                         icon: Icon(PhosphorIcons.x()),
                       ),
                 filled: true,
-                fillColor: TvDesign.raisedSurface,
+                fillColor: palette.raisedSurface,
                 contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(TvDesign.cardRadius),
@@ -774,11 +776,11 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(TvDesign.cardRadius),
-                  borderSide: const BorderSide(color: TvDesign.hairline),
+                  borderSide: BorderSide(color: palette.hairline),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(TvDesign.cardRadius),
-                  borderSide: const BorderSide(color: Colors.white, width: 2),
+                  borderSide: BorderSide(color: palette.foreground, width: 2),
                 ),
               ),
             ),
@@ -971,6 +973,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   }
 
   Widget _buildSchedule() {
+    final palette = TvPalette.of(context);
     final sections = _scheduleSections;
     if (sections.isEmpty) {
       return TvStatePanel(
@@ -1004,8 +1007,8 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
                       section.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: palette.foreground,
                         fontFamily: 'FigtreeSB',
                         fontSize: 20,
                       ),
@@ -1013,8 +1016,8 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
                   ),
                   Text(
                     '${section.events.length} ${section.events.length == 1 ? 'event' : 'events'}',
-                    style: const TextStyle(
-                      color: TvDesign.mutedText,
+                    style: TextStyle(
+                      color: palette.mutedText,
                       fontSize: 14,
                     ),
                   ),
@@ -1113,13 +1116,14 @@ class _TvSegmentCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Container(
       height: 38,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
-            color: selected ? TvDesign.foreground : Colors.transparent,
+            color: selected ? palette.foreground : Colors.transparent,
             width: 2,
           ),
         ),
@@ -1131,7 +1135,7 @@ class _TvSegmentCell extends StatelessWidget {
           Icon(
             icon,
             size: 19,
-            color: selected ? TvDesign.foreground : TvDesign.mutedText,
+            color: selected ? palette.foreground : palette.mutedText,
           ),
           const SizedBox(width: 8),
           Text(
@@ -1139,7 +1143,7 @@ class _TvSegmentCell extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: TvDesign.foreground,
+              color: palette.foreground,
               fontFamily: selected ? 'FigtreeSB' : 'Figtree',
               fontSize: 16,
             ),
@@ -1159,6 +1163,7 @@ class _TvPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Container(
       height: 38,
       padding: const EdgeInsets.symmetric(horizontal: 13),
@@ -1166,7 +1171,7 @@ class _TvPill extends StatelessWidget {
         color: Colors.transparent,
         border: Border(
           bottom: BorderSide(
-            color: selected ? TvDesign.foreground : Colors.transparent,
+            color: selected ? palette.foreground : Colors.transparent,
             width: 2,
           ),
         ),
@@ -1179,7 +1184,7 @@ class _TvPill extends StatelessWidget {
             Icon(
               icon,
               size: 20,
-              color: selected ? TvDesign.foreground : TvDesign.mutedText,
+              color: selected ? palette.foreground : palette.mutedText,
             ),
             if (label.isNotEmpty) const SizedBox(width: 8),
           ],
@@ -1187,7 +1192,7 @@ class _TvPill extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: TvDesign.foreground,
+                color: palette.foreground,
                 fontFamily: selected ? 'FigtreeSB' : 'Figtree',
                 fontSize: 16,
               ),
@@ -1259,14 +1264,15 @@ class _TvScheduleEventTileState extends State<_TvScheduleEventTile> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final event = widget.event;
     final expanded = widget.expanded;
     final channelCount = event.channels.length;
     final showChannels = expanded && channelCount > 0;
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: TvDesign.surface,
-        border: Border(bottom: BorderSide(color: TvDesign.hairline)),
+      decoration: BoxDecoration(
+        color: palette.surface,
+        border: Border(bottom: BorderSide(color: palette.hairline)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1294,8 +1300,8 @@ class _TvScheduleEventTileState extends State<_TvScheduleEventTile> {
                       children: <Widget>[
                         Text(
                           event.displayTime,
-                          style: const TextStyle(
-                            color: TvDesign.foreground,
+                          style: TextStyle(
+                            color: palette.foreground,
                             fontFamily: 'FigtreeSB',
                             fontSize: 18,
                           ),
@@ -1312,10 +1318,10 @@ class _TvScheduleEventTileState extends State<_TvScheduleEventTile> {
                               ),
                             ),
                             const SizedBox(width: 6),
-                            const Text(
+                            Text(
                               'LIVE',
                               style: TextStyle(
-                                color: Color(0xffd9d9d9),
+                                color: palette.secondaryText,
                                 fontFamily: 'FigtreeSB',
                                 fontSize: 11,
                                 letterSpacing: 1.2,
@@ -1326,15 +1332,15 @@ class _TvScheduleEventTileState extends State<_TvScheduleEventTile> {
                       ],
                     ),
                   ),
-                  Container(width: 1, height: 40, color: TvDesign.hairline),
+                  Container(width: 1, height: 40, color: palette.hairline),
                   const SizedBox(width: 18),
                   Expanded(
                     child: Text(
                       event.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: palette.foreground,
                         fontFamily: 'FigtreeSB',
                         fontSize: 19,
                         height: 1.25,
@@ -1344,8 +1350,8 @@ class _TvScheduleEventTileState extends State<_TvScheduleEventTile> {
                   const SizedBox(width: 18),
                   Text(
                     '$channelCount ${channelCount == 1 ? 'channel' : 'channels'}',
-                    style: const TextStyle(
-                      color: TvDesign.mutedText,
+                    style: TextStyle(
+                      color: palette.mutedText,
                       fontSize: 14,
                     ),
                   ),
@@ -1354,10 +1360,10 @@ class _TvScheduleEventTileState extends State<_TvScheduleEventTile> {
                     AnimatedRotation(
                       turns: expanded ? .5 : 0,
                       duration: const Duration(milliseconds: 180),
-                      child: const Icon(
+                      child: Icon(
                         Icons.keyboard_arrow_down_rounded,
                         size: 24,
-                        color: TvDesign.mutedText,
+                        color: palette.mutedText,
                       ),
                     ),
                   ],
@@ -1389,7 +1395,7 @@ class _TvScheduleEventTileState extends State<_TvScheduleEventTile> {
                         resolving: widget.resolvingChannelId ==
                             event.channels[index].id,
                         onPlay: widget.onPlay,
-                        primary: TvDesign.foreground,
+                        primary: palette.foreground,
                       ),
                     ),
                   )
@@ -1420,6 +1426,7 @@ class _TvScheduleChannelChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return TvFocusable(
       semanticLabel: 'Watch on ${channel.name}',
       focusNode: focusNode,
@@ -1433,7 +1440,7 @@ class _TvScheduleChannelChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 13),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.12),
+          color: palette.idleFill,
           borderRadius: BorderRadius.circular(TvDesign.cardRadius),
         ),
         child: Row(
@@ -1448,10 +1455,10 @@ class _TvScheduleChannelChip extends StatelessWidget {
                 ),
               )
             else
-              const Icon(
+              Icon(
                 Icons.play_arrow_rounded,
                 size: 20,
-                color: Colors.white,
+                color: palette.foreground,
               ),
             const SizedBox(width: 6),
             ConstrainedBox(
@@ -1460,8 +1467,8 @@ class _TvScheduleChannelChip extends StatelessWidget {
                 channel.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: TvDesign.foreground,
+                style: TextStyle(
+                  color: palette.foreground,
                   fontFamily: 'FigtreeSB',
                   fontSize: 15,
                 ),
@@ -1483,6 +1490,7 @@ class _TvChannelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final secondaryLabel = channel.nowPlaying ??
         channel.nextUp ??
         (channel.categories.isEmpty
@@ -1491,8 +1499,8 @@ class _TvChannelCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: TvDesign.surface,
-        border: Border.all(color: TvDesign.hairline),
+        color: palette.surface,
+        border: Border.all(color: palette.hairline),
         borderRadius: BorderRadius.circular(TvDesign.cardRadius),
       ),
       child: Row(
@@ -1518,8 +1526,8 @@ class _TvChannelCard extends StatelessWidget {
                         channel.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: TvDesign.foreground,
+                        style: TextStyle(
+                          color: palette.foreground,
                           fontFamily: 'FigtreeSB',
                           fontSize: 16,
                           height: 1.15,
@@ -1536,8 +1544,7 @@ class _TvChannelCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color:
-                          resolving ? TvDesign.foreground : TvDesign.mutedText,
+                      color: resolving ? palette.foreground : palette.mutedText,
                       fontSize: 12,
                     ),
                   ),
@@ -1551,7 +1558,7 @@ class _TvChannelCard extends StatelessWidget {
               dimension: 18,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: TvDesign.foreground,
+                color: palette.foreground,
               ),
             ),
           ] else if (favorite) ...<Widget>[
@@ -1559,7 +1566,7 @@ class _TvChannelCard extends StatelessWidget {
             Icon(
               PhosphorIcons.heart(PhosphorIconsStyle.fill),
               size: 16,
-              color: TvDesign.foreground,
+              color: palette.foreground,
             ),
           ],
         ],
@@ -1573,15 +1580,16 @@ class _TvLiveLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          const CircularProgressIndicator(color: TvDesign.mutedText),
+          CircularProgressIndicator(color: palette.mutedText),
           const SizedBox(height: 18),
-          const Text(
+          Text(
             'Loading Live TV',
-            style: TextStyle(color: TvDesign.mutedText, fontSize: 19),
+            style: TextStyle(color: palette.mutedText, fontSize: 19),
           ),
         ],
       ),

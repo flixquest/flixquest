@@ -587,6 +587,7 @@ class _TvSubtitleOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TvFocusable(
@@ -600,7 +601,7 @@ class _TvSubtitleOption extends StatelessWidget {
           decoration: BoxDecoration(
             color: TvDesign.surfaceFor(context, emphasis: 0.012),
             borderRadius: BorderRadius.circular(5),
-            border: Border.all(color: TvDesign.hairline),
+            border: Border.all(color: palette.hairline),
           ),
           child: Row(
             children: <Widget>[
@@ -611,7 +612,9 @@ class _TvSubtitleOption extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: color,
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0x66ffffff)),
+                    border: Border.all(
+                      color: palette.foreground.withValues(alpha: 0.4),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -620,7 +623,7 @@ class _TvSubtitleOption extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: TvDesign.foreground,
+                    color: palette.foreground,
                     fontFamily: 'FigtreeSB',
                     fontSize: 21,
                   ),
@@ -629,14 +632,14 @@ class _TvSubtitleOption extends StatelessWidget {
               Text(
                 value,
                 style: TextStyle(
-                  color: TvDesign.mutedText,
+                  color: palette.mutedText,
                   fontSize: 20,
                 ),
               ),
               const SizedBox(width: 12),
               Icon(
                 PhosphorIcons.caretRight(),
-                color: TvDesign.mutedText,
+                color: palette.mutedText,
                 size: 20,
               ),
             ],
@@ -730,21 +733,22 @@ class _TvColorThemePickerState extends State<_TvColorThemePicker> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final settings = context.watch<SettingsProvider>();
     final isDark = settings.appTheme == 'dark' || settings.appTheme == 'amoled';
-    final palette = AppColorsList().appColors(isDark,
+    final swatches = AppColorsList().appColors(isDark,
         customColor:
             settings.customAppColor > 0 ? settings.customAppColor : null);
     final selectedIndex =
-        palette.any((color) => color.index == settings.appColorIndex)
+        swatches.any((color) => color.index == settings.appColorIndex)
             ? settings.appColorIndex
-            : palette.first.index;
+            : swatches.first.index;
 
     return Wrap(
       spacing: 14,
       runSpacing: 14,
       children: <Widget>[
-        for (final appColor in palette)
+        for (final appColor in swatches)
           TvFocusable(
             key: ValueKey<int>(appColor.index),
             focusNode: _nodeFor(appColor.index),
@@ -761,7 +765,7 @@ class _TvColorThemePickerState extends State<_TvColorThemePicker> {
               decoration: BoxDecoration(
                 color: TvDesign.surfaceFor(context, emphasis: 0.012),
                 borderRadius: BorderRadius.circular(5),
-                border: Border.all(color: TvDesign.hairline),
+                border: Border.all(color: palette.hairline),
               ),
               child: Row(
                 children: <Widget>[
@@ -787,7 +791,7 @@ class _TvColorThemePickerState extends State<_TvColorThemePicker> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: TvDesign.foreground,
+                        color: palette.foreground,
                         fontFamily: 'FigtreeSB',
                         fontSize: 14,
                       ),

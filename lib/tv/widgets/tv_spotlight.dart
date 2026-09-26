@@ -77,6 +77,7 @@ class _TvBackdropState extends State<TvBackdrop> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final settings = context.watch<SettingsProvider>();
     final proxy = context.watch<AppDependencyProvider>().tmdbProxy;
     final baseUrl = buildImageUrl(
@@ -110,32 +111,32 @@ class _TvBackdropState extends State<TvBackdrop> {
             errorWidget: (_, __, ___) => const SizedBox.shrink(),
           ),
         // Keeps the spotlight text legible on the left...
-        const DecoratedBox(
+        DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
               colors: <Color>[
-                Color(0xf2050606),
-                Color(0xb3050606),
-                Color(0x33050606),
-                Color(0x00050606),
+                palette.scrim(0.95),
+                palette.scrim(0.7),
+                palette.scrim(0.2),
+                palette.scrim(0),
               ],
               stops: <double>[0, 0.32, 0.62, 0.85],
             ),
           ),
         ),
         // ...and the rows at the bottom.
-        const DecoratedBox(
+        DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: <Color>[
-                Color(0x00050606),
-                Color(0x40050606),
-                Color(0xd9050606),
-                TvDesign.pageBackground,
+                palette.scrim(0),
+                palette.scrim(0.25),
+                palette.scrim(0.85),
+                palette.page,
               ],
               stops: <double>[0, 0.42, 0.76, 1],
             ),
@@ -208,13 +209,14 @@ class TvSpotlightInfo extends StatelessWidget {
   final bool featured;
   final bool compact;
 
-  Widget _buildTitle() {
+  Widget _buildTitle(BuildContext context) {
+    final palette = TvPalette.of(context);
     final text = Text(
       data.title,
       maxLines: featured ? 2 : 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        color: TvDesign.foreground,
+        color: palette.foreground,
         fontFamily: 'FigtreeBold',
         fontSize: switch ((featured, compact)) {
           (true, true) => 34,
@@ -245,6 +247,7 @@ class TvSpotlightInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final colors = Theme.of(context).colorScheme;
     final kicker = data.kicker;
 
@@ -272,15 +275,15 @@ class TvSpotlightInfo extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        _buildTitle(),
+        _buildTitle(context),
         if (data.facts.isNotEmpty) ...<Widget>[
           const SizedBox(height: 8),
           Text(
             data.facts.join('   '),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xffd2d2d2),
+            style: TextStyle(
+              color: palette.secondaryText,
               fontFamily: 'FigtreeSB',
               fontSize: 14,
               height: 1.1,
@@ -294,7 +297,7 @@ class TvSpotlightInfo extends StatelessWidget {
             maxLines: featured && !compact ? 3 : 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: const Color(0xffdedede),
+              color: palette.secondaryText,
               fontSize: compact ? 13 : 15,
               height: 1.3,
             ),

@@ -41,6 +41,7 @@ class TvMediaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final colors = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final proxy = context.watch<AppDependencyProvider>().tmdbProxy;
@@ -85,7 +86,7 @@ class TvMediaCard extends StatelessWidget {
             if (!artworkOnly)
               DecoratedBox(
                 decoration: BoxDecoration(
-                  border: Border.all(color: TvDesign.hairline),
+                  border: Border.all(color: palette.hairline),
                   borderRadius: BorderRadius.circular(TvDesign.cardRadius),
                 ),
               ),
@@ -115,7 +116,7 @@ class TvMediaCard extends StatelessWidget {
             // cost every dimmed card an offscreen layer on TV GPUs.
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              color: dimmed ? const Color(0x8c000000) : Colors.transparent,
+              color: dimmed ? palette.dim : Colors.transparent,
             ),
           ],
         ),
@@ -136,7 +137,7 @@ class TvMediaCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: TvDesign.foreground,
+              color: palette.foreground,
               fontFamily: 'FigtreeSB',
               fontSize: 16,
               height: 1.1,
@@ -155,7 +156,7 @@ class TvMediaCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: TvDesign.mutedText,
+              color: palette.mutedText,
               fontSize: 12,
             ),
           ),
@@ -203,8 +204,9 @@ class TvMediaBadge extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.clip,
           softWrap: false,
-          style: const TextStyle(
-            color: TvDesign.foreground,
+          style: TextStyle(
+            // On its dark plate over the poster, in every theme.
+            color: Color(0xfff7f7f7),
             fontFamily: 'FigtreeBold',
             fontSize: 11,
             height: 1.1,
@@ -226,15 +228,16 @@ class _ImageFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final icon = Icon(
       item.kind == TvMediaKind.movie
           ? PhosphorIcons.filmSlate()
           : PhosphorIcons.television(),
-      color: TvDesign.mutedText,
+      color: palette.mutedText,
       size: 42,
     );
     return ColoredBox(
-      color: TvDesign.raisedSurface,
+      color: palette.raisedSurface,
       child: Center(
         child: !showTitle
             ? icon
@@ -251,7 +254,7 @@ class _ImageFallback extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: TvDesign.foreground,
+                        color: palette.foreground,
                         fontFamily: 'FigtreeSB',
                         fontSize: 14,
                         height: 1.15,

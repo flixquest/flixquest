@@ -117,14 +117,15 @@ class _ProfileLayout extends StatelessWidget {
   final bool isGuest;
   final TvScreenFocusController? focusController;
 
-  Widget _profileImage({required double size}) {
+  Widget _profileImage(BuildContext context, {required double size}) {
+    final palette = TvPalette.of(context);
     final fallback = Container(
       width: size,
       height: size,
-      color: TvDesign.raisedSurface,
+      color: palette.raisedSurface,
       child: Icon(
         PhosphorIcons.user(),
-        color: TvDesign.mutedText,
+        color: palette.mutedText,
         size: 54,
       ),
     );
@@ -152,6 +153,7 @@ class _ProfileLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final compact = metrics.compact;
     return _ProfileFocusEntry(
       focusController: focusController,
@@ -178,7 +180,7 @@ class _ProfileLayout extends StatelessWidget {
               padding: const EdgeInsets.only(left: TvDesign.focusOutset + 4),
               child: Row(
                 children: <Widget>[
-                  _profileImage(size: compact ? 132 : 180),
+                  _profileImage(context, size: compact ? 132 : 180),
                   SizedBox(width: compact ? 28 : 40),
                   Expanded(
                     child: Column(
@@ -188,11 +190,11 @@ class _ProfileLayout extends StatelessWidget {
                         _AccountStatus(isGuest: isGuest, compact: compact),
                         const SizedBox(height: 10),
                         if (loading)
-                          const SizedBox(
+                          SizedBox(
                             width: 240,
                             child: LinearProgressIndicator(
-                              color: TvDesign.mutedText,
-                              backgroundColor: TvDesign.raisedSurface,
+                              color: palette.mutedText,
+                              backgroundColor: palette.raisedSurface,
                             ),
                           )
                         else ...<Widget>[
@@ -201,7 +203,7 @@ class _ProfileLayout extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: TvDesign.foreground,
+                              color: palette.foreground,
                               fontFamily: 'FigtreeBold',
                               fontSize: compact ? 34 : 46,
                               height: 1.05,
@@ -214,7 +216,7 @@ class _ProfileLayout extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: TvDesign.mutedText,
+                              color: palette.mutedText,
                               fontSize: compact ? 16 : 19,
                             ),
                           ),
@@ -226,7 +228,7 @@ class _ProfileLayout extends StatelessWidget {
                               : 'Your list and history stay in sync across '
                                   'your devices.',
                           style: TextStyle(
-                            color: TvDesign.mutedText,
+                            color: palette.mutedText,
                             fontSize: compact ? 14 : 16,
                             height: 1.35,
                           ),
@@ -260,6 +262,7 @@ class _AccountStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
@@ -267,7 +270,7 @@ class _AccountStatus extends StatelessWidget {
           width: 7,
           height: 7,
           decoration: BoxDecoration(
-            color: isGuest ? TvDesign.mutedText : TvDesign.foreground,
+            color: isGuest ? palette.mutedText : palette.foreground,
             shape: BoxShape.circle,
           ),
         ),
@@ -275,7 +278,7 @@ class _AccountStatus extends StatelessWidget {
         Text(
           isGuest ? 'LOCAL PROFILE' : 'SIGNED IN',
           style: TextStyle(
-            color: TvDesign.mutedText,
+            color: palette.mutedText,
             fontFamily: 'FigtreeBold',
             fontSize: compact ? 12 : 13,
             letterSpacing: 1.35,

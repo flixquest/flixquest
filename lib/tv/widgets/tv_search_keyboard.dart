@@ -261,7 +261,8 @@ class _KeyState extends State<_Key> {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = _focused ? Colors.black : TvDesign.foreground;
+    final palette = TvPalette.of(context);
+    final foreground = _focused ? palette.onFocus : palette.foreground;
     final icon = widget.icon;
     return TvFocusable(
       focusNode: widget.focusNode,
@@ -279,7 +280,7 @@ class _KeyState extends State<_Key> {
         duration: const Duration(milliseconds: 110),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: _focused ? const Color(0xf2ffffff) : const Color(0x14ffffff),
+          color: _focused ? palette.focusFill : palette.idleFillFaint,
           borderRadius: BorderRadius.circular(TvDesign.cardRadius),
         ),
         child: icon != null

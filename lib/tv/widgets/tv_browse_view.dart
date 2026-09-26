@@ -719,6 +719,7 @@ class _MoreInfoButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return TvFocusable(
       focusNode: focusNode,
       semanticLabel: 'More information about $title',
@@ -732,18 +733,18 @@ class _MoreInfoButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xf2ffffff),
+          color: palette.focusFill,
           borderRadius: BorderRadius.circular(3),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(PhosphorIcons.info(), color: Colors.black, size: 19),
+            Icon(PhosphorIcons.info(), color: palette.onFocus, size: 19),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               'More info',
               style: TextStyle(
-                color: Colors.black,
+                color: palette.onFocus,
                 fontFamily: 'FigtreeSB',
                 fontSize: 16,
               ),

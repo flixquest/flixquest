@@ -552,11 +552,12 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final resume = _resume(listen: true);
     return TvFocusMemoryScope(
       memory: _memory,
       child: Scaffold(
-        backgroundColor: TvDesign.pageBackground,
+        backgroundColor: palette.page,
         body: LayoutBuilder(
           builder: (context, constraints) {
             final metrics = TvShellMetrics.fromConstraints(constraints);
@@ -581,8 +582,8 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                     AnimatedContainer(
                       duration: _motion,
                       color: browsing
-                          ? const Color(0xcc050606)
-                          : const Color(0x00050606),
+                          ? palette.scrim(0.8)
+                          : palette.scrim(0),
                     ),
                     Positioned(
                       left: inset,
@@ -666,6 +667,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
     required double maxWidth,
     required bool dimmed,
   }) {
+    final palette = TvPalette.of(context);
     final compact = metrics.compact;
     final colors = Theme.of(context).colorScheme;
     final data = _loaded;
@@ -718,7 +720,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: TvDesign.foreground,
+                  color: palette.foreground,
                   fontFamily: 'FigtreeBold',
                   fontSize: compact ? 38 : 52,
                   height: 1.02,
@@ -733,7 +735,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: const Color(0xffd2d2d2),
+                  color: palette.secondaryText,
                   fontFamily: 'FigtreeSB',
                   fontSize: compact ? 14 : 16,
                 ),
@@ -750,7 +752,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                 maxLines: compact ? 3 : 4,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: const Color(0xffdedede),
+                  color: palette.secondaryText,
                   fontSize: compact ? 14 : 17,
                   height: 1.35,
                 ),
@@ -1113,7 +1115,8 @@ class _DetailButtonState extends State<_DetailButton> {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = _focused ? Colors.black : TvDesign.foreground;
+    final palette = TvPalette.of(context);
+    final foreground = _focused ? palette.onFocus : palette.foreground;
     return TvFocusable(
       focusNode: widget.focusNode,
       semanticLabel: widget.label,
@@ -1132,7 +1135,7 @@ class _DetailButtonState extends State<_DetailButton> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         decoration: BoxDecoration(
-          color: _focused ? const Color(0xf2ffffff) : const Color(0x33ffffff),
+          color: _focused ? palette.focusFill : palette.idleFill,
           borderRadius: BorderRadius.circular(TvDesign.cardRadius),
         ),
         child: Row(
@@ -1164,6 +1167,7 @@ class _ResumeProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final colors = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1176,7 +1180,7 @@ class _ResumeProgress extends StatelessWidget {
               value: resume.progress,
               minHeight: 3,
               color: colors.primary,
-              backgroundColor: Colors.white24,
+              backgroundColor: palette.foreground.withValues(alpha: 0.24),
             ),
           ),
         ),
@@ -1187,7 +1191,7 @@ class _ResumeProgress extends StatelessWidget {
             resume.timeLeft,
           ].join('  ·  '),
           style: TextStyle(
-            color: TvDesign.mutedText,
+            color: palette.mutedText,
             fontFamily: 'FigtreeSB',
             fontSize: compact ? 13 : 14,
           ),
@@ -1206,17 +1210,18 @@ class _SeasonPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: selected ? const Color(0xf2ffffff) : const Color(0x1fffffff),
+        color: selected ? palette.focusFill : palette.idleFill,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: selected ? Colors.black : TvDesign.mutedText,
+          color: selected ? palette.onFocus : palette.mutedText,
           fontFamily: selected ? 'FigtreeSB' : 'Figtree',
           fontSize: 15,
         ),
@@ -1247,6 +1252,7 @@ class _EpisodeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final colors = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final proxy = context.watch<AppDependencyProvider>().tmdbProxy;
@@ -1262,11 +1268,11 @@ class _EpisodeCard extends StatelessWidget {
           )}w300$path';
     final number = episode.episodeNumber;
     final placeholder = ColoredBox(
-      color: TvDesign.raisedSurface,
+      color: palette.raisedSurface,
       child: Center(
         child: Icon(
           PhosphorIcons.television(),
-          color: TvDesign.mutedText,
+          color: palette.mutedText,
           size: 30,
         ),
       ),
@@ -1340,8 +1346,8 @@ class _EpisodeCard extends StatelessWidget {
                     '${episode.name ?? 'Untitled episode'}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: TvDesign.foreground,
+                    style: TextStyle(
+                      color: palette.foreground,
                       fontFamily: 'FigtreeSB',
                       fontSize: 15,
                       height: 1.1,
@@ -1352,8 +1358,8 @@ class _EpisodeCard extends StatelessWidget {
                     Text(
                       airLabel!,
                       maxLines: 1,
-                      style: const TextStyle(
-                        color: TvDesign.mutedText,
+                      style: TextStyle(
+                        color: palette.mutedText,
                         fontSize: 12,
                       ),
                     ),
@@ -1377,6 +1383,7 @@ class _EpisodePlaceholders extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Semantics(
       label: 'Loading episodes',
       child: Padding(
@@ -1400,7 +1407,7 @@ class _EpisodePlaceholders extends StatelessWidget {
                     height: width * 9 / 16,
                     margin: const EdgeInsets.only(right: 26),
                     decoration: BoxDecoration(
-                      color: TvDesign.surface,
+                      color: palette.surface,
                       borderRadius: BorderRadius.circular(TvDesign.cardRadius),
                     ),
                   ),
@@ -1428,6 +1435,7 @@ class _SectionMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final action = onAction;
     return Padding(
       padding: const EdgeInsets.fromLTRB(TvDesign.focusOutset + 4, 8, 0, 16),
@@ -1436,7 +1444,7 @@ class _SectionMessage extends StatelessWidget {
         children: <Widget>[
           Text(
             message,
-            style: const TextStyle(color: TvDesign.mutedText, fontSize: 15),
+            style: TextStyle(color: palette.mutedText, fontSize: 15),
           ),
           if (action != null) ...<Widget>[
             const SizedBox(width: 16),
@@ -1449,13 +1457,13 @@ class _SectionMessage extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
-                  color: const Color(0x33ffffff),
+                  color: palette.idleFill,
                   borderRadius: BorderRadius.circular(TvDesign.cardRadius),
                 ),
                 child: Text(
                   actionLabel ?? 'Retry',
-                  style: const TextStyle(
-                    color: TvDesign.foreground,
+                  style: TextStyle(
+                    color: palette.foreground,
                     fontFamily: 'FigtreeSB',
                     fontSize: 14,
                   ),

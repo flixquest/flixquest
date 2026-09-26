@@ -66,6 +66,7 @@ class TvShortcutTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final logo = shortcut.logoAsset;
     final wash = _washes[tint % _washes.length];
     return SizedBox(
@@ -110,7 +111,7 @@ class TvShortcutTile extends StatelessWidget {
                 _TileTitle(shortcut.title, icon: shortcut.icon),
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                color: dimmed ? const Color(0x8c000000) : Colors.transparent,
+                color: dimmed ? palette.dim : Colors.transparent,
               ),
             ],
           ),
@@ -134,14 +135,15 @@ class _TileTitle extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           if (icon case final icon?)
-            Icon(icon, color: TvDesign.mutedText, size: 20),
+            Icon(icon, color: const Color(0xb3ffffff), size: 20),
           const Spacer(),
           Text(
             title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: TvDesign.foreground,
+            style: TextStyle(
+              // Over the tile's dark wash or plate in every theme.
+              color: const Color(0xfff7f7f7),
               fontFamily: 'FigtreeBold',
               fontSize: 18,
               height: 1.1,

@@ -127,16 +127,17 @@ class _TvDialogState extends State<TvDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final hasExplicitAutofocus =
         widget.actions.any((action) => action.autofocus);
 
     return Dialog(
-      backgroundColor: TvDesign.surface,
+      backgroundColor: palette.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 28),
       elevation: 24,
       shadowColor: Colors.black.withValues(alpha: 0.54),
       shape: RoundedRectangleBorder(
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        side: BorderSide(color: palette.hairline),
         borderRadius: BorderRadius.circular(16),
       ),
       child: ConstrainedBox(
@@ -157,7 +158,7 @@ class _TvDialogState extends State<TvDialog> {
                     Text(
                       widget.title,
                       style: TextStyle(
-                        color: TvDesign.foreground,
+                        color: palette.foreground,
                         fontFamily: 'FigtreeBold',
                         fontSize: 32,
                         fontWeight: FontWeight.w700,
@@ -167,7 +168,7 @@ class _TvDialogState extends State<TvDialog> {
                     const SizedBox(height: 18),
                     DefaultTextStyle(
                       style: TextStyle(
-                        color: TvDesign.mutedText,
+                        color: palette.mutedText,
                         fontFamily: 'Figtree',
                         fontSize: 22,
                         height: 1.35,

@@ -106,6 +106,7 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final theme = Theme.of(context);
     final insights = widget.insights;
     final series = WellnessTimeSeries.forRange(insights, widget.range);
@@ -113,8 +114,8 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
     // on TV they read in greys, and the accent stays with the brand.
     final chartTheme = theme.copyWith(
       colorScheme: theme.colorScheme.copyWith(
-        primary: _chartMark,
-        secondary: TvDesign.mutedText,
+        primary: palette.secondaryText,
+        secondary: palette.mutedText,
       ),
     );
     return Theme(
@@ -136,9 +137,9 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Active playback only · private to this profile',
-                style: TextStyle(color: TvDesign.mutedText, fontSize: 15),
+                style: TextStyle(color: palette.mutedText, fontSize: 15),
               ),
               const SizedBox(height: 22),
               Wrap(
@@ -162,10 +163,10 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
               ),
               const SizedBox(height: 20),
               if (widget.loading)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(vertical: 100),
                   child: Center(
-                    child: CircularProgressIndicator(color: TvDesign.mutedText),
+                    child: CircularProgressIndicator(color: palette.mutedText),
                   ),
                 )
               else if (insights.isEmpty)
@@ -184,7 +185,7 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
                       Text(
                         _duration(insights.totalWatchedMs),
                         style: TextStyle(
-                          color: TvDesign.foreground,
+                          color: palette.foreground,
                           fontFamily: 'FigtreeBold',
                           fontSize: widget.metrics.compact ? 40 : 50,
                         ),
@@ -199,7 +200,7 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
                             ),
                         ],
                         averageMs: series.averageMs,
-                        color: _chartMark,
+                        color: palette.secondaryText,
                         height: widget.metrics.compact ? 156 : 190,
                       ),
                       const SizedBox(height: 8),
@@ -337,9 +338,6 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
   }
 }
 
-/// Chart bars and heat: a light grey that reads on the dark panels.
-const _chartMark = Color(0xffd6d7d7);
-
 const _weekdays = <String>[
   'Monday',
   'Tuesday',
@@ -373,12 +371,14 @@ String _hourLabel(int hour) {
 Widget _heading(String title, Key key) => Padding(
       key: key,
       padding: const EdgeInsets.fromLTRB(0, 34, 0, 14),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: TvDesign.foreground,
-          fontFamily: 'FigtreeBold',
-          fontSize: 25,
+      child: Builder(
+        builder: (context) => Text(
+          title,
+          style: TextStyle(
+            color: TvPalette.of(context).foreground,
+            fontFamily: 'FigtreeBold',
+            fontSize: 25,
+          ),
         ),
       ),
     );
@@ -400,6 +400,7 @@ Widget _columns(List<Widget> children) => LayoutBuilder(
 
 Widget _statGrid(WellnessInsights insights) => LayoutBuilder(
       builder: (context, constraints) {
+        final palette = TvPalette.of(context);
         const gap = 12.0;
         final columns = constraints.maxWidth >= 800 ? 3 : 2;
         final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
@@ -434,12 +435,12 @@ Widget _statGrid(WellnessInsights insights) => LayoutBuilder(
                   title: stat.$1,
                   child: Row(
                     children: <Widget>[
-                      Icon(stat.$3, color: TvDesign.mutedText),
+                      Icon(stat.$3, color: palette.mutedText),
                       const SizedBox(width: 12),
                       Text(
                         stat.$2,
-                        style: const TextStyle(
-                          color: TvDesign.foreground,
+                        style: TextStyle(
+                          color: palette.foreground,
                           fontFamily: 'FigtreeBold',
                           fontSize: 26,
                         ),
@@ -471,10 +472,14 @@ Widget _facts(String title, List<(String, String)> rows) => _InsightPanel(
                   ),
                   const SizedBox(width: 12),
                   Flexible(
-                    child: Text(
-                      row.$2,
-                      textAlign: TextAlign.end,
-                      style: const TextStyle(color: TvDesign.foreground),
+                    child: Builder(
+                      builder: (context) => Text(
+                        row.$2,
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          color: TvPalette.of(context).foreground,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -515,49 +520,52 @@ class _InsightPanelState extends State<_InsightPanel> {
   bool _focused = false;
 
   @override
-  Widget build(BuildContext context) => Focus(
-        onFocusChange: (focused) {
-          setState(() => _focused = focused);
-          if (focused) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              Scrollable.ensureVisible(
-                context,
-                duration: const Duration(milliseconds: 220),
-                alignment: 0.12,
-              );
-            });
-          }
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: TvDesign.surfaceFor(context),
-            borderRadius: BorderRadius.circular(TvDesign.cardRadius),
-            border: Border.all(
-              color: _focused ? Colors.white : TvDesign.hairline,
-              width: _focused ? 2 : 1,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                widget.title,
-                style: const TextStyle(
-                  color: TvDesign.foreground,
-                  fontFamily: 'FigtreeBold',
-                  fontSize: 20,
-                ),
-              ),
-              const SizedBox(height: 14),
-              DefaultTextStyle(
-                style: const TextStyle(color: TvDesign.mutedText, fontSize: 16),
-                child: widget.child,
-              ),
-            ],
+  Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
+    return Focus(
+      onFocusChange: (focused) {
+        setState(() => _focused = focused);
+        if (focused) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            Scrollable.ensureVisible(
+              context,
+              duration: const Duration(milliseconds: 220),
+              alignment: 0.12,
+            );
+          });
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: TvDesign.surfaceFor(context),
+          borderRadius: BorderRadius.circular(TvDesign.cardRadius),
+          border: Border.all(
+            color: _focused ? palette.foreground : palette.hairline,
+            width: _focused ? 2 : 1,
           ),
         ),
-      );
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              widget.title,
+              style: TextStyle(
+                color: palette.foreground,
+                fontFamily: 'FigtreeBold',
+                fontSize: 20,
+              ),
+            ),
+            const SizedBox(height: 14),
+            DefaultTextStyle(
+              style: TextStyle(color: palette.mutedText, fontSize: 16),
+              child: widget.child,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
