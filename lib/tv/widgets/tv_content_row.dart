@@ -24,7 +24,7 @@ class TvContentRow<T> extends StatefulWidget {
     this.onItemMenu,
     this.itemMenuHint,
     this.autofocus = false,
-    this.itemSpacing = 24,
+    this.itemSpacing = 14,
     super.key,
   });
 
@@ -289,7 +289,8 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
                 style: TextStyle(
                   color: colors.onSurface,
                   fontFamily: 'FigtreeSB',
-                  fontSize: 26,
+                  fontSize: 21,
+                  letterSpacing: -0.15,
                 ),
               ),
             ),
@@ -308,7 +309,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
                       style: TextStyle(
                         color: colors.onSurfaceVariant,
                         fontFamily: 'Figtree',
-                        fontSize: 16,
+                        fontSize: 14,
                       ),
                     ),
                   ),
@@ -316,14 +317,14 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
               ),
           ],
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 5),
         FocusTraversalGroup(
           policy: ReadingOrderTraversalPolicy(),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             clipBehavior: Clip.hardEdge,
             padding: const EdgeInsets.symmetric(
-              vertical: TvDesign.focusOutset,
+              vertical: 8,
               horizontal: TvDesign.focusOutset,
             ),
             child: Row(
@@ -349,7 +350,11 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
                         onActivate: () => widget.onItemActivated(item),
                         onLongPress:
                             onItemMenu == null ? null : () => onItemMenu(item),
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(4),
+                        scrollAlignment: 0.6,
+                        borderRadius: BorderRadius.circular(
+                          TvDesign.cardRadius + 2,
+                        ),
                         child: widget.itemBuilder(context, item),
                       );
                     },

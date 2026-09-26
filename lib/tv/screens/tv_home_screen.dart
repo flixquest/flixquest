@@ -104,11 +104,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
         // scrolling builds it, which strands TV remotes at the screen bottom.
         return SingleChildScrollView(
           clipBehavior: Clip.hardEdge,
-          padding: EdgeInsets.fromLTRB(
-            widget.metrics.contentPadding,
-            0,
-            widget.metrics.contentPadding,
-            widget.metrics.contentPadding + TvDesign.focusOutset,
+          padding: EdgeInsets.only(
+            bottom: widget.metrics.contentPadding + TvDesign.focusOutset,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,7 +115,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
                 compact: widget.metrics.compact,
                 onOpenDetails: () => widget.onOpenMedia(data.hero!),
               ),
-              SizedBox(height: widget.metrics.compact ? 22 : 34),
+              SizedBox(height: widget.metrics.compact ? 4 : 8),
               _mediaRow(
                 'Continue watching',
                 'home-continue-watching',
@@ -174,7 +171,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     if (items.isEmpty) return const SizedBox.shrink();
     final visibleItems = items.take(16).toList(growable: false);
     return Padding(
-      padding: EdgeInsets.only(bottom: widget.metrics.compact ? 18 : 28),
+      padding: EdgeInsets.only(bottom: widget.metrics.compact ? 16 : 24),
       child: TvContentRow<TvMediaItem>(
         title: title,
         scopeId: scopeId,

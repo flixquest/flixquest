@@ -150,9 +150,8 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
         error.message?.toLowerCase().contains('network') == true) {
       return 'Check your internet connection and retry.';
     }
-    final detail = (error.message?.isNotEmpty ?? false)
-        ? error.message!
-        : error.code;
+    final detail =
+        (error.message?.isNotEmpty ?? false) ? error.message! : error.code;
     return 'Google sign-in is not available on this device '
         '($detail). Make sure Google Play services is installed and a '
         'Google account is set up, or sign in with your email and password.';
@@ -222,12 +221,25 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                         padding: const EdgeInsets.all(TvDesign.focusOutset),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            color: colors.surface.withValues(alpha: 0.94),
-                            borderRadius: BorderRadius.circular(22),
-                            border: Border.all(
-                              color:
-                                  colors.outlineVariant.withValues(alpha: 0.45),
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: <Color>[
+                                Color(0xff191a19),
+                                Color(0xff111211),
+                              ],
                             ),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.09),
+                            ),
+                            boxShadow: <BoxShadow>[
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.34),
+                                blurRadius: 30,
+                                offset: const Offset(0, 16),
+                              ),
+                            ],
                           ),
                           child: Padding(
                             padding: EdgeInsets.all(compact ? 24 : 34),
@@ -251,9 +263,10 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                             ? 'Sign in to FlixQuest'
                                             : 'Create your account',
                                         style: TextStyle(
-                                          color: colors.onSurface,
-                                          fontFamily: 'FigtreeSB',
+                                          color: TvDesign.foreground,
+                                          fontFamily: 'FigtreeBold',
                                           fontSize: compact ? 28 : 34,
+                                          letterSpacing: -0.45,
                                         ),
                                       ),
                                     ],
@@ -268,14 +281,17 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                       borderRadius: BorderRadius.circular(11),
                                       child: Container(
                                         height: 56,
-                                        padding:
-                                            const EdgeInsets.symmetric(
+                                        padding: const EdgeInsets.symmetric(
                                           horizontal: 18,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: colors.surfaceContainerHighest,
+                                          color: TvDesign.raisedSurface,
+                                          border: Border.all(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.08),
+                                          ),
                                           borderRadius:
-                                              BorderRadius.circular(11),
+                                              BorderRadius.circular(9),
                                         ),
                                         child: Row(
                                           children: <Widget>[
@@ -452,9 +468,18 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
                                           horizontal: 26,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: colors.primary,
+                                          gradient: LinearGradient(
+                                            colors: <Color>[
+                                              colors.primary,
+                                              Color.lerp(
+                                                colors.primary,
+                                                colors.primaryContainer,
+                                                0.3,
+                                              )!,
+                                            ],
+                                          ),
                                           borderRadius:
-                                              BorderRadius.circular(11),
+                                              BorderRadius.circular(9),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
@@ -565,12 +590,23 @@ class _TvAuthFieldState extends State<_TvAuthField> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        color: TvDesign.raisedSurface,
+        borderRadius: BorderRadius.circular(9),
         border: Border.all(
-          color: _focused ? colors.primary : colors.outlineVariant,
+          color: _focused
+              ? Colors.white
+              : colors.onSurface.withValues(alpha: 0.09),
           width: _focused ? 3 : 1,
         ),
+        boxShadow: _focused
+            ? <BoxShadow>[
+                BoxShadow(
+                  color: colors.primary.withValues(alpha: 0.32),
+                  blurRadius: 18,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
       ),
       child: TextFormField(
         controller: widget.controller,
@@ -672,8 +708,11 @@ class _BackAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
         decoration: BoxDecoration(
-          color: colors.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(10),
+          color: TvDesign.raisedSurface,
+          border: Border.all(
+            color: colors.onSurface.withValues(alpha: 0.09),
+          ),
+          borderRadius: BorderRadius.circular(9),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

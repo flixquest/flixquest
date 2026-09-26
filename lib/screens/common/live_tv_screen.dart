@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 
 import '../../controllers/live_tv_database_controller.dart';
 import '../../functions/function.dart';
+import '../../functions/live_channel_letters.dart';
+import '../../functions/live_schedule_sports.dart';
 import '../../models/live_tv.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
@@ -27,13 +29,6 @@ enum _LiveTvMode { channels, schedule }
 // enum _LiveTvSource { daddyLive, ethioSports }
 
 const _allCategoriesKey = '__all_categories__';
-
-class _ScheduleSection {
-  const _ScheduleSection({required this.name, required this.events});
-
-  final String name;
-  final List<DaddyLiveEpgEvent> events;
-}
 
 class ChannelList extends StatefulWidget {
   const ChannelList({super.key});
@@ -56,6 +51,7 @@ class _ChannelListState extends State<ChannelList> {
   Set<String> _favoriteIds = <String>{};
   List<String> _recentIds = const <String>[];
   String? _selectedCategory;
+  String? _letter;
   String? _resolvingId;
   String _query = '';
   String? _error;
@@ -66,6 +62,9 @@ class _ChannelListState extends State<ChannelList> {
   // EthioTV source (commented out - disabled):
   // _LiveTvSource _source = _LiveTvSource.daddyLive;
   int _selectedDayIndex = 0;
+  String? _sport;
+  // Schedule events start collapsed; keys come from [_eventKey].
+  final Set<String> _expandedEvents = <String>{};
 
   @override
   void initState() {
@@ -175,7 +174,8 @@ class _ChannelListState extends State<ChannelList> {
     return values.toList()..sort();
   }
 
-  List<Channel> get _visibleChannels {
+  /// Channels matching every filter except the letter, which indexes them.
+  List<Channel> get _unletteredChannels {
     Iterable<Channel> result = _channels;
     if (_scope == _ChannelScope.favorites) {
       result = result.where((channel) => _favoriteIds.contains(channel.id));
@@ -197,6 +197,36 @@ class _ChannelListState extends State<ChannelList> {
     return result.toList(growable: false);
   }
 
+  List<String> get _letters => channelLetters(_unletteredChannels);
+
+  /// The chosen letter, or null when no channel under it survives the other
+  /// filters.
+  String? get _activeLetter {
+    final letter = _letter;
+    if (letter == null) return null;
+    return _letters.contains(letter) ? letter : null;
+  }
+
+  List<Channel> get _visibleChannels {
+    final channels = _unletteredChannels;
+    final letter = _activeLetter;
+    if (letter == null) return channels;
+    return channels
+        .where((channel) => channelLetter(channel) == letter)
+        .toList(growable: false);
+  }
+
+  void _selectLetter(String? letter) {
+    if (letter == _activeLetter) return;
+    setState(() => _letter = letter);
+    _analytics.trackLiveTVInteraction(
+      surface: _analyticsSurface,
+      action: 'letter_changed',
+      value: letter ?? 'all',
+      resultCount: _visibleChannels.length,
+    );
+  }
+
   static bool _channelMatches(Channel channel, List<String> tokens) {
     // 24/7 channels match by their own identity only (name / id), never by
     // the event that happens to be airing. Use the Schedule search for teams.
@@ -216,23 +246,39 @@ class _ChannelListState extends State<ChannelList> {
     return tokens.every(haystack.contains);
   }
 
-  List<_ScheduleSection> get _scheduleSections {
+  List<LiveSportSection> get _sportSections {
     final epg = _epg;
-    if (epg == null || epg.days.isEmpty) return const <_ScheduleSection>[];
-    final day = epg.days[_selectedDayIndex.clamp(0, epg.days.length - 1)];
+    if (epg == null || epg.days.isEmpty) return const <LiveSportSection>[];
+    return groupScheduleBySport(
+      epg.days[_selectedDayIndex.clamp(0, epg.days.length - 1)],
+    );
+  }
+
+  /// The chosen sport, or null when it is not on the selected day.
+  String? get _activeSport {
+    final sport = _sport;
+    if (sport == null) return null;
+    return _sportSections.any((section) => section.name == sport)
+        ? sport
+        : null;
+  }
+
+  List<LiveSportSection> get _scheduleSections {
+    final sport = _activeSport;
     final tokens = searchTokens(_query);
-    return <_ScheduleSection>[
-      for (final category in day.categories)
-        _ScheduleSection(
-          name: category.name,
-          events: category.events
-              .where(
-                (event) =>
-                    tokens.isEmpty ||
-                    _eventMatches(event, category.name, tokens),
-              )
-              .toList(growable: false),
-        ),
+    return <LiveSportSection>[
+      for (final section in _sportSections)
+        if (sport == null || section.name == sport)
+          LiveSportSection(
+            name: section.name,
+            emoji: section.emoji,
+            events: tokens.isEmpty
+                ? section.events
+                : section.events
+                    .where(
+                        (event) => _eventMatches(event, section.name, tokens))
+                    .toList(growable: false),
+          ),
     ]..removeWhere((section) => section.events.isEmpty);
   }
 
@@ -394,6 +440,26 @@ class _ChannelListState extends State<ChannelList> {
     );
   }
 
+  String _eventKey(String section, DaddyLiveEpgEvent event) =>
+      '$_selectedDayIndex|$section|${event.time}|${event.title}';
+
+  void _toggleEvent(String key) {
+    setState(() {
+      if (!_expandedEvents.remove(key)) _expandedEvents.add(key);
+    });
+  }
+
+  void _selectSport(String? sport) {
+    if (sport == _activeSport) return;
+    setState(() => _sport = sport);
+    _analytics.trackLiveTVInteraction(
+      surface: _analyticsSurface,
+      action: 'schedule_sport_changed',
+      value: sport ?? 'all',
+      resultCount: _visibleEventCount,
+    );
+  }
+
   void _selectDay(int index) {
     if (index == _selectedDayIndex) return;
     setState(() => _selectedDayIndex = index);
@@ -542,7 +608,7 @@ class _ChannelListState extends State<ChannelList> {
       for (final section in sections) ...<Widget>[
         SliverToBoxAdapter(
           child: _ScheduleCategoryHeader(
-            name: section.name,
+            name: section.label,
             count: section.events.length,
           ),
         ),
@@ -550,11 +616,17 @@ class _ChannelListState extends State<ChannelList> {
           padding: const EdgeInsets.fromLTRB(0, 0, 0, 18),
           sliver: SliverList.builder(
             itemCount: section.events.length,
-            itemBuilder: (_, index) => _ScheduleEventTile(
-              event: section.events[index],
-              resolvingChannelId: _resolvingId,
-              onPlay: _play,
-            ),
+            itemBuilder: (_, index) {
+              final event = section.events[index];
+              final key = _eventKey(section.name, event);
+              return _ScheduleEventTile(
+                event: event,
+                expanded: _expandedEvents.contains(key),
+                onToggle: () => _toggleEvent(key),
+                resolvingChannelId: _resolvingId,
+                onPlay: _play,
+              );
+            },
           ),
         ),
       ],
@@ -649,6 +721,25 @@ class _ChannelListState extends State<ChannelList> {
               const SizedBox(height: 10),
               _buildCategorySelector(),
             ],
+            if (_letters case final letters when letters.length > 1)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: AppFilterRail(
+                  children: <Widget>[
+                    AppFilterPill(
+                      label: 'A–Z',
+                      selected: _activeLetter == null,
+                      onPressed: () => _selectLetter(null),
+                    ),
+                    for (final letter in letters)
+                      AppFilterPill(
+                        label: letter,
+                        selected: _activeLetter == letter,
+                        onPressed: () => _selectLetter(letter),
+                      ),
+                  ],
+                ),
+              ),
           ] else if (_epg case final epg? when epg.days.isNotEmpty) ...<Widget>[
             AppFilterRail(
               children: <Widget>[
@@ -660,6 +751,25 @@ class _ChannelListState extends State<ChannelList> {
                   ),
               ],
             ),
+            if (_sportSections case final sports when sports.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: AppFilterRail(
+                  children: <Widget>[
+                    AppFilterPill(
+                      label: 'All sports',
+                      selected: _activeSport == null,
+                      onPressed: () => _selectSport(null),
+                    ),
+                    for (final sport in sports)
+                      AppFilterPill(
+                        label: sport.label,
+                        selected: _activeSport == sport.name,
+                        onPressed: () => _selectSport(sport.name),
+                      ),
+                  ],
+                ),
+              ),
           ],
           Padding(
             padding: const EdgeInsets.only(top: 12, bottom: 2),
@@ -1101,76 +1211,126 @@ class _ScheduleCategoryHeader extends StatelessWidget {
 class _ScheduleEventTile extends StatelessWidget {
   const _ScheduleEventTile({
     required this.event,
+    required this.expanded,
+    required this.onToggle,
     required this.resolvingChannelId,
     required this.onPlay,
   });
 
   final DaddyLiveEpgEvent event;
+  final bool expanded;
+  final VoidCallback onToggle;
   final String? resolvingChannelId;
   final void Function(Channel channel) onPlay;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final channelCount = event.channels.length;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: colors.surfaceContainerHighest.withValues(alpha: .55),
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Container(
-                constraints: const BoxConstraints(minWidth: 64),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                decoration: BoxDecoration(
-                  color: colors.primary.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  event.displayTime,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: colors.primary,
-                    fontFamily: 'FigtreeSB',
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            InkWell(
+              onTap: channelCount == 0 ? null : onToggle,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
                   children: <Widget>[
-                    Text(
-                      event.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            height: 1.25,
-                          ),
+                    Container(
+                      constraints: const BoxConstraints(minWidth: 64),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: .1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        event.displayTime,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: colors.primary,
+                          fontFamily: 'FigtreeSB',
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: <Widget>[
-                        for (final channel in event.channels)
-                          _ChannelChip(
-                            channel: channel,
-                            resolving: resolvingChannelId == channel.id,
-                            onPlay: () => onPlay(channel),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            event.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.25,
+                                ),
                           ),
-                      ],
+                          const SizedBox(height: 3),
+                          Text(
+                            '$channelCount ${channelCount == 1 ? 'channel' : 'channels'}',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: colors.onSurfaceVariant,
+                                    ),
+                          ),
+                        ],
+                      ),
                     ),
+                    if (channelCount > 0) ...<Widget>[
+                      const SizedBox(width: 8),
+                      AnimatedRotation(
+                        turns: expanded ? .5 : 0,
+                        duration: const Duration(milliseconds: 180),
+                        child: Icon(
+                          PhosphorIcons.caretDown(),
+                          size: 18,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: expanded && channelCount > 0
+                  ? SizedBox(
+                      height: 44,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        itemCount: channelCount,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (_, index) {
+                          final channel = event.channels[index];
+                          return _ChannelChip(
+                            channel: channel,
+                            resolving: resolvingChannelId == channel.id,
+                            onPlay: () => onPlay(channel),
+                          );
+                        },
+                      ),
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
+          ],
         ),
       ),
     );

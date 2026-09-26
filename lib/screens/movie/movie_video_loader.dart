@@ -179,8 +179,9 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
         widget.metadata.elapsed = 0;
       }
 
-      if (widget.metadata.releaseDate != null &&
-          !isReleased(widget.metadata.releaseDate!)) {
+      final isUnreleased = widget.metadata.releaseDate != null &&
+          !isReleased(widget.metadata.releaseDate!);
+      if (isUnreleased) {
         GlobalMethods.showScaffoldMessage(
             tr('movie_may_not_be_available'), context);
       }
@@ -258,13 +259,15 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
           );
           return;
         }
-        Provider.of<SettingsProvider>(context, listen: false)
-            .analytics
-            .trackMovieWatched(
-              movieName: widget.metadata.movieName,
-              movieId: widget.metadata.movieId,
-              isAdult: widget.metadata.isAdult ?? 'unknown',
-            );
+        if (!isUnreleased) {
+          Provider.of<SettingsProvider>(context, listen: false)
+              .analytics
+              .trackMovieWatched(
+                movieName: widget.metadata.movieName,
+                movieId: widget.metadata.movieId,
+                isAdult: widget.metadata.isAdult ?? 'unknown',
+              );
+        }
 
         final dependencies =
             Provider.of<AppDependencyProvider>(context, listen: false);

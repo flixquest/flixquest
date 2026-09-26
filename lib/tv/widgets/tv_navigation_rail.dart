@@ -116,48 +116,35 @@ class TvNavigationRailState extends State<TvNavigationRail> {
       policy: ReadingOrderTraversalPolicy(),
       child: Container(
         width: widget.metrics.railWidth,
-        decoration: BoxDecoration(
-          color: TvDesign.surfaceFor(context, emphasis: 0.015),
-          borderRadius: const BorderRadius.all(Radius.circular(20)),
-          border: Border.all(
-            color: colors.onSurface.withValues(alpha: 0.08),
-          ),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 28,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
+        decoration: const BoxDecoration(color: Color(0xb3000000)),
         padding: EdgeInsets.symmetric(
-          horizontal: (widget.metrics.railWidth < 140) ? 9 : 13,
-          vertical: (widget.metrics.railWidth < 140) ? 12 : 18,
+          horizontal: (widget.metrics.railWidth < 140) ? 5 : 9,
+          vertical: (widget.metrics.railWidth < 140) ? 8 : 14,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Padding(
               padding: EdgeInsets.fromLTRB(
-                (widget.metrics.railWidth < 140) ? 13 : 10,
+                (widget.metrics.railWidth < 140) ? 10 : 8,
                 0,
-                (widget.metrics.railWidth < 140) ? 13 : 10,
-                (widget.metrics.railWidth < 140) ? 10 : 18,
+                (widget.metrics.railWidth < 140) ? 10 : 8,
+                (widget.metrics.railWidth < 140) ? 8 : 14,
               ),
               child: (widget.metrics.railWidth < 140)
                   ? AppLogo(
                       fallbackAsset: 'assets/images/fq_svg.svg',
-                      height: 28,
+                      height: 22,
                       fallbackColor: colors.primary,
                     )
                   : Text(
                       'FLIXQUEST',
                       style: TextStyle(
                         color: colors.primary,
-                        fontFamily: 'FigtreeSB',
+                        fontFamily: 'FigtreeBold',
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 1.2,
+                        letterSpacing: 1.8,
                       ),
                     ),
             ),
@@ -199,7 +186,7 @@ class TvNavigationRailState extends State<TvNavigationRail> {
                             widget.onDestinationSelected(destination.id),
                         focusScale: 1.015,
                         borderRadius:
-                            const BorderRadius.all(Radius.circular(12)),
+                            const BorderRadius.all(Radius.circular(6)),
                         child: Container(
                           height: widget.metrics.navItemHeight,
                           padding: EdgeInsets.symmetric(
@@ -207,15 +194,10 @@ class TvNavigationRailState extends State<TvNavigationRail> {
                                 (widget.metrics.railWidth < 140) ? 0 : 12,
                           ),
                           decoration: BoxDecoration(
-                            gradient: destination.id == widget.selectedId
-                                ? LinearGradient(
-                                    colors: <Color>[
-                                      colors.primary.withValues(alpha: 0.2),
-                                      colors.primary.withValues(alpha: 0.08),
-                                    ],
-                                  )
-                                : null,
-                            borderRadius: BorderRadius.circular(9),
+                            color: destination.id == widget.selectedId
+                                ? Colors.white.withValues(alpha: 0.055)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(4),
                           ),
                           child: Stack(
                             fit: StackFit.expand,
@@ -224,8 +206,8 @@ class TvNavigationRailState extends State<TvNavigationRail> {
                                 Align(
                                   alignment: Alignment.centerLeft,
                                   child: Container(
-                                    width: 4,
-                                    height: 24,
+                                    width: 2,
+                                    height: 20,
                                     decoration: BoxDecoration(
                                       color: colors.primary,
                                       borderRadius: BorderRadius.circular(4),
@@ -244,11 +226,11 @@ class TvNavigationRailState extends State<TvNavigationRail> {
                                             destination.icon
                                         : destination.icon,
                                     color: destination.id == widget.selectedId
-                                        ? colors.primary
+                                        ? colors.onSurface
                                         : colors.onSurfaceVariant,
                                     size: (widget.metrics.railWidth < 140)
-                                        ? 25
-                                        : 26,
+                                        ? 22
+                                        : 24,
                                   ),
                                   if (!(widget.metrics.railWidth <
                                       140)) ...<Widget>[

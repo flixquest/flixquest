@@ -129,6 +129,7 @@ class _LivePlayerState extends State<LivePlayer> {
   late String _currentMediaType;
   String? _currentClearKey;
   late List<LiveStreamVariant> _streamVariants;
+  final LiveStreamFailoverQueue _variantFailover = LiveStreamFailoverQueue();
   final ValueNotifier<_LivePlaybackFailure?> _playbackFailure =
       ValueNotifier<_LivePlaybackFailure?>(null);
   late final AppDependencyProvider _appDependencies;
@@ -163,6 +164,10 @@ class _LivePlayerState extends State<LivePlayer> {
     _currentMediaType = widget.mediaType;
     _currentClearKey = widget.clearKey;
     _streamVariants = List<LiveStreamVariant>.of(widget.variants);
+    _variantFailover.replace(
+      _streamVariants,
+      currentUrl: _currentVideoUrl,
+    );
 
     betterPlayerBufferingConfiguration = liveBufferingConfiguration;
 
@@ -372,7 +377,7 @@ class _LivePlayerState extends State<LivePlayer> {
         if (canSwitchVariants)
           BetterPlayerOverflowMenuItem(
             PhosphorIcons.gauge(),
-            'Stream quality',
+            'Backup streams',
             _showStreamVariantSwitcher,
           ),
         if (canSwitchChannels)
@@ -482,8 +487,12 @@ class _LivePlayerState extends State<LivePlayer> {
       _currentVideoHeaders = Map<String, String>.of(headers);
       _currentMediaType = mediaType;
       _currentClearKey = clearKey;
-      if (stream != null && stream.variants.isNotEmpty) {
-        _streamVariants = stream.variants;
+      if (stream != null) {
+        _streamVariants = List<LiveStreamVariant>.of(stream.variants);
+        _variantFailover.replace(
+          _streamVariants,
+          currentUrl: url,
+        );
         _betterPlayerController.setBetterPlayerControlsConfiguration(
           _buildControlsConfiguration(_currentChannelName),
         );
@@ -565,9 +574,31 @@ class _LivePlayerState extends State<LivePlayer> {
     final attempt = ++_automaticRecoveryAttempt;
     _trackPlayerEvent('auto_retry_$attempt');
     try {
+      final backup = _variantFailover.next();
       final service = widget.service;
       final channelId = _currentChannelId;
-      if (service != null && channelId != null) {
+      if (backup != null) {
+        final didSetup = await _setupDataSourceForOperation(
+          operation,
+          _buildDataSource(
+            backup.url,
+            backup.headers,
+            mediaType: backup.mediaType,
+            clearKey: backup.clearKey,
+          ),
+        );
+        if (!didSetup ||
+            !_isActiveRecovery(generation) ||
+            !_isActiveSourceOperation(operation)) {
+          return;
+        }
+        _currentVideoUrl = backup.url;
+        _currentVideoHeaders = Map<String, String>.of(backup.headers);
+        _currentMediaType = backup.mediaType;
+        _currentClearKey = backup.clearKey;
+        _showBanner('Trying ${backup.title ?? 'backup stream'}…');
+        _trackPlayerEvent('auto_failover');
+      } else if (service != null && channelId != null) {
         final stream =
             await service.getStream(channelId).timeout(_sourceResolveTimeout);
         if (!_isActiveRecovery(generation) ||
@@ -592,12 +623,14 @@ class _LivePlayerState extends State<LivePlayer> {
         _currentVideoHeaders = Map<String, String>.of(stream.headers);
         _currentMediaType = stream.mediaType;
         _currentClearKey = stream.clearKey;
-        if (stream.variants.isNotEmpty) {
-          _streamVariants = stream.variants;
-          _betterPlayerController.setBetterPlayerControlsConfiguration(
-            _buildControlsConfiguration(_currentChannelName),
-          );
-        }
+        _streamVariants = List<LiveStreamVariant>.of(stream.variants);
+        _variantFailover.replace(
+          _streamVariants,
+          currentUrl: stream.url,
+        );
+        _betterPlayerController.setBetterPlayerControlsConfiguration(
+          _buildControlsConfiguration(_currentChannelName),
+        );
       } else {
         final didSetup = await _setupDataSourceForOperation(
           operation,
@@ -907,7 +940,7 @@ class _LivePlayerState extends State<LivePlayer> {
         child: ListView(
           shrinkWrap: true,
           children: <Widget>[
-            const ListTile(title: Text('Stream quality')),
+            const ListTile(title: Text('Backup streams')),
             for (final variant in _streamVariants)
               ListTile(
                 leading: Icon(PhosphorIcons.gauge()),
@@ -919,7 +952,7 @@ class _LivePlayerState extends State<LivePlayer> {
         ),
       ),
     );
-    if (selected == null || selected.url == _currentVideoUrl) return;
+    if (selected == null) return;
     await _switchVariant(selected);
   }
 
@@ -942,7 +975,8 @@ class _LivePlayerState extends State<LivePlayer> {
       _currentVideoHeaders = Map<String, String>.of(variant.headers);
       _currentMediaType = variant.mediaType;
       _currentClearKey = variant.clearKey;
-      _showBanner(variant.title ?? 'Stream quality');
+      _variantFailover.select(variant);
+      _showBanner(variant.title ?? 'Backup stream');
     } catch (error) {
       _trackPlayerEvent('quality_switch_error', error: error.toString());
       _beginPlaybackRecovery(error);
@@ -1004,12 +1038,14 @@ class _LivePlayerState extends State<LivePlayer> {
       _currentVideoHeaders = Map<String, String>.of(stream.headers);
       _currentMediaType = stream.mediaType;
       _currentClearKey = stream.clearKey;
-      if (stream.variants.isNotEmpty) {
-        _streamVariants = stream.variants;
-        _betterPlayerController.setBetterPlayerControlsConfiguration(
-          _buildControlsConfiguration(_currentChannelName),
-        );
-      }
+      _streamVariants = List<LiveStreamVariant>.of(stream.variants);
+      _variantFailover.replace(
+        _streamVariants,
+        currentUrl: stream.url,
+      );
+      _betterPlayerController.setBetterPlayerControlsConfiguration(
+        _buildControlsConfiguration(_currentChannelName),
+      );
       setState(() {
         _isSwitching = false;
       });

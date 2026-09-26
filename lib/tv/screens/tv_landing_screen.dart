@@ -117,9 +117,8 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
         error.message?.toLowerCase().contains('network') == true) {
       return 'Check your internet connection and retry.';
     }
-    final detail = (error.message?.isNotEmpty ?? false)
-        ? error.message!
-        : error.code;
+    final detail =
+        (error.message?.isNotEmpty ?? false) ? error.message! : error.code;
     return 'Google sign-in is not available on this device '
         '($detail). Make sure Google Play services is installed and a '
         'Google account is set up, or sign in with your email and password.';
@@ -147,7 +146,7 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
             'assets/images/grid_final.jpg',
             fit: BoxFit.cover,
             alignment: Alignment.topCenter,
-            opacity: const AlwaysStoppedAnimation<double>(0.34),
+            opacity: const AlwaysStoppedAnimation<double>(0.3),
           ),
           const DecoratedBox(
             decoration: BoxDecoration(
@@ -155,10 +154,24 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 colors: <Color>[
-                  Color(0xff101110),
-                  Color(0xe6101110),
-                  Color(0xa8101110),
+                  Color(0xff0d0e0d),
+                  Color(0xf20d0e0d),
+                  Color(0xa60d0e0d),
                 ],
+              ),
+            ),
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[
+                  Color(0x12000000),
+                  Color(0x28000000),
+                  Color(0xc9000000),
+                ],
+                stops: <double>[0, 0.55, 1],
               ),
             ),
           ),
@@ -180,12 +193,25 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
                         constraints: const BoxConstraints(maxWidth: 460),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            color: colors.surface.withValues(alpha: 0.94),
-                            borderRadius: BorderRadius.circular(22),
-                            border: Border.all(
-                              color:
-                                  colors.outlineVariant.withValues(alpha: 0.42),
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: <Color>[
+                                Color(0xf2171817),
+                                Color(0xf20e0f0e),
+                              ],
                             ),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.1),
+                            ),
+                            boxShadow: <BoxShadow>[
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.44),
+                                blurRadius: 34,
+                                offset: const Offset(0, 18),
+                              ),
+                            ],
                           ),
                           child: Padding(
                             padding: EdgeInsets.all(compact ? 24 : 32),
@@ -198,9 +224,10 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
                                   Text(
                                     'Ready to watch?',
                                     style: TextStyle(
-                                      color: colors.onSurface,
-                                      fontFamily: 'FigtreeSB',
+                                      color: TvDesign.foreground,
+                                      fontFamily: 'FigtreeBold',
                                       fontSize: compact ? 26 : 32,
+                                      letterSpacing: -0.45,
                                     ),
                                   ),
                                   SizedBox(height: compact ? 8 : 12),
@@ -288,7 +315,15 @@ class _TvLandingIntro extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white24),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.32),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: const AppLogo(),
         ),
@@ -353,8 +388,25 @@ class _TvLandingAction extends StatelessWidget {
           height: 58,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            color: primary ? colors.primary : colors.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(11),
+            gradient: primary
+                ? LinearGradient(
+                    colors: <Color>[
+                      colors.primary,
+                      Color.lerp(
+                        colors.primary,
+                        colors.primaryContainer,
+                        0.3,
+                      )!,
+                    ],
+                  )
+                : null,
+            color: primary ? null : TvDesign.raisedSurface,
+            border: Border.all(
+              color: primary
+                  ? colors.primary.withValues(alpha: 0.55)
+                  : Colors.white.withValues(alpha: 0.08),
+            ),
+            borderRadius: BorderRadius.circular(9),
           ),
           child: Row(
             children: <Widget>[

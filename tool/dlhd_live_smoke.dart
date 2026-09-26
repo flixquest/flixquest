@@ -3,32 +3,21 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flixquest/models/live_tv.dart';
 import 'package:flixquest/services/daddylive_service.dart';
 import 'package:http/http.dart' as http;
 
 class _RecordingClient extends http.BaseClient {
   final http.Client _upstream = http.Client();
-  DaddyLiveStream? serverStream;
+  bool requestedServerStream = false;
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    final response = await _upstream.send(request);
-    if (!request.url.path.endsWith('/stream')) return response;
-    final bytes = await response.stream.toBytes();
-    stdout.writeln('Real scraper API: HTTP ${response.statusCode}');
-    if (response.statusCode == 200) {
-      serverStream = DaddyLiveStream.fromJson(
-        jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>,
-      );
+    if (request.url.path.endsWith('/stream')) {
+      requestedServerStream = true;
+      stdout
+          .writeln('Local watch-page resolution failed; using embed fallback');
     }
-    return http.StreamedResponse(
-      Stream.value(bytes),
-      response.statusCode,
-      headers: response.headers,
-      request: response.request,
-      reasonPhrase: response.reasonPhrase,
-    );
+    return _upstream.send(request);
   }
 
   @override
@@ -48,26 +37,22 @@ Future<void> main(List<String> args) async {
   final service = DaddyLiveService(baseUrl: args[0], client: recording);
   final client = http.Client();
   try {
+    final channels = await service.getChannels();
+    if (!channels.any((item) => item.id == channel)) {
+      throw StateError('Channel $channel is missing from the scraper catalog');
+    }
     final timer = Stopwatch()..start();
     final stream = await service.getStream(channel);
     stdout.writeln(
       'Channel $channel resolved by DaddyLiveService in '
-      '${timer.elapsed.inMilliseconds}ms; expires=${stream.expiresAt}',
+      '${timer.elapsed.inMilliseconds}ms; ${stream.variants.length} playable '
+      'stream(s); metadata fallback=${recording.requestedServerStream}',
     );
-    final server = recording.serverStream;
-    if (server == null || stream.embedUrl.isEmpty) {
-      throw StateError(
-          'The scraper did not return an embed for device extraction');
+    if (stream.variants.isEmpty || stream.embedUrl.isEmpty) {
+      throw StateError('The device did not resolve a local stream');
     }
-    final serverResponse = await client
-        .get(Uri.parse(server.url), headers: stream.headers)
-        .timeout(const Duration(seconds: 25));
-    stdout.writeln(
-      'Server token on this device: HTTP ${serverResponse.statusCode}; '
-      'device token differs=${server.url != stream.url}',
-    );
-    if (serverResponse.statusCode == 403 && server.url == stream.url) {
-      throw StateError('The resolver reused a rejected server token');
+    for (final variant in stream.variants) {
+      stdout.writeln('${variant.title}: ${Uri.parse(variant.url).host}');
     }
 
     var playlistUri = Uri.parse(stream.url);
@@ -114,8 +99,10 @@ Future<void> main(List<String> args) async {
         throw StateError('Invalid MPEG-TS media segment');
       }
     }
-    stdout
-        .writeln('PASS: real DLHD extraction, device playlist, and 3 segments');
+    stdout.writeln(
+      'PASS: local DLHD extraction, ordered backups, device playlist, '
+      'and 3 segments',
+    );
   } catch (error) {
     stderr.writeln('FAIL: $error');
     exitCode = 1;

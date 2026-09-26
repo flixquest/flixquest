@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixquest/functions/live_playback_policy.dart';
+import 'package:flixquest/models/live_tv.dart';
 
 void main() {
   test('live startup and refill thresholds fit a bounded forward-only buffer',
@@ -80,4 +81,47 @@ void main() {
         ),
         isFalse);
   });
+
+  test('backup streams advance once in advertised order', () {
+    final queue = LiveStreamFailoverQueue()
+      ..replace(
+        <LiveStreamVariant>[
+          _variant('one'),
+          _variant('two'),
+          _variant('three'),
+        ],
+        currentUrl: 'one',
+      );
+
+    expect(queue.next()?.url, 'two');
+    expect(queue.next()?.url, 'three');
+    expect(queue.next(), isNull);
+    expect(queue.next(), isNull);
+  });
+
+  test('fresh resolution resets failover and preserves provider order', () {
+    final queue = LiveStreamFailoverQueue()
+      ..replace(<LiveStreamVariant>[_variant('old')], currentUrl: 'old');
+    expect(queue.next(), isNull);
+
+    queue.replace(
+      <LiveStreamVariant>[
+        _variant('fresh-one', title: 'Stream 1'),
+        _variant('fresh-one', title: 'Stream 2'),
+        _variant('fresh-two'),
+      ],
+      currentUrl: 'fresh-one',
+    );
+
+    expect(queue.next()?.title, 'Stream 2');
+    expect(queue.next()?.url, 'fresh-two');
+    expect(queue.next(), isNull);
+  });
 }
+
+LiveStreamVariant _variant(String url, {String? title}) => LiveStreamVariant(
+      url: url,
+      headers: const <String, String>{},
+      mediaType: 'hls',
+      title: title ?? url,
+    );

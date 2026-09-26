@@ -32,13 +32,20 @@ class TvUpdateAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         decoration: BoxDecoration(
-            color: primary ? colors.primary : colors.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(10)),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: primary ? colors.onPrimary : colors.onSurface)),
+          color: primary
+              ? colors.primary
+              : TvDesign.surfaceFor(context, emphasis: 0.012),
+          borderRadius: BorderRadius.circular(5),
+          border: primary ? null : Border.all(color: TvDesign.hairline),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 19,
+            fontFamily: 'FigtreeSB',
+            color: primary ? colors.onPrimary : colors.onSurface,
+          ),
+        ),
       ),
     );
   }
@@ -75,15 +82,34 @@ class TvUpdateChangelog extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('What’s new',
-                style: TextStyle(
-                    color: colors.primary,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700)),
+            Row(
+              children: <Widget>[
+                Container(
+                  width: 3,
+                  height: 24,
+                  color: colors.primary,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'What’s new',
+                  style: const TextStyle(
+                    color: TvDesign.foreground,
+                    fontFamily: 'FigtreeBold',
+                    fontSize: 21,
+                    letterSpacing: -0.25,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
-            Text(changeLog,
-                style: const TextStyle(
-                    color: Colors.white, fontSize: 20, height: 1.45)),
+            Text(
+              changeLog,
+              style: const TextStyle(
+                color: TvDesign.mutedText,
+                fontSize: 19,
+                height: 1.45,
+              ),
+            ),
           ],
         ),
       ),
@@ -105,36 +131,77 @@ class TvUpdateLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: TvDesign.pageBackground,
-      body: SafeArea(
-        minimum: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
-        child: Center(
-            child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(TvDesign.focusOutset),
-            child: FocusTraversalGroup(
-              policy: ReadingOrderTraversalPolicy(),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(title,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 34,
-                            fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 12),
-                    Text(message,
-                        style: const TextStyle(
-                            color: TvDesign.mutedText,
-                            fontSize: 20,
-                            height: 1.4)),
-                    const SizedBox(height: 24),
-                    ...children,
-                  ]),
+      body: Stack(
+        children: <Widget>[
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                  colors: <Color>[
+                    Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.055),
+                    TvDesign.pageBackground,
+                    TvDesign.pageBackground,
+                  ],
+                ),
+              ),
             ),
           ),
-        )),
+          SafeArea(
+            minimum: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(TvDesign.focusOutset),
+                  child: FocusTraversalGroup(
+                    policy: ReadingOrderTraversalPolicy(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          'FLIXQUEST FOR TV',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontFamily: 'FigtreeBold',
+                            fontSize: 13,
+                            letterSpacing: 2.1,
+                          ),
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: TvDesign.foreground,
+                            fontFamily: 'FigtreeBold',
+                            fontSize: 38,
+                            letterSpacing: -0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          message,
+                          style: const TextStyle(
+                            color: TvDesign.mutedText,
+                            fontSize: 20,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 25),
+                        ...children,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -210,11 +277,25 @@ class _TvChangelogViewState extends State<TvChangelogView> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('What’s new',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 34,
-                              fontWeight: FontWeight.w700)),
+                      Text(
+                        'RELEASE NOTES',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontFamily: 'FigtreeBold',
+                          fontSize: 13,
+                          letterSpacing: 2.1,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'What’s new',
+                        style: TextStyle(
+                          color: TvDesign.foreground,
+                          fontFamily: 'FigtreeBold',
+                          fontSize: 36,
+                          letterSpacing: -0.7,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       const Text('Use ↑ ↓ to scroll',
                           style: TextStyle(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../app/tv_design.dart';
 import '../focus/tv_focusable.dart';
 
 class TvStatePanel extends StatelessWidget {
@@ -47,9 +48,10 @@ class TvStatePanel extends StatelessWidget {
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: colors.onSurface,
-                fontFamily: 'FigtreeSB',
+                color: TvDesign.foreground,
+                fontFamily: 'FigtreeBold',
                 fontSize: 30,
+                letterSpacing: -0.4,
               ),
             ),
             const SizedBox(height: 10),
@@ -74,8 +76,17 @@ class TvStatePanel extends StatelessWidget {
                     vertical: 14,
                   ),
                   decoration: BoxDecoration(
-                    color: colors.primary,
-                    borderRadius: BorderRadius.circular(10),
+                    gradient: LinearGradient(
+                      colors: <Color>[
+                        colors.primary,
+                        Color.lerp(
+                          colors.primary,
+                          colors.primaryContainer,
+                          0.3,
+                        )!,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,

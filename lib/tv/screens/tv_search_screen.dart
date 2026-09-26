@@ -247,8 +247,9 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
           Text('Search',
               style: TextStyle(
                   color: colors.onSurface,
-                  fontFamily: 'FigtreeSB',
-                  fontSize: 28)),
+                  fontFamily: 'FigtreeBold',
+                  fontSize: 28,
+                  letterSpacing: -0.4)),
           const SizedBox(height: 10),
           FocusTraversalGroup(
             policy: ReadingOrderTraversalPolicy(),
@@ -260,20 +261,21 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                     height: 62,
                     decoration: BoxDecoration(
                       color: _queryHasFocus
-                          ? colors.primary.withValues(alpha: 0.08)
-                          : colors.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(15),
+                          ? TvDesign.surfaceFor(context, emphasis: 0.045)
+                          : TvDesign.surfaceFor(context, emphasis: 0.012),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: _queryHasFocus
-                            ? colors.primary
+                            ? Colors.white
                             : colors.onSurface.withValues(alpha: 0.1),
                         width: _queryHasFocus ? 3 : 1,
                       ),
                       boxShadow: _queryHasFocus
                           ? <BoxShadow>[
                               BoxShadow(
-                                color: colors.primary.withValues(alpha: 0.18),
-                                blurRadius: 22,
+                                color: colors.primary.withValues(alpha: 0.38),
+                                blurRadius: 24,
+                                spreadRadius: 2,
                               ),
                             ]
                           : null,
@@ -415,6 +417,8 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
                       itemId: (item) => item.stableId,
                       semanticLabel: (item) => item.title,
                       targetItemWidth: widget.metrics.mediaCardWidth,
+                      itemAspectRatio: TvMediaCard.artworkAspectRatio,
+                      itemDetailsExtent: TvMediaCard.detailsHeight,
                       autofocus: true,
                       itemBuilder: (_, item, width) =>
                           TvMediaCard(item: item, width: width),
@@ -713,15 +717,18 @@ class _SearchResultTab extends StatelessWidget {
       onActivate: onActivate,
       selected: selected,
       focusScale: 1.02,
+      borderRadius: BorderRadius.circular(4),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         height: 48,
         padding: const EdgeInsets.symmetric(horizontal: 18),
         decoration: BoxDecoration(
-          color: selected
-              ? colors.primary.withValues(alpha: 0.18)
-              : colors.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(10),
+          border: Border(
+            bottom: BorderSide(
+              color: selected ? colors.primary : Colors.transparent,
+              width: 2,
+            ),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -741,21 +748,12 @@ class _SearchResultTab extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 9),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: selected
-                    ? colors.primary
-                    : colors.onSurface.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  color: selected ? colors.onPrimary : colors.onSurfaceVariant,
-                  fontFamily: 'FigtreeSB',
-                  fontSize: 13,
-                ),
+            Text(
+              '$count',
+              style: TextStyle(
+                color: selected ? colors.primary : colors.onSurfaceVariant,
+                fontFamily: 'FigtreeSB',
+                fontSize: 13,
               ),
             ),
           ],

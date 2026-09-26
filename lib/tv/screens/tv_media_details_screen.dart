@@ -303,10 +303,11 @@ class _DetailsBody extends StatelessWidget {
                       Text(
                         data.item.title,
                         style: TextStyle(
-                          color: colors.onSurface,
+                          color: TvDesign.foreground,
                           fontFamily: 'FigtreeBold',
                           fontSize: metrics.compact ? 42 : 58,
                           height: 1.02,
+                          letterSpacing: -0.8,
                         ),
                       ),
                       if (data.tagline case final tagline?
@@ -562,8 +563,25 @@ class _DetailAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
         decoration: BoxDecoration(
-          color: primary ? colors.primary : colors.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(10),
+          gradient: primary
+              ? LinearGradient(
+                  colors: <Color>[
+                    colors.primary,
+                    Color.lerp(
+                      colors.primary,
+                      colors.primaryContainer,
+                      0.34,
+                    )!,
+                  ],
+                )
+              : null,
+          color: primary ? null : TvDesign.raisedSurface,
+          border: Border.all(
+            color: primary
+                ? colors.primary.withValues(alpha: 0.5)
+                : colors.onSurface.withValues(alpha: 0.1),
+          ),
+          borderRadius: BorderRadius.circular(9),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -615,8 +633,9 @@ class _SeasonSection extends StatelessWidget {
           'Seasons & episodes',
           style: TextStyle(
             color: colors.onSurface,
-            fontFamily: 'FigtreeSB',
+            fontFamily: 'FigtreeBold',
             fontSize: 26,
+            letterSpacing: -0.35,
           ),
         ),
         const SizedBox(height: 14),
@@ -637,10 +656,27 @@ class _SeasonSection extends StatelessWidget {
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
+                      gradient: selectedSeason == season.seasonNumber
+                          ? LinearGradient(
+                              colors: <Color>[
+                                colors.primary,
+                                Color.lerp(
+                                  colors.primary,
+                                  colors.primaryContainer,
+                                  0.3,
+                                )!,
+                              ],
+                            )
+                          : null,
                       color: selectedSeason == season.seasonNumber
-                          ? colors.primary
-                          : colors.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
+                          ? null
+                          : TvDesign.raisedSurface,
+                      border: Border.all(
+                        color: selectedSeason == season.seasonNumber
+                            ? colors.primary.withValues(alpha: 0.5)
+                            : colors.onSurface.withValues(alpha: 0.09),
+                      ),
+                      borderRadius: BorderRadius.circular(9),
                     ),
                     child: Text(
                       season.name ?? 'Season ${season.seasonNumber}',
@@ -714,7 +750,10 @@ class _EpisodeTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
       decoration: BoxDecoration(
         color: TvDesign.surfaceFor(context, emphasis: 0.02),
-        borderRadius: BorderRadius.circular(11),
+        border: Border.all(
+          color: colors.onSurface.withValues(alpha: 0.07),
+        ),
+        borderRadius: BorderRadius.circular(9),
       ),
       child: Row(
         children: <Widget>[

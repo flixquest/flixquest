@@ -24,6 +24,8 @@ class TvContentGrid<T> extends StatefulWidget {
     required this.targetItemWidth,
     this.autofocus = false,
     this.itemExtent,
+    this.itemAspectRatio = 16 / 9,
+    this.itemDetailsExtent = 60,
     this.onItemMenu,
     this.controller,
     this.padding = const EdgeInsets.all(TvDesign.focusOutset),
@@ -41,6 +43,8 @@ class TvContentGrid<T> extends StatefulWidget {
   final double targetItemWidth;
   final bool autofocus;
   final double? itemExtent;
+  final double itemAspectRatio;
+  final double itemDetailsExtent;
   final ValueChanged<T>? onItemMenu;
   final TvContentGridController? controller;
   final EdgeInsets padding;
@@ -296,7 +300,9 @@ class _TvContentGridState<T> extends State<TvContentGrid<T>> {
         const focusPadding = 6.0;
         final contentWidth = itemWidth - (focusPadding * 2);
         final itemHeight = widget.itemExtent ??
-            (contentWidth / (16 / 9)) + 60 + (focusPadding * 2);
+            (contentWidth / widget.itemAspectRatio) +
+                widget.itemDetailsExtent +
+                (focusPadding * 2);
 
         _columnCount = columnCount;
         _itemHeight = itemHeight;
@@ -331,6 +337,7 @@ class _TvContentGridState<T> extends State<TvContentGrid<T>> {
                   }
                 },
                 onActivate: () => widget.onItemActivated(item),
+                borderRadius: BorderRadius.circular(TvDesign.cardRadius + 2),
                 onLongPress: widget.onItemMenu == null
                     ? null
                     : () => widget.onItemMenu!(item),

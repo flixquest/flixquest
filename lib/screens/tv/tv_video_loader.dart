@@ -163,8 +163,9 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
         widget.metadata.elapsed = 0;
       }
 
-      if (widget.metadata.airDate != null &&
-          !isReleased(widget.metadata.airDate!)) {
+      final isUnreleased = widget.metadata.airDate != null &&
+          !isReleased(widget.metadata.airDate!);
+      if (isUnreleased) {
         GlobalMethods.showScaffoldMessage(
             tr('episode_may_not_be_available'), context);
       }
@@ -242,15 +243,17 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
           );
           return;
         }
-        Provider.of<SettingsProvider>(context, listen: false)
-            .analytics
-            .trackTVWatched(
-              tvName: widget.metadata.seriesName,
-              tvId: widget.metadata.tvId,
-              episodeName: widget.metadata.episodeName,
-              seasonNumber: widget.metadata.seasonNumber,
-              episodeNumber: widget.metadata.episodeNumber,
-            );
+        if (!isUnreleased) {
+          Provider.of<SettingsProvider>(context, listen: false)
+              .analytics
+              .trackTVWatched(
+                tvName: widget.metadata.seriesName,
+                tvId: widget.metadata.tvId,
+                episodeName: widget.metadata.episodeName,
+                seasonNumber: widget.metadata.seasonNumber,
+                episodeNumber: widget.metadata.episodeNumber,
+              );
+        }
 
         final dependencies =
             Provider.of<AppDependencyProvider>(context, listen: false);

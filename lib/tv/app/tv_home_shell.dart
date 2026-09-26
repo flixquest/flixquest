@@ -53,6 +53,10 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
       TvScreenFocusController();
   final TvScreenFocusController _liveFocusController =
       TvScreenFocusController();
+  final TvScreenFocusController _profileFocusController =
+      TvScreenFocusController();
+  final TvScreenFocusController _wellnessFocusController =
+      TvScreenFocusController();
   final TvScreenFocusController _settingsFocusController =
       TvScreenFocusController();
   late final FocusScopeNode _shellFocusScope;
@@ -193,6 +197,8 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
       'series' => _seriesFocusController,
       'settings' => _settingsFocusController,
       'live' => _liveFocusController,
+      'profile' => _profileFocusController,
+      'wellness' => _wellnessFocusController,
       _ => null,
     };
     if (controller == null) return false;
@@ -333,20 +339,8 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
           child: Scaffold(
             key: TvHomeShell.shellKey,
             backgroundColor: TvDesign.pageBackground,
-            body: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0.75, -1),
-                  radius: 1.35,
-                  colors: <Color>[
-                    Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.1),
-                    TvDesign.pageBackground,
-                  ],
-                ),
-              ),
+            body: ColoredBox(
+              color: TvDesign.pageBackground,
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final metrics = TvShellMetrics.fromConstraints(constraints);
@@ -407,8 +401,12 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
                                   ),
                                   'wellness': TvWellnessScreen(
                                     metrics: metrics,
+                                    focusController: _wellnessFocusController,
                                   ),
-                                  'profile': TvProfileScreen(metrics: metrics),
+                                  'profile': TvProfileScreen(
+                                    metrics: metrics,
+                                    focusController: _profileFocusController,
+                                  ),
                                   'settings': TvSettingsScreen(
                                     metrics: metrics,
                                     focusController: _settingsFocusController,

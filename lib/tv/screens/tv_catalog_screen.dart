@@ -118,21 +118,31 @@ class _TvCatalogScreenState extends State<TvCatalogScreen> {
                   semanticLabel: '$sort $title',
                   selected: _sort == sort,
                   focusScale: 1,
+                  borderRadius: BorderRadius.circular(4),
                   onActivate: () => setState(() => _sort = sort),
                   child: Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                     decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: _sort == sort
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      sort,
+                      style: TextStyle(
+                        fontFamily: _sort == sort ? 'FigtreeSB' : 'Figtree',
+                        fontSize: 16,
                         color: _sort == sort
-                            ? Theme.of(context).colorScheme.primary
-                            : TvDesign.raisedSurface,
-                        borderRadius: BorderRadius.circular(8)),
-                    child: Text(sort,
-                        style: TextStyle(
-                            fontSize: 17,
-                            color: _sort == sort
-                                ? Theme.of(context).colorScheme.onPrimary
-                                : Colors.white)),
+                            ? TvDesign.foreground
+                            : TvDesign.mutedText,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -173,6 +183,8 @@ class _TvCatalogScreenState extends State<TvCatalogScreen> {
                   itemId: (item) => item.stableId,
                   semanticLabel: (item) => item.title,
                   targetItemWidth: widget.metrics.mediaCardWidth,
+                  itemAspectRatio: TvMediaCard.artworkAspectRatio,
+                  itemDetailsExtent: TvMediaCard.detailsHeight,
                   itemBuilder: (_, item, width) =>
                       TvMediaCard(item: item, width: width),
                   onItemActivated: widget.onOpenMedia,
@@ -203,8 +215,9 @@ class _CatalogHeader extends StatelessWidget {
           title,
           style: TextStyle(
             color: colors.onSurface,
-            fontFamily: 'FigtreeSB',
+            fontFamily: 'FigtreeBold',
             fontSize: 28,
+            letterSpacing: -0.4,
           ),
         ),
       ],

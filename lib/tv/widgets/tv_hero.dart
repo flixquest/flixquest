@@ -40,11 +40,15 @@ class TvHero extends StatelessWidget {
             settings.enableProxy,
             context,
           )}original/$path';
+    final metadata = <String>[
+      if (item.year case final year?) year,
+      item.kind == TvMediaKind.movie ? 'Movie' : 'Series',
+      if (item.rating case final rating?) '★ ${rating.toStringAsFixed(1)}',
+    ];
 
     return SizedBox(
-      height: compact ? 230 : 340,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+      height: compact ? 240 : 310,
+      child: ClipRect(
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
@@ -60,7 +64,7 @@ class TvHero extends StatelessWidget {
                         MediaQuery.devicePixelRatioOf(context))
                     .round(),
                 fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
+                alignment: Alignment.centerRight,
                 placeholder: (_, __) => ColoredBox(
                   color: AppLoadingColors.of(context).cachedImagePlaceholder,
                 ),
@@ -73,20 +77,39 @@ class TvHero extends StatelessWidget {
                   begin: Alignment.centerRight,
                   end: Alignment.centerLeft,
                   colors: <Color>[
-                    Color(0x10000000),
-                    Color(0xcc000000),
-                    Color(0xf2000000),
+                    Color(0x00000000),
+                    Color(0x5c000000),
+                    Color(0xf7000000),
                   ],
-                  stops: <double>[0, 0.58, 1],
+                  stops: <double>[0, 0.55, 1],
+                ),
+              ),
+            ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: <Color>[
+                    Color(0x00000000),
+                    Color(0x08000000),
+                    Color(0xff050606),
+                  ],
+                  stops: <double>[0, 0.64, 1],
                 ),
               ),
             ),
             Padding(
-              padding: EdgeInsets.all(compact ? 24 : 38),
+              padding: EdgeInsets.fromLTRB(
+                compact ? 22 : 32,
+                compact ? 18 : 24,
+                compact ? 22 : 32,
+                compact ? 22 : 30,
+              ),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: compact ? 430 : 600),
+                  constraints: BoxConstraints(maxWidth: compact ? 410 : 530),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,66 +131,81 @@ class TvHero extends StatelessWidget {
                             style: TextStyle(
                               color: colors.primary,
                               fontFamily: 'FigtreeSB',
-                              fontSize: compact ? 14 : 16,
-                              letterSpacing: 1.1,
+                              fontSize: compact ? 11 : 12,
+                              letterSpacing: 1.5,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       Text(
                         item.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white,
-                          fontFamily: 'FigtreeSB',
-                          fontSize: compact ? 34 : 48,
-                          height: 1.02,
+                          color: TvDesign.foreground,
+                          fontFamily: 'FigtreeBold',
+                          fontSize: compact ? 32 : 44,
+                          height: 0.98,
+                          letterSpacing: -0.7,
                         ),
                       ),
-                      if (!compact && item.overview.isNotEmpty) ...<Widget>[
-                        const SizedBox(height: 14),
+                      const SizedBox(height: 9),
+                      Text(
+                        metadata.join('   '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xffd2d2d2),
+                          fontFamily: 'FigtreeSB',
+                          fontSize: 14,
+                          height: 1.1,
+                        ),
+                      ),
+                      if (item.overview.isNotEmpty) ...<Widget>[
+                        SizedBox(height: compact ? 8 : 10),
                         Text(
                           item.overview,
-                          maxLines: 2,
+                          maxLines: compact ? 2 : 3,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xffdddddd),
-                            fontSize: 18,
-                            height: 1.35,
+                          style: TextStyle(
+                            color: const Color(0xffdedede),
+                            fontSize: compact ? 13 : 15,
+                            height: 1.25,
                           ),
                         ),
                       ],
-                      const SizedBox(height: 20),
+                      SizedBox(height: compact ? 12 : 15),
                       TvFocusable(
                         semanticLabel: 'More information about ${item.title}',
                         onActivate: onOpenDetails,
-                        focusScale: 1.025,
+                        focusScale: 1.035,
+                        focusColor: colors.primary,
+                        borderRadius: BorderRadius.circular(5),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 13,
+                            horizontal: 18,
+                            vertical: 10,
                           ),
                           decoration: BoxDecoration(
-                            color: colors.primary,
-                            borderRadius: BorderRadius.circular(10),
+                            color: const Color(0xf2ffffff),
+                            borderRadius: BorderRadius.circular(3),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: <Widget>[
                               Icon(
                                 PhosphorIcons.info(),
-                                color: colors.onPrimary,
-                                size: 22,
+                                color: Colors.black,
+                                size: 19,
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 8),
                               Text(
                                 'More info',
-                                style: TextStyle(
-                                  color: colors.onPrimary,
+                                style: const TextStyle(
+                                  color: Colors.black,
                                   fontFamily: 'FigtreeSB',
-                                  fontSize: 19,
+                                  fontSize: 16,
                                 ),
                               ),
                             ],

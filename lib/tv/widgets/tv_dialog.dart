@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app/tv_design.dart';
 import '../focus/tv_focusable.dart';
 import '../focus/tv_keymap.dart';
 
@@ -131,9 +132,14 @@ class _TvDialogState extends State<TvDialog> {
         widget.actions.any((action) => action.autofocus);
 
     return Dialog(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: TvDesign.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 28),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 24,
+      shadowColor: Colors.black.withValues(alpha: 0.54),
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720),
         child: FocusScope(
@@ -152,10 +158,11 @@ class _TvDialogState extends State<TvDialog> {
                     Text(
                       widget.title,
                       style: TextStyle(
-                        color: colorScheme.onSurface,
-                        fontFamily: 'FigtreeSB',
+                        color: TvDesign.foreground,
+                        fontFamily: 'FigtreeBold',
                         fontSize: 32,
                         fontWeight: FontWeight.w700,
+                        letterSpacing: -0.45,
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -196,10 +203,29 @@ class _TvDialogState extends State<TvDialog> {
                                       vertical: 15,
                                     ),
                                     decoration: BoxDecoration(
+                                      gradient: action.isPrimary
+                                          ? LinearGradient(
+                                              colors: <Color>[
+                                                colorScheme.primary,
+                                                Color.lerp(
+                                                  colorScheme.primary,
+                                                  colorScheme.primaryContainer,
+                                                  0.3,
+                                                )!,
+                                              ],
+                                            )
+                                          : null,
                                       color: action.isPrimary
-                                          ? colorScheme.primary
-                                          : colorScheme.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(10),
+                                          ? null
+                                          : TvDesign.raisedSurface,
+                                      border: Border.all(
+                                        color: action.isPrimary
+                                            ? colorScheme.primary
+                                                .withValues(alpha: 0.5)
+                                            : colorScheme.onSurface
+                                                .withValues(alpha: 0.09),
+                                      ),
+                                      borderRadius: BorderRadius.circular(9),
                                     ),
                                     child: Text(
                                       action.label,

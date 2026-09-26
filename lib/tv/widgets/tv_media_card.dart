@@ -23,12 +23,15 @@ class TvMediaCard extends StatelessWidget {
   final TvMediaItem item;
   final double width;
 
+  static const artworkAspectRatio = 2 / 3;
+  static const detailsHeight = 46.0;
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final proxy = context.watch<AppDependencyProvider>().tmdbProxy;
-    final path = item.backdropPath ?? item.posterPath;
+    final path = item.posterPath ?? item.backdropPath;
     final imageUrl = path == null
         ? null
         : '${buildImageUrl(
@@ -45,9 +48,9 @@ class TvMediaCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           AspectRatio(
-            aspectRatio: 16 / 9,
+            aspectRatio: artworkAspectRatio,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(TvDesign.cardRadius - 3),
+              borderRadius: BorderRadius.circular(TvDesign.cardRadius),
               child: Stack(
                 fit: StackFit.expand,
                 children: <Widget>[
@@ -62,6 +65,10 @@ class TvMediaCard extends StatelessWidget {
                       memCacheWidth:
                           (width * MediaQuery.devicePixelRatioOf(context))
                               .round(),
+                      memCacheHeight: (width /
+                              artworkAspectRatio *
+                              MediaQuery.devicePixelRatioOf(context))
+                          .round(),
                       fit: BoxFit.cover,
                       placeholder: (_, __) => ColoredBox(
                         color:
@@ -69,86 +76,12 @@ class TvMediaCard extends StatelessWidget {
                       ),
                       errorWidget: (_, __, ___) => _ImageFallback(item: item),
                     ),
-                  const DecoratedBox(
+                  DecoratedBox(
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: <Color>[
-                          Color(0x08000000),
-                          Color(0xb8000000),
-                        ],
-                      ),
+                      border: Border.all(color: TvDesign.hairline),
+                      borderRadius: BorderRadius.circular(TvDesign.cardRadius),
                     ),
                   ),
-                  Positioned(
-                    left: 12,
-                    bottom: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.62),
-                        borderRadius: BorderRadius.circular(7),
-                        border: Border.all(color: Colors.white12),
-                      ),
-                      child: Row(
-                        children: <Widget>[
-                          Icon(
-                            item.kind == TvMediaKind.movie
-                                ? PhosphorIcons.filmSlate()
-                                : PhosphorIcons.television(),
-                            color: Colors.white,
-                            size: 15,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            item.kind == TvMediaKind.movie ? 'Movie' : 'Series',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontFamily: 'FigtreeSB',
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (item.rating case final rating?)
-                    Positioned(
-                      top: 10,
-                      right: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.68),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: <Widget>[
-                            Icon(
-                              PhosphorIcons.star(PhosphorIconsStyle.fill),
-                              color: colors.primary,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              rating.toStringAsFixed(1),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontFamily: 'FigtreeSB',
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   if (item.progress case final progress?)
                     Positioned(
                       left: 0,
@@ -156,7 +89,7 @@ class TvMediaCard extends StatelessWidget {
                       bottom: 0,
                       child: LinearProgressIndicator(
                         value: progress,
-                        minHeight: 4,
+                        minHeight: 3,
                         color: colors.primary,
                         backgroundColor: Colors.white24,
                       ),
@@ -165,7 +98,7 @@ class TvMediaCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 7),
           Text(
             item.title,
             maxLines: 1,
@@ -173,22 +106,25 @@ class TvMediaCard extends StatelessWidget {
             style: TextStyle(
               color: colors.onSurface,
               fontFamily: 'FigtreeSB',
-              fontSize: 19,
+              fontSize: 16,
               height: 1.1,
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 2),
           Text(
             item.progressLabel ??
                 <String>[
                   if (item.year != null) item.year!,
-                  item.kind == TvMediaKind.movie ? 'Movie' : 'Series',
+                  if (item.rating case final rating?)
+                    '★ ${rating.toStringAsFixed(1)}'
+                  else
+                    item.kind == TvMediaKind.movie ? 'Movie' : 'Series',
                 ].join('  •  '),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: colors.onSurfaceVariant,
-              fontSize: 14,
+              color: TvDesign.mutedText,
+              fontSize: 12,
             ),
           ),
         ],

@@ -14,22 +14,21 @@ class TvShellMetrics {
 
   factory TvShellMetrics.fromConstraints(BoxConstraints constraints) {
     final compact = constraints.maxHeight < 700 || constraints.maxWidth < 1200;
-    final safeInset = compact ? 22.0 : 42.0;
-    final railWidth = compact ? 72.0 : 96.0;
-    final railGap = compact ? 12.0 : 24.0;
+    final safeInset = compact ? 16.0 : 26.0;
+    final railWidth = compact ? 56.0 : 68.0;
+    final railGap = compact ? 8.0 : 14.0;
     final contentWidth =
         constraints.maxWidth - (safeInset * 2) - railWidth - railGap;
-    final mediaCardWidth =
-        (contentWidth / (compact ? 3.5 : 4.5)).clamp(170.0, 286.0);
+    final mediaCardWidth = (contentWidth / 7.2).clamp(106.0, 210.0);
 
     return TvShellMetrics(
       compact: compact,
       safeInset: safeInset,
       railWidth: railWidth,
       railGap: railGap,
-      contentPadding: compact ? 18 : 30,
-      navItemHeight: compact ? 46 : 52,
-      navItemGap: compact ? 3 : 7,
+      contentPadding: compact ? 14 : 22,
+      navItemHeight: compact ? 42 : 48,
+      navItemGap: compact ? 2 : 5,
       mediaCardWidth: mediaCardWidth,
     );
   }
@@ -45,20 +44,25 @@ class TvShellMetrics {
 }
 
 abstract final class TvDesign {
-  static const pageBackground = Color(0xff101110);
-  static const surface = Color(0xff1b1c1b);
-  static const raisedSurface = Color(0xff252625);
-  static const mutedText = Color(0xffb8bab8);
-  static const focusOutset = 16.0;
-  static const cardRadius = 14.0;
+  /// The phone app's charcoal palette, deepened slightly for a ten-foot screen.
+  /// Keeping these colors neutral lets the user's mobile accent color remain the
+  /// only saturated UI color on television as well.
+  static const pageBackground = Color(0xff050606);
+  static const surface = Color(0xff111212);
+  static const raisedSurface = Color(0xff1b1c1c);
+  static const mutedText = Color(0xffa7a8a8);
+  static const foreground = Color(0xfff7f7f7);
+  static const hairline = Color(0x1fffffff);
+  static const focusOutset = 12.0;
+  static const cardRadius = 5.0;
 
   static Color surfaceFor(BuildContext context, {double emphasis = 0}) {
     final theme = Theme.of(context);
     final base = theme.brightness == Brightness.dark
-        ? theme.scaffoldBackgroundColor
+        ? surface
         : theme.colorScheme.surface;
     return Color.alphaBlend(
-      theme.colorScheme.primary.withValues(alpha: 0.035 + emphasis),
+      theme.colorScheme.primary.withValues(alpha: 0.025 + emphasis),
       base,
     );
   }

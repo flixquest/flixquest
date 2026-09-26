@@ -16,6 +16,7 @@ class TvFocusable extends StatefulWidget {
     this.focusScale = 1.04,
     this.focusColor,
     this.padding = EdgeInsets.zero,
+    this.scrollAlignment = 0.45,
     this.onKeyEvent,
     super.key,
   });
@@ -37,6 +38,7 @@ class TvFocusable extends StatefulWidget {
   final double focusScale;
   final Color? focusColor;
   final EdgeInsetsGeometry padding;
+  final double scrollAlignment;
   final KeyEventResult Function(FocusNode node, KeyEvent event)? onKeyEvent;
 
   @override
@@ -91,7 +93,7 @@ class _TvFocusableState extends State<TvFocusable> {
             context,
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
-            alignment: 0.45,
+            alignment: widget.scrollAlignment,
             alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
           );
         }
@@ -101,8 +103,10 @@ class _TvFocusableState extends State<TvFocusable> {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveFocusColor =
-        widget.focusColor ?? Theme.of(context).colorScheme.primary;
+    // White is the clearest focus boundary against both very dark posters and
+    // bright artwork. Keep the effect neutral so the poster remains the visual
+    // focus and low-power TV GPUs only have one small shadow to rasterize.
+    final effectiveFocusColor = widget.focusColor ?? Colors.white;
     final focusable = Semantics(
       container: true,
       excludeSemantics: true,
@@ -150,14 +154,14 @@ class _TvFocusableState extends State<TvFocusable> {
                 borderRadius: widget.borderRadius,
                 border: Border.all(
                   color: _hasFocus ? effectiveFocusColor : Colors.transparent,
-                  width: 3,
+                  width: 2,
                 ),
                 boxShadow: _hasFocus
                     ? <BoxShadow>[
                         BoxShadow(
-                          color: effectiveFocusColor.withValues(alpha: 0.28),
-                          blurRadius: 18,
-                          spreadRadius: 2,
+                          color: Colors.black.withValues(alpha: 0.5),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
                         ),
                       ]
                     : const <BoxShadow>[],

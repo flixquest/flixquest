@@ -92,6 +92,8 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
                   itemId: (item) => item.stableId,
                   semanticLabel: (item) => item.title,
                   targetItemWidth: widget.metrics.mediaCardWidth,
+                  itemAspectRatio: TvMediaCard.artworkAspectRatio,
+                  itemDetailsExtent: TvMediaCard.detailsHeight,
                   itemBuilder: (_, item, width) =>
                       TvMediaCard(item: item, width: width),
                   onItemActivated: widget.onOpenMedia,
