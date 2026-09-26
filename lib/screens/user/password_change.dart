@@ -125,7 +125,7 @@ class PasswordChangeScreenState extends State<PasswordChangeScreen> {
                             .colorScheme
                             .primary
                             .withValues(alpha: .12),
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(PhosphorIcons.lockKey(),
                           size: 32,

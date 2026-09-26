@@ -162,7 +162,7 @@ class EmailChangeScreenState extends State<EmailChangeScreen> {
                             .colorScheme
                             .primary
                             .withValues(alpha: .12),
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(PhosphorIcons.at(),
                           size: 32,

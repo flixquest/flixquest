@@ -102,7 +102,7 @@ class _UserInfoState extends State<UserInfo> {
             Row(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(5),
                   child: const AppLogo(width: 34, height: 34),
                 ),
                 const SizedBox(width: 12),
@@ -183,7 +183,7 @@ class _UserInfoState extends State<UserInfo> {
             Row(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(5),
                   child: const AppLogo(width: 34, height: 34),
                 ),
                 const SizedBox(width: 12),
@@ -250,7 +250,7 @@ class _UserInfoState extends State<UserInfo> {
             //   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
             //   decoration: BoxDecoration(
             //     border: Border.all(color: colors.primary, width: 1.6),
-            //     borderRadius: BorderRadius.circular(24),
+            //     borderRadius: BorderRadius.circular(10),
             //   ),
             //   child: Row(
             //     children: [
@@ -259,7 +259,7 @@ class _UserInfoState extends State<UserInfo> {
             //         height: 48,
             //         decoration: BoxDecoration(
             //           color: colors.primary.withValues(alpha: .12),
-            //           borderRadius: BorderRadius.circular(16),
+            //           borderRadius: BorderRadius.circular(9),
             //         ),
             //         child:
             //             Icon(Icons.auto_awesome_rounded, color: colors.primary),

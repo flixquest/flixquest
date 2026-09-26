@@ -11,7 +11,8 @@ abstract final class AppUI {
   static const double phonePadding = 20;
   static const double tabletPadding = 28;
   static const double contentMaxWidth = 1180;
-  static const double cardRadius = 14;
+  // The same restrained corners are used by posters and their placeholders.
+  static const double cardRadius = 5;
   static const double mediaGridCrossAxisSpacing = 12;
   static const double mediaGridTitleGap = 9;
   static const double mediaGridTitleHeight = 36;
@@ -123,7 +124,7 @@ class AppGenreTile extends StatelessWidget {
     return Material(
       color: colors.surfaceContainerHigh.withValues(alpha: .78),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(17),
+        borderRadius: BorderRadius.circular(9),
         side: BorderSide(
           color: colors.outlineVariant.withValues(alpha: .55),
         ),
@@ -437,7 +438,7 @@ class AppSegmentedTab {
   final IconData? icon;
 }
 
-/// The pill-shaped segmented control used wherever a screen splits its body
+/// The segmented control used wherever a screen splits its body
 /// into a small, fixed set of tabs (bookmarks, cast & crew, …).
 class AppSegmentedTabs extends StatelessWidget {
   const AppSegmentedTabs({
@@ -456,7 +457,7 @@ class AppSegmentedTabs extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: colors.onSurface.withValues(alpha: .06),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: TabBar(
         controller: controller,
@@ -464,7 +465,7 @@ class AppSegmentedTabs extends StatelessWidget {
         indicatorSize: TabBarIndicatorSize.tab,
         indicator: BoxDecoration(
           color: colors.primary,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(10),
         ),
         labelColor: colors.onPrimary,
         unselectedLabelColor: colors.onSurfaceVariant,
@@ -693,7 +694,7 @@ class AppSelectionTile extends StatelessWidget {
           ? colors.primaryContainer.withValues(alpha: .55)
           : colors.surfaceContainerHighest.withValues(alpha: .45),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(9),
         side: BorderSide(
           color: selected
               ? colors.primary.withValues(alpha: .7)
@@ -815,7 +816,7 @@ class AppStreamSourceTile extends StatelessWidget {
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(17),
+        borderRadius: BorderRadius.circular(9),
         side: BorderSide(color: colors.outline.withValues(alpha: .14)),
       ),
       child: InkWell(
@@ -829,7 +830,7 @@ class AppStreamSourceTile extends StatelessWidget {
                 height: 42,
                 decoration: BoxDecoration(
                   color: colors.primary.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(13),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
                   child: Text(
@@ -912,7 +913,7 @@ class AppFormSurface extends StatelessWidget {
               height: 68,
               decoration: BoxDecoration(
                 color: accent.withValues(alpha: .12),
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, size: 32, color: accent),
             ),
@@ -1002,11 +1003,11 @@ class AppFilterPill extends StatelessWidget {
       duration: const Duration(milliseconds: 180),
       decoration: BoxDecoration(
         color: selected ? colors.primary : Colors.transparent,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: colors.primary, width: 1.4),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(10),
         onTap: onPressed,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -1094,7 +1095,7 @@ class AppRatingBadge extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colors.primary,
-        borderRadius: BorderRadius.circular(compact ? 7 : 8),
+        borderRadius: BorderRadius.circular(4),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: .12),
@@ -1609,7 +1610,7 @@ class AppInfoPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         color: colors.onSurface.withValues(alpha: .06),
-        borderRadius: BorderRadius.circular(13),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1627,7 +1628,7 @@ class AppInfoPill extends StatelessWidget {
 
 /// A self-contained shimmer placeholder that can fill any constrained space.
 class AppShimmerBlock extends StatelessWidget {
-  const AppShimmerBlock({this.radius = 14, super.key});
+  const AppShimmerBlock({this.radius = AppUI.cardRadius, super.key});
 
   final double radius;
 

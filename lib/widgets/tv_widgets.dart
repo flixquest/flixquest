@@ -632,11 +632,11 @@ class _TVHeroLiveButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.black.withValues(alpha: .38),
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
         key: const ValueKey('tv_live_tv_shortcut'),
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(10),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
@@ -785,7 +785,7 @@ class ScrollingTVState extends State<ScrollingTV>
                       maximumSize: WidgetStateProperty.all(const Size(200, 60)),
                       shape: WidgetStateProperty.all<RoundedRectangleBorder>(
                           RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20.0),
+                        borderRadius: BorderRadius.circular(10),
                       ))),
                   child: Padding(
                     padding: const EdgeInsets.only(left: 8.0, right: 8.0),
@@ -841,7 +841,7 @@ class ScrollingTVState extends State<ScrollingTV>
                                             children: [
                                               ClipRRect(
                                                 borderRadius:
-                                                    BorderRadius.circular(13.0),
+                                                    BorderRadius.circular(AppUI.cardRadius),
                                                 child: tvList![index]
                                                             .posterPath ==
                                                         null
@@ -1012,7 +1012,7 @@ class _ScrollingRecentEpisodesState extends State<ScrollingRecentEpisodes> {
               return SizedBox(
                 width: cardWidth,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(AppUI.cardRadius),
                   onLongPress: () => _deleteEpisode(episode),
                   onTap: () => _openEpisode(episode),
                   child: Column(
@@ -1021,7 +1021,7 @@ class _ScrollingRecentEpisodesState extends State<ScrollingRecentEpisodes> {
                       AspectRatio(
                         aspectRatio: 16 / 9,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(AppUI.cardRadius),
                           child: Stack(
                             fit: StackFit.expand,
                             children: [
@@ -1068,7 +1068,7 @@ class _ScrollingRecentEpisodesState extends State<ScrollingRecentEpisodes> {
                                       horizontal: 9, vertical: 6),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withValues(alpha: .72),
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(5),
                                   ),
                                   child: Text(
                                     episodeLabel,
@@ -2308,7 +2308,7 @@ class TVImagesDisplayState extends State<TVImagesDisplay> {
                                           height: 180,
                                           child: ClipRRect(
                                             borderRadius:
-                                                BorderRadius.circular(8.0),
+                                                BorderRadius.circular(AppUI.cardRadius),
                                             child: tvImages!.poster!.isEmpty
                                                 ? Image.asset(
                                                     'assets/images/na_logo.png',
@@ -2421,7 +2421,7 @@ class TVImagesDisplayState extends State<TVImagesDisplay> {
                                           height: 180,
                                           child: ClipRRect(
                                             borderRadius:
-                                                BorderRadius.circular(8.0),
+                                                BorderRadius.circular(AppUI.cardRadius),
                                             child: tvImages!.backdrop!.isEmpty
                                                 ? Image.asset(
                                                     'assets/images/na_logo.png',
@@ -2639,7 +2639,7 @@ class TVSeasonImagesDisplayState extends State<TVSeasonImagesDisplay> {
                               SizedBox(
                                 width: 125,
                                 child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8.0),
+                                  borderRadius: BorderRadius.circular(AppUI.cardRadius),
                                   child: tvImages!.poster!.isEmpty
                                       ? Image.asset('assets/images/na_logo.png',
                                           fit: BoxFit.cover,
@@ -2818,7 +2818,7 @@ class TVEpisodeImagesDisplayState extends State<TVEpisodeImagesDisplay> {
                             Padding(
                               padding: const EdgeInsets.all(8.0),
                               child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8.0),
+                                borderRadius: BorderRadius.circular(AppUI.cardRadius),
                                 child: tvImages!.still!.isEmpty
                                     ? Image.asset('assets/images/na_logo.png',
                                         fit: BoxFit.cover,
@@ -3023,7 +3023,7 @@ class TVVideosDisplayState extends State<TVVideosDisplay> {
                                             padding: const EdgeInsets.all(8.0),
                                             child: ClipRRect(
                                               borderRadius:
-                                                  BorderRadius.circular(8.0),
+                                                  BorderRadius.circular(AppUI.cardRadius),
                                               child: Stack(
                                                 fit: StackFit.expand,
                                                 children: [
@@ -3303,7 +3303,7 @@ class TVSeasonsTabState extends State<TVSeasonsTab>
                                                   '${tvDetails!.seasons![index].seasonId}',
                                               child: ClipRRect(
                                                 borderRadius:
-                                                    BorderRadius.circular(10.0),
+                                                    BorderRadius.circular(AppUI.cardRadius),
                                                 child: tvDetails!
                                                             .seasons![index]
                                                             .posterPath ==
@@ -3852,7 +3852,7 @@ class TVGenreDisplayState extends State<TVGenreDisplay>
                                   style: BorderStyle.solid,
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
-                                borderRadius: BorderRadius.circular(20.0),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               label: Text(
                                 genres![index].genreName!,
@@ -4446,7 +4446,7 @@ class SeasonsListState extends State<SeasonsList> {
                                                 '${tvDetails!.seasons![index].seasonNumber}',
                                             child: ClipRRect(
                                               borderRadius:
-                                                  BorderRadius.circular(8.0),
+                                                  BorderRadius.circular(AppUI.cardRadius),
                                               child: tvDetails!.seasons![index]
                                                           .posterPath ==
                                                       null
@@ -5087,7 +5087,7 @@ class _TVWatchProvidersDetailsState extends State<TVWatchProvidersDetails>
                                       flex: 6,
                                       child: ClipRRect(
                                         borderRadius:
-                                            BorderRadius.circular(8.0),
+                                            BorderRadius.circular(AppUI.cardRadius),
                                         child: const AppLogo(
                                           fit: BoxFit.cover,
                                         ),
@@ -5172,7 +5172,7 @@ class TVGenreListGridState extends State<TVGenreListGrid>
             itemCount: genreList?.length ?? 8,
             itemBuilder: (context, index) {
               if (genreList == null) {
-                return const AppShimmerBlock(radius: 17);
+                return const AppShimmerBlock(radius: 9);
               }
               final genre = genreList![index];
               return AppGenreTile(
@@ -5238,7 +5238,7 @@ class TVStreamingServicesWidget extends StatelessWidget {
     return SizedBox(
       width: 92,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(9),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
@@ -5258,7 +5258,7 @@ class TVStreamingServicesWidget extends StatelessWidget {
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(9),
                   border: Border.all(
                     color: Theme.of(context)
                         .colorScheme
@@ -5267,7 +5267,7 @@ class TVStreamingServicesWidget extends StatelessWidget {
                   ),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppUI.cardRadius),
                   child: Image.asset(imagePath, fit: BoxFit.cover),
                 ),
               ),
@@ -5735,11 +5735,11 @@ class TVDetailQuickInfo extends StatelessWidget {
                     child: Material(
                       type: MaterialType.transparency,
                       child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(AppUI.cardRadius),
                           child: Container(
                             padding: const EdgeInsets.fromLTRB(0, 0, 8, 0),
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppUI.cardRadius),
                               child: SizedBox(
                                 width: 94,
                                 height: 140,
@@ -5896,7 +5896,7 @@ class _TVDetailOptionsState extends State<TVDetailOptions> {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(5),
               ),
               child: Text(
                 widget.tvSeries.voteCount!.toString(),
@@ -6481,7 +6481,7 @@ class TVEpisodeOptions extends StatelessWidget {
                     .colorScheme
                     .primary
                     .withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(5),
               ),
               child: Text(
                 episodeList.voteCount!.toString(),

@@ -76,14 +76,14 @@ class _MovieBookmarkState extends State<MovieBookmark> {
         final movie = items[index];
         return Card(
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(9),
             onTap: () => _open(movie),
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppUI.cardRadius),
                     child: CachedNetworkImage(
                       cacheManager: cacheProp(),
                       imageUrl: _imageUrl(context, movie, settings, proxy),

@@ -343,7 +343,7 @@ class _CategorySectionState extends State<_CategorySection>
               child: SizedBox(
                 width: double.infinity,
                 height: MediaQuery.of(context).size.width * 0.56,
-                child: const AppShimmerBlock(radius: 10),
+                child: const AppShimmerBlock(radius: AppUI.cardRadius),
               ),
             ),
             const SizedBox(height: 16),
@@ -368,7 +368,7 @@ class _CategorySectionState extends State<_CategorySection>
                 itemBuilder: (_, __) => const SizedBox(
                   width: 240,
                   height: 140,
-                  child: AppShimmerBlock(radius: 10),
+                  child: AppShimmerBlock(radius: AppUI.cardRadius),
                 ),
               ),
             ),
@@ -404,7 +404,7 @@ class _CategorySectionState extends State<_CategorySection>
             itemBuilder: (_, __) => const SizedBox(
               width: 240,
               height: 140,
-              child: AppShimmerBlock(radius: 10),
+              child: AppShimmerBlock(radius: AppUI.cardRadius),
             ),
           ),
         );
@@ -483,7 +483,7 @@ class _CategorizedPosterCard extends StatelessWidget {
             SizedBox(
               height: cardWidth * 1.5,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(10.0),
+                borderRadius: BorderRadius.circular(AppUI.cardRadius),
                 child: Hero(
                   tag: item.heroId,
                   child: item.posterPath == null
@@ -552,7 +552,7 @@ class _CategorizedBackdropCard extends StatelessWidget {
         width: width,
         height: height,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(10.0),
+          borderRadius: BorderRadius.circular(AppUI.cardRadius),
           child: Stack(
             fit: StackFit.expand,
             children: [

@@ -282,7 +282,7 @@ class PlayerMovieRecommendations {
                                     : Theme.of(context)
                                         .colorScheme
                                         .surfaceContainerLow,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(8),
                                 clipBehavior: Clip.antiAlias,
                                 child: InkWell(
                                   onTap: () => setDialogState(

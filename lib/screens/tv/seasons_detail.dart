@@ -550,7 +550,7 @@ class _EpisodeRow extends StatelessWidget {
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppUI.cardRadius),
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
@@ -566,7 +566,7 @@ class _EpisodeRow extends StatelessWidget {
                                   '${buildImageUrl(TMDB_BASE_IMAGE_URL, proxy, settings.enableProxy, context)}${settings.imageQuality}${episode.stillPath}',
                               fit: BoxFit.cover,
                               placeholder: (_, __) =>
-                                  const AppShimmerBlock(radius: 12),
+                                  const AppShimmerBlock(radius: 7),
                               errorWidget: (_, __, ___) => Image.asset(
                                 'assets/images/na_rect.png',
                                 fit: BoxFit.cover,
@@ -1166,7 +1166,7 @@ class _SeasonError extends StatelessWidget {
               .colorScheme
               .errorContainer
               .withValues(alpha: .4),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
@@ -1250,7 +1250,7 @@ class _EpisodeRowShimmer extends StatelessWidget {
                 width: thumbWidth,
                 child: const AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: AppShimmerBlock(radius: 12),
+                  child: AppShimmerBlock(radius: 7),
                 ),
               ),
               SizedBox(width: isWide ? 18 : 13),
@@ -1423,11 +1423,11 @@ class TVSeasonDetailQuickInfo extends StatelessWidget {
                   Hero(
                     tag: heroId,
                     child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppUI.cardRadius),
                         child: Container(
                           padding: const EdgeInsets.fromLTRB(0, 0, 8, 0),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppUI.cardRadius),
                             child: SizedBox(
                               width: 94,
                               height: 140,

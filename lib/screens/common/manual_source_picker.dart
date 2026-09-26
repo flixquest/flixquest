@@ -57,7 +57,7 @@ class _TvProviderPickerDialogState extends State<_TvProviderPickerDialog> {
     return Dialog(
       backgroundColor: colors.surface,
       insetPadding: const EdgeInsets.all(72),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 720,
@@ -141,7 +141,7 @@ class _TvProviderPickerDialogState extends State<_TvProviderPickerDialog> {
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
         decoration: BoxDecoration(
           color: colors.surfaceContainerHighest.withValues(alpha: .55),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: <Widget>[
@@ -150,7 +150,7 @@ class _TvProviderPickerDialogState extends State<_TvProviderPickerDialog> {
               height: 44,
               decoration: BoxDecoration(
                 color: colors.primary.withValues(alpha: .11),
-                borderRadius: BorderRadius.circular(13),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 PhosphorIcons.playCircle(),

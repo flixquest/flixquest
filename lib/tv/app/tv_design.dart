@@ -41,6 +41,9 @@ class TvShellMetrics {
   final double navItemHeight;
   final double navItemGap;
   final double mediaCardWidth;
+
+  /// The rail's width while it has focus and shows its labels.
+  double get expandedRailWidth => compact ? 200 : 244;
 }
 
 abstract final class TvDesign {

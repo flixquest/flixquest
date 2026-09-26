@@ -85,7 +85,7 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
             colors.surface.withValues(alpha: .94),
           ],
         ),
-        borderRadius: BorderRadius.circular(useSplitLayout ? 24 : 28),
+        borderRadius: BorderRadius.circular(useSplitLayout ? 10 : 12),
         border: Border.all(
           color: colors.outlineVariant.withValues(alpha: .46),
         ),
@@ -237,7 +237,7 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
               color: colors.primaryContainer.withValues(alpha: .3),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -316,7 +316,7 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
       ),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest.withValues(alpha: .4),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
@@ -368,7 +368,7 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
             color: isHighlighted
                 ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
             border: isHighlighted
                 ? Border.all(
                     color: Theme.of(context)

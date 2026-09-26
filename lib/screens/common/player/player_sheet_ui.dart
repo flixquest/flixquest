@@ -152,7 +152,7 @@ class PlayerChoiceCard extends StatelessWidget {
     return Material(
       color: backgroundColor ??
           (selected ? colors.primary.withValues(alpha: .1) : Colors.transparent),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(9),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -173,7 +173,7 @@ class PlayerChoiceCard extends StatelessWidget {
                         bottom: 0,
                         child: ClipRRect(
                           borderRadius: const BorderRadius.vertical(
-                            bottom: Radius.circular(11),
+                            bottom: Radius.circular(5),
                           ),
                           child: LinearProgressIndicator(
                             value: progress!.clamp(0, 1),
@@ -304,7 +304,7 @@ class PlayerThumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(11),
+      borderRadius: BorderRadius.circular(5),
       child: ColoredBox(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: SizedBox(

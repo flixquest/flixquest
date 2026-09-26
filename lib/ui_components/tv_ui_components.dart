@@ -62,7 +62,7 @@ class HorizontalScrollingTVList extends StatelessWidget {
                           alignment: Alignment.center,
                           children: [
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: BorderRadius.circular(AppUI.cardRadius),
                               child: tvList![index].posterPath == null
                                   ? Image.asset('assets/images/na_logo.png',
                                       fit: BoxFit.cover,
@@ -114,7 +114,7 @@ class HorizontalScrollingTVList extends StatelessWidget {
                                 padding: EdgeInsets.symmetric(horizontal: 3),
                                 height: 25,
                                 decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(4),
                                     color: themeMode == 'dark' ||
                                             themeMode == 'amoled'
                                         ? Colors.black45
@@ -215,7 +215,7 @@ class TVListView extends StatelessWidget {
             child: Material(
               color: Colors.transparent,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppUI.cardRadius),
                 child: show.posterPath == null
                     ? Image.asset(
                         'assets/images/na_logo.png',

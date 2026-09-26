@@ -66,7 +66,7 @@ class _UnityBannerWidgetState extends State<UnityBannerWidget> {
     }
 
     final adWidget = ClipRRect(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(5),
       child: SizedBox(
         width: widget.size.width.toDouble(),
         height: widget.size.height.toDouble(),

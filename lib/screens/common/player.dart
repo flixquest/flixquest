@@ -2494,7 +2494,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                               .colorScheme
                               .primary
                               .withValues(alpha: .12),
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
                           PhosphorIcons.hardDrives(),
@@ -2563,7 +2563,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                                   .colorScheme
                                   .primary
                                   .withValues(alpha: .1),
-                              borderRadius: BorderRadius.circular(13),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: loading
                                 ? const Padding(
@@ -4115,7 +4115,7 @@ class _SubtitleTimingControlState extends State<_SubtitleTimingControl> {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest.withValues(alpha: .42),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: colors.outlineVariant.withValues(alpha: .5),
         ),
@@ -4154,7 +4154,7 @@ class _SubtitleTimingControlState extends State<_SubtitleTimingControl> {
                   ),
                   decoration: BoxDecoration(
                     color: colors.primary.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(99),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     _subtitleOffsetValue(offset),
@@ -4207,7 +4207,7 @@ class _SubtitleTimingControlState extends State<_SubtitleTimingControl> {
           Container(
             decoration: BoxDecoration(
               color: colors.primary.withValues(alpha: .13),
-              borderRadius: BorderRadius.circular(99),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: colors.primary.withValues(alpha: .28),
               ),

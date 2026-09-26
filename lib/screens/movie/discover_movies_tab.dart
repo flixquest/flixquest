@@ -94,7 +94,7 @@ class _DiscoverMoviesTabState extends State<DiscoverMoviesTab> {
                         .colorScheme
                         .primary
                         .withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(PhosphorIcons.sliders(),
                       color: Theme.of(context).colorScheme.primary),

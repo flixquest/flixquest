@@ -173,7 +173,7 @@ class DeleteAccountScreenState extends State<DeleteAccountScreen> {
                               .colorScheme
                               .error
                               .withValues(alpha: .12),
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(PhosphorIcons.trash(),
                             size: 32,

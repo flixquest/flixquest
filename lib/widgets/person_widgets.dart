@@ -364,7 +364,7 @@ class _PersonHero extends StatelessWidget {
                     DecoratedBox(
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: .38),
-                        borderRadius: BorderRadius.circular(99),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
@@ -504,7 +504,7 @@ class _PersonTabButton extends StatelessWidget {
     final color = selected ? colors.primary : colors.onSurfaceVariant;
     return Expanded(
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(4, 7, 4, 5),
@@ -1167,7 +1167,7 @@ class PersonInfoTile extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: colors.onSurface.withValues(alpha: .05),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1221,7 +1221,7 @@ class PersonCompactEmpty extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
       decoration: BoxDecoration(
         color: colors.onSurface.withValues(alpha: .045),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1252,7 +1252,7 @@ class PersonInlineError extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: colors.errorContainer.withValues(alpha: .4),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
@@ -1347,7 +1347,7 @@ class _PersonTileGridShimmer extends StatelessWidget {
             (_) => SizedBox(
               width: width,
               height: 94,
-              child: const AppShimmerBlock(radius: 12),
+              child: const AppShimmerBlock(radius: 7),
             ),
           ),
         );

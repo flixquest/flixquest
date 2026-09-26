@@ -71,7 +71,7 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     .colorScheme
                     .primary
                     .withValues(alpha: .12),
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(PhosphorIcons.envelopeOpen(),
                   size: 32, color: Theme.of(context).colorScheme.primary),

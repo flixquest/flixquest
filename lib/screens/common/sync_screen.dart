@@ -398,7 +398,7 @@ class _SyncScreenState extends State<SyncScreen>
         margin: EdgeInsets.zero,
         color: colors.errorContainer.withValues(alpha: .35),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(10),
           side: BorderSide(color: colors.error.withValues(alpha: .3)),
         ),
         child: Padding(
@@ -486,7 +486,7 @@ class _SyncScreenState extends State<SyncScreen>
               margin: EdgeInsets.zero,
               color: colors.primaryContainer.withValues(alpha: .45),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(10),
                 side: BorderSide(
                   color: colors.primary.withValues(alpha: .35),
                 ),
@@ -538,7 +538,7 @@ class _SyncScreenState extends State<SyncScreen>
                                     decoration: BoxDecoration(
                                       color:
                                           colors.primary.withValues(alpha: .2),
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
                                       'LIVE',
@@ -914,7 +914,7 @@ class _MetricTile extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHigh.withValues(alpha: .75),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(9),
         border: Border.all(
           color: colors.outlineVariant.withValues(alpha: .4),
         ),

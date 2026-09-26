@@ -7,6 +7,7 @@ import 'package:flixquest/tv/focus/tv_focus_memory.dart';
 import 'package:flixquest/tv/focus/tv_screen_focus_controller.dart';
 import 'package:flixquest/tv/models/tv_media_item.dart';
 import 'package:flixquest/tv/widgets/tv_browse_view.dart';
+import 'package:flixquest/tv/widgets/tv_media_card.dart';
 import 'package:flixquest/tv/widgets/tv_navigation_rail.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -38,13 +39,20 @@ TvMediaItem _item(int id) => TvMediaItem(
       releaseDate: '2024-01-01',
     );
 
-TvBrowseRow _row(String scopeId, int firstId) => TvBrowseRow(
+TvMediaRow _row(String scopeId, int firstId) => TvMediaRow(
       title: scopeId,
       scopeId: scopeId,
       items: <TvMediaItem>[for (var i = 0; i < 12; i++) _item(firstId + i)],
     );
 
 String? get _focused => FocusManager.instance.primaryFocus?.debugLabel;
+
+/// The artwork of the card for [itemId] in the row [scopeId], as painted,
+/// focus scale included.
+Finder _card(String scopeId, int itemId) => find.descendant(
+      of: find.byKey(ValueKey<String>('$scopeId:movie:$itemId')),
+      matching: find.byType(TvMediaCard),
+    );
 
 Future<void> _press(WidgetTester tester, LogicalKeyboardKey key) async {
   await tester.sendKeyEvent(key);
@@ -172,14 +180,14 @@ void main() {
 
     await _press(tester, LogicalKeyboardKey.arrowDown);
     final firstRowTop = tester.getTopLeft(find.text('first')).dy;
-    final firstCardLeft = tester.getTopLeft(find.text('Title 100').last).dx;
+    final firstCardLeft = tester.getTopLeft(_card('first', 100)).dx;
 
     await _press(tester, LogicalKeyboardKey.arrowDown);
     expect(tester.getTopLeft(find.text('second')).dy, firstRowTop);
 
     await _press(tester, LogicalKeyboardKey.arrowRight);
     await _press(tester, LogicalKeyboardKey.arrowRight);
-    expect(tester.getTopLeft(find.text('Title 202').last).dx, firstCardLeft);
+    expect(tester.getTopLeft(_card('second', 202)).dx, firstCardLeft);
   });
 
   testWidgets('the spotlight follows the focused card', (tester) async {
@@ -238,7 +246,7 @@ void main() {
     expect(_focused, 'first:movie:100');
 
     rows.value = <TvBrowseRow>[
-      const TvBrowseRow(title: 'first', scopeId: 'first', items: []),
+      const TvMediaRow(title: 'first', scopeId: 'first', items: []),
       _row('second', 200),
     ];
     await tester.pumpAndSettle();
@@ -313,5 +321,56 @@ void main() {
     // Back into the content returns to the row, where it was left.
     await _press(tester, LogicalKeyboardKey.arrowRight);
     expect(_focused, 'second:movie:200');
+  });
+
+  testWidgets('cards are artwork only; the spotlight carries their details',
+      (tester) async {
+    final controller = await _pumpBrowse(tester);
+    controller.requestFocus();
+    await tester.pumpAndSettle();
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+
+    // A card's own facts line would read "2024  •  ★ 7.0".
+    expect(find.textContaining('  •  '), findsNothing);
+    expect(find.text('2024   Movie   ★ 7.0'), findsOneWidget);
+  });
+
+  testWidgets('the focused card grows from its leading edge', (tester) async {
+    final controller = await _pumpBrowse(tester);
+    controller.requestFocus();
+    await tester.pumpAndSettle();
+    final resting = tester.getRect(_card('first', 100));
+
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    final focused = tester.getRect(_card('first', 100));
+
+    expect(focused.left, moreOrLessEquals(resting.left, epsilon: 1));
+    expect(focused.width, moreOrLessEquals(resting.width * 1.1, epsilon: 1));
+    // Its neighbour is not covered by it.
+    expect(
+        tester.getRect(_card('first', 101)).left, greaterThan(focused.right));
+  });
+
+  testWidgets('rows below the focused one are dimmed while browsing',
+      (tester) async {
+    bool dimmed(String scopeId, int itemId) =>
+        tester.widget<TvMediaCard>(_card(scopeId, itemId)).dimmed;
+
+    final controller = await _pumpBrowse(tester);
+    controller.requestFocus();
+    await tester.pumpAndSettle();
+    // The billboard leaves every row at full strength.
+    expect(dimmed('first', 100), isFalse);
+    expect(dimmed('second', 200), isFalse);
+
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    expect(dimmed('first', 100), isFalse);
+    expect(dimmed('first', 105), isFalse);
+    expect(dimmed('second', 200), isTrue);
+    expect(dimmed('third', 300), isTrue);
+
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    expect(dimmed('second', 200), isFalse);
+    expect(dimmed('third', 300), isTrue);
   });
 }

@@ -693,7 +693,7 @@ class _ChannelListState extends State<ChannelList> {
                       icon: Icon(PhosphorIcons.x()),
                     ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(9),
               ),
             ),
           ),
@@ -808,9 +808,9 @@ class _ChannelListState extends State<ChannelList> {
     final colors = Theme.of(context).colorScheme;
     return Material(
       color: colors.surfaceContainerHighest.withValues(alpha: .6),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(9),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(9),
         onTap: _pickCategory,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
@@ -893,9 +893,9 @@ class _ModeTab extends StatelessWidget {
     return Expanded(
       child: Material(
         color: selected ? colors.primary : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 11),
@@ -938,7 +938,7 @@ class _SegmentedTrack extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest.withValues(alpha: .6),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(9),
       ),
       child: Row(
         children: children,
@@ -1100,7 +1100,7 @@ class _ChannelAvatar extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -1231,7 +1231,7 @@ class _ScheduleEventTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: colors.surfaceContainerHighest.withValues(alpha: .55),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(9),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1447,7 +1447,7 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
                   height: 46,
                   decoration: BoxDecoration(
                     color: colors.primary.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     PhosphorIcons.funnel(),
@@ -1496,7 +1496,7 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
                       ),
                 isDense: true,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
@@ -1564,9 +1564,9 @@ class _CategoryPickerTile extends StatelessWidget {
       color: selected
           ? colors.primary.withValues(alpha: .14)
           : colors.surfaceContainerHighest.withValues(alpha: .55),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(9),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(9),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),

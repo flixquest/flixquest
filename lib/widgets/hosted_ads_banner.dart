@@ -68,7 +68,7 @@ class HostedAdsBanner extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(5),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final width = (config.width ?? constraints.maxWidth)
@@ -117,7 +117,7 @@ Future<void> showHostedInterstitialAd(
             GestureDetector(
               onTap: () => unawaited(launchUrlString(ad.targetUrl)),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(5),
                 child: CachedNetworkImage(
                   imageUrl: ad.imageUrl,
                   cacheManager: _adImageCache,

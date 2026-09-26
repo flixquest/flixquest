@@ -102,7 +102,7 @@ class _DiscoverTVTabState extends State<DiscoverTVTab> {
                         .colorScheme
                         .primary
                         .withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(PhosphorIcons.sliders(),
                       color: Theme.of(context).colorScheme.primary),

@@ -153,7 +153,7 @@ class _DownloadChoiceSheet<T> extends StatelessWidget {
                   height: 46,
                   decoration: BoxDecoration(
                     color: colors.primary.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, color: colors.primary),
                 ),
@@ -187,9 +187,9 @@ class _DownloadChoiceSheet<T> extends StatelessWidget {
                 final choice = choices[index];
                 return Material(
                   color: colors.surfaceContainerHighest.withValues(alpha: .55),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(9),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(9),
                     onTap: () => Navigator.pop(context, choice.value),
                     child: Padding(
                       padding: const EdgeInsets.all(14),
@@ -200,7 +200,7 @@ class _DownloadChoiceSheet<T> extends StatelessWidget {
                             height: 42,
                             decoration: BoxDecoration(
                               color: colors.primary.withValues(alpha: .11),
-                              borderRadius: BorderRadius.circular(13),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
                               choice.icon,

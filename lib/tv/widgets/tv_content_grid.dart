@@ -27,6 +27,7 @@ class TvContentGrid<T> extends StatefulWidget {
     this.itemAspectRatio = 16 / 9,
     this.itemDetailsExtent = 60,
     this.onItemMenu,
+    this.onItemFocused,
     this.controller,
     this.padding = const EdgeInsets.all(TvDesign.focusOutset),
     this.horizontalSpacing = 22,
@@ -46,6 +47,9 @@ class TvContentGrid<T> extends StatefulWidget {
   final double itemAspectRatio;
   final double itemDetailsExtent;
   final ValueChanged<T>? onItemMenu;
+
+  /// Called as each item takes focus, e.g. to load more before the end.
+  final ValueChanged<T>? onItemFocused;
   final TvContentGridController? controller;
   final EdgeInsets padding;
   final double horizontalSpacing;
@@ -361,6 +365,7 @@ class _TvContentGridState<T> extends State<TvContentGrid<T>> {
                   }
                   if (hasFocus) {
                     memory?.remember(scopeId: widget.scopeId, itemId: id);
+                    widget.onItemFocused?.call(item);
                   }
                 },
                 onActivate: () => widget.onItemActivated(item),

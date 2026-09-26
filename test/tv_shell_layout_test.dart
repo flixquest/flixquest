@@ -51,9 +51,9 @@ Future<GlobalKey<TvShellLayoutState>> _pumpLayout(
       create: (_) => AppDependencyProvider(),
       child: MaterialApp(
         home: Scaffold(
-          body: Padding(
-            padding: EdgeInsets.all(metrics.safeInset),
-            child: TvFocusMemoryScope(
+          // The layout keeps to the TV-safe margins itself, as in the app.
+          body: Builder(
+            builder: (context) => TvFocusMemoryScope(
               memory: memory ?? TvFocusMemory(),
               child: StatefulBuilder(
                 builder: (context, setState) => TvShellLayout(
@@ -295,12 +295,8 @@ void main() {
 
       // The shell rebuilds while the content holds focus, as it does when a
       // details page closes.
-      tester
-          .state<TvShellLayoutState>(find.byType(TvShellLayout))
-          .setState(() {});
-      tester
-          .state<TvNavigationRailState>(find.byType(TvNavigationRail))
-          .setState(() {});
+      tester.element(find.byType(TvShellLayout)).markNeedsBuild();
+      tester.element(find.byType(TvNavigationRail)).markNeedsBuild();
       await tester.pumpAndSettle();
 
       await _press(tester, LogicalKeyboardKey.arrowLeft);

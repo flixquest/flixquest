@@ -119,7 +119,7 @@ class _ProviderChooseScreenState extends State<ProviderChooseScreen> {
                                 .colorScheme
                                 .surfaceContainerLow,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(9),
                               side: BorderSide(
                                 color: Theme.of(context)
                                     .colorScheme
@@ -168,7 +168,7 @@ class _ProviderChooseScreenState extends State<ProviderChooseScreen> {
                                     color: Theme.of(context)
                                         .colorScheme
                                         .surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
                                     PhosphorIcons.dotsSixVertical(),
@@ -211,7 +211,7 @@ class _ProviderOrderHeader extends StatelessWidget {
             colors.tertiaryContainer.withValues(alpha: .7),
           ],
         ),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
@@ -221,7 +221,7 @@ class _ProviderOrderHeader extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: colors.surface.withValues(alpha: .7),
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(9),
             ),
             child: Icon(
               PhosphorIcons.stack(),
@@ -256,7 +256,7 @@ class _ProviderOrderHeader extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
               color: colors.surface.withValues(alpha: .7),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               '$providerCount',
@@ -350,7 +350,7 @@ class _ProviderOrderHelp extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
         color: colors.primaryContainer.withValues(alpha: .45),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(9),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

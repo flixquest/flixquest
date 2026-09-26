@@ -764,7 +764,7 @@ class _TVTabButton extends StatelessWidget {
     final color = selected ? colors.primary : colors.onSurfaceVariant;
     return Expanded(
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(4, 7, 4, 5),
@@ -1511,7 +1511,7 @@ class _TVInfoRow extends StatelessWidget {
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest.withValues(alpha: .45),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
@@ -1583,7 +1583,7 @@ class _TVInlineError extends StatelessWidget {
       decoration: BoxDecoration(
         color:
             Theme.of(context).colorScheme.errorContainer.withValues(alpha: .4),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
@@ -1612,7 +1612,7 @@ class _TVEmpty extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
       decoration: BoxDecoration(
         color: colors.onSurface.withValues(alpha: .045),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         children: [
@@ -1843,7 +1843,7 @@ class _TVInfoRowShimmer extends StatelessWidget {
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest.withValues(alpha: .45),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: const Row(
         children: [

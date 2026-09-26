@@ -206,6 +206,8 @@ class _FlixQuestState extends State<FlixQuest>
                 darkDynamicColor: darkDynamic,
                 context: context,
                 appColor: selectedAppColor,
+                compactCorners: widget.devicePresentation !=
+                    DevicePresentation.television,
                 occasionalTheme: appDependencyProvider.activeOccasionalTheme,
                 ambientColor: appDependencyProvider.activeAmbientColor,
               );
@@ -365,7 +367,7 @@ class _FlixQuestHomePageState extends State<FlixQuestHomePage>
             child: Container(
               margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(10),
                 color: Theme.of(context).scaffoldBackgroundColor,
                 border: Border.all(
                   color: colorScheme.onSurface.withValues(alpha: 0.08),

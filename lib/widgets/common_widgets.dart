@@ -113,7 +113,7 @@ class _StreamingServiceCard extends StatelessWidget {
           width: 96,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(10),
             child: Column(
               children: [
                 Container(
@@ -122,7 +122,7 @@ class _StreamingServiceCard extends StatelessWidget {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: const Color(0xFF111216),
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: colors.outlineVariant.withValues(alpha: .4),
                     ),
@@ -191,7 +191,7 @@ Widget scrollingImageShimmer(String themeMode) => ShimmerBase(
     child: Container(
       width: 120.0,
       decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8.0),
+          borderRadius: BorderRadius.circular(AppUI.cardRadius),
           color: Colors.grey.shade600),
     ));
 
@@ -199,7 +199,7 @@ Widget discoverImageShimmer(String themeMode) => ShimmerBase(
       themeMode: themeMode,
       child: Container(
         decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8.0),
+            borderRadius: BorderRadius.circular(AppUI.cardRadius),
             color: Colors.grey.shade600),
       ),
     );
@@ -216,7 +216,7 @@ Widget genreListGridShimmer(String themeMode) => ShimmerBase(
                 width: 125,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15.0),
+                    borderRadius: BorderRadius.circular(9),
                     color: Colors.grey.shade600),
               ),
             );
@@ -242,7 +242,7 @@ Widget horizontalLoadMoreShimmer(String themeMode) => Padding(
                       child: Container(
                         width: 100.0,
                         decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8.0),
+                            borderRadius: BorderRadius.circular(AppUI.cardRadius),
                             color: Colors.grey.shade600),
                       ),
                     ),
@@ -283,7 +283,7 @@ Widget detailGenreShimmer(String themeMode) => ShimmerBase(
                   width: 2,
                   style: BorderStyle.solid,
                   color: Colors.grey.shade600),
-              borderRadius: BorderRadius.circular(20.0),
+              borderRadius: BorderRadius.circular(10),
             ),
             label: Text(
               tr('placeholder'),
@@ -364,7 +364,7 @@ Widget detailImageShimmer(String themeMode) => ShimmerBase(
                             height: 180,
                             child: Container(
                               decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8.0),
+                                  borderRadius: BorderRadius.circular(AppUI.cardRadius),
                                   color: Colors.grey.shade600),
                             ),
                           ),
@@ -392,7 +392,7 @@ Widget detailImageShimmer(String themeMode) => ShimmerBase(
                               height: 180,
                               child: Container(
                                 decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8.0),
+                                    borderRadius: BorderRadius.circular(AppUI.cardRadius),
                                     color: Colors.white),
                               ),
                             ),
@@ -427,7 +427,7 @@ Widget detailImageImageSimmer(String themeMode) => ShimmerBase(
     themeMode: themeMode,
     child: Container(
       decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8.0),
+          borderRadius: BorderRadius.circular(AppUI.cardRadius),
           color: Colors.grey.shade600),
     ));
 
@@ -453,7 +453,7 @@ Widget detailVideoShimmer(String themeMode) => SizedBox(
                     flex: 5,
                     child: Container(
                       decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8.0),
+                          borderRadius: BorderRadius.circular(AppUI.cardRadius),
                           color: Colors.grey.shade600),
                       padding: const EdgeInsets.all(8),
                     ),
@@ -496,7 +496,7 @@ Widget socialMediaShimmer(String themeMode) => Container(
                   width: 40,
                   height: 50,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10.0),
+                    borderRadius: BorderRadius.circular(AppUI.cardRadius),
                     color: Colors.grey.shade600,
                   ),
                 ),
@@ -693,7 +693,7 @@ Widget detailsRecommendationsAndSimilarShimmer(
                               height: 130,
                               child: Container(
                                 decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10.0),
+                                    borderRadius: BorderRadius.circular(AppUI.cardRadius),
                                     color: Colors.grey.shade600),
                               ),
                             ),
@@ -785,7 +785,7 @@ Widget watchProvidersTabData(
                     Expanded(
                       flex: 6,
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8.0),
+                        borderRadius: BorderRadius.circular(AppUI.cardRadius),
                         child: watchOptions[index].logoPath == null
                             ? Image.asset(
                                 'assets/images/na_logo.png',
@@ -861,7 +861,7 @@ Widget watchProvidersShimmer(String themeMode) => Container(
                       flex: 6,
                       child: Container(
                         decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8.0),
+                            borderRadius: BorderRadius.circular(AppUI.cardRadius),
                             color: Colors.grey.shade600),
                       ),
                     ),
@@ -900,7 +900,7 @@ Widget recommendationAndSimilarTabImageShimmer(String themeMode) => ShimmerBase(
       width: 85.0,
       height: 130.0,
       decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10.0),
+          borderRadius: BorderRadius.circular(AppUI.cardRadius),
           color: Colors.grey.shade600),
     ));
 
@@ -930,7 +930,7 @@ Widget mainPageVerticalScrollImageShimmer(String themeMode) => ShimmerBase(
       width: 85.0,
       height: 130.0,
       decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10.0),
+          borderRadius: BorderRadius.circular(AppUI.cardRadius),
           color: Colors.grey.shade600),
     ));
 
@@ -953,7 +953,7 @@ Widget horizontalScrollingSeasonsList(themeMode) => Column(
                         child: Container(
                           width: 105.0,
                           decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: BorderRadius.circular(AppUI.cardRadius),
                               color: Colors.grey.shade600),
                         ),
                       ),
@@ -985,7 +985,7 @@ Widget detailVideoImageShimmer(String themeMode) => ShimmerBase(
     themeMode: themeMode,
     child: Container(
       decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8.0),
+          borderRadius: BorderRadius.circular(AppUI.cardRadius),
           color: Colors.grey.shade600),
     ));
 
@@ -1014,7 +1014,7 @@ Widget tvDetailsSeasonsTabShimmer(String themeMode) => Column(
                                   width: 85,
                                   height: 130,
                                   child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(10.0),
+                                      borderRadius: BorderRadius.circular(AppUI.cardRadius),
                                       child: Container(
                                           color: Colors.grey.shade600)),
                                 ),
@@ -1171,7 +1171,7 @@ Widget personMoviesAndTVShowShimmer(String themeMode) => Column(
                                 flex: 6,
                                 child: Container(
                                   decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(8.0),
+                                      borderRadius: BorderRadius.circular(AppUI.cardRadius),
                                       color: Colors.grey.shade600),
                                 ),
                               ),
@@ -1186,7 +1186,7 @@ Widget personMoviesAndTVShowShimmer(String themeMode) => Column(
                                       height: 20,
                                       decoration: BoxDecoration(
                                           borderRadius:
-                                              BorderRadius.circular(8.0),
+                                              BorderRadius.circular(AppUI.cardRadius),
                                           color: Colors.grey.shade600),
                                     ),
                                   )),
@@ -1225,7 +1225,7 @@ Widget personImageShimmer(String themeMode) => Row(
                           flex: 6,
                           child: Container(
                             decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8.0),
+                                borderRadius: BorderRadius.circular(AppUI.cardRadius),
                                 color: Colors.grey.shade600),
                           ),
                         ),
@@ -1770,7 +1770,7 @@ class ReportErrorWidget extends StatelessWidget {
                   height: 46,
                   decoration: BoxDecoration(
                     color: colors.error.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     icon ?? PhosphorIcons.warningCircle(),
@@ -1792,7 +1792,7 @@ class ReportErrorWidget extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: colors.surfaceContainerHighest.withValues(alpha: .55),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(9),
                 border:
                     Border.all(color: colors.outline.withValues(alpha: .16)),
               ),
@@ -1880,7 +1880,7 @@ class ExternalPlay extends StatelessWidget {
                         .colorScheme
                         .primary
                         .withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     PhosphorIcons.arrowSquareOut(),

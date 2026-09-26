@@ -642,11 +642,11 @@ class _HeroLiveButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.black.withValues(alpha: .38),
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
         key: const ValueKey('movie_live_tv_shortcut'),
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(10),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
@@ -810,7 +810,7 @@ class ScrollingMoviesState extends State<ScrollingMovies>
                       maximumSize: WidgetStateProperty.all(const Size(200, 60)),
                       shape: WidgetStateProperty.all<RoundedRectangleBorder>(
                           RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20.0),
+                        borderRadius: BorderRadius.circular(10),
                       ))),
                   child: Padding(
                     padding: const EdgeInsets.only(left: 8.0, right: 8.0),
@@ -866,7 +866,7 @@ class ScrollingMoviesState extends State<ScrollingMovies>
                                             children: [
                                               ClipRRect(
                                                 borderRadius:
-                                                    BorderRadius.circular(13.0),
+                                                    BorderRadius.circular(AppUI.cardRadius),
                                                 child: moviesList![index]
                                                             .posterPath ==
                                                         null
@@ -1036,7 +1036,7 @@ class _ScrollingRecentMoviesState extends State<ScrollingRecentMovies> {
               return SizedBox(
                 width: cardWidth,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(AppUI.cardRadius),
                   onLongPress: () =>
                       context.read<RecentProvider>().deleteMovie(movie.id!),
                   onTap: () => _openMovie(movie),
@@ -1046,7 +1046,7 @@ class _ScrollingRecentMoviesState extends State<ScrollingRecentMovies> {
                       AspectRatio(
                         aspectRatio: 16 / 9,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(AppUI.cardRadius),
                           child: Stack(
                             fit: StackFit.expand,
                             children: [
@@ -1458,11 +1458,11 @@ class MovieDetailQuickInfo extends StatelessWidget {
                     child: Material(
                       type: MaterialType.transparency,
                       child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(AppUI.cardRadius),
                           child: Container(
                             padding: const EdgeInsets.fromLTRB(0, 0, 8, 0),
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppUI.cardRadius),
                               child: SizedBox(
                                 width: 94,
                                 height: 140,
@@ -1628,7 +1628,7 @@ class _MovieDetailOptionsState extends State<MovieDetailOptions> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(5),
                 ),
                 child: Text(
                   widget.movie.voteCount!.toString(),
@@ -2404,7 +2404,7 @@ class BelongsToCollectionWidgetState extends State<BelongsToCollectionWidget> {
                           alignment: Alignment.center,
                           children: [
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: BorderRadius.circular(AppUI.cardRadius),
                               child: belongsToCollection!.backdropPath == null
                                   ? Image.asset(
                                       'assets/images/na_logo.png',
@@ -2614,7 +2614,7 @@ class MovieImagesState extends State<MovieImagesDisplay> {
                                               height: 180,
                                               child: ClipRRect(
                                                 borderRadius:
-                                                    BorderRadius.circular(8.0),
+                                                    BorderRadius.circular(AppUI.cardRadius),
                                                 child: movieImages!
                                                         .poster!.isEmpty
                                                     ? Image.asset(
@@ -2751,7 +2751,7 @@ class MovieImagesState extends State<MovieImagesDisplay> {
                                             height: 180,
                                             child: ClipRRect(
                                               borderRadius:
-                                                  BorderRadius.circular(8.0),
+                                                  BorderRadius.circular(AppUI.cardRadius),
                                               child: movieImages!
                                                       .backdrop!.isEmpty
                                                   ? Image.asset(
@@ -3004,7 +3004,7 @@ class MovieVideosState extends State<MovieVideosDisplay> {
                                             padding: const EdgeInsets.all(8.0),
                                             child: ClipRRect(
                                               borderRadius:
-                                                  BorderRadius.circular(8.0),
+                                                  BorderRadius.circular(AppUI.cardRadius),
                                               child: Stack(
                                                 fit: StackFit.expand,
                                                 children: [
@@ -3305,7 +3305,7 @@ class GenreDisplayState extends State<GenreDisplay>
                                   style: BorderStyle.solid,
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
-                                borderRadius: BorderRadius.circular(20.0),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               label: Text(
                                 genreList![index].genreName!,
@@ -4226,7 +4226,7 @@ class StreamingServicesWidget extends StatelessWidget {
     return SizedBox(
       width: 92,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(9),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
@@ -4246,7 +4246,7 @@ class StreamingServicesWidget extends StatelessWidget {
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(9),
                   border: Border.all(
                     color: Theme.of(context)
                         .colorScheme
@@ -4255,7 +4255,7 @@ class StreamingServicesWidget extends StatelessWidget {
                   ),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppUI.cardRadius),
                   child: Image.asset(imagePath, fit: BoxFit.cover),
                 ),
               ),
@@ -4335,7 +4335,7 @@ class GenreListGridState extends State<GenreListGrid>
             itemCount: genreList?.length ?? 8,
             itemBuilder: (context, index) {
               if (genreList == null) {
-                return const AppShimmerBlock(radius: 17);
+                return const AppShimmerBlock(radius: 9);
               }
               final genre = genreList![index];
               return AppGenreTile(
@@ -4564,7 +4564,7 @@ class CollectionMoviesState extends State<CollectionMovies> {
                                         tag: '${moviesList![index].id}',
                                         child: ClipRRect(
                                           borderRadius:
-                                              BorderRadius.circular(8.0),
+                                              BorderRadius.circular(AppUI.cardRadius),
                                           child: moviesList![index]
                                                       .posterPath ==
                                                   null

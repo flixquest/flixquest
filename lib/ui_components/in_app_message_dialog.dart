@@ -67,14 +67,14 @@ class InAppMessageDialog extends StatelessWidget {
     final cardBg = isDark ? const Color(0xFF1E1F1E) : Colors.white;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 420),
         decoration: BoxDecoration(
           color: cardBg,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: primaryColor.withValues(alpha: 0.2),
             width: 1.5,
@@ -88,7 +88,7 @@ class InAppMessageDialog extends StatelessWidget {
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(10),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -237,7 +237,7 @@ class InAppMessageDialog extends StatelessWidget {
                                     theme.dividerColor.withValues(alpha: 0.3),
                               ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                             ),
                             child: Text(
@@ -263,7 +263,7 @@ class InAppMessageDialog extends StatelessWidget {
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 13),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
                               child: Row(
@@ -326,7 +326,7 @@ class _InAppBottomSheetWidget extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
         border: Border(
           top: BorderSide(
             color: primaryColor.withValues(alpha: 0.25),
@@ -367,7 +367,7 @@ class _InAppBottomSheetWidget extends StatelessWidget {
           // Optional Image
           if (payload.imageUrl != null && payload.imageUrl!.isNotEmpty) ...[
             ClipRRect(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(5),
               child: CachedNetworkImage(
                 imageUrl: payload.imageUrl!,
                 height: 170,
@@ -419,7 +419,7 @@ class _InAppBottomSheetWidget extends StatelessWidget {
                       color: theme.dividerColor.withValues(alpha: 0.3),
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                   child: Text(
@@ -444,7 +444,7 @@ class _InAppBottomSheetWidget extends StatelessWidget {
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 13),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                     child: Row(
@@ -494,7 +494,7 @@ class _InAppBannerWidget extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: cardBg,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(9),
           border: Border.all(
             color: primaryColor.withValues(alpha: 0.25),
             width: 1,
@@ -512,7 +512,7 @@ class _InAppBannerWidget extends StatelessWidget {
             // Thumbnail or Icon
             if (payload.imageUrl != null && payload.imageUrl!.isNotEmpty)
               ClipRRect(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(5),
                 child: CachedNetworkImage(
                   imageUrl: payload.imageUrl!,
                   width: 48,

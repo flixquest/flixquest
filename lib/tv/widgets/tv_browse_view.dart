@@ -3,32 +3,60 @@ import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../app/tv_design.dart';
+import '../app/tv_shell_layout.dart';
 import '../focus/tv_focus_memory.dart';
 import '../focus/tv_focusable.dart';
 import '../focus/tv_screen_focus_controller.dart';
 import '../models/tv_media_item.dart';
 import 'tv_content_row.dart';
 import 'tv_media_card.dart';
+import 'tv_shortcut_tile.dart';
 import 'tv_spotlight.dart';
 
-class TvBrowseRow {
-  const TvBrowseRow({
-    required this.title,
-    required this.scopeId,
+sealed class TvBrowseRow {
+  const TvBrowseRow({required this.title, required this.scopeId});
+
+  final String title;
+  final String scopeId;
+
+  /// An empty row is left out of the page altogether.
+  bool get isEmpty;
+}
+
+/// A row of titles, shown as artwork-only posters.
+class TvMediaRow extends TvBrowseRow {
+  const TvMediaRow({
+    required super.title,
+    required super.scopeId,
     required this.items,
     this.onItemActivated,
     this.onItemMenu,
     this.itemMenuHint,
   });
 
-  final String title;
-  final String scopeId;
   final List<TvMediaItem> items;
 
   /// Replaces the view's `onOpenMedia` for this row's items.
   final ValueChanged<TvMediaItem>? onItemActivated;
   final ValueChanged<TvMediaItem>? onItemMenu;
   final String? itemMenuHint;
+
+  @override
+  bool get isEmpty => items.isEmpty;
+}
+
+/// A row of tiles leading elsewhere, such as streaming services or genres.
+class TvShortcutRow extends TvBrowseRow {
+  const TvShortcutRow({
+    required super.title,
+    required super.scopeId,
+    required this.shortcuts,
+  });
+
+  final List<TvBrowseShortcut> shortcuts;
+
+  @override
+  bool get isEmpty => shortcuts.isEmpty;
 }
 
 /// A Netflix-style browse page: the focused title fills the backdrop and the
@@ -37,6 +65,9 @@ class TvBrowseRow {
 ///
 /// It starts on the billboard, with [featured] and its More info button. Down
 /// enters the rows; Up from the first row or Back returns to the billboard.
+///
+/// The backdrop fills the view; everything else keeps to [TvShellInsets], so
+/// as a full-bleed shell screen the artwork runs under the rail.
 class TvBrowseView extends StatefulWidget {
   const TvBrowseView({
     required this.featured,
@@ -73,8 +104,16 @@ class _TvBrowseViewState extends State<TvBrowseView> {
   /// scale.
   static const _focusRingRoom = 8.0;
 
-  /// How much of the next row shows under the focused one.
-  static const _nextRowPeek = 28.0;
+  /// How much of the next row shows under the focused one, as a fraction of
+  /// a row: its title and the top of its artwork, so the page reads as rows
+  /// to move through rather than a single strip.
+  static const _nextRowPeek = 0.4;
+
+  /// The focused card grows from its leading edge by this much.
+  static const _cardFocusScale = 1.1;
+
+  /// Clears the grown card's trailing edge from the next card.
+  static const _cardSpacing = 18.0;
 
   static final _backKeys = <LogicalKeyboardKey>{
     LogicalKeyboardKey.escape,
@@ -89,9 +128,29 @@ class _TvBrowseViewState extends State<TvBrowseView> {
   final GlobalKey _columnKey = GlobalKey();
 
   /// Only the spotlight and backdrop follow each card, so moving along a row
-  /// does not rebuild every row.
-  late final ValueNotifier<TvMediaItem> _spotlight =
+  /// does not rebuild every row. A shortcut tile changes the spotlight and
+  /// leaves the backdrop on the last title.
+  late final ValueNotifier<TvSpotlightData> _spotlight =
+      ValueNotifier<TvSpotlightData>(_featuredSpotlight);
+  late final ValueNotifier<TvMediaItem> _backdrop =
       ValueNotifier<TvMediaItem>(widget.featured);
+
+  TvSpotlightData get _featuredSpotlight =>
+      TvSpotlightData.forItem(widget.featured, featured: true);
+
+  void _showItem(TvMediaItem item) {
+    _spotlight.value = TvSpotlightData.forItem(item);
+    _backdrop.value = item;
+  }
+
+  void _showShortcut(TvBrowseShortcut shortcut) {
+    _spotlight.value = TvSpotlightData(
+      id: 'shortcut:${shortcut.id}',
+      title: shortcut.title,
+      facts: shortcut.facts,
+      overview: shortcut.description,
+    );
+  }
 
   /// The row holding focus, or null on the billboard.
   String? _focusedRowId;
@@ -99,7 +158,7 @@ class _TvBrowseViewState extends State<TvBrowseView> {
   double _focusedRowExtent = 0;
 
   List<TvBrowseRow> get _rows =>
-      widget.rows.where((row) => row.items.isNotEmpty).toList(growable: false);
+      widget.rows.where((row) => !row.isEmpty).toList(growable: false);
 
   @override
   void initState() {
@@ -114,14 +173,17 @@ class _TvBrowseViewState extends State<TvBrowseView> {
       oldWidget.focusController?.detach(this);
       widget.focusController?.attach(this, _requestEntryFocus);
     }
-    if (_focusedRowId == null) _spotlight.value = widget.featured;
+    if (_focusedRowId == null) {
+      _spotlight.value = _featuredSpotlight;
+      _backdrop.value = widget.featured;
+    }
 
     final focusedRowId = _focusedRowId;
     if (focusedRowId == null) return;
     if (!_rows.any((row) => row.scopeId == focusedRowId)) {
       _recoverFromRemovedRow(
         oldWidget.rows
-            .where((row) => row.items.isNotEmpty)
+            .where((row) => !row.isEmpty)
             .toList(growable: false)
             .indexWhere((row) => row.scopeId == focusedRowId),
       );
@@ -141,6 +203,7 @@ class _TvBrowseViewState extends State<TvBrowseView> {
     widget.focusController?.detach(this);
     _featuredFocus.dispose();
     _spotlight.dispose();
+    _backdrop.dispose();
     super.dispose();
   }
 
@@ -174,7 +237,8 @@ class _TvBrowseViewState extends State<TvBrowseView> {
 
   void _handleFeaturedFocused() {
     TvFocusMemoryScope.maybeOf(context)?.forget(widget.focusMemoryScope);
-    _spotlight.value = widget.featured;
+    _spotlight.value = _featuredSpotlight;
+    _backdrop.value = widget.featured;
     if (_focusedRowId != null) setState(() => _focusedRowId = null);
   }
 
@@ -241,17 +305,20 @@ class _TvBrowseViewState extends State<TvBrowseView> {
   @override
   Widget build(BuildContext context) {
     final compact = widget.metrics.compact;
+    final insets = TvShellInsets.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
         final height = constraints.maxHeight;
+        final innerHeight = height - insets.vertical;
         final rows = _rows;
         final focusedIndex =
             rows.indexWhere((row) => row.scopeId == _focusedRowId);
         final browsing = focusedIndex >= 0;
-        final rowsTop = browsing
-            ? (height - _focusedRowExtent - _nextRowPeek)
-                .clamp(height * 0.34, height * 0.5)
-            : height * _billboardRowsTop;
+        final rowsTop = insets.top +
+            (browsing
+                ? (innerHeight - _focusedRowExtent * (1 + _nextRowPeek))
+                    .clamp(innerHeight * 0.3, innerHeight * 0.5)
+                : innerHeight * _billboardRowsTop);
         final rowsShift = rowsTop - (browsing ? _focusedRowTop : 0);
 
         return Focus(
@@ -263,25 +330,34 @@ class _TvBrowseViewState extends State<TvBrowseView> {
               fit: StackFit.expand,
               children: <Widget>[
                 ValueListenableBuilder<TvMediaItem>(
-                  valueListenable: _spotlight,
+                  valueListenable: _backdrop,
                   builder: (_, item, __) => TvBackdrop(item: item),
                 ),
                 AnimatedPositioned(
                   duration: _motion,
                   curve: Curves.easeOutCubic,
-                  left: TvDesign.focusOutset + 4 - _focusRingRoom,
-                  top: widget.metrics.contentPadding,
-                  width: (constraints.maxWidth * 0.46)
+                  left: insets.left + TvDesign.focusOutset + 4 - _focusRingRoom,
+                  top: insets.top + widget.metrics.contentPadding,
+                  width: ((constraints.maxWidth - insets.horizontal) * 0.46)
                       .clamp(0.0, compact ? 430.0 : 580.0),
                   bottom:
                       height - rowsTop + (compact ? 10 : 16) - _focusRingRoom,
                   child: _buildSpotlight(browsing: browsing),
                 ),
-                Positioned.fill(
-                  child: _buildRows(
-                    rows: rows,
-                    focusedIndex: focusedIndex,
-                    shift: rowsShift,
+                // Rows run to the trailing edge; only their leading edge is cut,
+                // where pinned rows scroll earlier cards away under the rail.
+                Positioned(
+                  left: insets.left,
+                  top: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: ClipRect(
+                    clipper: const _LeadingEdgeClipper(),
+                    child: _buildRows(
+                      rows: rows,
+                      focusedIndex: focusedIndex,
+                      shift: rowsShift,
+                    ),
                   ),
                 ),
               ],
@@ -306,9 +382,9 @@ class _TvBrowseViewState extends State<TvBrowseView> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              ValueListenableBuilder<TvMediaItem>(
+              ValueListenableBuilder<TvSpotlightData>(
                 valueListenable: _spotlight,
-                builder: (_, item, __) => AnimatedSwitcher(
+                builder: (_, data, __) => AnimatedSwitcher(
                   duration: const Duration(milliseconds: 180),
                   switchInCurve: Curves.easeOut,
                   switchOutCurve: Curves.easeIn,
@@ -320,8 +396,8 @@ class _TvBrowseViewState extends State<TvBrowseView> {
                     ],
                   ),
                   child: TvSpotlightInfo(
-                    key: ValueKey<String>('${item.stableId}|$browsing'),
-                    item: item,
+                    key: ValueKey<String>('${data.id}|$browsing'),
+                    data: data,
                     featured: !browsing,
                     compact: compact,
                   ),
@@ -387,6 +463,8 @@ class _TvBrowseViewState extends State<TvBrowseView> {
                 rows[index],
                 // Rows scrolled past would sit under the spotlight text.
                 visible: index >= focusedIndex,
+                // Browsing, the rows below step back behind the focused one.
+                dimmed: focusedIndex >= 0 && index > focusedIndex,
                 bottomGap: rowGap,
               ),
           ],
@@ -398,6 +476,7 @@ class _TvBrowseViewState extends State<TvBrowseView> {
   Widget _buildRow(
     TvBrowseRow row, {
     required bool visible,
+    required bool dimmed,
     required double bottomGap,
   }) {
     return AnimatedOpacity(
@@ -412,28 +491,64 @@ class _TvBrowseViewState extends State<TvBrowseView> {
           onFocusChange: (hasFocus) {
             if (hasFocus) _handleRowFocused(row.scopeId);
           },
-          child: TvContentRow<TvMediaItem>(
-            controller: _rowControllers.putIfAbsent(
-              row.scopeId,
-              TvContentRowController.new,
-            ),
-            title: row.title,
-            scopeId: row.scopeId,
-            items: row.items,
-            itemId: (item) => item.stableId,
-            semanticLabel: (item) => item.title,
-            itemBuilder: (_, item) => TvMediaCard(
-              item: item,
-              width: widget.metrics.mediaCardWidth,
-            ),
-            onItemActivated: row.onItemActivated ?? widget.onOpenMedia,
-            onItemFocused: (item) => _spotlight.value = item,
-            onItemMenu: row.onItemMenu,
-            itemMenuHint: row.itemMenuHint,
-            pinFocusedItem: true,
-          ),
+          child: switch (row) {
+            TvMediaRow() => _buildMediaRow(row, dimmed: dimmed),
+            TvShortcutRow() => _buildShortcutRow(row, dimmed: dimmed),
+          },
         ),
       ),
+    );
+  }
+
+  TvContentRowController _controllerFor(TvBrowseRow row) =>
+      _rowControllers.putIfAbsent(row.scopeId, TvContentRowController.new);
+
+  Widget _buildMediaRow(TvMediaRow row, {required bool dimmed}) {
+    return TvContentRow<TvMediaItem>(
+      controller: _controllerFor(row),
+      title: row.title,
+      scopeId: row.scopeId,
+      items: row.items,
+      itemId: (item) => item.stableId,
+      semanticLabel: (item) => item.title,
+      // The spotlight names the focused card, so cards are artwork only.
+      itemBuilder: (_, item) => TvMediaCard(
+        item: item,
+        width: widget.metrics.mediaCardWidth,
+        artworkOnly: true,
+        dimmed: dimmed,
+      ),
+      itemSpacing: _cardSpacing,
+      itemFocusScale: _cardFocusScale,
+      onItemActivated: row.onItemActivated ?? widget.onOpenMedia,
+      onItemFocused: _showItem,
+      onItemMenu: row.onItemMenu,
+      itemMenuHint: row.itemMenuHint,
+      pinFocusedItem: true,
+    );
+  }
+
+  Widget _buildShortcutRow(TvShortcutRow row, {required bool dimmed}) {
+    // Wider than a poster: a landscape tile of roughly the same area.
+    final width = widget.metrics.mediaCardWidth * 1.45;
+    return TvContentRow<TvBrowseShortcut>(
+      controller: _controllerFor(row),
+      title: row.title,
+      scopeId: row.scopeId,
+      items: row.shortcuts,
+      itemId: (shortcut) => shortcut.id,
+      semanticLabel: (shortcut) => shortcut.title,
+      itemBuilder: (_, shortcut) => TvShortcutTile(
+        shortcut: shortcut,
+        width: width,
+        tint: row.shortcuts.indexOf(shortcut),
+        dimmed: dimmed,
+      ),
+      itemSpacing: _cardSpacing,
+      itemFocusScale: _cardFocusScale,
+      onItemActivated: (shortcut) => shortcut.onActivate(),
+      onItemFocused: _showShortcut,
+      pinFocusedItem: true,
     );
   }
 }
@@ -500,4 +615,17 @@ class _BillboardTraversalPolicy extends ReadingOrderTraversalPolicy {
     if (direction != TraversalDirection.up) return false;
     return super.inDirection(currentNode, direction);
   }
+}
+
+/// Clips only the leading edge, leaving the focused card's growth and shadow
+/// free to spill past the other three.
+class _LeadingEdgeClipper extends CustomClipper<Rect> {
+  const _LeadingEdgeClipper();
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(0, -size.height, size.width * 2, size.height * 2);
+
+  @override
+  bool shouldReclip(_LeadingEdgeClipper oldClipper) => false;
 }

@@ -359,7 +359,7 @@ class _SeasonSelector extends StatelessWidget {
     return Material(
       color: background,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
         side: BorderSide(
           color: selected
               ? colors.primary

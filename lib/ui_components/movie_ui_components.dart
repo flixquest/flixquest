@@ -61,7 +61,7 @@ class HorizontalScrollingMoviesList extends StatelessWidget {
                           alignment: Alignment.center,
                           children: [
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: BorderRadius.circular(AppUI.cardRadius),
                               child: movieList![index].posterPath == null
                                   ? Image.asset('assets/images/na_logo.png',
                                       fit: BoxFit.cover,
@@ -113,7 +113,7 @@ class HorizontalScrollingMoviesList extends StatelessWidget {
                                 alignment: Alignment.topLeft,
                                 height: 25,
                                 decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(4),
                                     color: themeMode == 'dark' ||
                                             themeMode == 'amoled'
                                         ? Colors.black45
@@ -214,7 +214,7 @@ class MovieListView extends StatelessWidget {
             child: Material(
               color: Colors.transparent,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppUI.cardRadius),
                 child: movie.posterPath == null
                     ? Image.asset(
                         'assets/images/na_logo.png',

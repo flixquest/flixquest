@@ -43,9 +43,9 @@ class _DiscoverPageState extends State<DiscoverPage>
                 Expanded(
                   child: Material(
                     color: colors.onSurface.withValues(alpha: .06),
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(9),
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(15),
+                      borderRadius: BorderRadius.circular(9),
                       onTap: () => _openSearch(settings),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(

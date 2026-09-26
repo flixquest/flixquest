@@ -7,6 +7,7 @@ import '../../screens/common/update_screen.dart';
 import '../../provider/recently_watched_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../app/tv_design.dart';
+import '../app/tv_shell_layout.dart';
 import '../controllers/tv_home_controller.dart';
 import '../focus/tv_screen_focus_controller.dart';
 import '../models/tv_media_item.dart';
@@ -69,12 +70,19 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(children: [
-        const UpdateBottom(television: true),
-        Expanded(child: _buildFeed(context)),
-      ]);
+  Widget build(BuildContext context) {
+    // Home is full bleed: only the browse view's artwork reaches the edges.
+    final insets = TvShellInsets.of(context);
+    return Column(children: [
+      Padding(
+        padding: insets.copyWith(bottom: 0),
+        child: const UpdateBottom(television: true),
+      ),
+      Expanded(child: _buildFeed(context, insets)),
+    ]);
+  }
 
-  Widget _buildFeed(BuildContext context) {
+  Widget _buildFeed(BuildContext context, EdgeInsets insets) {
     final recent = context.watch<RecentProvider>();
     final continueWatching = <TvMediaItem>[
       ...recent.movies.map(TvMediaItem.fromRecentMovie),
@@ -84,19 +92,25 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       future: _homeData,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const _TvHomeLoading();
+          return Padding(padding: insets, child: const _TvHomeLoading());
         }
         if (snapshot.hasError) {
-          return TvStatePanel.error(onRetry: _retry);
+          return Padding(
+            padding: insets,
+            child: TvStatePanel.error(onRetry: _retry),
+          );
         }
         final data = snapshot.data;
         if (data == null || data.isEmpty || data.hero == null) {
-          return TvStatePanel(
-            title: 'Nothing to show yet',
-            message: 'FlixQuest could not find content for this region.',
-            icon: PhosphorIcons.filmStrip(),
-            actionLabel: 'Retry',
-            onAction: _retry,
+          return Padding(
+            padding: insets,
+            child: TvStatePanel(
+              title: 'Nothing to show yet',
+              message: 'FlixQuest could not find content for this region.',
+              icon: PhosphorIcons.filmStrip(),
+              actionLabel: 'Retry',
+              onAction: _retry,
+            ),
           );
         }
 
@@ -107,7 +121,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
           focusController: widget.focusController,
           focusMemoryScope: 'tv-home-row',
           rows: <TvBrowseRow>[
-            TvBrowseRow(
+            TvMediaRow(
               title: 'Continue watching',
               scopeId: 'home-continue-watching',
               items: continueWatching,
@@ -127,8 +141,8 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
     );
   }
 
-  TvBrowseRow _row(String title, String scopeId, List<TvMediaItem> items) =>
-      TvBrowseRow(
+  TvMediaRow _row(String title, String scopeId, List<TvMediaItem> items) =>
+      TvMediaRow(
         title: title,
         scopeId: scopeId,
         items: items.take(16).toList(growable: false),

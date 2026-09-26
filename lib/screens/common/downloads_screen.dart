@@ -337,7 +337,7 @@ class _Poster extends StatelessWidget {
       child: Center(child: Icon(PhosphorIcons.filmSlate(), size: 28)),
     );
     return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(5),
       child: SizedBox(
         width: 76,
         height: 112,
@@ -376,7 +376,7 @@ class _StatusChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: .13),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(5),
       ),
       child: Text(
         label,
@@ -531,7 +531,7 @@ class _DownloadActionsSheet extends StatelessWidget {
                   height: 46,
                   decoration: BoxDecoration(
                     color: colors.primary.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     PhosphorIcons.downloadSimple(PhosphorIconsStyle.bold),
@@ -646,9 +646,9 @@ class _DownloadActionTile extends StatelessWidget {
     final accent = destructive ? colors.error : colors.primary;
     return Material(
       color: accent.withValues(alpha: .08),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(9),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(9),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -659,7 +659,7 @@ class _DownloadActionTile extends StatelessWidget {
                 height: 42,
                 decoration: BoxDecoration(
                   color: accent.withValues(alpha: .13),
-                  borderRadius: BorderRadius.circular(13),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, size: 21, color: accent),
               ),

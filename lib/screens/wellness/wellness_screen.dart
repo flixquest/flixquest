@@ -421,7 +421,7 @@ class _InsightsActionsSheet extends StatelessWidget {
                 height: 42,
                 decoration: BoxDecoration(
                   color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   PhosphorIcons.slidersHorizontal(),
@@ -498,7 +498,7 @@ class _InsightsActionTile extends StatelessWidget {
       color: destructive
           ? colors.errorContainer.withValues(alpha: .32)
           : _insightSurface(context),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(10),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -511,7 +511,7 @@ class _InsightsActionTile extends StatelessWidget {
                 height: 44,
                 decoration: BoxDecoration(
                   color: accent.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: accent, size: 21),
               ),
@@ -664,7 +664,7 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
     }
     return Material(
       color: colors.surface,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
       clipBehavior: Clip.antiAlias,
       child: DraggableScrollableSheet(
         expand: false,
@@ -829,7 +829,7 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
             Container(
               decoration: BoxDecoration(
                 color: _insightSurface(context),
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(9),
               ),
               child: SwitchListTile.adaptive(
                 value: _includeTopTitle,
@@ -890,9 +890,9 @@ class _RecapStyleChip extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Material(
       color: selected ? scheme.primary : _insightSurface(context, raised: true),
-      borderRadius: BorderRadius.circular(99),
+      borderRadius: BorderRadius.circular(8),
       child: InkWell(
-        borderRadius: BorderRadius.circular(99),
+        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 7, 13, 7),
@@ -1026,7 +1026,7 @@ class _ShareRecapCard extends StatelessWidget {
                 Row(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(11),
+                      borderRadius: BorderRadius.circular(5),
                       child: Image.asset(
                         'assets/images/logo.png',
                         width: 34,
@@ -1051,7 +1051,7 @@ class _ShareRecapCard extends StatelessWidget {
                           horizontal: 9, vertical: 5),
                       decoration: BoxDecoration(
                         color: foreground.withValues(alpha: .1),
-                        borderRadius: BorderRadius.circular(99),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: foreground.withValues(alpha: .13),
                         ),
@@ -1319,7 +1319,7 @@ class WellnessPreviewCard extends StatelessWidget {
             colors.tertiaryContainer.withValues(alpha: .42),
           ],
         ),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Material(
         color: Colors.transparent,
@@ -1340,7 +1340,7 @@ class WellnessPreviewCard extends StatelessWidget {
                         Theme.of(context).colorScheme.tertiary,
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(
                     recapReady
@@ -1370,7 +1370,7 @@ class WellnessPreviewCard extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: colors.primary,
-                                borderRadius: BorderRadius.circular(99),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 'RECAP READY',
@@ -1440,7 +1440,7 @@ class _InsightsToolbar extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _insightSurface(context),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1650,7 +1650,7 @@ class _HeroCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: gradient,
         ),
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: colors.primary.withValues(alpha: .22),
@@ -1705,7 +1705,7 @@ class _HeroCard extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: translucentSurface,
-                            borderRadius: BorderRadius.circular(99),
+                            borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: foreground.withValues(alpha: .14),
                             ),
@@ -1781,7 +1781,7 @@ class _HeroCard extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
                         decoration: BoxDecoration(
                           color: trailSurface,
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(9),
                           border: Border.all(
                             color: foreground.withValues(alpha: .12),
                           ),
@@ -1890,7 +1890,7 @@ class _HeroMetric extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1944,7 +1944,7 @@ class _RecapShelf extends StatelessWidget {
             _insightSurface(context),
           ],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Stack(
         children: [
@@ -1971,7 +1971,7 @@ class _RecapShelf extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: colors.primary.withValues(alpha: .1),
-                        borderRadius: BorderRadius.circular(99),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         ready ? 'RECAP READY' : 'YOUR RECAPS',
@@ -2069,7 +2069,7 @@ class _QuickRecapButton extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return Material(
       color: _insightSurface(context, raised: true),
-      borderRadius: BorderRadius.circular(15),
+      borderRadius: BorderRadius.circular(9),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -2148,7 +2148,7 @@ class _StatGrid extends StatelessWidget {
                     color: index == 0
                         ? colors.primaryContainer.withValues(alpha: .55)
                         : _insightSurface(context),
-                    borderRadius: BorderRadius.circular(19),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     children: [
@@ -2157,7 +2157,7 @@ class _StatGrid extends StatelessWidget {
                         height: 38,
                         decoration: BoxDecoration(
                           color: colors.primary.withValues(alpha: .1),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
                           stats[index].$1,
@@ -2349,7 +2349,7 @@ class _MediaLegendRow extends StatelessWidget {
       label: '$label, $valueLabel, $shareLabel',
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         child: ExcludeSemantics(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 6),
@@ -2522,7 +2522,7 @@ class _HistoryPanel extends StatelessWidget {
             color: index == 0
                 ? colors.primaryContainer.withValues(alpha: .3)
                 : _insightSurface(context),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(10),
             clipBehavior: Clip.antiAlias,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
@@ -2573,7 +2573,7 @@ class _HistoryRow extends StatelessWidget {
                 colors.tertiary.withValues(alpha: .1),
               ],
             ),
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(9),
           ),
           child: Icon(icon, size: 21, color: colors.primary),
         ),
@@ -3015,7 +3015,7 @@ class _BucketCallout extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 14),
         decoration: BoxDecoration(
           color: surface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(9),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3684,7 +3684,7 @@ class _PrivacyNote extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colors.secondaryContainer.withValues(alpha: .32),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(9),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3747,7 +3747,7 @@ class _WellnessEmptyState extends StatelessWidget {
             _insightSurface(context),
           ],
         ),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
@@ -3815,7 +3815,7 @@ class _EmptyFeature extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withValues(alpha: .72),
-        borderRadius: BorderRadius.circular(99),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -3854,7 +3854,7 @@ class _SectionHeader extends StatelessWidget {
           height: 44,
           decoration: BoxDecoration(
             color: colors.primaryContainer,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: colors.onPrimaryContainer, size: 22),
         ),
@@ -3897,7 +3897,7 @@ class _Panel extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: _insightSurface(context),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: child,
     );

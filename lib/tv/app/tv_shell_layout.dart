@@ -11,8 +11,35 @@ typedef TvShellScreenBuilder = Widget Function(
   TvScreenFocusController focusController,
 );
 
-/// The navigation rail beside the active destination's screen, and the D-pad
+/// Where a full-bleed screen's controls go: clear of the collapsed rail on the
+/// leading edge and of the TV's overscan margins on the others.
+///
+/// Only [TvShellLayout.fullBleedDestinations] see it; every other screen is
+/// laid out inside these insets already.
+class TvShellInsets extends InheritedWidget {
+  const TvShellInsets({
+    required this.insets,
+    required super.child,
+    super.key,
+  });
+
+  final EdgeInsets insets;
+
+  /// Zero outside a shell, so a full-bleed screen also lays out on its own.
+  static EdgeInsets of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<TvShellInsets>()?.insets ??
+      EdgeInsets.zero;
+
+  @override
+  bool updateShouldNotify(TvShellInsets oldWidget) =>
+      insets != oldWidget.insets;
+}
+
+/// The navigation rail over the active destination's screen, and the D-pad
 /// contract between them.
+///
+/// The rail floats: collapsed it is a column of icons at the leading edge, and
+/// with focus it widens to show labels over a scrim that dims the screen.
 class TvShellLayout extends StatefulWidget {
   const TvShellLayout({
     required this.destinations,
@@ -20,6 +47,7 @@ class TvShellLayout extends StatefulWidget {
     required this.metrics,
     required this.onDestinationSelected,
     required this.screenBuilder,
+    this.fullBleedDestinations = const <String>{},
     super.key,
   });
 
@@ -28,6 +56,10 @@ class TvShellLayout extends StatefulWidget {
   final TvShellMetrics metrics;
   final ValueChanged<String> onDestinationSelected;
   final TvShellScreenBuilder screenBuilder;
+
+  /// Screens that fill the whole display, artwork running under the rail to
+  /// the screen edge, and place their controls with [TvShellInsets].
+  final Set<String> fullBleedDestinations;
 
   @override
   State<TvShellLayout> createState() => TvShellLayoutState();
@@ -57,6 +89,12 @@ class TvShellLayoutState extends State<TvShellLayout> {
     onKeyEvent: _handleContentKey,
   );
 
+  static const _railMotion = Duration(milliseconds: 220);
+
+  /// Tracks focus in the rail rather than reading it while building, so the
+  /// rail widens and the scrim fades in the frame focus arrives.
+  bool _railExpanded = false;
+
   bool get railHasFocus => _railKey.currentState?.hasFocus == true;
 
   /// Focuses [destinationId] in the rail, or the selected destination.
@@ -72,7 +110,21 @@ class TvShellLayoutState extends State<TvShellLayout> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _railRegion.addListener(_syncRailExpanded);
+  }
+
+  void _syncRailExpanded() {
+    final expanded = _railRegion.hasFocus;
+    if (expanded != _railExpanded && mounted) {
+      setState(() => _railExpanded = expanded);
+    }
+  }
+
+  @override
   void dispose() {
+    _railRegion.removeListener(_syncRailExpanded);
     _railRegion.dispose();
     _contentRegion.dispose();
     super.dispose();
@@ -133,36 +185,76 @@ class TvShellLayoutState extends State<TvShellLayout> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final metrics = widget.metrics;
+    final system = MediaQuery.paddingOf(context);
+    double safe(double systemInset) =>
+        systemInset > metrics.safeInset ? systemInset : metrics.safeInset;
+    final railInset = safe(system.left);
+    final contentInsets = EdgeInsets.fromLTRB(
+      railInset + metrics.railWidth + metrics.railGap,
+      safe(system.top),
+      safe(system.right),
+      safe(system.bottom),
+    );
+    final screen = widget.screenBuilder(
+      context,
+      widget.selectedId,
+      _controllerFor(widget.selectedId),
+    );
+
+    return Stack(
+      fit: StackFit.expand,
       children: <Widget>[
         FocusScope.withExternalFocusNode(
-          focusScopeNode: _railRegion,
-          child: TvNavigationRail(
-            key: _railKey,
-            destinations: widget.destinations,
-            selectedId: widget.selectedId,
-            autofocusId: widget.selectedId,
-            metrics: widget.metrics,
-            onDestinationSelected: widget.onDestinationSelected,
-            onMoveRight: (_) => enterContent(),
+          focusScopeNode: _contentRegion,
+          child: ClipRect(
+            // Only the active destination stays mounted; keeping every
+            // screen alive held their images and controllers in TV RAM.
+            child: KeyedSubtree(
+              key: ValueKey<String>(widget.selectedId),
+              child: widget.fullBleedDestinations.contains(widget.selectedId)
+                  ? TvShellInsets(insets: contentInsets, child: screen)
+                  : Padding(padding: contentInsets, child: screen),
+            ),
           ),
         ),
-        SizedBox(width: widget.metrics.railGap),
-        Expanded(
-          child: FocusScope.withExternalFocusNode(
-            focusScopeNode: _contentRegion,
-            child: ClipRect(
-              // Only the active destination stays mounted; keeping every
-              // screen alive held their images and controllers in TV RAM.
-              child: KeyedSubtree(
-                key: ValueKey<String>(widget.selectedId),
-                child: widget.screenBuilder(
-                  context,
-                  widget.selectedId,
-                  _controllerFor(widget.selectedId),
+        // One gradient both backs the expanded labels and dims the screen, so
+        // opening the rail costs a single full-screen draw.
+        IgnorePointer(
+          child: AnimatedOpacity(
+            opacity: _railExpanded ? 1 : 0,
+            duration: _railMotion,
+            curve: Curves.easeOut,
+            child: const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: <Color>[
+                    Color(0xf5050606),
+                    Color(0xe6050606),
+                    Color(0x8c050606),
+                    Color(0x73050606),
+                  ],
+                  stops: <double>[0, 0.2, 0.45, 1],
                 ),
               ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: railInset,
+          top: contentInsets.top,
+          bottom: contentInsets.bottom,
+          child: FocusScope.withExternalFocusNode(
+            focusScopeNode: _railRegion,
+            child: TvNavigationRail(
+              key: _railKey,
+              destinations: widget.destinations,
+              selectedId: widget.selectedId,
+              autofocusId: widget.selectedId,
+              metrics: metrics,
+              expanded: _railExpanded,
+              onDestinationSelected: widget.onDestinationSelected,
+              onMoveRight: (_) => enterContent(),
             ),
           ),
         ),

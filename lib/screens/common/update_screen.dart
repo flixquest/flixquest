@@ -652,7 +652,7 @@ class _UpdateBottomState extends State<UpdateBottom> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
                 color: colors.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 border:
                     Border.all(color: colors.primary.withValues(alpha: 0.5))),
             child: Row(children: [
@@ -681,7 +681,7 @@ class _UpdateBottomState extends State<UpdateBottom> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(10),
           gradient: LinearGradient(
             colors: [
               colors.primary.withValues(alpha: .20),
@@ -702,7 +702,7 @@ class _UpdateBottomState extends State<UpdateBottom> {
                 height: 48,
                 decoration: BoxDecoration(
                   color: colors.primary,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(
                   PhosphorIcons.rocketLaunch(PhosphorIconsStyle.fill),

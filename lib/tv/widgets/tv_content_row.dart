@@ -27,6 +27,7 @@ class TvContentRow<T> extends StatefulWidget {
     this.pinFocusedItem = false,
     this.autofocus = false,
     this.itemSpacing = 14,
+    this.itemFocusScale = 1.04,
     this.controller,
     super.key,
   });
@@ -57,6 +58,10 @@ class TvContentRow<T> extends StatefulWidget {
 
   final bool autofocus;
   final double itemSpacing;
+
+  /// How much the focused item grows. A pinned row grows it from its leading
+  /// edge, so the item stays lined up with the row title.
+  final double itemFocusScale;
   final TvContentRowController? controller;
 
   @override
@@ -414,7 +419,9 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
           child: SingleChildScrollView(
             controller: _scrollController,
             scrollDirection: Axis.horizontal,
-            clipBehavior: Clip.hardEdge,
+            // A pinned row scrolls earlier items clear of its leading edge, so
+            // it can leave the grown focused item and its shadow unclipped.
+            clipBehavior: widget.pinFocusedItem ? Clip.none : Clip.hardEdge,
             padding: const EdgeInsets.symmetric(
               vertical: 8,
               horizontal: TvDesign.focusOutset,
@@ -447,6 +454,10 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
                             onItemMenu == null ? null : () => onItemMenu(item),
                         padding: const EdgeInsets.all(_itemFocusPadding),
                         scrollAlignment: widget.pinFocusedItem ? null : 0.6,
+                        focusScale: widget.itemFocusScale,
+                        focusAlignment: widget.pinFocusedItem
+                            ? Alignment.centerLeft
+                            : Alignment.center,
                         borderRadius: BorderRadius.circular(
                           TvDesign.cardRadius + 2,
                         ),

@@ -190,7 +190,7 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
       margin: EdgeInsets.zero,
       color: colors.surfaceContainerHighest.withValues(alpha: .55),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(10),
         side: BorderSide(color: statusColor.withValues(alpha: .28)),
       ),
       child: Padding(
@@ -321,7 +321,7 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: .09),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         children: [
@@ -357,11 +357,11 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(9),
         side: BorderSide(color: colors.outline.withValues(alpha: .14)),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(9),
         onDoubleTap: () {
           setState(() {
             if (_revealedProviderIds.contains(provider.id)) {
@@ -380,7 +380,7 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
                 height: 48,
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: .11),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   provider.online
@@ -422,7 +422,7 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   provider.online
@@ -446,7 +446,7 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: colors.errorContainer.withValues(alpha: .65),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [

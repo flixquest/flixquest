@@ -17,11 +17,20 @@ class TvMediaCard extends StatelessWidget {
   const TvMediaCard({
     required this.item,
     required this.width,
+    this.artworkOnly = false,
+    this.dimmed = false,
     super.key,
   });
 
   final TvMediaItem item;
   final double width;
+
+  /// Leaves out the title and facts below the artwork, for rows whose
+  /// spotlight already shows them for the focused card.
+  final bool artworkOnly;
+
+  /// Shades the artwork, for cards outside the row being browsed.
+  final bool dimmed;
 
   static const artworkAspectRatio = 2 / 3;
   static const detailsHeight = 46.0;
@@ -41,63 +50,72 @@ class TvMediaCard extends StatelessWidget {
             context,
           )}${settings.imageQuality}$path';
 
+    final artwork = AspectRatio(
+      aspectRatio: artworkAspectRatio,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(TvDesign.cardRadius),
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            if (imageUrl == null)
+              _ImageFallback(item: item, showTitle: artworkOnly)
+            else
+              CachedNetworkImage(
+                cacheManager: cacheProp(),
+                imageUrl: imageUrl,
+                // Decode close to the rendered size to avoid retaining
+                // multi-megapixel TMDB frames for small TV cards.
+                memCacheWidth:
+                    (width * MediaQuery.devicePixelRatioOf(context)).round(),
+                memCacheHeight: (width /
+                        artworkAspectRatio *
+                        MediaQuery.devicePixelRatioOf(context))
+                    .round(),
+                fit: BoxFit.cover,
+                placeholder: (_, __) => ColoredBox(
+                  color: AppLoadingColors.of(context).cachedImagePlaceholder,
+                ),
+                errorWidget: (_, __, ___) =>
+                    _ImageFallback(item: item, showTitle: artworkOnly),
+              ),
+            if (!artworkOnly)
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(color: TvDesign.hairline),
+                  borderRadius: BorderRadius.circular(TvDesign.cardRadius),
+                ),
+              ),
+            if (item.progress case final progress?)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 3,
+                  color: colors.primary,
+                  backgroundColor: Colors.white24,
+                ),
+              ),
+            // A plain shaded rect rather than an Opacity, which would
+            // cost every dimmed card an offscreen layer on TV GPUs.
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              color: dimmed ? const Color(0x8c000000) : Colors.transparent,
+            ),
+          ],
+        ),
+      ),
+    );
+    if (artworkOnly) return SizedBox(width: width, child: artwork);
+
     return SizedBox(
       width: width,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          AspectRatio(
-            aspectRatio: artworkAspectRatio,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(TvDesign.cardRadius),
-              child: Stack(
-                fit: StackFit.expand,
-                children: <Widget>[
-                  if (imageUrl == null)
-                    _ImageFallback(item: item)
-                  else
-                    CachedNetworkImage(
-                      cacheManager: cacheProp(),
-                      imageUrl: imageUrl,
-                      // Decode close to the rendered size to avoid retaining
-                      // multi-megapixel TMDB frames for small TV cards.
-                      memCacheWidth:
-                          (width * MediaQuery.devicePixelRatioOf(context))
-                              .round(),
-                      memCacheHeight: (width /
-                              artworkAspectRatio *
-                              MediaQuery.devicePixelRatioOf(context))
-                          .round(),
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => ColoredBox(
-                        color:
-                            AppLoadingColors.of(context).cachedImagePlaceholder,
-                      ),
-                      errorWidget: (_, __, ___) => _ImageFallback(item: item),
-                    ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: TvDesign.hairline),
-                      borderRadius: BorderRadius.circular(TvDesign.cardRadius),
-                    ),
-                  ),
-                  if (item.progress case final progress?)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 3,
-                        color: colors.primary,
-                        backgroundColor: Colors.white24,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
+          artwork,
           const SizedBox(height: 7),
           Text(
             item.title,
@@ -134,23 +152,50 @@ class TvMediaCard extends StatelessWidget {
 }
 
 class _ImageFallback extends StatelessWidget {
-  const _ImageFallback({required this.item});
+  const _ImageFallback({required this.item, required this.showTitle});
 
   final TvMediaItem item;
+
+  /// Names the title on the card itself when no text sits below it.
+  final bool showTitle;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final icon = Icon(
+      item.kind == TvMediaKind.movie
+          ? PhosphorIcons.filmSlate()
+          : PhosphorIcons.television(),
+      color: colors.onSurfaceVariant,
+      size: 42,
+    );
     return ColoredBox(
       color: colors.surfaceContainerHighest,
       child: Center(
-        child: Icon(
-          item.kind == TvMediaKind.movie
-              ? PhosphorIcons.filmSlate()
-              : PhosphorIcons.television(),
-          color: colors.onSurfaceVariant,
-          size: 42,
-        ),
+        child: !showTitle
+            ? icon
+            : Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    icon,
+                    const SizedBox(height: 10),
+                    Text(
+                      item.title,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: colors.onSurface,
+                        fontFamily: 'FigtreeSB',
+                        fontSize: 14,
+                        height: 1.15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
       ),
     );
   }

@@ -76,14 +76,14 @@ class _TVBookmarkState extends State<TVBookmark> {
         final item = items[index];
         return Card(
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(9),
             onTap: () => _open(item),
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppUI.cardRadius),
                     child: CachedNetworkImage(
                       cacheManager: cacheProp(),
                       imageUrl: _imageUrl(context, item, settings, proxy),

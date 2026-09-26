@@ -231,7 +231,7 @@ class _Intro extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Hero(
             tag: 'logo_shadow',

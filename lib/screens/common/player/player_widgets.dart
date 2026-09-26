@@ -93,7 +93,7 @@ class PlayerNextEpisodeWidget {
               shadowColor: colors.shadow.withValues(alpha: .45),
               clipBehavior: Clip.antiAlias,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(8),
                 side: BorderSide(
                   color: colors.primary.withValues(alpha: .38),
                 ),

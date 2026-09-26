@@ -14,6 +14,7 @@ class TvFocusable extends StatefulWidget {
     this.onFocusChanged,
     this.borderRadius = const BorderRadius.all(Radius.circular(12)),
     this.focusScale = 1.04,
+    this.focusAlignment = Alignment.center,
     this.focusColor,
     this.padding = EdgeInsets.zero,
     this.scrollAlignment = 0.45,
@@ -36,6 +37,9 @@ class TvFocusable extends StatefulWidget {
   final ValueChanged<bool>? onFocusChanged;
   final BorderRadius borderRadius;
   final double focusScale;
+
+  /// The point the focus scale grows from.
+  final Alignment focusAlignment;
   final Color? focusColor;
   final EdgeInsetsGeometry padding;
 
@@ -148,6 +152,7 @@ class _TvFocusableState extends State<TvFocusable> {
           onLongPress: widget.enabled ? widget.onLongPress : null,
           child: AnimatedScale(
             scale: _hasFocus ? widget.focusScale : 1,
+            alignment: widget.focusAlignment,
             duration: const Duration(milliseconds: 150),
             curve: Curves.easeOut,
             child: AnimatedContainer(

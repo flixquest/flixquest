@@ -1274,7 +1274,7 @@ class _MovieTabButton extends StatelessWidget {
     final color = selected ? colors.primary : colors.onSurfaceVariant;
     return Expanded(
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(4, 7, 4, 5),
@@ -2210,7 +2210,7 @@ class _InfoTile extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: colors.onSurface.withValues(alpha: .05),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2430,7 +2430,7 @@ class _ProviderGrid extends StatelessWidget {
         return Column(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppUI.cardRadius),
               child: SizedBox.square(
                 dimension: 86,
                 child: provider.logoPath == null
@@ -2509,7 +2509,7 @@ class _InlineError extends StatelessWidget {
       decoration: BoxDecoration(
         color:
             Theme.of(context).colorScheme.errorContainer.withValues(alpha: .4),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
@@ -2538,7 +2538,7 @@ class _CompactEmpty extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
       decoration: BoxDecoration(
         color: colors.onSurface.withValues(alpha: .045),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2740,7 +2740,7 @@ class _InfoShimmer extends StatelessWidget {
             (_) => SizedBox(
               width: width,
               height: 94,
-              child: const AppShimmerBlock(radius: 12),
+              child: const AppShimmerBlock(radius: 7),
             ),
           ),
         );
@@ -2756,9 +2756,9 @@ class _SocialShimmer extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Row(
       children: [
-        SizedBox(width: 108, height: 48, child: AppShimmerBlock(radius: 14)),
+        SizedBox(width: 108, height: 48, child: AppShimmerBlock(radius: 7)),
         SizedBox(width: 10),
-        SizedBox(width: 108, height: 48, child: AppShimmerBlock(radius: 14)),
+        SizedBox(width: 108, height: 48, child: AppShimmerBlock(radius: 7)),
       ],
     );
   }
@@ -2782,7 +2782,7 @@ class _ProviderShimmer extends StatelessWidget {
         children: [
           SizedBox.square(
             dimension: 86,
-            child: AppShimmerBlock(radius: 12),
+            child: AppShimmerBlock(radius: 7),
           ),
           SizedBox(height: 8),
           SizedBox(width: 76, height: 12, child: AppShimmerBlock(radius: 4)),

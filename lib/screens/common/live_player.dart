@@ -1198,7 +1198,7 @@ class _LivePlayerState extends State<LivePlayer> {
                           duration: const Duration(milliseconds: 240),
                           child: Material(
                             color: Colors.black.withValues(alpha: .78),
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(10),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -1326,7 +1326,7 @@ class _LivePlayerState extends State<LivePlayer> {
                           duration: const Duration(milliseconds: 240),
                           child: Material(
                             color: Colors.black.withValues(alpha: .78),
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(10),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -1434,7 +1434,7 @@ class _LivePlayerState extends State<LivePlayer> {
                             ? colors.primary.withValues(alpha: .12)
                             : colors.surfaceContainerHighest
                                 .withValues(alpha: .45),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(8),
                         clipBehavior: Clip.antiAlias,
                         child: ListTile(
                           dense: true,
@@ -1550,7 +1550,7 @@ class _ChannelSwitcherSheetState extends State<_ChannelSwitcherSheet> {
                   height: 46,
                   decoration: BoxDecoration(
                     color: colors.primary.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     PhosphorIcons.televisionSimple(),
@@ -1599,7 +1599,7 @@ class _ChannelSwitcherSheetState extends State<_ChannelSwitcherSheet> {
                       ),
                 isDense: true,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
@@ -1618,9 +1618,9 @@ class _ChannelSwitcherSheetState extends State<_ChannelSwitcherSheet> {
                     color: isCurrent
                         ? colors.primary.withValues(alpha: .14)
                         : colors.surfaceContainerHighest.withValues(alpha: .55),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(9),
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(9),
                       onTap: () => Navigator.pop(context, channel),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(

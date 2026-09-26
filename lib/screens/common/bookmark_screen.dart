@@ -117,7 +117,7 @@ class _BookmarkScreenState extends State<BookmarkScreen>
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: colors.onSurface.withValues(alpha: .06),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: TabBar(
                   controller: tabController,
@@ -125,7 +125,7 @@ class _BookmarkScreenState extends State<BookmarkScreen>
                   indicatorSize: TabBarIndicatorSize.tab,
                   indicator: BoxDecoration(
                     color: colors.primary,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   labelColor: colors.onPrimary,
                   unselectedLabelColor: colors.onSurfaceVariant,

@@ -30,7 +30,7 @@ class AboutPage extends StatelessWidget {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
                       color: Theme.of(context)
@@ -43,7 +43,7 @@ class AboutPage extends StatelessWidget {
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(23),
+                  borderRadius: BorderRadius.circular(5),
                   child: const AppLogo(),
                 ),
               ),
@@ -79,7 +79,7 @@ class AboutPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 18),
                       InkWell(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(9),
                         onTap: () => launchUrl(
                             Uri.parse('https://themoviedb.org'),
                             mode: LaunchMode.externalApplication),
@@ -173,7 +173,7 @@ class SocialIconContainer extends StatelessWidget {
       width: 48,
       height: 48,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(9),
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
       ),
       child: PlatformIcon(platformIcon: platformIcon, uri: uri),

@@ -17,7 +17,9 @@ import '../focus/tv_focus_memory.dart';
 import '../focus/tv_screen_focus_controller.dart';
 import '../models/tv_media_item.dart';
 import '../navigation/tv_back_dispatcher.dart';
+import '../controllers/tv_catalog_controller.dart';
 import '../screens/tv_catalog_screen.dart';
+import '../screens/tv_collection_screen.dart';
 import '../screens/tv_home_screen.dart';
 import '../screens/tv_library_screen.dart';
 import '../screens/tv_live_screen.dart';
@@ -48,6 +50,9 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
       GlobalKey<TvShellLayoutState>();
   late final FocusScopeNode _shellFocusScope;
   late final List<TvNavigationDestination> _destinations;
+
+  /// Browse pages whose artwork runs under the rail to the screen edge.
+  static const _fullBleedDestinations = <String>{'home', 'movies', 'series'};
   late final AppSessionStateStore _sessionState;
   late final RestorableString _selectedDestinationId;
   int _libraryRevision = 0;
@@ -204,6 +209,19 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
     }
   }
 
+  Future<void> _openCollection(TvCollection collection) async {
+    final previousFocus = FocusManager.instance.primaryFocus;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => TvCollectionScreen(
+          collection: collection,
+          onOpenMedia: _openMedia,
+        ),
+      ),
+    );
+    if (mounted) _restoreFocusAfterRoute(previousFocus);
+  }
+
   Future<void> _continueWatching(TvMediaItem item) async {
     final previousFocus = FocusManager.instance.primaryFocus;
     final recentMovie = item.recentMovie;
@@ -312,17 +330,17 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final metrics = TvShellMetrics.fromConstraints(constraints);
-                  return SafeArea(
-                    minimum: EdgeInsets.all(metrics.safeInset),
-                    child: TvShellLayout(
-                      key: _layoutKey,
-                      destinations: destinations,
-                      selectedId: selectedId,
-                      metrics: metrics,
-                      onDestinationSelected: _selectDestination,
-                      screenBuilder: (context, id, focusController) =>
-                          _buildScreen(id, metrics, focusController),
-                    ),
+                  // The layout keeps its controls inside the TV-safe margins
+                  // itself, so full-bleed artwork can still reach the edges.
+                  return TvShellLayout(
+                    key: _layoutKey,
+                    destinations: destinations,
+                    selectedId: selectedId,
+                    metrics: metrics,
+                    fullBleedDestinations: _fullBleedDestinations,
+                    onDestinationSelected: _selectDestination,
+                    screenBuilder: (context, id, focusController) =>
+                        _buildScreen(id, metrics, focusController),
                   );
                 },
               ),
@@ -354,12 +372,14 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
           kind: TvMediaKind.movie,
           metrics: metrics,
           onOpenMedia: _openMedia,
+          onOpenCollection: _openCollection,
           focusController: focusController,
         ),
       'series' => TvCatalogScreen(
           kind: TvMediaKind.series,
           metrics: metrics,
           onOpenMedia: _openMedia,
+          onOpenCollection: _openCollection,
           focusController: focusController,
         ),
       _liveDestinationId => TvLiveScreen(

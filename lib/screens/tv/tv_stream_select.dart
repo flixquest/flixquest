@@ -86,7 +86,7 @@ class TVStreamSelect extends StatelessWidget {
                               .colorScheme
                               .primary
                               .withValues(alpha: .12),
-                          borderRadius: BorderRadius.circular(15),
+                          borderRadius: BorderRadius.circular(9),
                         ),
                         child: Icon(
                           PhosphorIcons.broadcast(),

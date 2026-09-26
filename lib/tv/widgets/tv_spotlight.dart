@@ -145,51 +145,81 @@ class _TvBackdropState extends State<TvBackdrop> {
   }
 }
 
-/// Title, facts and synopsis for the item in the spotlight.
+/// What the spotlight says about the focused tile: a media item, or a
+/// shortcut such as a streaming service or genre.
+class TvSpotlightData {
+  const TvSpotlightData({
+    required this.id,
+    required this.title,
+    this.facts = const <String>[],
+    this.overview = '',
+    this.kicker,
+    this.kickerIcon,
+  });
+
+  /// The billboard's [featured] treatment adds the "Featured movie" kicker.
+  factory TvSpotlightData.forItem(TvMediaItem item, {bool featured = false}) {
+    final isMovie = item.kind == TvMediaKind.movie;
+    return TvSpotlightData(
+      id: item.stableId,
+      title: item.title,
+      facts: <String>[
+        if (item.year case final year?) year,
+        isMovie ? 'Movie' : 'Series',
+        if (item.rating case final rating? when rating > 0)
+          '★ ${rating.toStringAsFixed(1)}',
+        if (item.progressLabel case final label?) label,
+      ],
+      overview: item.overview,
+      kicker:
+          featured ? (isMovie ? 'FEATURED MOVIE' : 'FEATURED SERIES') : null,
+      kickerIcon: featured
+          ? (isMovie ? PhosphorIcons.filmSlate() : PhosphorIcons.television())
+          : null,
+    );
+  }
+
+  final String id;
+  final String title;
+  final List<String> facts;
+  final String overview;
+  final String? kicker;
+  final IconData? kickerIcon;
+}
+
+/// Title, facts and synopsis for the tile in the spotlight.
 ///
-/// [featured] is the billboard treatment: a kicker, a larger title and more
-/// synopsis, with room for [action] below.
+/// [featured] is the billboard treatment: a larger title and more synopsis.
 class TvSpotlightInfo extends StatelessWidget {
   const TvSpotlightInfo({
-    required this.item,
+    required this.data,
     required this.featured,
     required this.compact,
     super.key,
   });
 
-  final TvMediaItem item;
+  final TvSpotlightData data;
   final bool featured;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final isMovie = item.kind == TvMediaKind.movie;
-    final metadata = <String>[
-      if (item.year case final year?) year,
-      isMovie ? 'Movie' : 'Series',
-      if (item.rating case final rating? when rating > 0)
-        '★ ${rating.toStringAsFixed(1)}',
-      if (item.progressLabel case final label?) label,
-    ];
+    final kicker = data.kicker;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        if (featured) ...<Widget>[
+        if (kicker != null) ...<Widget>[
           Row(
             children: <Widget>[
-              Icon(
-                isMovie
-                    ? PhosphorIcons.filmSlate()
-                    : PhosphorIcons.television(),
-                color: colors.primary,
-                size: 18,
-              ),
-              const SizedBox(width: 8),
+              if (data.kickerIcon case final icon?) ...<Widget>[
+                Icon(icon, color: colors.primary, size: 18),
+                const SizedBox(width: 8),
+              ],
               Text(
-                isMovie ? 'FEATURED MOVIE' : 'FEATURED SERIES',
+                kicker,
                 style: TextStyle(
                   color: colors.primary,
                   fontFamily: 'FigtreeSB',
@@ -202,7 +232,7 @@ class TvSpotlightInfo extends StatelessWidget {
           const SizedBox(height: 8),
         ],
         Text(
-          item.title,
+          data.title,
           maxLines: featured ? 2 : 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
@@ -218,22 +248,24 @@ class TvSpotlightInfo extends StatelessWidget {
             letterSpacing: -0.6,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          metadata.join('   '),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Color(0xffd2d2d2),
-            fontFamily: 'FigtreeSB',
-            fontSize: 14,
-            height: 1.1,
+        if (data.facts.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 8),
+          Text(
+            data.facts.join('   '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xffd2d2d2),
+              fontFamily: 'FigtreeSB',
+              fontSize: 14,
+              height: 1.1,
+            ),
           ),
-        ),
-        if (item.overview.isNotEmpty) ...<Widget>[
+        ],
+        if (data.overview.isNotEmpty) ...<Widget>[
           SizedBox(height: compact ? 8 : 10),
           Text(
-            item.overview,
+            data.overview,
             maxLines: featured && !compact ? 3 : 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(

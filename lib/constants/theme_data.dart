@@ -845,6 +845,7 @@ class Styles {
       required ColorScheme? darkDynamicColor,
       required BuildContext context,
       required AppColor appColor,
+      bool compactCorners = false,
       OccasionalTheme? occasionalTheme,
       Color? ambientColor}) {
     var baseTheme = appThemeMode == 'dark'
@@ -863,6 +864,7 @@ class Styles {
     }
     final themed = _applyFlixQuestUI(
       baseTheme,
+      compactCorners: compactCorners,
       surfaceOverride:
           activeTheme?.backgroundFor(baseTheme.colorScheme.brightness) ??
               (ambientColor == null ? null : baseTheme.colorScheme.surface),
@@ -932,7 +934,13 @@ Color _readableOn(Color color) =>
         ? Colors.white
         : const Color(0xDE000000);
 
-ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
+ThemeData _applyFlixQuestUI(
+  ThemeData base, {
+  Color? surfaceOverride,
+  bool compactCorners = false,
+}) {
+  double corner(double handheld, double television) =>
+      compactCorners ? handheld : television;
   final colors = base.colorScheme;
   final dark = colors.brightness == Brightness.dark;
   final surface = surfaceOverride ??
@@ -960,7 +968,7 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
             )
           : colors.primary;
   final roundedBorder = OutlineInputBorder(
-    borderRadius: BorderRadius.circular(15),
+    borderRadius: BorderRadius.circular(corner(8, 15)),
     borderSide: BorderSide.none,
   );
   Color accentFor(Set<WidgetState> states) {
@@ -1028,7 +1036,8 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
       color: softSurface,
       surfaceTintColor: Colors.transparent,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(corner(8, 16))),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -1054,7 +1063,8 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
         foregroundColor: solidButtonForeground,
         minimumSize: const Size(48, 48),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(corner(7, 14))),
         textStyle: const TextStyle(fontFamily: 'FigtreeSB'),
       ),
     ),
@@ -1064,7 +1074,8 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
         foregroundColor: solidButtonForeground,
         minimumSize: const Size(48, 48),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(corner(7, 14))),
         textStyle: const TextStyle(fontFamily: 'FigtreeSB'),
       ),
     ),
@@ -1074,7 +1085,8 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
         minimumSize: const Size(48, 48),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
         side: BorderSide(color: actionButtonForeground, width: 1.4),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(corner(7, 14))),
         textStyle: const TextStyle(fontFamily: 'FigtreeSB'),
       ),
     ),
@@ -1082,7 +1094,8 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
       style: TextButton.styleFrom(
         foregroundColor: actionButtonForeground,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(corner(6, 12))),
         textStyle: const TextStyle(fontFamily: 'FigtreeSB'),
       ),
     ),
@@ -1141,7 +1154,7 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
       splashColor: colors.primary.withValues(alpha: .10),
       borderColor: colors.outline,
       selectedBorderColor: colors.primary,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(corner(7, 12)),
     ),
     chipTheme: base.chipTheme.copyWith(
       backgroundColor: Colors.transparent,
@@ -1151,7 +1164,8 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
       secondaryLabelStyle: TextStyle(color: colors.onPrimary),
       side: BorderSide(color: colors.primary, width: 1.3),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(corner(8, 22))),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -1209,8 +1223,9 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
       backgroundColor: surface,
       surfaceTintColor: Colors.transparent,
       showDragHandle: false,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(corner(12, 28))),
       ),
     ),
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
@@ -1250,7 +1265,8 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
     dialogTheme: DialogThemeData(
       backgroundColor: surface,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(corner(10, 22))),
       titleTextStyle: base.textTheme.titleLarge?.copyWith(
         color: colors.onSurface,
         fontFamily: 'FigtreeSB',
@@ -1273,13 +1289,15 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
       showCloseIcon: true,
       elevation: 8,
       insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(corner(8, 16))),
     ),
     dividerTheme: DividerThemeData(color: outline, space: 1, thickness: 1),
     listTileTheme: ListTileThemeData(
       iconColor: colors.onSurface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(corner(8, 14))),
     ),
   );
 }
