@@ -9,6 +9,9 @@ import 'package:share_plus/share_plus.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/auth_navigation_service.dart';
 import '../../services/flixquest_auth_service.dart';
+import '../../design/app_palette.dart';
+import '../../design/skeleton.dart';
+import '../../mobile/widgets/page_kit.dart';
 import '../../ui_components/app_ui_components.dart';
 import '../../widgets/app_logo.dart';
 import '../common/about.dart';
@@ -46,17 +49,14 @@ class _UserInfoState extends State<UserInfo> {
 
   @override
   Widget build(BuildContext context) {
-    if (userAnonymous == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (userAnonymous!) return _anonymousProfile();
+    if (userAnonymous ?? true) return _anonymousProfile();
     return StreamBuilder<DocumentSnapshot>(
       stream:
           FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const _ProfileSkeleton();
         }
         final data = snapshot.data?.data() as Map<String, dynamic>?;
         if (snapshot.hasData && snapshot.data!.exists && data != null) {
@@ -119,15 +119,12 @@ class _UserInfoState extends State<UserInfo> {
                 height: 112,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withValues(alpha: .12),
+                  color: AppPalette.of(context).idleFill,
                 ),
                 child: Icon(
                   PhosphorIcons.user(),
                   size: 54,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: AppPalette.of(context).foreground,
                 ),
               ),
             ),
@@ -203,8 +200,7 @@ class _UserInfoState extends State<UserInfo> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                          color: colors.primary.withValues(alpha: .28),
-                          width: 2),
+                          color: AppPalette.of(context).hairline, width: 2),
                     ),
                     child: ClipOval(
                       child: _avatarImage(
@@ -458,6 +454,58 @@ class _ProfileAction extends StatelessWidget {
       leading: Icon(icon, color: color),
       title: Text(title, style: TextStyle(color: color)),
       trailing: Icon(PhosphorIcons.caretRight()),
+    );
+  }
+}
+
+/// The profile's shape while the account loads: the avatar, the name and
+/// the rows under it.
+class _ProfileSkeleton extends StatelessWidget {
+  const _ProfileSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      bottom: false,
+      child: SkeletonPulse(
+        child: SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(
+            AppUI.pagePadding(context),
+            20,
+            AppUI.pagePadding(context),
+            0,
+          ),
+          child: const Column(
+            children: [
+              Row(
+                children: [
+                  SkeletonBlock(width: 34, height: 34, radius: 5),
+                  SizedBox(width: 12),
+                  SkeletonBlock.line(width: 110, height: 22),
+                ],
+              ),
+              SizedBox(height: 32),
+              SkeletonBlock(width: 120, height: 120, circle: true),
+              SizedBox(height: 18),
+              SkeletonBlock.line(width: 160, height: 20),
+              SizedBox(height: 10),
+              SkeletonBlock.line(width: 200, height: 12),
+              SizedBox(height: 8),
+              SkeletonBlock.line(width: 110, height: 12),
+              SizedBox(height: 22),
+              SkeletonBlock(height: 84),
+              SizedBox(height: 14),
+              ListSkeleton(
+                rows: 5,
+                leadingWidth: 24,
+                leadingHeight: 24,
+                padding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

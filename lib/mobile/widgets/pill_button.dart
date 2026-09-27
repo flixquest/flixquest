@@ -16,6 +16,7 @@ class PillButton extends StatelessWidget {
     this.busy = false,
     this.height = 40,
     this.onArtwork = false,
+    this.destructive = false,
     super.key,
   });
 
@@ -32,12 +33,20 @@ class PillButton extends StatelessWidget {
   /// translucent white one, as on the player.
   final bool onArtwork;
 
+  /// Something that can't be undone (Delete account): the theme's error
+  /// colour.
+  final bool destructive;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final Color background;
     final Color foreground;
-    if (onArtwork) {
+    if (destructive) {
+      final colors = Theme.of(context).colorScheme;
+      background = colors.error;
+      foreground = colors.onError;
+    } else if (onArtwork) {
       background = primary ? const Color(0xF2FFFFFF) : const Color(0x38FFFFFF);
       foreground = primary ? const Color(0xFF000000) : const Color(0xFFFFFFFF);
     } else {

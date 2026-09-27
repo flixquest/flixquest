@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../catalog/media_item.dart';
@@ -8,6 +7,7 @@ import '../../constants/api_constants.dart';
 import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
+import '../../design/outline_mark.dart';
 import '../../functions/function.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
@@ -55,8 +55,8 @@ String? tmdbImageUrl(
 }
 
 /// A title's artwork filling its box: [path] decoded near the size it is
-/// drawn, a quiet panel while it loads, and the title's kind as an icon when
-/// there is none.
+/// drawn, a quiet panel while it loads, and the FlixQuest mark when there is
+/// none.
 class MediaArt extends StatelessWidget {
   const MediaArt({
     required this.item,
@@ -107,6 +107,7 @@ class MediaArt extends StatelessWidget {
   }
 }
 
+/// A title's artwork that isn't there.
 class MediaArtFallback extends StatelessWidget {
   const MediaArtFallback({required this.item, this.background, super.key});
 
@@ -114,20 +115,34 @@ class MediaArtFallback extends StatelessWidget {
   final Color? background;
 
   @override
+  Widget build(BuildContext context) => ArtPlaceholder(background: background);
+}
+
+/// Any artwork that isn't there (a poster, a still, a face): the FlixQuest
+/// mark in outline, quiet on the panel and sized to the box.
+class ArtPlaceholder extends StatelessWidget {
+  const ArtPlaceholder({this.background, super.key});
+
+  /// The panel; the theme's raised surface by default. A fixed tone means
+  /// dark artwork ground, where the mark is translucent white in every theme.
+  final Color? background;
+
+  @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return ColoredBox(
       color: background ?? palette.raisedSurface,
-      child: Center(
-        child: Icon(
-          item.kind == MediaKind.movie
-              ? PhosphorIcons.filmSlate()
-              : PhosphorIcons.television(),
-          // A fixed background is dark artwork ground in every theme.
-          color:
-              background == null ? palette.mutedText : const Color(0x61FFFFFF),
-          size: 32,
-        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Center(
+            child: OutlineMark(
+              height: OutlineMark.heightFor(constraints.biggest.shortestSide),
+              color: background == null
+                  ? palette.mutedText
+                  : const Color(0x61FFFFFF),
+            ),
+          );
+        },
       ),
     );
   }

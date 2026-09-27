@@ -12,6 +12,7 @@ import '../../catalog/media_search.dart';
 import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
 import '../../models/genres.dart';
 import '../../models/person.dart';
 import '../../preferences/setting_preferences.dart';
@@ -25,6 +26,7 @@ import 'discover_screen.dart';
 import '../widgets/category_section.dart';
 import '../widgets/filter_chips.dart';
 import '../widgets/media_art.dart';
+import '../widgets/page_kit.dart';
 import '../widgets/pill_button.dart';
 import '../widgets/poster_card.dart';
 import '../widgets/section_header.dart';
@@ -262,8 +264,10 @@ class _SearchScreenState extends State<SearchScreen> {
     if (!typed) {
       content = _startSlivers(context);
     } else if (results == null) {
-      // The first answer is on its way; the field shows it's working.
-      content = const <Widget>[];
+      // The first answer is on its way: its shape, pulsing.
+      content = const <Widget>[
+        SliverToBoxAdapter(child: _ResultsSkeleton()),
+      ];
     } else if (results.isEmpty) {
       content = _noMatchSlivers(context, results.query);
     } else {
@@ -282,17 +286,19 @@ class _SearchScreenState extends State<SearchScreen> {
               topInset: media.padding.top,
               palette: palette,
               chips: showResults && !results.isEmpty ? _chips() : null,
-              field: _SearchField(
-                controller: _query,
-                focusNode: _field,
-                searching: _searching,
-                onChanged: _onChanged,
-                onSubmitted: _onSubmitted,
-                onClear: () {
-                  _query.clear();
-                  _onChanged('');
-                  _field.requestFocus();
-                },
+              field: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppSpace.gutter(context),
+                ),
+                child: SearchPill(
+                  controller: _query,
+                  focusNode: _field,
+                  hint: tr('search_hint'),
+                  searching: _searching,
+                  onChanged: _onChanged,
+                  onSubmitted: _onSubmitted,
+                  onClear: _field.requestFocus,
+                ),
               ),
             ),
           ),
@@ -576,107 +582,6 @@ class _SearchHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(_SearchHeaderDelegate oldDelegate) => true;
-}
-
-class _SearchField extends StatelessWidget {
-  const _SearchField({
-    required this.controller,
-    required this.focusNode,
-    required this.searching,
-    required this.onChanged,
-    required this.onSubmitted,
-    required this.onClear,
-  });
-
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final bool searching;
-  final ValueChanged<String> onChanged;
-  final ValueChanged<String> onSubmitted;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final gutter = AppSpace.gutter(context);
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: gutter),
-      child: Container(
-        height: 46,
-        decoration: BoxDecoration(
-          color: palette.idleFill,
-          borderRadius: BorderRadius.circular(AppRadii.hero),
-        ),
-        child: Row(
-          children: <Widget>[
-            const SizedBox(width: 14),
-            Icon(
-              PhosphorIcons.magnifyingGlass(),
-              size: 20,
-              color: palette.mutedText,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                onChanged: onChanged,
-                onSubmitted: onSubmitted,
-                textInputAction: TextInputAction.search,
-                style: AppType.body.copyWith(
-                  fontSize: 16,
-                  color: palette.foreground,
-                  // Figtree sits low in its line; even leading centres it.
-                  leadingDistribution: TextLeadingDistribution.even,
-                ),
-                decoration: InputDecoration(
-                  isCollapsed: true,
-                  // The theme pads fields for forms; this one is centred
-                  // in its pill instead.
-                  contentPadding: EdgeInsets.zero,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  filled: false,
-                  hintText: tr('search_hint'),
-                  hintStyle: AppType.body.copyWith(
-                    fontSize: 16,
-                    color: palette.mutedText,
-                    leadingDistribution: TextLeadingDistribution.even,
-                  ),
-                ),
-              ),
-            ),
-            ListenableBuilder(
-              listenable: controller,
-              builder: (context, _) {
-                if (searching) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: palette.mutedText,
-                      ),
-                    ),
-                  );
-                }
-                if (controller.text.isEmpty) return const SizedBox(width: 8);
-                return IconButton(
-                  tooltip: tr('clear'),
-                  color: palette.mutedText,
-                  iconSize: 18,
-                  onPressed: onClear,
-                  icon: Icon(PhosphorIcons.xCircle(PhosphorIconsStyle.fill)),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// Recent searches as chips: tap to search again, long press to forget one,
@@ -1088,6 +993,50 @@ class _People extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Results while the first answer comes: the top result's wide card, then
+/// a grid of posters.
+class _ResultsSkeleton extends StatelessWidget {
+  const _ResultsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final gutter = AppSpace.gutter(context);
+    final width = MediaQuery.sizeOf(context).width;
+    final columns = width >= AppBreakpoints.tablet ? 5 : 3;
+    final poster = (width - gutter * 2 - 10 * (columns - 1)) / columns;
+    return SkeletonPulse(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(gutter, AppSpace.sm, gutter, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const SkeletonBlock.line(width: 110, height: 16),
+            const SizedBox(height: AppSpace.md),
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: SkeletonBlock(width: width, radius: AppRadii.hero),
+            ),
+            const SizedBox(height: AppSpace.rowGap),
+            const SkeletonBlock.line(width: 80, height: 16),
+            const SizedBox(height: AppSpace.md),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: <Widget>[
+                for (var i = 0; i < columns * 2; i++)
+                  SkeletonBlock(
+                    width: poster,
+                    height: poster / PosterCard.aspectRatio,
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

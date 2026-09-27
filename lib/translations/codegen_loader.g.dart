@@ -752,7 +752,50 @@ class CodegenLoader extends AssetLoader{
   "more_like_this": "More Like This",
   "trailers_and_more": "Trailers & More",
   "first_aired": "First aired",
-  "networks": "Networks"
+  "networks": "Networks",
+  "schedule": "Schedule",
+  "live_tv_unavailable": "Live TV is unavailable",
+  "no_channels_match": "No channels match “{query}”. Try Schedule to find matches, or clear the search.",
+  "try_another_channel_filter": "Try another search, category or list.",
+  "clear_search": "Clear search",
+  "no_matches_found": "No matches found",
+  "schedule_unavailable": "Schedule unavailable",
+  "try_another_match_filter": "Try another team, league or day.",
+  "pull_to_refresh_schedule": "Pull down to load today’s schedule.",
+  "search_matches": "Search matches, teams and leagues",
+  "search_channels": "Search channels",
+  "all": "All",
+  "favorites": "Favorites",
+  "recent": "Recent",
+  "all_categories": "All categories",
+  "all_sports": "All sports",
+  "event_count": {
+    "one": "{} match",
+    "other": "{} matches"
+  },
+  "times_in_zone": "Times in {zone}",
+  "channel_count": {
+    "one": "{} channel",
+    "other": "{} channels"
+  },
+  "channel_number": "Channel {id}",
+  "share_channel": "Share channel",
+  "remove_from_favorites": "Remove from favorites",
+  "add_to_favorites": "Add to favorites",
+  "live_now": "Live now",
+  "search_categories": "Search categories",
+  "no_categories_match": "No categories match",
+  "watch_channel_live": "Watch {name} live on FlixQuest",
+  "something_went_wrong": "Something went wrong",
+  "choose_season": "Choose a season",
+  "posters": "Posters",
+  "choose_episode": "Choose an episode",
+  "guest_stars_line": "Guest stars: {names}",
+  "writers_line": "Writers: {names}",
+  "video_source_count": {
+    "one": "{} source",
+    "other": "{} sources"
+  }
 };
 static const Map<String,dynamic> _hi = {
   "popularity_descending": "लोकप्रियता घटती",
@@ -1492,7 +1535,50 @@ static const Map<String,dynamic> _hi = {
   "more_like_this": "ऐसे और शीर्षक",
   "trailers_and_more": "ट्रेलर और अन्य",
   "first_aired": "पहला प्रसारण",
-  "networks": "नेटवर्क"
+  "networks": "नेटवर्क",
+  "schedule": "शेड्यूल",
+  "live_tv_unavailable": "लाइव टीवी उपलब्ध नहीं है",
+  "no_channels_match": "“{query}” से कोई चैनल मेल नहीं खाता। मैच ढूँढने के लिए शेड्यूल आज़माएँ, या खोज साफ़ करें।",
+  "try_another_channel_filter": "कोई दूसरी खोज, श्रेणी या सूची आज़माएँ।",
+  "clear_search": "खोज साफ़ करें",
+  "no_matches_found": "कोई मैच नहीं मिला",
+  "schedule_unavailable": "शेड्यूल उपलब्ध नहीं है",
+  "try_another_match_filter": "कोई दूसरी टीम, लीग या दिन आज़माएँ।",
+  "pull_to_refresh_schedule": "आज का शेड्यूल लोड करने के लिए नीचे खींचें।",
+  "search_matches": "मैच, टीमें और लीग खोजें",
+  "search_channels": "चैनल खोजें",
+  "all": "सभी",
+  "favorites": "पसंदीदा",
+  "recent": "हाल के",
+  "all_categories": "सभी श्रेणियाँ",
+  "all_sports": "सभी खेल",
+  "event_count": {
+    "one": "{} मैच",
+    "other": "{} मैच"
+  },
+  "times_in_zone": "समय {zone} में",
+  "channel_count": {
+    "one": "{} चैनल",
+    "other": "{} चैनल"
+  },
+  "channel_number": "चैनल {id}",
+  "share_channel": "चैनल शेयर करें",
+  "remove_from_favorites": "पसंदीदा से हटाएँ",
+  "add_to_favorites": "पसंदीदा में जोड़ें",
+  "live_now": "अभी लाइव",
+  "search_categories": "श्रेणियाँ खोजें",
+  "no_categories_match": "कोई श्रेणी मेल नहीं खाती",
+  "watch_channel_live": "FlixQuest पर {name} लाइव देखें",
+  "something_went_wrong": "कुछ गलत हो गया",
+  "choose_season": "सीज़न चुनें",
+  "posters": "पोस्टर",
+  "choose_episode": "एपिसोड चुनें",
+  "guest_stars_line": "अतिथि कलाकार: {names}",
+  "writers_line": "लेखक: {names}",
+  "video_source_count": {
+    "one": "{} स्रोत",
+    "other": "{} स्रोत"
+  }
 };
 static const Map<String,dynamic> _es = {
   "popularity_descending": "Popularidad descendiente",
@@ -2232,7 +2318,50 @@ static const Map<String,dynamic> _es = {
   "more_like_this": "Similares",
   "trailers_and_more": "Tráileres y más",
   "first_aired": "Primera emisión",
-  "networks": "Cadenas"
+  "networks": "Cadenas",
+  "schedule": "Programación",
+  "live_tv_unavailable": "TV en vivo no está disponible",
+  "no_channels_match": "Ningún canal coincide con “{query}”. Prueba en Programación para encontrar partidos, o borra la búsqueda.",
+  "try_another_channel_filter": "Prueba otra búsqueda, categoría o lista.",
+  "clear_search": "Borrar búsqueda",
+  "no_matches_found": "No se encontraron partidos",
+  "schedule_unavailable": "Programación no disponible",
+  "try_another_match_filter": "Prueba otro equipo, liga o día.",
+  "pull_to_refresh_schedule": "Desliza hacia abajo para cargar la programación de hoy.",
+  "search_matches": "Buscar partidos, equipos y ligas",
+  "search_channels": "Buscar canales",
+  "all": "Todo",
+  "favorites": "Favoritos",
+  "recent": "Recientes",
+  "all_categories": "Todas las categorías",
+  "all_sports": "Todos los deportes",
+  "event_count": {
+    "one": "{} partido",
+    "other": "{} partidos"
+  },
+  "times_in_zone": "Horas en {zone}",
+  "channel_count": {
+    "one": "{} canal",
+    "other": "{} canales"
+  },
+  "channel_number": "Canal {id}",
+  "share_channel": "Compartir canal",
+  "remove_from_favorites": "Quitar de favoritos",
+  "add_to_favorites": "Añadir a favoritos",
+  "live_now": "En vivo ahora",
+  "search_categories": "Buscar categorías",
+  "no_categories_match": "Ninguna categoría coincide",
+  "watch_channel_live": "Mira {name} en vivo en FlixQuest",
+  "something_went_wrong": "Algo salió mal",
+  "choose_season": "Elegir temporada",
+  "posters": "Pósteres",
+  "choose_episode": "Elige un episodio",
+  "guest_stars_line": "Estrellas invitadas: {names}",
+  "writers_line": "Guionistas: {names}",
+  "video_source_count": {
+    "one": "{} fuente",
+    "other": "{} fuentes"
+  }
 };
 static const Map<String,dynamic> _ar = {
   "popularity_descending": "ترتيب تنازلي حسب الشعبية",
@@ -2972,7 +3101,62 @@ static const Map<String,dynamic> _ar = {
   "more_like_this": "أعمال مشابهة",
   "trailers_and_more": "الإعلانات والمزيد",
   "first_aired": "أول عرض",
-  "networks": "الشبكات"
+  "networks": "الشبكات",
+  "schedule": "الجدول",
+  "live_tv_unavailable": "البث المباشر غير متاح",
+  "no_channels_match": "لا توجد قنوات تطابق “{query}”. جرّب الجدول للعثور على المباريات، أو امسح البحث.",
+  "try_another_channel_filter": "جرّب بحثًا أو فئة أو قائمة أخرى.",
+  "clear_search": "مسح البحث",
+  "no_matches_found": "لم يتم العثور على مباريات",
+  "schedule_unavailable": "الجدول غير متاح",
+  "try_another_match_filter": "جرّب فريقًا أو دوريًا أو يومًا آخر.",
+  "pull_to_refresh_schedule": "اسحب للأسفل لتحميل جدول اليوم.",
+  "search_matches": "ابحث عن المباريات والفرق والدوريات",
+  "search_channels": "ابحث عن القنوات",
+  "all": "الكل",
+  "favorites": "المفضلة",
+  "recent": "الأخيرة",
+  "all_categories": "كل الفئات",
+  "all_sports": "كل الرياضات",
+  "event_count": {
+    "zero": "لا مباريات",
+    "one": "مباراة واحدة",
+    "two": "مباراتان",
+    "few": "{} مباريات",
+    "many": "{} مباراة",
+    "other": "{} مباراة"
+  },
+  "times_in_zone": "الأوقات بتوقيت {zone}",
+  "channel_count": {
+    "zero": "لا قنوات",
+    "one": "قناة واحدة",
+    "two": "قناتان",
+    "few": "{} قنوات",
+    "many": "{} قناة",
+    "other": "{} قناة"
+  },
+  "channel_number": "القناة {id}",
+  "share_channel": "مشاركة القناة",
+  "remove_from_favorites": "إزالة من المفضلة",
+  "add_to_favorites": "إضافة إلى المفضلة",
+  "live_now": "مباشر الآن",
+  "search_categories": "ابحث في الفئات",
+  "no_categories_match": "لا توجد فئات مطابقة",
+  "watch_channel_live": "شاهد {name} مباشرة على FlixQuest",
+  "something_went_wrong": "حدث خطأ ما",
+  "choose_season": "اختر موسمًا",
+  "posters": "الملصقات",
+  "choose_episode": "اختر حلقة",
+  "guest_stars_line": "ضيوف الشرف: {names}",
+  "writers_line": "الكتّاب: {names}",
+  "video_source_count": {
+    "zero": "لا مصادر",
+    "one": "مصدر واحد",
+    "two": "مصدران",
+    "few": "{} مصادر",
+    "many": "{} مصدرًا",
+    "other": "{} مصدر"
+  }
 };
 static const Map<String, Map<String,dynamic>> mapLocales = {"en": _en, "hi": _hi, "es": _es, "ar": _ar};
 }

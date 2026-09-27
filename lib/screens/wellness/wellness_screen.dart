@@ -11,6 +11,12 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
+import '../../mobile/widgets/filter_chips.dart';
+import '../../mobile/widgets/page_kit.dart';
+import '../../mobile/widgets/pill_button.dart';
 import '../../models/wellness.dart';
 import '../../models/wellness_insights.dart';
 import '../../models/wellness_recap.dart';
@@ -39,23 +45,25 @@ class _WellnessScreenState extends State<WellnessScreen> {
     final wellness = context.watch<WellnessProvider>();
     final insights = wellness.insights;
     final hasRecapHistory = hasRecapWorthyHistory(wellness.sessions);
+    final palette = AppPalette.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Viewing Insights'),
-        centerTitle: false,
-        scrolledUnderElevation: 0,
+      backgroundColor: palette.page,
+      appBar: PageAppBar(
+        title: 'Viewing Insights',
         actions: [
           IconButton(
             tooltip: 'Viewing Insights options',
             onPressed: () => _showInsightsActions(wellness),
             icon: Icon(PhosphorIcons.dotsThreeVertical()),
           ),
-          const SizedBox(width: 4),
         ],
       ),
-      body: wellness.loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+      body: SkeletonSwitcher(
+        loading: wellness.loading,
+        skeleton: const _InsightsSkeleton(),
+        child: RefreshIndicator(
+              color: palette.foreground,
+              backgroundColor: palette.raisedSurface,
               onRefresh: wellness.canSync ? wellness.syncNow : wellness.reload,
               child: AppResponsiveContent(
                 maxWidth: 920,
@@ -114,19 +122,11 @@ class _WellnessScreenState extends State<WellnessScreen> {
                                   ),
                             ),
                           ),
-                          OutlinedButton.icon(
-                            onPressed: _sharing
-                                ? null
-                                : () => _openShareRecap(wellness),
-                            icon: _sharing
-                                ? const SizedBox.square(
-                                    dimension: 15,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Icon(PhosphorIcons.shareNetwork(), size: 18),
-                            label: const Text('Share recap'),
+                          PillButton(
+                            busy: _sharing,
+                            onPressed: () => _openShareRecap(wellness),
+                            icon: PhosphorIcons.shareNetwork(),
+                            label: 'Share recap',
                           ),
                         ],
                       ),
@@ -283,6 +283,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                 ),
               ),
             ),
+      ),
     );
   }
 
@@ -420,12 +421,12 @@ class _InsightsActionsSheet extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: colors.primaryContainer,
+                  color: AppPalette.of(context).idleFill,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   PhosphorIcons.slidersHorizontal(),
-                  color: colors.onPrimaryContainer,
+                  color: AppPalette.of(context).foreground,
                   size: 21,
                 ),
               ),
@@ -493,7 +494,8 @@ class _InsightsActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final accent = destructive ? colors.error : colors.primary;
+    final accent =
+        destructive ? colors.error : AppPalette.of(context).foreground;
     return Material(
       color: destructive
           ? colors.errorContainer.withValues(alpha: .32)
@@ -732,22 +734,12 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
                 itemBuilder: (context, index) {
                   final period = periods[index];
                   final selected = period.id == _period.id;
-                  return ChoiceChip(
-                    label: Text(
-                      period.label,
-                      style: TextStyle(
-                        color: selected ? colors.onPrimary : colors.onSurface,
-                        fontFamily: selected ? 'FigtreeSB' : 'Figtree',
-                        fontWeight:
-                            selected ? FontWeight.w600 : FontWeight.w500,
-                      ),
+                  return ChoicePill(
+                    spec: FilterChipSpec(
+                      label: period.label,
+                      selected: selected,
+                      onTap: () => setState(() => _period = period),
                     ),
-                    selected: selected,
-                    showCheckmark: false,
-                    side: BorderSide.none,
-                    backgroundColor: _insightSurface(context, raised: true),
-                    selectedColor: colors.primary,
-                    onSelected: (_) => setState(() => _period = period),
                   );
                 },
               ),
@@ -843,24 +835,22 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: PillButton(
+                    height: 48,
                     onPressed: insights.isEmpty ? null : _copyCaption,
-                    icon: Icon(PhosphorIcons.copy(), size: 18),
-                    label: const Text('Copy caption'),
+                    icon: PhosphorIcons.copy(),
+                    label: 'Copy caption',
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: FilledButton.icon(
-                    onPressed:
-                        _sharing || insights.isEmpty ? null : _shareImage,
-                    icon: _sharing
-                        ? const SizedBox.square(
-                            dimension: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(PhosphorIcons.shareNetwork(), size: 18),
-                    label: Text(_sharing ? 'Creating…' : 'Share image'),
+                  child: PillButton(
+                    primary: true,
+                    height: 48,
+                    busy: _sharing,
+                    onPressed: insights.isEmpty ? null : _shareImage,
+                    icon: PhosphorIcons.shareNetwork(),
+                    label: _sharing ? 'Creating…' : 'Share image',
                   ),
                 ),
               ],
@@ -887,9 +877,9 @@ class _RecapStyleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
     return Material(
-      color: selected ? scheme.primary : _insightSurface(context, raised: true),
+      color: selected ? palette.focusFill : palette.idleFill,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -912,9 +902,8 @@ class _RecapStyleChip extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? scheme.onPrimary : scheme.onSurface,
-                  fontFamily: selected ? 'FigtreeSB' : 'Figtree',
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? palette.onFocus : palette.foreground,
+                  fontFamily: 'FigtreeSB',
                 ),
               ),
               if (selected) ...[
@@ -922,7 +911,7 @@ class _RecapStyleChip extends StatelessWidget {
                 Icon(
                   PhosphorIcons.checkCircle(),
                   size: 17,
-                  color: scheme.onPrimary,
+                  color: palette.onFocus,
                 ),
               ],
             ],
@@ -1308,18 +1297,12 @@ class WellnessPreviewCard extends StatelessWidget {
     final featured = WellnessRecapPeriod.featured(provider.sessions, now);
     final recapReady = featured.hasReadyRecap(provider.sessions, now);
     final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.primaryContainer.withValues(alpha: .72),
-            colors.tertiaryContainer.withValues(alpha: .42),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(10),
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
       ),
       child: Material(
         color: Colors.transparent,
@@ -1334,19 +1317,14 @@ class WellnessPreviewCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Theme.of(context).colorScheme.primary,
-                        Theme.of(context).colorScheme.tertiary,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(9),
+                    color: palette.idleFill,
+                    borderRadius: BorderRadius.circular(AppRadii.card),
                   ),
                   child: Icon(
                     recapReady
                         ? PhosphorIcons.confetti()
                         : PhosphorIcons.chartDonut(),
-                    color: Colors.white,
+                    color: palette.foreground,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -1364,22 +1342,16 @@ class WellnessPreviewCard extends StatelessWidget {
                           ),
                           if (recapReady)
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colors.primary,
-                                borderRadius: BorderRadius.circular(6),
+                              padding: const EdgeInsetsDirectional.only(
+                                start: 8,
                               ),
                               child: Text(
                                 'RECAP READY',
                                 style: TextStyle(
-                                  color: colors.onPrimary,
+                                  color: colors.primary,
                                   fontFamily: 'FigtreeSB',
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: .7,
+                                  fontSize: 10,
+                                  letterSpacing: 1.2,
                                 ),
                               ),
                             ),
@@ -1399,14 +1371,12 @@ class WellnessPreviewCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: colors.surface.withValues(alpha: .7),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(PhosphorIcons.caretRight(), size: 17),
+                Icon(
+                  Directionality.of(context) == ui.TextDirection.rtl
+                      ? PhosphorIcons.caretLeft()
+                      : PhosphorIcons.caretRight(),
+                  size: 17,
+                  color: palette.mutedText,
                 ),
               ],
             ),
@@ -1451,15 +1421,15 @@ class _InsightsToolbar extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(11),
+                  color: AppPalette.of(context).idleFill,
+                  borderRadius: BorderRadius.circular(AppRadii.card),
                 ),
                 child: Icon(
                   provider.canSync
                       ? PhosphorIcons.cloudCheck()
                       : PhosphorIcons.deviceMobile(),
                   size: 18,
-                  color: colors.onPrimaryContainer,
+                  color: AppPalette.of(context).foreground,
                 ),
               ),
               const SizedBox(width: 10),
@@ -1483,15 +1453,11 @@ class _InsightsToolbar extends StatelessWidget {
                 ),
               ),
               if (provider.canSync)
-                IconButton.filledTonal(
-                  tooltip: 'Sync now',
-                  onPressed: syncing ? null : provider.syncNow,
-                  icon: syncing
-                      ? const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(PhosphorIcons.arrowsClockwise(), size: 19),
+                PillButton(
+                  busy: syncing,
+                  onPressed: provider.syncNow,
+                  icon: PhosphorIcons.arrowsClockwise(),
+                  label: 'Sync',
                 ),
             ],
           ),
@@ -1520,36 +1486,19 @@ class _RangePicker extends StatelessWidget {
       WellnessRange.year: 'Year',
       WellnessRange.allTime: 'All time',
     };
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: WellnessRange.values.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final range = WellnessRange.values[index];
-          final isSelected = selected == range;
-          return ChoiceChip(
-            label: Text(
-              labels[range]!,
-              style: TextStyle(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurface,
-                fontFamily: isSelected ? 'FigtreeSB' : 'Figtree',
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              ),
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final range in WellnessRange.values)
+          ChoicePill(
+            spec: FilterChipSpec(
+              label: labels[range]!,
+              selected: selected == range,
+              onTap: () => onSelected(range),
             ),
-            selected: isSelected,
-            showCheckmark: false,
-            visualDensity: VisualDensity.compact,
-            side: BorderSide.none,
-            backgroundColor: _insightSurface(context, raised: true),
-            selectedColor: Theme.of(context).colorScheme.primary,
-            onSelected: (_) => onSelected(range),
-          );
-        },
-      ),
+          ),
+      ],
     );
   }
 }
@@ -1569,29 +1518,19 @@ class _SectionNavigator extends StatelessWidget {
       (_InsightsSection.taste, PhosphorIcons.palette(), 'Taste'),
       (_InsightsSection.patterns, PhosphorIcons.calendarDots(), 'Patterns'),
     ];
-    return SizedBox(
-      height: 42,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return ActionChip(
-            avatar: Icon(item.$2, size: 17),
-            label: Text(
-              item.$3,
-              style: const TextStyle(
-                fontFamily: 'FigtreeSB',
-                fontWeight: FontWeight.w600,
-              ),
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final item in items)
+          ChoicePill(
+            spec: FilterChipSpec(
+              icon: item.$2,
+              label: item.$3,
+              onTap: () => onSelected(item.$1),
             ),
-            side: BorderSide.none,
-            backgroundColor: _insightSurface(context, raised: true),
-            onPressed: () => onSelected(item.$1),
-          );
-        },
-      ),
+          ),
+      ],
     );
   }
 }
@@ -1609,11 +1548,12 @@ class _HeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
+    // A raised panel, not a coloured one: the accent is kept for progress.
     final rawGradient = <Color>[
-      colors.primary,
-      Color.lerp(colors.primary, colors.tertiary, .72)!,
-      colors.tertiary,
+      palette.raisedSurface,
+      Color.lerp(palette.raisedSurface, palette.surface, .5)!,
+      palette.surface,
     ];
     final foreground = _bestGradientForeground(rawGradient);
     final gradient = rawGradient
@@ -1650,14 +1590,7 @@ class _HeroCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: gradient,
         ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: colors.primary.withValues(alpha: .22),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(AppRadii.hero),
       ),
       child: Stack(
         children: [
@@ -1936,25 +1869,18 @@ class _RecapShelf extends StatelessWidget {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.primaryContainer.withValues(alpha: .72),
-            _insightSurface(context),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(10),
+        color: _insightSurface(context),
+        borderRadius: BorderRadius.circular(AppRadii.card),
       ),
       child: Stack(
         children: [
-          Positioned(
-            right: -28,
+          PositionedDirectional(
+            end: -28,
             top: -38,
             child: Icon(
               PhosphorIcons.sparkle(PhosphorIconsStyle.fill),
               size: 150,
-              color: colors.primary.withValues(alpha: .07),
+              color: AppPalette.of(context).foreground.withValues(alpha: .04),
             ),
           ),
           Padding(
@@ -1964,24 +1890,13 @@ class _RecapShelf extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: .1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        ready ? 'RECAP READY' : 'YOUR RECAPS',
-                        style: TextStyle(
-                          color: colors.primary,
-                          fontFamily: 'FigtreeSB',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: .9,
-                        ),
+                    Text(
+                      ready ? 'RECAP READY' : 'YOUR RECAPS',
+                      style: TextStyle(
+                        color: ready ? colors.primary : colors.onSurfaceVariant,
+                        fontFamily: 'FigtreeSB',
+                        fontSize: 11,
+                        letterSpacing: 1.4,
                       ),
                     ),
                     const Spacer(),
@@ -1989,7 +1904,7 @@ class _RecapShelf extends StatelessWidget {
                       ready
                           ? PhosphorIcons.confetti()
                           : PhosphorIcons.calendarDots(),
-                      color: colors.primary,
+                      color: colors.onSurfaceVariant,
                       size: 22,
                     ),
                   ],
@@ -2011,17 +1926,15 @@ class _RecapShelf extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: 16),
-                FilledButton.icon(
+                PillButton(
+                  primary: true,
                   onPressed: featuredInsights.isEmpty
                       ? null
                       : () => onSelected(featured),
-                  icon: Icon(
-                    ready
-                        ? PhosphorIcons.sparkle()
-                        : PhosphorIcons.arrowUpRight(),
-                    size: 18,
-                  ),
-                  label: Text(ready ? 'See my recap' : 'Preview recap'),
+                  icon: ready
+                      ? PhosphorIcons.sparkle()
+                      : PhosphorIcons.arrowUpRight(),
+                  label: ready ? 'See my recap' : 'Preview recap',
                 ),
                 if (quickPeriods.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -2078,7 +1991,7 @@ class _QuickRecapButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(PhosphorIcons.playCircle(), size: 17, color: colors.primary),
+              Icon(PhosphorIcons.playCircle(), size: 17, color: colors.onSurface),
               const SizedBox(width: 7),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2145,9 +2058,7 @@ class _StatGrid extends StatelessWidget {
                   constraints: const BoxConstraints(minHeight: 102),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: index == 0
-                        ? colors.primaryContainer.withValues(alpha: .55)
-                        : _insightSurface(context),
+                    color: _insightSurface(context),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -2156,13 +2067,13 @@ class _StatGrid extends StatelessWidget {
                         width: 38,
                         height: 38,
                         decoration: BoxDecoration(
-                          color: colors.primary.withValues(alpha: .1),
-                          borderRadius: BorderRadius.circular(8),
+                          color: AppPalette.of(context).idleFill,
+                          borderRadius: BorderRadius.circular(AppRadii.card),
                         ),
                         child: Icon(
                           stats[index].$1,
                           size: 20,
-                          color: colors.primary,
+                          color: colors.onSurface,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -2444,10 +2355,9 @@ class _RankedPanel extends StatelessWidget {
                     height: 25,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primaryContainer
-                          .withValues(alpha: index == 0 ? .9 : .45),
+                      color: index == 0
+                          ? AppPalette.of(context).idleFillStrong
+                          : AppPalette.of(context).idleFill,
                       shape: BoxShape.circle,
                     ),
                     child: Text(
@@ -2519,9 +2429,7 @@ class _HistoryPanel extends StatelessWidget {
         const SizedBox(height: 12),
         for (var index = 0; index < sessions.length; index++) ...[
           Material(
-            color: index == 0
-                ? colors.primaryContainer.withValues(alpha: .3)
-                : _insightSurface(context),
+            color: _insightSurface(context, raised: index == 0),
             borderRadius: BorderRadius.circular(10),
             clipBehavior: Clip.antiAlias,
             child: Padding(
@@ -2557,7 +2465,8 @@ class _HistoryRow extends StatelessWidget {
         .add(Duration(minutes: session.timezoneOffsetMinutes));
     final hasProgress =
         session.mediaType != WellnessMediaType.live && session.durationMs > 0;
-    final statusColor = session.completed ? colors.primary : colors.tertiary;
+    final statusColor =
+        session.completed ? colors.onSurface : colors.onSurfaceVariant;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2565,17 +2474,10 @@ class _HistoryRow extends StatelessWidget {
           width: 46,
           height: 58,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colors.primary.withValues(alpha: .16),
-                colors.tertiary.withValues(alpha: .1),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(9),
+            color: AppPalette.of(context).idleFill,
+            borderRadius: BorderRadius.circular(AppRadii.card),
           ),
-          child: Icon(icon, size: 21, color: colors.primary),
+          child: Icon(icon, size: 21, color: colors.onSurface),
         ),
         const SizedBox(width: 13),
         Expanded(
@@ -2798,7 +2700,7 @@ class _InsightStrip extends StatelessWidget {
                     child: Icon(
                       observation.$1,
                       size: 17,
-                      color: theme.colorScheme.primary,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -3739,15 +3641,8 @@ class _WellnessEmptyState extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.primaryContainer.withValues(alpha: .48),
-            _insightSurface(context),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(12),
+        color: _insightSurface(context),
+        borderRadius: BorderRadius.circular(AppRadii.hero),
       ),
       child: Column(
         children: [
@@ -3755,9 +3650,7 @@ class _WellnessEmptyState extends StatelessWidget {
             width: 82,
             height: 82,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [colors.primary, colors.tertiary],
-              ),
+              color: AppPalette.of(context).idleFill,
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -3765,7 +3658,7 @@ class _WellnessEmptyState extends StatelessWidget {
                   ? PhosphorIcons.calendarBlank()
                   : PhosphorIcons.chartDonut(),
               size: 38,
-              color: Colors.white,
+              color: colors.onSurface,
             ),
           ),
           const SizedBox(height: 20),
@@ -3853,10 +3746,10 @@ class _SectionHeader extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: colors.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
+            color: AppPalette.of(context).idleFill,
+            borderRadius: BorderRadius.circular(AppRadii.card),
           ),
-          child: Icon(icon, color: colors.onPrimaryContainer, size: 22),
+          child: Icon(icon, color: colors.onSurface, size: 22),
         ),
         const SizedBox(width: 13),
         Expanded(
@@ -3865,11 +3758,7 @@ class _SectionHeader extends StatelessWidget {
             children: [
               Text(
                 eyebrow,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: colors.primary,
-                      letterSpacing: 1.2,
-                      fontWeight: FontWeight.w800,
-                    ),
+                style: AppType.kicker.copyWith(color: colors.onSurfaceVariant),
               ),
               const SizedBox(height: 2),
               Text(title, style: Theme.of(context).textTheme.headlineSmall),
@@ -3908,22 +3797,8 @@ bool _isLightsOut(BuildContext context) =>
     Theme.of(context).scaffoldBackgroundColor.computeLuminance() < .003;
 
 Color _insightSurface(BuildContext context, {bool raised = false}) {
-  final theme = Theme.of(context);
-  if (_isLightsOut(context)) {
-    return Color.alphaBlend(
-      Colors.white.withValues(alpha: raised ? .13 : .08),
-      theme.scaffoldBackgroundColor,
-    );
-  }
-  if (theme.brightness == Brightness.light) {
-    return Color.alphaBlend(
-      theme.colorScheme.onSurface.withValues(alpha: raised ? .065 : .035),
-      theme.scaffoldBackgroundColor,
-    );
-  }
-  return raised
-      ? theme.colorScheme.surfaceContainerHighest
-      : theme.colorScheme.surfaceContainerLow;
+  final palette = AppPalette.of(context);
+  return raised ? palette.raisedSurface : palette.surface;
 }
 
 Color _bestGradientForeground(List<Color> colors) {
@@ -4027,3 +3902,44 @@ List<WellnessBarDatum> _recapBarData(
               fullLabel: bucket.fullLabel,
             ))
         .toList(growable: false);
+
+/// Viewing Insights' shape while the history loads: the sync bar, the
+/// story card and the grid of counts.
+class _InsightsSkeleton extends StatelessWidget {
+  const _InsightsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final gutter = AppUI.pagePadding(context);
+    return SkeletonPulse(
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(gutter, 12, gutter, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SkeletonBlock(height: 116),
+            const SizedBox(height: 18),
+            const SkeletonBlock(height: 300, radius: AppRadii.hero),
+            const SizedBox(height: 18),
+            const SkeletonBlock(height: 170),
+            const SizedBox(height: 18),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = (constraints.maxWidth - 10) / 2;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (var i = 0; i < 4; i++)
+                      SkeletonBlock(width: width, height: 102),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

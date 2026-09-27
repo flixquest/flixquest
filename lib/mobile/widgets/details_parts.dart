@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../constants/api_constants.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
 import '../../models/credits.dart';
 import '../../models/movie.dart';
 import '../../models/videos.dart';
@@ -14,35 +15,10 @@ import '../../models/watch_providers.dart';
 import '../../screens/person/cast_detail.dart';
 import 'media_art.dart';
 import 'pill_button.dart';
+import 'poster_card.dart';
 
 /// The parts a details page is built from, each quiet and in the palette's
 /// roles: ink for what can be pressed, the accent only on progress.
-
-/// A block standing in for content while it loads.
-class DetailsBlock extends StatelessWidget {
-  const DetailsBlock({
-    this.width = double.infinity,
-    required this.height,
-    this.radius = AppRadii.card,
-    super.key,
-  });
-
-  final double width;
-  final double height;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) => ExcludeSemantics(
-        child: Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            color: AppPalette.of(context).raisedSurface,
-            borderRadius: BorderRadius.circular(radius),
-          ),
-        ),
-      );
-}
 
 /// A part that didn't load, or has nothing: one muted line, and Retry when
 /// trying again could help.
@@ -193,7 +169,10 @@ class CastRow extends StatelessWidget {
                     style: AppType.metadata.copyWith(color: palette.foreground),
                   ),
                   Text(
-                    person.character ?? '',
+                    // A season's cast names its roles instead.
+                    person.character ??
+                        person.roles?.firstOrNull?.character ??
+                        '',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
@@ -203,6 +182,149 @@ class CastRow extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// A row of faces while the cast loads.
+class CastRowSkeleton extends StatelessWidget {
+  const CastRowSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final gutter = AppSpace.gutter(context);
+    return SkeletonPulse(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(gutter, AppSpace.xl, 0, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const SkeletonBlock.line(width: 80, height: 16),
+            const SizedBox(height: AppSpace.md),
+            SizedBox(
+              height: CastRow._face + 40,
+              child: OverflowBox(
+                alignment: AlignmentDirectional.topStart,
+                maxWidth: double.infinity,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    for (var i = 0; i < 6; i++)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          end: AppSpace.md + 12,
+                        ),
+                        child: Column(
+                          children: <Widget>[
+                            const SkeletonBlock(
+                              width: CastRow._face,
+                              height: CastRow._face,
+                              circle: true,
+                            ),
+                            const SizedBox(height: AppSpace.sm),
+                            const SkeletonBlock.line(width: 60, height: 10),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Videos side by side, each a thumbnail with its name under it.
+class VideoRow extends StatelessWidget {
+  const VideoRow({required this.videos, super.key});
+
+  final List<Results> videos;
+
+  @override
+  Widget build(BuildContext context) {
+    final gutter = AppSpace.gutter(context);
+    final width = (MediaQuery.sizeOf(context).width * .72).clamp(220.0, 320.0);
+    // The thumbnail, then two lines of title at the reader's text size.
+    final height = width * 9 / 16 +
+        AppSpace.sm +
+        MediaQuery.textScalerOf(context).scale(14) * 18 / 14 * 2 +
+        4;
+    return SizedBox(
+      height: height,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: gutter),
+        itemCount: videos.length,
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpace.md),
+        itemBuilder: (context, index) => SizedBox(
+          width: width,
+          child: VideoTile(video: videos[index]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Images side by side ([paths], all [aspectRatio]), each opening the
+/// full-screen viewer at itself.
+class ImageRow extends StatelessWidget {
+  const ImageRow({
+    required this.paths,
+    required this.aspectRatio,
+    required this.onOpen,
+    super.key,
+  });
+
+  final List<String> paths;
+  final double aspectRatio;
+  final ValueChanged<int> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final gutter = AppSpace.gutter(context);
+    final height = aspectRatio < 1 ? 170.0 : 124.0;
+    final width = height * aspectRatio;
+    return SizedBox(
+      height: height,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: gutter),
+        itemCount: paths.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final url = tmdbImageUrl(
+            context,
+            paths[index],
+            size: aspectRatio < 1 ? 'w342/' : 'w500/',
+          );
+          return Pressable(
+            onTap: () => onOpen(index),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              child: SizedBox(
+                width: width,
+                height: height,
+                child: url == null
+                    ? const ArtPlaceholder()
+                    : CachedNetworkImage(
+                        imageUrl: url,
+                        fit: BoxFit.cover,
+                        memCacheWidth:
+                            (width * MediaQuery.devicePixelRatioOf(context))
+                                .round(),
+                        placeholder: (_, __) => ColoredBox(
+                          color: AppPalette.of(context).raisedSurface,
+                        ),
+                        errorWidget: (_, __, ___) => const ArtPlaceholder(),
+                      ),
               ),
             ),
           );
@@ -520,7 +642,7 @@ class _WatchProviders extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpace.lg),
                 if (snapshot.connectionState != ConnectionState.done)
-                  const DetailsBlock(height: 120)
+                  const SkeletonBlock(height: 120)
                 else if (data == null)
                   DetailsMessage(message: tr('check_connection'))
                 else ...<Widget>[

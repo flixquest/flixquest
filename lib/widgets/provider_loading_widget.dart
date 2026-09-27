@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../models/provider_load_state.dart';
 import 'app_logo.dart';
+import '../design/app_palette.dart';
+import '../design/app_tokens.dart';
+import '../design/skeleton.dart';
 
 class ProviderLoadingWidget extends StatefulWidget {
   final List<ProviderLoadState> providers;
@@ -76,30 +79,8 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
         minHeight: useSplitLayout ? 0 : 340,
       ),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.primaryContainer.withValues(alpha: .22),
-            colors.surfaceContainerHigh.withValues(alpha: .88),
-            colors.surface.withValues(alpha: .94),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(useSplitLayout ? 10 : 12),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: .46),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colors.shadow.withValues(alpha: .18),
-            blurRadius: 36,
-            offset: const Offset(0, 18),
-          ),
-          BoxShadow(
-            color: colors.primary.withValues(alpha: .07),
-            blurRadius: 48,
-          ),
-        ],
+        color: AppPalette.of(context).surface,
+        borderRadius: BorderRadius.circular(AppRadii.hero),
       ),
       child: useSplitLayout
           ? Row(
@@ -142,16 +123,7 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
           padding: EdgeInsets.all(compact ? 12 : 18),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [
-                colors.primary.withValues(alpha: .22),
-                colors.primary.withValues(alpha: .08),
-                Colors.transparent,
-              ],
-            ),
-            border: Border.all(
-              color: colors.primary.withValues(alpha: .12),
-            ),
+            color: AppPalette.of(context).idleFill,
           ),
           child: AppLogo(height: logoSize, width: logoSize),
         ),
@@ -236,8 +208,8 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
-              color: colors.primaryContainer.withValues(alpha: .3),
-              borderRadius: BorderRadius.circular(8),
+              color: AppPalette.of(context).idleFill,
+              borderRadius: BorderRadius.circular(AppRadii.card),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -247,7 +219,7 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
+                    color: AppPalette.of(context).mutedText,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -307,37 +279,20 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
   }
 
   Widget _buildEmptyProviderItem({required bool compact}) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: compact ? 12 : 15,
-      ),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest.withValues(alpha: .4),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          SizedBox.square(
-            dimension: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.2,
-              color: colors.primary,
-            ),
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Container(
-              height: 10,
-              decoration: BoxDecoration(
-                color: colors.onSurface.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-        ],
+    // The list of sources is still coming: its first row, pulsing.
+    return SkeletonPulse(
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: compact ? 12 : 15,
+        ),
+        child: const Row(
+          children: [
+            SkeletonBlock(width: 20, height: 20, circle: true),
+            SizedBox(width: 13),
+            Expanded(child: SkeletonBlock.line(height: 10)),
+          ],
+        ),
       ),
     );
   }
@@ -366,18 +321,9 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
           ),
           decoration: BoxDecoration(
             color: isHighlighted
-                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                ? AppPalette.of(context).idleFill
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: isHighlighted
-                ? Border.all(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.25),
-                    width: 1.2,
-                  )
-                : null,
+            borderRadius: BorderRadius.circular(AppRadii.card),
           ),
           child: Row(
             children: [
@@ -446,22 +392,20 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
           height: iconSize,
           child: CircularProgressIndicator(
             strokeWidth: 2.2,
-            valueColor: AlwaysStoppedAnimation<Color>(
-              Theme.of(context).colorScheme.primary,
-            ),
+            color: AppPalette.of(context).foreground,
           ),
         );
       case ProviderStatus.success:
         return Icon(
-          PhosphorIcons.checkCircle(),
+          PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
           size: iconSize,
-          color: const Color(0xFF4CAF50),
+          color: AppPalette.of(context).foreground,
         );
       case ProviderStatus.failed:
         return Icon(
           PhosphorIcons.warningCircle(),
           size: iconSize,
-          color: const Color(0xFFEF5350),
+          color: Theme.of(context).colorScheme.error,
         );
     }
   }

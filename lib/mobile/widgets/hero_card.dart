@@ -251,7 +251,7 @@ class _HeroKicker extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         SvgPicture.asset(
-          'assets/images/fq_svg.svg',
+          'assets/images/fq_mark.svg',
           height: 18,
           colorFilter: ColorFilter.mode(accent, BlendMode.srcIn),
         ),

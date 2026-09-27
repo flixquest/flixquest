@@ -141,7 +141,7 @@ class TvNavigationRailState extends State<TvNavigationRail> {
                     width: metrics.railWidth,
                     child: Center(
                       child: AppLogo(
-                        fallbackAsset: 'assets/images/fq_svg.svg',
+                        fallbackAsset: 'assets/images/fq_mark.svg',
                         height: 24,
                         fallbackColor: colors.primary,
                       ),

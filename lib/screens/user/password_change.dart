@@ -6,7 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '/provider/settings_provider.dart';
-import '../../ui_components/app_ui_components.dart';
+import '../../mobile/widgets/account_form.dart';
 
 class PasswordChangeScreen extends StatefulWidget {
   const PasswordChangeScreen({super.key});
@@ -102,180 +102,87 @@ class PasswordChangeScreenState extends State<PasswordChangeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(tr('change_password'))),
-      body: _emailAddress == null
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
-          : AppResponsiveContent(
-              maxWidth: 560,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 68,
-                      height: 68,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: .12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(PhosphorIcons.lockKey(),
-                          size: 32,
-                          color: Theme.of(context).colorScheme.primary),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        tr('change_password'),
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        tr('process_stuck'),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(12.0),
-                              child: TextFormField(
-                                key: const ValueKey('newPassword'),
-                                validator: (value) {
-                                  if (value!.isEmpty || value.length < 7) {
-                                    return tr('weak_password');
-                                  }
-                                  if (value == '123456' ||
-                                      value == '12345678' ||
-                                      value == 'password') {
-                                    return tr('lame_password');
-                                  }
-                                  return null;
-                                },
-                                textInputAction: TextInputAction.next,
-                                focusNode: _newPasswordFocusNode,
-                                keyboardType: TextInputType.visiblePassword,
-                                obscureText: _obscureText,
-                                onEditingComplete: () => FocusScope.of(context)
-                                    .requestFocus(_passwordVerifyFocusNode),
-                                decoration: InputDecoration(
-                                  errorMaxLines: 3,
-                                  filled: true,
-                                  prefixIcon: Icon(PhosphorIcons.lock()),
-                                  suffixIcon: GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _obscureText = !_obscureText;
-                                      });
-                                    },
-                                    child: Icon(_obscureText
-                                        ? PhosphorIcons.eye()
-                                        : PhosphorIcons.eyeSlash()),
-                                  ),
-                                  labelText: tr('enter_new_pass'),
-                                ),
-                                onChanged: (value) {
-                                  setState(() {
-                                    newPassword = value;
-                                  });
-                                },
-                                onSaved: (value) {
-                                  newPassword = value!;
-                                },
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(12.0),
-                              child: TextFormField(
-                                key: const ValueKey('verifyPassword'),
-                                validator: (value) {
-                                  if (value != newPassword) {
-                                    return tr('password_mismatch');
-                                  }
-                                  return null;
-                                },
-                                textInputAction: TextInputAction.next,
-                                focusNode: _passwordVerifyFocusNode,
-                                keyboardType: TextInputType.visiblePassword,
-                                obscureText: _obscureText,
-                                decoration: InputDecoration(
-                                  errorMaxLines: 3,
-                                  filled: true,
-                                  prefixIcon: Icon(PhosphorIcons.lock()),
-                                  suffixIcon: GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _obscureText = !_obscureText;
-                                      });
-                                    },
-                                    child: Icon(_obscureText
-                                        ? PhosphorIcons.eye()
-                                        : PhosphorIcons.eyeSlash()),
-                                  ),
-                                  labelText: tr('repeat_new_password'),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(
-                      height: 20,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25),
-                      child: _isLoading
-                          ? const CircularProgressIndicator()
-                          : ElevatedButton(
-                              style: ButtonStyle(
-                                  minimumSize: const WidgetStatePropertyAll(
-                                      Size(200, 50)),
-                                  shape: WidgetStateProperty.all(
-                                    RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10.0),
-                                    ),
-                                  )),
-                              onPressed: () {
-                                _submitForm();
-                              },
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    tr('change_password'),
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: 17),
-                                  ),
-                                  const SizedBox(
-                                    width: 5,
-                                  ),
-                                  Icon(
-                                    PhosphorIcons.arrowsClockwise(),
-                                    size: 18,
-                                  )
-                                ],
-                              )),
-                    ),
-                  ],
+    Widget obscureToggle() => IconButton(
+          onPressed: () => setState(() => _obscureText = !_obscureText),
+          icon: Icon(
+            _obscureText ? PhosphorIcons.eye() : PhosphorIcons.eyeSlash(),
+          ),
+        );
+    return AccountFormPage(
+      title: tr('change_password'),
+      icon: PhosphorIcons.lockKey(),
+      heading: tr('change_password'),
+      message: tr('process_stuck'),
+      children: [
+        Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                key: const ValueKey('newPassword'),
+                validator: (value) {
+                  if (value!.isEmpty || value.length < 7) {
+                    return tr('weak_password');
+                  }
+                  if (value == '123456' ||
+                      value == '12345678' ||
+                      value == 'password') {
+                    return tr('lame_password');
+                  }
+                  return null;
+                },
+                textInputAction: TextInputAction.next,
+                focusNode: _newPasswordFocusNode,
+                keyboardType: TextInputType.visiblePassword,
+                autofillHints: const [AutofillHints.newPassword],
+                obscureText: _obscureText,
+                onEditingComplete: () => FocusScope.of(context)
+                    .requestFocus(_passwordVerifyFocusNode),
+                decoration: InputDecoration(
+                  errorMaxLines: 3,
+                  prefixIcon: Icon(PhosphorIcons.lock()),
+                  suffixIcon: obscureToggle(),
+                  labelText: tr('enter_new_pass'),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    newPassword = value;
+                  });
+                },
+                onSaved: (value) {
+                  newPassword = value!;
+                },
+              ),
+              const AccountFieldGap(),
+              TextFormField(
+                key: const ValueKey('verifyPassword'),
+                validator: (value) {
+                  if (value != newPassword) {
+                    return tr('password_mismatch');
+                  }
+                  return null;
+                },
+                textInputAction: TextInputAction.done,
+                focusNode: _passwordVerifyFocusNode,
+                keyboardType: TextInputType.visiblePassword,
+                obscureText: _obscureText,
+                decoration: InputDecoration(
+                  errorMaxLines: 3,
+                  prefixIcon: Icon(PhosphorIcons.lock()),
+                  suffixIcon: obscureToggle(),
+                  labelText: tr('repeat_new_password'),
                 ),
               ),
-            ),
+            ],
+          ),
+        ),
+        AccountSubmitButton(
+          label: tr('change_password'),
+          // Working until the account is known, then while it saves.
+          busy: _isLoading || _emailAddress == null,
+          onPressed: _submitForm,
+        ),
+      ],
     );
   }
 }

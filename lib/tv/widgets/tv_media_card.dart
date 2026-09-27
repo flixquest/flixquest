@@ -2,7 +2,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../constants/loading_colors.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../constants/api_constants.dart';
@@ -13,6 +12,7 @@ import '../../provider/settings_provider.dart';
 import '../app/tv_design.dart';
 import '../models/tv_media_item.dart';
 import '../../design/media_badge.dart';
+import '../../design/outline_mark.dart';
 
 export '../../design/media_badge.dart';
 
@@ -183,13 +183,7 @@ class _ImageFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = TvPalette.of(context);
-    final icon = Icon(
-      item.kind == TvMediaKind.movie
-          ? PhosphorIcons.filmSlate()
-          : PhosphorIcons.television(),
-      color: palette.mutedText,
-      size: 42,
-    );
+    final icon = OutlineMark(height: 48, color: palette.mutedText);
     return ColoredBox(
       color: palette.raisedSurface,
       child: Center(

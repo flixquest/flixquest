@@ -1,7 +1,7 @@
 import '../models/credits.dart';
 import '../models/movie.dart' show MovieDetails;
 import '../models/recently_watched.dart';
-import '../models/tv.dart' show CreatedBy, TVDetails;
+import '../models/tv.dart' show CreatedBy, EpisodeList, TVDetails;
 import '../models/videos.dart';
 import 'details_controller.dart';
 import 'episode_choice.dart';
@@ -195,8 +195,15 @@ List<MediaItem> moreLikeThis(
 
 /// Genres, languages and countries for Viewing Insights, as the player
 /// records them with each watch.
-({List<String> genres, List<String> languages, List<String> countries})
-    insightsMetadata({
+typedef InsightsMetadata = ({
+  List<String> genres,
+  List<String> languages,
+  List<String> countries,
+});
+
+/// [InsightsMetadata] from what the details say, else the original
+/// language.
+InsightsMetadata insightsMetadata({
   required List<String> genres,
   MovieDetails? movie,
   TVDetails? series,
@@ -221,4 +228,105 @@ List<MediaItem> moreLikeThis(
           ],
     countries: _names(countries ?? const <String?>[]).toList(),
   );
+}
+
+/// What a season's page offers to play, and how far into it the viewer is.
+class EpisodePlay {
+  const EpisodePlay(this.episode, {this.resume});
+
+  final EpisodeList episode;
+
+  /// Set when the episode is part way through.
+  final ResumePoint? resume;
+
+  bool get resuming => resume != null;
+
+  /// "S2:E4".
+  String get label => 'S${episode.seasonNumber}:E${episode.episodeNumber}';
+}
+
+/// The episode a season's page offers: the one of [episodes] (a season, in
+/// order) the viewer is part way through, else the one after the last they
+/// finished, else the first. Only episodes that have aired count; null when
+/// none has.
+EpisodePlay? seasonPlayFor(
+  List<EpisodeList> episodes,
+  WatchHistory history, {
+  required int seriesId,
+  DateTime? now,
+}) {
+  final aired = episodes
+      .where((episode) => episode.episodeNumber != null)
+      .where((episode) => hasAired(episode, now: now))
+      .toList(growable: false);
+  if (aired.isEmpty) return null;
+  final season = aired.first.seasonNumber;
+  // Newest first: the latest episode of this season the viewer touched.
+  for (final entry in history.episodes) {
+    if (entry.seriesId != seriesId || entry.seasonNum != season) continue;
+    final index = aired.indexWhere(
+      (episode) => episode.episodeNumber == entry.episodeNum,
+    );
+    if (index < 0) continue;
+    final point = ResumePoint(
+      elapsed: entry.elapsed ?? 0,
+      remaining: entry.remaining ?? 0,
+      episode: entry,
+    );
+    if (point.elapsed > 0 && !point.finished) {
+      return EpisodePlay(aired[index], resume: point);
+    }
+    return index + 1 < aired.length
+        ? EpisodePlay(aired[index + 1])
+        : EpisodePlay(aired.first);
+  }
+  return EpisodePlay(aired.first);
+}
+
+/// Where [episode] of [seriesId] picks up, or null when it isn't started or
+/// is finished.
+ResumePoint? episodeResume(
+  List<RecentEpisode> episodes, {
+  required int seriesId,
+  required EpisodeList episode,
+}) {
+  for (final entry in episodes) {
+    if (entry.seriesId != seriesId ||
+        entry.seasonNum != episode.seasonNumber ||
+        entry.episodeNum != episode.episodeNumber) {
+      continue;
+    }
+    final point = ResumePoint(
+      elapsed: entry.elapsed ?? 0,
+      remaining: entry.remaining ?? 0,
+      episode: entry,
+    );
+    return point.elapsed > 0 && !point.finished ? point : null;
+  }
+  return null;
+}
+
+/// The people in [credits] who did [jobs], each once.
+List<String> crewWith(Credits? credits, Set<String> jobs) => _names(
+      (credits?.crew ?? const <Crew>[])
+          .where((person) => jobs.contains(person.job))
+          .map((person) => person.name),
+    ).toList();
+
+/// An episode's guest stars, then the series' regulars, as one cast.
+List<Cast> episodeCast(Credits? credits) {
+  final seen = <int>{};
+  return <Cast>[
+    for (final guest in credits?.episodeGuestStars ?? const [])
+      if (guest.id == null || seen.add(guest.id!))
+        Cast(
+          id: guest.id,
+          name: guest.name,
+          character: guest.character,
+          profilePath: guest.profilePath,
+          order: guest.order,
+        ),
+    for (final regular in credits?.cast ?? const <Cast>[])
+      if (regular.id == null || seen.add(regular.id!)) regular,
+  ];
 }

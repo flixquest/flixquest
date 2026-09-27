@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 import '../models/banner_ad.dart';
 import '../provider/app_dependency_provider.dart';
 import 'unity_banner_widget.dart';
+import '../design/skeleton.dart';
 
 final CacheManager _adImageCache = CacheManager(
   Config(
@@ -122,10 +123,7 @@ Future<void> showHostedInterstitialAd(
                   imageUrl: ad.imageUrl,
                   cacheManager: _adImageCache,
                   fit: BoxFit.contain,
-                  placeholder: (_, __) => const SizedBox(
-                    height: 240,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
+                  placeholder: (_, __) => const SkeletonBlock(height: 240),
                   errorWidget: (_, __, ___) => const SizedBox.shrink(),
                 ),
               ),

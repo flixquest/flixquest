@@ -14,6 +14,9 @@ import '../../../api/endpoints.dart';
 import '../../../functions/network.dart';
 import '../../tv/tv_video_loader.dart';
 import 'player_sheet_ui.dart';
+import '../../../design/app_palette.dart';
+import '../../../design/app_tokens.dart';
+import '../../../mobile/widgets/episode_row.dart';
 
 class PlayerEpisodeSelection {
   int? _browsedSeasonNumber;
@@ -260,17 +263,30 @@ class PlayerEpisodeSelection {
                     DialogRoute<void>(
                       context: playerContext,
                       barrierDismissible: false,
-                      builder: (context) => const PopScope(
+                      // The season's episodes, pulsing, until they come.
+                      builder: (context) => PopScope(
                         canPop: false,
                         child: Dialog(
+                          backgroundColor: AppPalette.of(context).surface,
                           child: Padding(
-                            padding: EdgeInsets.all(28),
-                            child: Row(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Column(
                               mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                CircularProgressIndicator(),
-                                SizedBox(width: 18),
-                                Text('Loading episodes…'),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  child: Text(
+                                    tr('loading_episodes'),
+                                    style: AppType.cardTitle.copyWith(
+                                      fontSize: 16,
+                                      color: AppPalette.of(context).foreground,
+                                    ),
+                                  ),
+                                ),
+                                const EpisodeListSkeleton(count: 2),
                               ],
                             ),
                           ),

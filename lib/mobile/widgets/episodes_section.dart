@@ -1,6 +1,5 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../catalog/details_controller.dart';
 import '../../catalog/details_play.dart';
@@ -10,9 +9,8 @@ import '../../design/app_tokens.dart';
 import '../../models/recently_watched.dart';
 import '../../models/tv.dart';
 import 'details_parts.dart';
+import 'episode_row.dart';
 import 'filter_chips.dart';
-import 'media_art.dart';
-import 'pill_button.dart';
 
 typedef EpisodeAction = void Function(
   EpisodeList episode,
@@ -79,25 +77,11 @@ class _EpisodesSectionState extends State<EpisodesSection> {
     return _episodes.putIfAbsent(season, () => widget.loadSeason(season));
   }
 
-  String _seasonName(Seasons season) {
-    final name = season.name?.trim() ?? '';
-    return name.isNotEmpty
-        ? name
-        : tr('season_number', namedArgs: <String, String>{
-            'number': '${season.seasonNumber}',
-          });
-  }
-
   Future<void> _pickSeason() async {
-    final picked = await showModalBottomSheet<int>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => _SeasonSheet(
-        seasons: widget.seasons,
-        current: _season,
-        nameOf: _seasonName,
-      ),
+    final picked = await showSeasonSheet(
+      context,
+      seasons: widget.seasons,
+      current: _season,
     );
     if (picked != null && mounted) setState(() => _season = picked);
   }
@@ -129,7 +113,7 @@ class _EpisodesSectionState extends State<EpisodesSection> {
                     alignment: AlignmentDirectional.centerStart,
                     child: ChoicePill(
                       spec: FilterChipSpec(
-                        label: _seasonName(current),
+                        label: seasonDisplayName(current),
                         dropdown: widget.seasons.length > 1,
                         onTap: widget.seasons.length > 1 ? _pickSeason : () {},
                       ),
@@ -157,16 +141,7 @@ class _EpisodesSectionState extends State<EpisodesSection> {
           future: _load(season),
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return Padding(
-                padding: EdgeInsets.symmetric(horizontal: gutter),
-                child: const Column(
-                  children: <Widget>[
-                    _EpisodeSkeleton(),
-                    _EpisodeSkeleton(),
-                    _EpisodeSkeleton(),
-                  ],
-                ),
-              );
+              return const EpisodeListSkeleton();
             }
             if (snapshot.hasError) {
               return Padding(
@@ -188,7 +163,7 @@ class _EpisodesSectionState extends State<EpisodesSection> {
             return Column(
               children: <Widget>[
                 for (final episode in episodes)
-                  _EpisodeRow(
+                  EpisodeRow(
                     series: widget.series,
                     episode: episode,
                     aired: hasAired(episode, now: now),
@@ -211,274 +186,4 @@ class _EpisodesSectionState extends State<EpisodesSection> {
       ],
     );
   }
-}
-
-class _SeasonSheet extends StatelessWidget {
-  const _SeasonSheet({
-    required this.seasons,
-    required this.current,
-    required this.nameOf,
-  });
-
-  final List<Seasons> seasons;
-  final int? current;
-  final String Function(Seasons season) nameOf;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * .7,
-      ),
-      child: SafeArea(
-        top: false,
-        child: ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.only(bottom: AppSpace.lg),
-          children: <Widget>[
-            for (final season in seasons)
-              ListTile(
-                selected: season.seasonNumber == current,
-                onTap: () => Navigator.of(context).pop(season.seasonNumber),
-                title: Text(
-                  nameOf(season),
-                  style: AppType.cardTitle.copyWith(
-                    color: palette.foreground,
-                    fontSize: 16,
-                  ),
-                ),
-                subtitle: season.episodeCount == null
-                    ? null
-                    : Text(
-                        tr('episodes_count', namedArgs: <String, String>{
-                          'count': '${season.episodeCount}',
-                        }),
-                        style:
-                            AppType.metadata.copyWith(color: palette.mutedText),
-                      ),
-                trailing: season.seasonNumber == current
-                    ? Icon(PhosphorIcons.check(), color: palette.foreground)
-                    : null,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EpisodeRow extends StatelessWidget {
-  const _EpisodeRow({
-    required this.series,
-    required this.episode,
-    required this.aired,
-    required this.progress,
-    required this.canPlay,
-    required this.canDownload,
-    required this.onPlay,
-    required this.onDownload,
-    required this.onOpen,
-  });
-
-  final MediaItem series;
-  final EpisodeList episode;
-  final bool aired;
-  final double? progress;
-  final bool canPlay;
-  final bool canDownload;
-  final VoidCallback onPlay;
-  final VoidCallback onDownload;
-  final VoidCallback onOpen;
-
-  static const _stillWidth = 132.0;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final gutter = AppSpace.gutter(context);
-    final locale = Localizations.localeOf(context).toString();
-    final airDate = DateTime.tryParse(episode.airDate ?? '');
-    final runtime = episode.runtime;
-    final playable = aired && canPlay;
-    final number = episode.episodeNumber;
-    final title = episode.name?.trim() ?? '';
-    final facts = aired
-        ? <String>[
-            if (runtime != null && runtime > 0)
-              formatRuntime(Duration(minutes: runtime)),
-            if (airDate != null) DateFormat.yMMMd(locale).format(airDate),
-          ].join(' · ')
-        : airDate == null
-            ? tr('coming_soon')
-            : tr('coming_date', namedArgs: <String, String>{
-                'date': DateFormat.MMMd(locale).format(airDate),
-              });
-    final progress = this.progress;
-    final row = InkWell(
-      onTap: playable ? onPlay : onOpen,
-      onLongPress: onOpen,
-      child: Padding(
-        padding: EdgeInsetsDirectional.fromSTEB(
-          gutter,
-          AppSpace.md,
-          canDownload && aired ? gutter - AppSpace.sm : gutter,
-          AppSpace.md,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.card),
-                  child: SizedBox(
-                    width: _stillWidth,
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: <Widget>[
-                          MediaArt(
-                            item: series,
-                            path: episode.stillPath ?? series.backdropPath,
-                            width: _stillWidth,
-                            size: 'w300/',
-                            placeholder: MediaArt.darkPlaceholder,
-                          ),
-                          if (playable)
-                            Center(
-                              child: Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: const Color(0x73000000),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: const Color(0xD9FFFFFF),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: PlaybackIcon(
-                                  PhosphorIcons.play(PhosphorIconsStyle.fill),
-                                  size: 16,
-                                  color: const Color(0xFFFFFFFF),
-                                ),
-                              ),
-                            ),
-                          if (progress != null)
-                            PositionedDirectional(
-                              start: 0,
-                              end: 0,
-                              bottom: 0,
-                              child: _Progress(value: progress),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSpace.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        number == null || title.isEmpty
-                            ? (title.isEmpty ? '$number' : title)
-                            : '$number. $title',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppType.cardTitle
-                            .copyWith(color: palette.foreground),
-                      ),
-                      if (facts.isNotEmpty) ...<Widget>[
-                        const SizedBox(height: AppSpace.xs),
-                        Text(
-                          facts,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppType.metadata
-                              .copyWith(color: palette.mutedText),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (canDownload && aired)
-                  IconButton(
-                    tooltip: tr('download_episode'),
-                    color: palette.foreground,
-                    onPressed: onDownload,
-                    icon: Icon(PhosphorIcons.downloadSimple(), size: 22),
-                  ),
-              ],
-            ),
-            if ((episode.overview ?? '').trim().isNotEmpty) ...<Widget>[
-              const SizedBox(height: AppSpace.sm),
-              Text(
-                episode.overview!.trim(),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: AppType.body.copyWith(color: palette.secondaryText),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-    return Semantics(
-      label: number == null ? title : '$number. $title',
-      // Not out yet: shown, but quieter.
-      child: aired ? row : Opacity(opacity: .5, child: row),
-    );
-  }
-}
-
-/// Progress through an episode, along the bottom of its still.
-class _Progress extends StatelessWidget {
-  const _Progress({required this.value});
-
-  final double value;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-        height: 3,
-        child: Stack(
-          fit: StackFit.expand,
-          children: <Widget>[
-            const ColoredBox(color: Color(0x3DFFFFFF)),
-            FractionallySizedBox(
-              alignment: AlignmentDirectional.centerStart,
-              widthFactor: value.clamp(0.0, 1.0),
-              child: ColoredBox(color: Theme.of(context).colorScheme.primary),
-            ),
-          ],
-        ),
-      );
-}
-
-class _EpisodeSkeleton extends StatelessWidget {
-  const _EpisodeSkeleton();
-
-  @override
-  Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.symmetric(vertical: AppSpace.md),
-        child: Row(
-          children: <Widget>[
-            DetailsBlock(width: _EpisodeRow._stillWidth, height: 74),
-            SizedBox(width: AppSpace.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  DetailsBlock(width: 150, height: 16),
-                  SizedBox(height: AppSpace.sm),
-                  DetailsBlock(width: 90, height: 12),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
 }

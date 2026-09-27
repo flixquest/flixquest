@@ -18,6 +18,7 @@ import '../../functions/function.dart';
 import '../../models/images.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
+import '../../design/outline_mark.dart';
 import '../../ui_components/app_ui_components.dart';
 
 class HeroPhotoView extends StatefulWidget {
@@ -27,6 +28,7 @@ class HeroPhotoView extends StatefulWidget {
       this.stills,
       this.posters,
       this.backdrops,
+      this.initialIndex = 0,
       super.key});
   final List<Backdrops>? backdrops;
   final List<Posters>? posters;
@@ -34,12 +36,17 @@ class HeroPhotoView extends StatefulWidget {
   final String? name;
   final String imageType;
 
+  /// The image shown first.
+  final int initialIndex;
+
   @override
   State<HeroPhotoView> createState() => _HeroPhotoViewState();
 }
 
 class _HeroPhotoViewState extends State<HeroPhotoView> {
-  int currentIndex = 0;
+  late int currentIndex = widget.initialIndex;
+  late final PageController _pages =
+      PageController(initialPage: widget.initialIndex);
 
   void onPageChanged(int index) {
     setState(() {
@@ -139,6 +146,7 @@ class _HeroPhotoViewState extends State<HeroPhotoView> {
   void dispose() {
     IsolateNameServer.removePortNameMapping('downloader_send_port');
     _port.close();
+    _pages.dispose();
     super.dispose();
   }
 
@@ -184,6 +192,7 @@ class _HeroPhotoViewState extends State<HeroPhotoView> {
         color: Colors.black,
         child: Stack(alignment: Alignment.bottomCenter, children: [
           PhotoViewGallery.builder(
+            pageController: _pages,
             allowImplicitScrolling: true,
             gaplessPlayback: true,
             wantKeepAlive: true,
@@ -202,16 +211,9 @@ class _HeroPhotoViewState extends State<HeroPhotoView> {
             },
             itemCount: _itemCount,
             onPageChanged: onPageChanged,
-            loadingBuilder: (context, event) => Center(
-              child: SizedBox(
-                width: 50.0,
-                height: 50.0,
-                child: CircularProgressIndicator(
-                  value: event == null
-                      ? 0
-                      : event.cumulativeBytesLoaded / event.expectedTotalBytes!,
-                ),
-              ),
+            // The mark, quietly, until the image arrives.
+            loadingBuilder: (context, event) => const Center(
+              child: OutlineMark(height: 48, color: Color(0x3DFFFFFF)),
             ),
           ),
           Container(

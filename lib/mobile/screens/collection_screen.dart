@@ -6,6 +6,7 @@ import '../../catalog/catalog_controller.dart';
 import '../../catalog/media_item.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../video_providers/scraper_api.dart';
 import '../../widgets/hosted_ads_banner.dart';
@@ -171,6 +172,12 @@ class _CollectionGridState extends State<_CollectionGrid> {
     }
   }
 
+  /// Places for the page on its way: the first four rows of an empty grid,
+  /// else the rest of the last row and one more.
+  int _placeholders(int columns) => _items.isEmpty
+      ? columns * 4
+      : (columns - _items.length % columns) % columns + columns;
+
   bool _onScroll(ScrollNotification notification) {
     if (notification.metrics.extentAfter < 800) _loadMore();
     return false;
@@ -208,14 +215,18 @@ class _CollectionGridState extends State<_CollectionGrid> {
                 crossAxisSpacing: 10,
                 childAspectRatio: PosterCard.aspectRatio,
               ),
-              itemCount: _items.length,
-              itemBuilder: (context, index) => LayoutBuilder(
-                builder: (context, constraints) => PosterCard(
-                  item: _items[index],
-                  width: constraints.maxWidth,
-                  badge: recencyBadge(_items[index]),
-                ),
-              ),
+              // While a page comes, posters' places pulse where it'll go:
+              // the rest of the last row and the one after.
+              itemCount: _items.length + (_loading ? _placeholders(columns) : 0),
+              itemBuilder: (context, index) => index >= _items.length
+                  ? const SkeletonBlock()
+                  : LayoutBuilder(
+                      builder: (context, constraints) => PosterCard(
+                        item: _items[index],
+                        width: constraints.maxWidth,
+                        badge: recencyBadge(_items[index]),
+                      ),
+                    ),
             ),
           ),
           SliverToBoxAdapter(
@@ -230,13 +241,7 @@ class _CollectionGridState extends State<_CollectionGrid> {
                 child: _failed
                     ? PillButton(label: tr('retry'), onPressed: _loadMore)
                     : _loading
-                        ? SizedBox.square(
-                            dimension: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: palette.mutedText,
-                            ),
-                          )
+                        ? const SizedBox.shrink()
                         : _items.isEmpty
                             ? Text(
                                 tr('nothing_here_yet'),

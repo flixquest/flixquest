@@ -13,6 +13,8 @@ import 'package:provider/provider.dart';
 import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
+import '../../mobile/widgets/page_kit.dart';
 import '../../mobile/widgets/pill_button.dart';
 import '../../tv/focus/tv_keymap.dart';
 import '../../tv/widgets/tv_dialog.dart';
@@ -21,7 +23,6 @@ import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/globle_method.dart';
 import '../../services/app_update_service.dart';
-import '../../ui_components/app_ui_components.dart';
 
 class UpdateScreen extends StatefulWidget {
   const UpdateScreen(
@@ -143,9 +144,12 @@ class _UpdateScreenState extends State<UpdateScreen> {
               },
               child: _buildTvBody())
           : Scaffold(
-              appBar: AppBar(title: Text(tr('check_for_update'))),
-              body: AppResponsiveContent(
-                maxWidth: 680,
+              backgroundColor: AppPalette.of(context).page,
+              appBar: PageAppBar(title: tr('check_for_update')),
+              body: SkeletonSwitcher(
+                loading: _error == null && _packageInfo == null,
+                alignment: Alignment.center,
+                skeleton: const _UpdateSkeleton(),
                 child: _buildBody(),
               ),
             ),
@@ -226,25 +230,16 @@ class _UpdateScreenState extends State<UpdateScreen> {
 
   Widget _buildBody() {
     if (_error != null) {
-      return AppEmptyState(
+      return EmptyState(
         icon: PhosphorIcons.wifiSlash(),
         title: tr('internet_problem'),
         message: tr('check_connection'),
-        action: FilledButton.icon(
-          onPressed: _prepare,
-          icon: Icon(PhosphorIcons.arrowsClockwise()),
-          label: Text(tr('retry')),
-        ),
+        actionLabel: tr('retry'),
+        actionIcon: PhosphorIcons.arrowsClockwise(),
+        onAction: _prepare,
       );
     }
-    if (_packageInfo == null) {
-      return AppEmptyState(
-        icon: PhosphorIcons.downloadSimple(),
-        title: tr('check_for_update'),
-        message: tr('loading_video_sources'),
-        action: const CircularProgressIndicator(),
-      );
-    }
+    if (_packageInfo == null) return const SizedBox.shrink();
     final config = context.watch<AppDependencyProvider>();
     if (!AppUpdateService.isAvailable(
       packageInfo: _packageInfo!,
@@ -252,7 +247,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
       latestBuildNumber: config.latestBuildNumber,
       minimumBuildNumber: config.minimumBuildNumber,
     )) {
-      return AppEmptyState(
+      return EmptyState(
         icon: PhosphorIcons.checkCircle(),
         title: tr('no_update'),
         message: 'FlixQuest v${_packageInfo!.version}',
@@ -269,34 +264,42 @@ class _UpdateScreenState extends State<UpdateScreen> {
     final downloadUrl = config.appDownloadUrl;
     final changeLog = config.changeLog;
 
+    final palette = AppPalette.of(context);
     return Center(
       child: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(horizontal: AppSpace.gutter(context)),
         child: Column(
           children: [
-            Icon(
-              PhosphorIcons.rocketLaunch(PhosphorIconsStyle.fill),
-              size: 56,
-              color: Theme.of(context).colorScheme.primary,
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: palette.idleFill,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                PhosphorIcons.rocketLaunch(),
+                size: 32,
+                color: palette.foreground,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               tr('update_available'),
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: AppType.pageTitle.copyWith(color: palette.foreground),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             Text(
               tr('new_version', namedArgs: {'v': version}),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+              style: AppType.body.copyWith(color: palette.mutedText),
             ),
             if (changeLog.isNotEmpty) ...[
               const SizedBox(height: 18),
-              OutlinedButton.icon(
+              PillButton(
                 onPressed: () => _showChangelog(changeLog),
-                icon: Icon(PhosphorIcons.listBullets()),
-                label: Text(tr('see_changelogs')),
+                icon: PhosphorIcons.listBullets(),
+                label: tr('see_changelogs'),
               ),
             ],
             if (downloadUrl.isNotEmpty) ...[
@@ -486,18 +489,20 @@ class _DownloadCard extends StatelessWidget {
           _tvActions(context, null),
       ]);
     }
-    return Card(
-      clipBehavior: Clip.antiAlias,
+    final palette = AppPalette.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.hero),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                Icon(
-                  PhosphorIcons.androidLogo(),
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+                Icon(PhosphorIcons.androidLogo(), color: palette.mutedText),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -511,54 +516,69 @@ class _DownloadCard extends StatelessWidget {
               const SizedBox(height: 14),
               ValueListenableBuilder<double>(
                 valueListenable: task!.progress,
-                builder: (context, progress, _) =>
-                    LinearProgressIndicator(value: progress),
+                builder: (context, progress, _) => ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 3,
+                    backgroundColor: palette.idleFill,
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
             ],
             if (task == null)
-              FilledButton.icon(
-                onPressed: () {
-                  context
-                      .read<SettingsProvider>()
-                      .analytics
-                      .trackAppUpdateDownload(appVersion);
-                  onToggle(url);
-                },
-                icon: Icon(PhosphorIcons.downloadSimple()),
-                label: Text(tr('download')),
+              Padding(
+                padding: const EdgeInsets.only(top: 14),
+                child: PillButton(
+                  primary: true,
+                  height: 46,
+                  onPressed: () {
+                    context
+                        .read<SettingsProvider>()
+                        .analytics
+                        .trackAppUpdateDownload(appVersion);
+                    onToggle(url);
+                  },
+                  icon: PhosphorIcons.downloadSimple(),
+                  label: tr('download_action'),
+                ),
               )
             else
               ValueListenableBuilder<DownloadStatus>(
                 valueListenable: task!.status,
                 builder: (context, status, _) {
                   if (status == DownloadStatus.completed) {
-                    return Wrap(
-                      spacing: 10,
+                    return Row(
                       children: [
-                        FilledButton(
-                          onPressed: () => onOpen(url),
-                          child: Text(tr('install')),
+                        Expanded(
+                          child: PillButton(
+                            primary: true,
+                            height: 46,
+                            onPressed: () => onOpen(url),
+                            icon: PhosphorIcons.downloadSimple(),
+                            label: tr('install_action'),
+                          ),
                         ),
-                        OutlinedButton(
+                        const SizedBox(width: 10),
+                        PillButton(
+                          height: 46,
                           onPressed: () => onDelete(url),
-                          child: Text(tr('delete')),
+                          icon: PhosphorIcons.trash(),
+                          label: tr('remove'),
                         ),
                       ],
                     );
                   }
-                  return FilledButton.icon(
+                  return PillButton(
+                    height: 46,
                     onPressed: () => onToggle(url),
-                    icon: Icon(
-                      status == DownloadStatus.downloading
-                          ? PhosphorIcons.pause()
-                          : PhosphorIcons.play(),
-                    ),
-                    label: Text(
-                      status == DownloadStatus.downloading
-                          ? tr('pause')
-                          : tr('resume'),
-                    ),
+                    icon: status == DownloadStatus.downloading
+                        ? PhosphorIcons.pause()
+                        : PhosphorIcons.play(),
+                    label: status == DownloadStatus.downloading
+                        ? tr('pause_action')
+                        : tr('resume_action'),
                   );
                 },
               ),
@@ -744,4 +764,28 @@ class _UpdateBottomState extends State<UpdateBottom> {
       ),
     );
   }
+}
+
+/// The update page while it finds the installed version.
+class _UpdateSkeleton extends StatelessWidget {
+  const _UpdateSkeleton();
+
+  @override
+  Widget build(BuildContext context) => SkeletonPulse(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: AppSpace.gutter(context)),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SkeletonBlock(width: 72, height: 72, circle: true),
+              SizedBox(height: 16),
+              SkeletonBlock.line(width: 200, height: 26),
+              SizedBox(height: 10),
+              SkeletonBlock.line(width: 140),
+              SizedBox(height: 24),
+              SkeletonBlock(height: 120, radius: AppRadii.hero),
+            ],
+          ),
+        ),
+      );
 }

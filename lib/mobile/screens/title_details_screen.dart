@@ -17,6 +17,7 @@ import '../../controllers/bookmark_database_controller.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../design/media_badge.dart';
+import '../../design/skeleton.dart';
 import '../../design/title_logo.dart';
 import '../../functions/function.dart';
 import '../../models/credits.dart';
@@ -25,7 +26,6 @@ import '../../models/images.dart';
 import '../../models/movie.dart';
 import '../../models/movie_stream_metadata.dart';
 import '../../models/tv.dart';
-import '../../models/tv_stream_metadata.dart';
 import '../../models/videos.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/recently_watched_provider.dart';
@@ -34,13 +34,12 @@ import '../../screens/common/photoview.dart';
 import '../../screens/movie/collection_detail.dart';
 import '../../screens/movie/movie_castandcrew.dart';
 import '../../screens/movie/movie_video_loader.dart';
-import '../../screens/tv/episode_detail.dart';
-import '../../screens/tv/seasons_detail.dart';
-import '../../screens/tv/tv_video_loader.dart';
 import '../../screens/tv/tvdetail_castandcrew.dart';
 import '../../services/ambient_theme_service.dart';
 import '../collections.dart';
+import '../episode_playback.dart';
 import '../my_list.dart';
+import '../widgets/details_header.dart';
 import '../widgets/details_parts.dart';
 import '../widgets/episodes_section.dart';
 import '../widgets/filter_chips.dart';
@@ -48,7 +47,9 @@ import '../widgets/media_art.dart';
 import '../widgets/pill_button.dart';
 import '../widgets/poster_card.dart';
 import '../widgets/section_header.dart';
+import 'episode_screen.dart';
 import 'home_screen.dart' show HomeAdSlot;
+import 'season_screen.dart';
 
 enum DetailsTab { moreLikeThis, trailers, about }
 
@@ -380,59 +381,42 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
     int? elapsed,
     bool download = false,
   }) async {
-    if (!await _online() || !mounted) return;
     final insights = await _insights();
     TVDetails? details;
     try {
       details = await _series;
     } catch (_) {}
     if (!mounted) return;
-    final item = _item;
-    final queued = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => TVVideoLoader(
-          download: download,
-          metadata: TVStreamMetadata(
-            elapsed: elapsed,
-            episodeId: episode.episodeId,
-            episodeName: episode.name,
-            episodeNumber: episode.episodeNumber,
-            posterPath: item.posterPath,
-            backdropPath: episode.stillPath ?? item.backdropPath,
-            seasonNumber: episode.seasonNumber,
-            seriesName: item.title,
-            tvId: item.id,
-            airDate: episode.airDate,
-            genres: insights.genres,
-            languages: insights.languages,
-            countries: insights.countries,
-            seasonEpisodes: seasonEpisodes
-                .where((episode) => episode.episodeId != null)
-                .map(EpisodeMetadata.fromEpisodeList)
-                .toList(growable: false),
-            allSeasons: details?.seasons
-                ?.where((season) => season.seasonNumber != null)
-                .map(SeasonMetadata.fromSeason)
-                .toList(growable: false),
-          ),
-        ),
-      ),
+    await playEpisode(
+      context,
+      series: _item,
+      episode: episode,
+      seasonEpisodes: seasonEpisodes,
+      allSeasons: details?.seasons,
+      insights: insights,
+      elapsed: elapsed,
+      download: download,
     );
-    if (download && queued == true && mounted) _addedToDownloads();
   }
 
   void _openEpisode(EpisodeList episode, List<EpisodeList> seasonEpisodes) {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => EpisodeDetailPage(
-          episodeList: episode,
-          episodes: seasonEpisodes,
-          tvId: _item.id,
-          seriesName: _item.title,
-          posterPath: _item.posterPath,
+    unawaited(() async {
+      TVDetails? details;
+      try {
+        details = await _series;
+      } catch (_) {}
+      if (!mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => EpisodeScreen(
+            series: _item,
+            episode: episode,
+            seasonEpisodes: seasonEpisodes,
+            seasons: details == null ? null : _orderedSeasons(details),
+          ),
         ),
-      ),
-    );
+      );
+    }());
   }
 
   Future<void> _openSeason(Seasons season) async {
@@ -440,15 +424,14 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
     try {
       details = await _series;
     } catch (_) {}
-    if (details == null || !mounted) return;
+    final number = season.seasonNumber;
+    if (details == null || number == null || !mounted) return;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => SeasonsDetail(
-          seasons: season,
-          tvDetails: details!,
-          tvId: _item.id,
-          seriesName: _item.title,
-          heroId: 'season_${_item.id}_${season.seasonNumber}',
+        builder: (_) => SeasonScreen(
+          series: _item,
+          seasons: _orderedSeasons(details!),
+          seasonNumber: number,
         ),
       ),
     );
@@ -576,49 +559,17 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
         : page;
   }
 
-  Widget _header(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final height = _backdropHeight(context);
-    final collapsed = _collapsed;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return SliverAppBar(
-      pinned: true,
-      expandedHeight: height,
-      backgroundColor: palette.page,
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      automaticallyImplyLeading: false,
-      // Light icons over the artwork; the theme's own once it has scrolled
-      // away.
-      systemOverlayStyle: collapsed && !dark
-          ? SystemUiOverlayStyle.dark
-          : SystemUiOverlayStyle.light,
-      leading: Padding(
-        padding: const EdgeInsetsDirectional.only(start: AppSpace.sm),
-        child: Center(
-          child: _RoundButton(
-            icon: PhosphorIcons.caretLeft(),
-            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-            onArtwork: !collapsed,
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
+  Widget _header(BuildContext context) => DetailsSliverHeader(
+        title: _item.title,
+        collapsed: _collapsed,
+        artwork: MediaArt(
+          item: _item,
+          path: _item.backdropPath ?? _item.posterPath,
+          width: MediaQuery.sizeOf(context).width,
+          size: ArtSize.backdrop,
+          alignment: Alignment.topCenter,
         ),
-      ),
-      titleSpacing: 0,
-      title: AnimatedOpacity(
-        opacity: collapsed ? 1 : 0,
-        duration: const Duration(milliseconds: 160),
-        child: Text(
-          _item.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppType.sectionHeader.copyWith(color: palette.foreground),
-        ),
-      ),
-      flexibleSpace: _Backdrop(item: _item),
-    );
-  }
+      );
 
   Widget _summary(BuildContext context, WatchHistory history) {
     final palette = AppPalette.of(context);
@@ -773,7 +724,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
         return const SizedBox.shrink();
       }
       final plan = detailsPlayFor(_item, history);
-      return _PlayButton(
+      return DetailsPlayButton(
         label: _playLabel(plan),
         resume: plan.resume,
         busy: _starting,
@@ -784,7 +735,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
       future: _series,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const DetailsBlock(height: 48, radius: AppRadii.button);
+          return const SkeletonBlock(height: 48, radius: AppRadii.button);
         }
         final details = snapshot.data;
         final seasons =
@@ -795,7 +746,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
           history,
           firstSeason: seasons.first.seasonNumber,
         );
-        return _PlayButton(
+        return DetailsPlayButton(
           label: _playLabel(plan),
           resume: plan.resume,
           busy: _starting,
@@ -964,7 +915,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
         if (snapshot.connectionState != ConnectionState.done) {
           body = Padding(
             padding: EdgeInsets.symmetric(horizontal: gutter),
-            child: const DetailsBlock(width: 140, height: 34),
+            child: const SkeletonBlock(width: 140, height: 34),
           );
         } else if (snapshot.hasError || snapshot.data == null) {
           body = Padding(
@@ -1065,7 +1016,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
                     runSpacing: spacing,
                     children: <Widget>[
                       for (var i = 0; i < 6; i++)
-                        DetailsBlock(
+                        SkeletonBlock(
                           width: width,
                           height: width / PosterCard.aspectRatio,
                         ),
@@ -1127,7 +1078,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
             future: _videos,
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
-                return const DetailsBlock(height: 200);
+                return const SkeletonBlock(height: 200);
               }
               if (snapshot.hasError) {
                 return DetailsMessage(
@@ -1253,7 +1204,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
             if (snapshot.connectionState != ConnectionState.done) {
               return Padding(
                 padding: EdgeInsets.symmetric(horizontal: gutter),
-                child: const DetailsBlock(height: 120),
+                child: const SkeletonBlock(height: 120),
               );
             }
             if (cast.isEmpty) return const SizedBox.shrink();
@@ -1346,8 +1297,12 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => _isMovie
-            ? MovieCastAndCrew(credits: credits)
-            : TVDetailCastAndCrew(id: _item.id, passedFrom: 'tv_detail'),
+            ? MovieCastAndCrew(credits: credits, title: _item.title)
+            : TVDetailCastAndCrew(
+                id: _item.id,
+                passedFrom: 'tv_detail',
+                title: _item.title,
+              ),
       ),
     );
   }
@@ -1358,7 +1313,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
     List<(String, String?)> Function() rows,
   ) {
     if (snapshot.connectionState != ConnectionState.done) {
-      return const DetailsBlock(height: 160);
+      return const SkeletonBlock(height: 160);
     }
     if (snapshot.hasError) {
       return DetailsMessage(message: tr('check_connection'), onRetry: _retry);
@@ -1480,184 +1435,8 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
   }
 }
 
-/// The title's backdrop, fading into the page at whatever height the header
-/// has collapsed to, with a shade at the top for the status bar and the back
-/// button. As it collapses the artwork rises a little slower than the page
-/// and gives way to the page's colour.
-class _Backdrop extends StatelessWidget {
-  const _Backdrop({required this.item});
 
-  final MediaItem item;
 
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final settings =
-        context.dependOnInheritedWidgetOfExactType<FlexibleSpaceBarSettings>();
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final current = settings?.currentExtent ?? constraints.maxHeight;
-        final max = settings?.maxExtent ?? current;
-        final min = settings?.minExtent ?? 0;
-        final shown =
-            max <= min ? 1.0 : ((current - min) / (max - min)).clamp(0.0, 1.0);
-        return ClipRect(
-          child: Stack(
-            fit: StackFit.expand,
-            children: <Widget>[
-              Positioned(
-                top: (current - max) / 2,
-                left: 0,
-                right: 0,
-                height: max,
-                child: MediaArt(
-                  item: item,
-                  path: item.backdropPath ?? item.posterPath,
-                  width: MediaQuery.sizeOf(context).width,
-                  size: ArtSize.backdrop,
-                  alignment: Alignment.topCenter,
-                ),
-              ),
-              const Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 120,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: <Color>[Color(0x8C000000), Color(0x00000000)],
-                    ),
-                  ),
-                ),
-              ),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: const Alignment(0, 0.25),
-                    end: Alignment.bottomCenter,
-                    // Solid for the last few pixels, so no seam shows where
-                    // the artwork meets the page.
-                    stops: const <double>[0, .94, 1],
-                    colors: <Color>[
-                      palette.scrim(0),
-                      palette.page,
-                      palette.page,
-                    ],
-                  ),
-                ),
-              ),
-              if (shown < 1) ColoredBox(color: palette.scrim(1 - shown)),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// A round button over the artwork: translucent black with a white icon,
-/// then the page's own ink once the artwork has scrolled away.
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onArtwork,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final bool onArtwork;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: onArtwork
-            ? const Color(0x61000000)
-            : palette.page.withValues(alpha: 0),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        tooltip: tooltip,
-        padding: EdgeInsets.zero,
-        onPressed: onPressed,
-        color: onArtwork ? const Color(0xFFFFFFFF) : palette.foreground,
-        icon: Icon(icon, size: 22),
-      ),
-    );
-  }
-}
-
-/// The main button, full width, with how far in the viewer is under it.
-class _PlayButton extends StatelessWidget {
-  const _PlayButton({
-    required this.label,
-    required this.resume,
-    required this.busy,
-    required this.onPressed,
-  });
-
-  final String label;
-  final ResumePoint? resume;
-  final bool busy;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final resume = this.resume;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        SizedBox(
-          width: double.infinity,
-          child: PillButton(
-            label: label,
-            icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
-            primary: true,
-            busy: busy,
-            height: 48,
-            onPressed: busy ? null : onPressed,
-          ),
-        ),
-        if (resume != null) ...<Widget>[
-          const SizedBox(height: AppSpace.sm),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(2),
-                  child: LinearProgressIndicator(
-                    value: resume.progress,
-                    minHeight: 3,
-                    backgroundColor: palette.idleFill,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpace.md),
-              Text(
-                tr('time_left', namedArgs: <String, String>{
-                  'time': formatRuntime(Duration(seconds: resume.remaining)),
-                }),
-                style: AppType.metadata.copyWith(color: palette.mutedText),
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-}
 
 class _TabsHeader extends SliverPersistentHeaderDelegate {
   const _TabsHeader({

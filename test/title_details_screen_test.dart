@@ -4,6 +4,7 @@ import 'package:flixquest/catalog/title_details_source.dart';
 import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/constants/theme_data.dart';
 import 'package:flixquest/mobile/screens/title_details_screen.dart';
+import 'package:flixquest/mobile/widgets/page_kit.dart';
 import 'package:flixquest/mobile/widgets/filter_chips.dart';
 import 'package:flixquest/mobile/widgets/poster_card.dart';
 import 'package:flixquest/models/app_colors.dart';
@@ -349,8 +350,8 @@ void main() {
     await tester.tap(find.text('Season 2'));
     await tester.pumpAndSettle();
     final names = tester
-        .widgetList<ListTile>(find.byType(ListTile))
-        .map((tile) => (tile.title! as Text).data)
+        .widgetList<ListRow>(find.byType(ListRow))
+        .map((row) => row.label)
         .toList();
     expect(names, <String>['Season 1', 'Season 2', 'Specials']);
     await tester.tap(find.text('Specials'));

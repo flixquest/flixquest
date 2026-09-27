@@ -149,7 +149,12 @@ class Crew {
     department = json['department'];
     gender = json['gender'];
     id = json['id'];
-    job = json['job'];
+    // A series' combined credits list each person's jobs instead.
+    job = json['job'] ??
+        (json['jobs'] as List<dynamic>?)
+            ?.map((entry) => (entry as Map<String, dynamic>)['job'])
+            .whereType<String>()
+            .join(', ');
     name = json['name'];
     adult = json['adult'];
     profilePath = json['profile_path'];

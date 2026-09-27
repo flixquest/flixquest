@@ -635,7 +635,7 @@ class _HomeHeader extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           AppLogo(
-                            fallbackAsset: 'assets/images/fq_svg.svg',
+                            fallbackAsset: 'assets/images/fq_mark.svg',
                             height: 26,
                             fallbackColor:
                                 Theme.of(context).colorScheme.primary,

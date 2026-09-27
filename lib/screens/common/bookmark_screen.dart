@@ -91,7 +91,7 @@ class _BookmarkScreenState extends State<BookmarkScreen>
                 child: Row(
                   children: [
                     AppLogo(
-                      fallbackAsset: 'assets/images/fq_svg.svg',
+                      fallbackAsset: 'assets/images/fq_mark.svg',
                       width: 30,
                       height: 30,
                       fallbackColor: colors.primary,

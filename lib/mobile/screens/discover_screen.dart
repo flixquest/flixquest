@@ -14,6 +14,7 @@ import '../../design/app_tokens.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../widgets/common_widgets.dart' show appStreamingServices;
+import '../widgets/page_kit.dart';
 import '../widgets/pill_button.dart';
 import 'collection_screen.dart';
 
@@ -215,7 +216,22 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           preferredSize: const Size.fromHeight(56),
           child: Padding(
             padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 12),
-            child: _KindSwitch(kind: _kind, onChanged: _switchKind),
+            child: SegmentSwitch<MediaKind>(
+              segments: <Segment<MediaKind>>[
+                Segment(
+                  MediaKind.movie,
+                  tr('movies'),
+                  icon: PhosphorIcons.filmSlate(),
+                ),
+                Segment(
+                  MediaKind.series,
+                  tr('series'),
+                  icon: PhosphorIcons.television(),
+                ),
+              ],
+              selected: _kind,
+              onChanged: _switchKind,
+            ),
           ),
         ),
       ),
@@ -246,7 +262,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     runSpacing: AppSpace.sm,
                     children: <Widget>[
                       for (final genre in query.genreOptions)
-                        _TogglePill(
+                        TogglePill(
                           label: tr(genre.label),
                           selected: query.genres.contains(genre.value),
                           onTap: () => _toggle(query.genres, genre.value),
@@ -276,7 +292,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     runSpacing: AppSpace.sm,
                     children: <Widget>[
                       for (final threshold in DiscoverQuery.ratingThresholds)
-                        _TogglePill(
+                        TogglePill(
                           label: threshold == 0
                               ? tr('any')
                               : _ratingsLabel(threshold),
@@ -298,7 +314,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                         for (var i = 0;
                             i < DiscoverQuery.seriesStatuses.length;
                             i++)
-                          _TogglePill(
+                          TogglePill(
                             label: tr(DiscoverQuery.seriesStatuses[i].label),
                             selected: query.status == i,
                             onTap: () => _change((query) => query.status = i),
@@ -320,76 +336,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 }
 
-/// Movies | Series as one control, the chosen half filled with ink.
-class _KindSwitch extends StatelessWidget {
-  const _KindSwitch({required this.kind, required this.onChanged});
-
-  final MediaKind kind;
-  final ValueChanged<MediaKind> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: palette.idleFill,
-        borderRadius: BorderRadius.circular(AppRadii.chip),
-      ),
-      child: Row(
-        children: <Widget>[
-          for (final option in MediaKind.values)
-            Expanded(
-              child: Semantics(
-                button: true,
-                selected: option == kind,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => onChanged(option),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: option == kind
-                          ? palette.focusFill
-                          : const Color(0x00000000),
-                      borderRadius: BorderRadius.circular(AppRadii.chip - 3),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Icon(
-                          option == MediaKind.movie
-                              ? PhosphorIcons.filmSlate()
-                              : PhosphorIcons.television(),
-                          size: 17,
-                          color: option == kind
-                              ? palette.onFocus
-                              : palette.secondaryText,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          tr(option == MediaKind.movie ? 'movies' : 'series'),
-                          style: AppType.cardTitle.copyWith(
-                            fontSize: 15,
-                            color: option == kind
-                                ? palette.onFocus
-                                : palette.secondaryText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
 
 /// The choices made so far, each with an × to take it back.
 class _ActiveFilters extends StatelessWidget {
@@ -495,61 +441,6 @@ class _Section extends StatelessWidget {
   }
 }
 
-/// A choice that fills with ink, with a check, when on.
-class _TogglePill extends StatelessWidget {
-  const _TogglePill({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final foreground = selected ? palette.onFocus : palette.foreground;
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: Material(
-        color: selected ? palette.focusFill : palette.idleFill,
-        borderRadius: BorderRadius.circular(AppRadii.chip),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: AnimatedPadding(
-            duration: const Duration(milliseconds: 160),
-            padding: EdgeInsetsDirectional.fromSTEB(
-              selected ? 11 : 15,
-              9,
-              15,
-              9,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                if (selected) ...<Widget>[
-                  Icon(PhosphorIcons.check(), size: 15, color: foreground),
-                  const SizedBox(width: 5),
-                ],
-                Text(
-                  label,
-                  style: AppType.cardTitle.copyWith(
-                    fontSize: 14,
-                    color: foreground,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// The four orders as tiles, each with a mark for what it does.
 class _SortGrid extends StatelessWidget {
@@ -795,7 +686,7 @@ class _YearRail extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: AppSpace.sm),
         itemBuilder: (context, index) {
           final year = years[index];
-          return _TogglePill(
+          return TogglePill(
             label: year.isEmpty ? tr('any') : year,
             selected: year == selected,
             onTap: () => onSelect(year),

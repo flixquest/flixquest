@@ -10,6 +10,7 @@ import '../../../models/tv_stream_metadata.dart';
 import '../../../services/external_subtitle_service.dart';
 import '../../../ui_components/app_ui_components.dart';
 import 'player_sheet_ui.dart';
+import '../../../mobile/widgets/page_kit.dart';
 
 class PlayerExternalSubtitles {
   List<ExternalSubtitle> _availableExternalSubtitles = [];
@@ -66,47 +67,13 @@ class PlayerExternalSubtitles {
 
             final Widget content;
             if (_isLoadingExternalSubtitles) {
-              content = Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: .12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: SizedBox(
-                        width: 32,
-                        height: 32,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      tr('searching_for_subtitles'),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontFamily: 'FigtreeSB',
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      tr('loading_video_sources'),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
-                ),
+              // The list of subtitles, pulsing, until it comes.
+              content = const ListSkeleton(
+                rows: 7,
+                leadingWidth: 36,
+                leadingHeight: 36,
+                circle: true,
+                scrolls: true,
               );
             } else if (_availableExternalSubtitles.isEmpty) {
               content = AppEmptyState(

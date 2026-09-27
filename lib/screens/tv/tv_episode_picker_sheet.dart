@@ -1,33 +1,34 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../api/endpoints.dart';
-import '../../constants/api_constants.dart';
-import '../../constants/app_constants.dart';
+import '../../catalog/details_controller.dart';
+import '../../catalog/details_play.dart';
+import '../../catalog/media_item.dart';
 import '../../design/app_palette.dart';
-import '../../functions/function.dart';
+import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
 import '../../functions/network.dart';
+import '../../mobile/widgets/episode_row.dart';
+import '../../mobile/widgets/filter_chips.dart';
+import '../../mobile/widgets/page_kit.dart';
+import '../../models/recently_watched.dart';
 import '../../models/tv.dart';
 import '../../models/tv_stream_metadata.dart';
 import '../../provider/app_dependency_provider.dart';
+import '../../provider/recently_watched_provider.dart';
 import '../../provider/settings_provider.dart';
-import '../../ui_components/app_ui_components.dart';
-import '../common/player/player_sheet_ui.dart';
 
+/// The episodes of [series] to choose one to play, a season at a time.
+/// Resolves to what the player needs for the one chosen, or null.
 Future<TVStreamMetadata?> showTVEpisodePickerSheet(
   BuildContext context, {
   required TV series,
 }) {
-  return showModalBottomSheet<TVStreamMetadata>(
-    context: context,
-    useRootNavigator: true,
-    useSafeArea: true,
-    isScrollControlled: true,
-    showDragHandle: true,
-    backgroundColor: AppPalette.of(context).surface,
+  return showAppSheet<TVStreamMetadata>(
+    context,
     builder: (_) => DraggableScrollableSheet(
       initialChildSize: .84,
       minChildSize: .58,
@@ -66,6 +67,8 @@ class _TVEpisodePickerSheetState extends State<_TVEpisodePickerSheet> {
   bool _started = false;
   int _seasonRequest = 0;
 
+  MediaItem get _item => MediaItem.fromSeries(widget.series);
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -99,15 +102,19 @@ class _TVEpisodePickerSheetState extends State<_TVEpisodePickerSheet> {
       );
       if (!mounted) return;
 
-      final seasons = (details.seasons ?? const <Seasons>[])
+      // Specials last, as on the series' page; seasons with no episodes
+      // aren't offered.
+      final seasons = MediaDetailsData(
+        item: _item,
+        seriesDetails: details,
+        recommendations: const <MediaItem>[],
+      )
+          .seasons
           .where(
             (season) =>
                 season.seasonNumber != null && (season.episodeCount ?? 0) > 0,
           )
-          .toList()
-        ..sort(
-          (a, b) => a.seasonNumber!.compareTo(b.seasonNumber!),
-        );
+          .toList(growable: false);
       if (seasons.isEmpty) {
         setState(() {
           _seasons = const [];
@@ -117,8 +124,18 @@ class _TVEpisodePickerSheetState extends State<_TVEpisodePickerSheet> {
         return;
       }
 
+      // The season being watched, else the first.
+      final recent = context.read<RecentProvider?>();
+      final watching = initialSeasonNumber(
+        seasons,
+        ResumePoint.forItem(
+          _item,
+          movies: const <RecentMovie>[],
+          episodes: recent?.episodes ?? const <RecentEpisode>[],
+        ),
+      );
       final initialSeason = seasons.firstWhere(
-        (season) => season.seasonNumber == 1,
+        (season) => season.seasonNumber == watching,
         orElse: () => seasons.first,
       );
       setState(() {
@@ -186,102 +203,115 @@ class _TVEpisodePickerSheetState extends State<_TVEpisodePickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedSeason = _selectedSeason;
-    return PlayerSheetScaffold(
-      icon: PhosphorIcons.playlist(),
-      title: widget.series.name ?? tr('tv_series'),
-      subtitle: selectedSeason == null
-          ? tr('select_season')
-          : tr(
-              'season_episodes',
-              namedArgs: {'season': '${selectedSeason.seasonNumber}'},
-            ),
-      actions: [
-        IconButton(
-          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(PhosphorIcons.x()),
-        ),
-      ],
-      child: _loadingSeries
-          ? const Center(child: CircularProgressIndicator())
-          : _seasons.isEmpty
-              ? _PickerMessage(
-                  message: _errorMessage ?? tr('no_season_tv'),
-                  onRetry: _loadSeries,
-                )
-              : Column(
-                  children: [
-                    SizedBox(
-                      height: 66,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
-                        itemCount: _seasons.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final season = _seasons[index];
-                          final selected = season.seasonNumber ==
-                              _selectedSeason?.seasonNumber;
-                          return _SeasonSelector(
-                            season: season,
-                            selected: selected,
-                            enabled: !_loadingEpisodes,
-                            onTap: () => _loadSeason(season),
-                          );
-                        },
-                      ),
-                    ),
-                    const Divider(height: 1),
-                    Expanded(child: _buildEpisodeList()),
-                  ],
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(gutter, 0, gutter, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                tr('choose_episode').toUpperCase(),
+                style: AppType.kicker.copyWith(color: palette.mutedText),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                widget.series.name ?? tr('tv_series'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppType.sectionHeader.copyWith(
+                  fontFamily: AppType.bold,
+                  color: palette.foreground,
                 ),
+              ),
+            ],
+          ),
+        ),
+        if (_loadingSeries)
+          const Expanded(child: _PickerSkeleton(seasons: true))
+        else if (_seasons.isEmpty)
+          Expanded(
+            child: EmptyState(
+              icon: PhosphorIcons.television(),
+              title: _errorMessage ?? tr('no_season_tv'),
+              actionLabel: tr('retry'),
+              actionIcon: PhosphorIcons.arrowClockwise(),
+              onAction: _loadSeries,
+            ),
+          )
+        else ...<Widget>[
+          if (_seasons.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpace.sm),
+              child: FilterChips(
+                chips: <FilterChipSpec>[
+                  for (final season in _seasons)
+                    FilterChipSpec(
+                      label: seasonDisplayName(season),
+                      selected:
+                          season.seasonNumber == _selectedSeason?.seasonNumber,
+                      onTap: () {
+                        if (season.seasonNumber ==
+                            _selectedSeason?.seasonNumber) {
+                          return;
+                        }
+                        _loadSeason(season);
+                      },
+                    ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: SkeletonSwitcher(
+              loading: _loadingEpisodes,
+              skeleton: const _PickerSkeleton(seasons: false),
+              child: _buildEpisodeList(),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
   Widget _buildEpisodeList() {
-    if (_loadingEpisodes) {
-      return const Center(child: CircularProgressIndicator());
-    }
     if (_episodes.isEmpty) {
-      return _PickerMessage(
-        message: _errorMessage ?? tr('no_episodes'),
-        onRetry: _selectedSeason == null
+      return EmptyState(
+        icon: PhosphorIcons.filmStrip(),
+        title: _errorMessage ?? tr('no_episodes'),
+        actionLabel: _selectedSeason == null ? null : tr('retry'),
+        actionIcon: PhosphorIcons.arrowClockwise(),
+        onAction: _selectedSeason == null
             ? null
             : () => _loadSeason(_selectedSeason!),
       );
     }
-
-    return ListView.separated(
+    final watched =
+        context.watch<RecentProvider?>()?.episodes ?? const <RecentEpisode>[];
+    final item = _item;
+    return ListView.builder(
       controller: widget.scrollController,
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + AppSpace.xxl,
+      ),
       itemCount: _episodes.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 4),
       itemBuilder: (context, index) {
         final episode = _episodes[index];
-        final details = <String>[
-          episodeSeasonFormatter(
-            episode.episodeNumber!,
-            episode.seasonNumber!,
+        return EpisodeRow(
+          series: item,
+          episode: episode,
+          aired: hasAired(episode),
+          progress: episodeProgress(
+            watched,
+            seriesId: item.id,
+            season: episode.seasonNumber ?? 0,
+            episode: episode.episodeNumber ?? -1,
           ),
-          if (episode.voteAverage != null && episode.voteAverage! > 0)
-            '\u2605 ${episode.voteAverage!.toStringAsFixed(1)}',
-          if ((episode.airDate ?? '').isNotEmpty) episode.airDate!,
-        ];
-        return PlayerChoiceCard(
-          title: episode.name ?? '${tr('episodes')} ${episode.episodeNumber}',
-          subtitle: details.join('  \u2022  '),
-          description: episode.overview,
-          onTap: () => _selectEpisode(episode),
-          trailing: Icon(
-            PhosphorIcons.playCircle(PhosphorIconsStyle.fill),
-            color: AppPalette.of(context).foreground,
-          ),
-          thumbnail: PlayerThumbnail(
-            width: 124,
-            height: 76,
-            child: _EpisodeImage(path: episode.stillPath),
-          ),
+          canPlay: true,
+          canDownload: false,
+          onPlay: () => _selectEpisode(episode),
         );
       },
     );
@@ -311,160 +341,47 @@ class _TVEpisodePickerSheetState extends State<_TVEpisodePickerSheet> {
   }
 }
 
-class _EpisodeImage extends StatelessWidget {
-  const _EpisodeImage({required this.path});
+/// The sheet's shape while it loads: the season chips (when they're still
+/// coming) and the first episodes.
+class _PickerSkeleton extends StatelessWidget {
+  const _PickerSkeleton({required this.seasons});
 
-  final String? path;
-
-  @override
-  Widget build(BuildContext context) {
-    if (path == null) return Icon(PhosphorIcons.filmStrip());
-    final settings = context.watch<SettingsProvider>();
-    final proxy = context.watch<AppDependencyProvider>().tmdbProxy;
-    return CachedNetworkImage(
-      cacheManager: cacheProp(),
-      imageUrl:
-          '${buildImageUrl(TMDB_BASE_IMAGE_URL, proxy, settings.enableProxy, context)}w300$path',
-      fit: BoxFit.cover,
-      placeholder: (_, __) => const AppCachedImagePlaceholder(),
-      errorWidget: (_, __, ___) => Icon(PhosphorIcons.filmStrip()),
-    );
-  }
-}
-
-class _SeasonSelector extends StatelessWidget {
-  const _SeasonSelector({
-    required this.season,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final Seasons season;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
+  final bool seasons;
 
   @override
   Widget build(BuildContext context) {
-    // Selection in ink, as elsewhere; the accent is kept for small marks.
-    final palette = AppPalette.of(context);
-    final seasonNumber = season.seasonNumber ?? 0;
-    final title = season.name?.trim().isNotEmpty == true
-        ? season.name!.trim()
-        : '${tr('seasons')} $seasonNumber';
-    final background = selected ? palette.focusFill : palette.idleFill;
-    final foreground = selected ? palette.onFocus : palette.foreground;
-
-    return Material(
-      color: background,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide.none,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: enabled && !selected ? onTap : null,
-        child: SizedBox(
-          width: 142,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: foreground.withValues(alpha: selected ? .16 : .1),
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    '$seasonNumber',
-                    style: TextStyle(
-                      color: foreground,
-                      fontFamily: 'FigtreeSB',
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: foreground,
-                          fontFamily: 'FigtreeSB',
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${season.episodeCount ?? 0} ${tr('episodes')}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: foreground.withValues(alpha: .72),
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (selected)
-                  Icon(
-                    PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
-                    color: foreground,
-                    size: 17,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PickerMessage extends StatelessWidget {
-  const _PickerMessage({required this.message, this.onRetry});
-
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
+    final gutter = AppSpace.gutter(context);
+    return SkeletonPulse(
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              PhosphorIcons.warningCircle(),
-              size: 36,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-            if (onRetry != null) ...[
-              const SizedBox(height: 16),
-              FilledButton.tonalIcon(
-                onPressed: onRetry,
-                icon: Icon(PhosphorIcons.arrowClockwise()),
-                label: Text(tr('retry')),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            if (seasons)
+              Padding(
+                padding: EdgeInsetsDirectional.fromSTEB(
+                  gutter,
+                  0,
+                  gutter,
+                  AppSpace.sm,
+                ),
+                child: Row(
+                  children: <Widget>[
+                    for (final width in const <double>[86, 86, 86])
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          end: AppSpace.sm,
+                        ),
+                        child: SkeletonBlock(
+                          width: width,
+                          height: FilterChips.height,
+                          radius: AppRadii.chip,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ],
+            const EpisodeListSkeleton(count: 5),
           ],
         ),
       ),

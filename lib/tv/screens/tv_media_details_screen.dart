@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../catalog/episode_choice.dart';
 import '../../constants/api_constants.dart';
 import '../../constants/app_constants.dart';
+import '../../design/outline_mark.dart';
 import '../../functions/function.dart';
 import '../../models/movie_stream_metadata.dart';
 import '../../models/tv.dart';
@@ -1256,11 +1257,7 @@ class _EpisodeCard extends StatelessWidget {
     final placeholder = ColoredBox(
       color: palette.raisedSurface,
       child: Center(
-        child: Icon(
-          PhosphorIcons.television(),
-          color: palette.mutedText,
-          size: 30,
-        ),
+        child: OutlineMark(height: 34, color: palette.mutedText),
       ),
     );
 

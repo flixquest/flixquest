@@ -9,6 +9,7 @@ import '../../catalog/new_and_hot.dart';
 import '../../catalog/title_logos.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
 import '../../design/title_logo.dart';
 import '../../design/top_ten_rank.dart';
 import '../../models/genres.dart';
@@ -594,87 +595,53 @@ class _HotMessage extends StatelessWidget {
   }
 }
 
-class _HotSkeleton extends StatefulWidget {
+class _HotSkeleton extends StatelessWidget {
   const _HotSkeleton({required this.segment});
   final HotSegment segment;
 
   @override
-  State<_HotSkeleton> createState() => _HotSkeletonState();
-}
-
-class _HotSkeletonState extends State<_HotSkeleton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1100),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
     final gutter = AppSpace.gutter(context);
-    return ExcludeSemantics(
-      child: AnimatedBuilder(
-        animation: _pulse,
-        builder: (context, _) {
-          final color = Color.lerp(
-            palette.surface,
-            palette.raisedSurface,
-            Curves.easeInOut.transform(_pulse.value),
-          )!;
-          Widget block(double width, double height) => Container(
-                width: width,
-                height: height,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(AppRadii.card),
-                ),
-              );
-          return Padding(
-            padding: EdgeInsetsDirectional.symmetric(horizontal: gutter),
-            child: Column(
-              children: <Widget>[
-                for (var i = 0; i < 3; i++) ...<Widget>[
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      if (widget.segment == HotSegment.comingSoon) ...<Widget>[
-                        block(48, 56),
-                        const SizedBox(width: AppSpace.md)
-                      ],
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            AspectRatio(
-                              aspectRatio:
-                                  widget.segment == HotSegment.topMovies ||
-                                          widget.segment == HotSegment.topSeries
-                                      ? 3 / 1
-                                      : 16 / 9,
-                              child: block(double.infinity, double.infinity),
-                            ),
-                            const SizedBox(height: AppSpace.md),
-                            block(150, 20),
-                            const SizedBox(height: AppSpace.sm),
-                            block(double.infinity, 16),
-                          ],
+    Widget block(double width, double height) =>
+        SkeletonBlock(width: width, height: height);
+    return SkeletonPulse(
+      child: Padding(
+        padding: EdgeInsetsDirectional.symmetric(horizontal: gutter),
+        child: Column(
+          children: <Widget>[
+            for (var i = 0; i < 3; i++) ...<Widget>[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  if (segment == HotSegment.comingSoon) ...<Widget>[
+                    block(48, 56),
+                    const SizedBox(width: AppSpace.md),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        AspectRatio(
+                          aspectRatio:
+                              segment == HotSegment.topMovies ||
+                                  segment == HotSegment.topSeries
+                              ? 3 / 1
+                              : 16 / 9,
+                          child: block(double.infinity, double.infinity),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: AppSpace.md),
+                        block(150, 20),
+                        const SizedBox(height: AppSpace.sm),
+                        block(double.infinity, 16),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: AppSpace.rowGap),
                 ],
-              ],
-            ),
-          );
-        },
+              ),
+              const SizedBox(height: AppSpace.rowGap),
+            ],
+          ],
+        ),
       ),
     );
   }
