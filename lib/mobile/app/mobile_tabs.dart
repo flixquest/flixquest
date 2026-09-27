@@ -50,6 +50,11 @@ class MobileTabController extends ChangeNotifier {
   MobileTab _current;
   MobileTab get current => _current;
 
+  /// How many times the viewer has changed tab; none means the tab showing
+  /// is the one the app opened on.
+  int get switches => _switches;
+  int _switches = 0;
+
   /// The filter Home opens with, from the default-home setting.
   final HomeFilter initialHomeFilter;
 
@@ -72,6 +77,15 @@ class MobileTabController extends ChangeNotifier {
       reselect();
       return;
     }
+    _current = tab;
+    _switches++;
+    notifyListeners();
+  }
+
+  /// Shows [tab] as the app's starting tab, as when Android brings the app
+  /// back after closing it: not a switch the viewer made.
+  void restore(MobileTab tab) {
+    if (tab == _current) return;
     _current = tab;
     notifyListeners();
   }

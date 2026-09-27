@@ -1,4 +1,4 @@
-/// Every address on TMDB or IMDb that this app has a screen for.
+/// Every address on TMDB, IMDb or FlixQuest's own flix.quest that this app has a screen for.
 ///
 /// The two sites name the same things differently. A TMDB address says both what kind of record it
 /// is and which one, so the app can go straight to the screen for it. An IMDb address only ever
@@ -9,25 +9,35 @@
 /// IMDb page and a pasted TMDB page as the same request. It is also what stops a link from being
 /// answered with less than it asked for: an address that names a season opens that season, and one
 /// that names an episode opens that episode, rather than both landing on the series.
+///
+/// flix.quest is this app's own short form of a TMDB address: `/m/550` is a film, and `/t/1396`,
+/// `/t/1396.4` and `/t/1396.4.13` are a series, one of its seasons and one of its episodes. Being our
+/// domain, it is the one Android verifies, so these open the app straight from a tap.
 class MediaLink {
   const MediaLink._();
 
   /// Registrable domains this reads, matched after any `www.`, `m.` or `api.` in front is dropped.
   static const String _tmdb = 'themoviedb.org';
   static const String _imdb = 'imdb.com';
+  static const String _flixquest = 'flix.quest';
 
   /// A whole URL sitting in shared text, which is how another app hands one over.
   static final RegExp _schemed = RegExp(r'https?://\S+', caseSensitive: false);
 
   /// The same link with the scheme left off, as it appears in text people typed themselves.
   static final RegExp _bare = RegExp(
-    r'\b(?:[\w-]+\.)*(?:imdb\.com|themoviedb\.org)/\S*',
+    r'\b(?:[\w-]+\.)*(?:imdb\.com|themoviedb\.org|flix\.quest)/\S*',
     caseSensitive: false,
   );
 
   static final RegExp _imdbTitleId = RegExp(r'^tt\d+$');
   static final RegExp _imdbNameId = RegExp(r'^nm\d+$');
   static final RegExp _leadingDigits = RegExp(r'^\d+');
+
+  /// A flix.quest film is its id alone. A series is its id with, optionally, a season and then an
+  /// episode after it, joined by dots.
+  static final RegExp _flixquestMovie = RegExp(r'^\d+$');
+  static final RegExp _flixquestSeries = RegExp(r'^(\d+)(?:\.(\d+)(?:\.(\d+))?)?$');
 
   /// Reads whatever link [value] carries.
   ///
@@ -38,11 +48,12 @@ class MediaLink {
   static MediaLinkTarget? parse(String value) {
     for (final uri in _urls(value)) {
       final host = _registrableDomain(uri);
-      final target = host == _tmdb
-          ? _tmdbTarget(uri)
-          : host == _imdb
-              ? _imdbTarget(uri)
-              : null;
+      final target = switch (host) {
+        _tmdb => _tmdbTarget(uri),
+        _imdb => _imdbTarget(uri),
+        _flixquest => _flixquestTarget(uri),
+        _ => null,
+      };
       if (target != null) return target;
     }
     return null;
@@ -130,6 +141,35 @@ class MediaLink {
     if (segments.length < 2 || segments[0].toLowerCase() != label) return null;
     final number = int.tryParse(segments[1]);
     return number == null || number < 0 ? null : number;
+  }
+
+  /// flix.quest puts the kind first, as a single letter, and everything else in the one segment after
+  /// it. Anything that does not fit that exactly is not read at all, since these addresses are ours
+  /// and a malformed one is a broken link rather than a layout to guess at.
+  static MediaLinkTarget? _flixquestTarget(Uri uri) {
+    final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
+    if (segments.length != 2) return null;
+    final value = segments[1];
+    switch (segments[0].toLowerCase()) {
+      case 'm':
+        return _flixquestMovie.hasMatch(value) ? TmdbMovieLink(id: int.parse(value)) : null;
+      case 't':
+        final match = _flixquestSeries.firstMatch(value);
+        if (match == null) return null;
+        final id = int.parse(match.group(1)!);
+        final season = match.group(2);
+        final episode = match.group(3);
+        if (season == null) return TmdbTvLink(id: id);
+        if (episode == null) {
+          return TmdbSeasonLink(seriesId: id, seasonNumber: int.parse(season));
+        }
+        return TmdbEpisodeLink(
+          seriesId: id,
+          seasonNumber: int.parse(season),
+          episodeNumber: int.parse(episode),
+        );
+    }
+    return null;
   }
 
   /// IMDb addresses a title under `/title/tt…` and a person under `/name/nm…`, and says nothing more

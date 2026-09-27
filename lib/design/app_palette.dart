@@ -100,4 +100,8 @@ class AppPalette {
 
   /// [page] at [alpha], for scrims that fade artwork into the page.
   Color scrim(double alpha) => page.withValues(alpha: alpha);
+
+  /// The plate streaming-service logos sit on, in every theme: they're app
+  /// icons, several of them black squares, drawn for a light ground.
+  static const logoPlate = Color(0xFFF2F2F3);
 }

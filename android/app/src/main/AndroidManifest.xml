@@ -72,6 +72,21 @@
                 <action android:name="es.antonborri.home_widget.action.LAUNCH" />
             </intent-filter>
 
+            <!-- Addresses on flix.quest, our own domain. Verified: the domain publishes
+                 /.well-known/assetlinks.json naming this app's signing certificate, so Android 12
+                 and later open these here straight from a tap. Kept in a filter of its own because
+                 verification needs every host in a filter to pass, and the ones below cannot. Only
+                 the bare domain is claimed; www redirects there, and a redirect fails the check. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="flix.quest" />
+                <data android:pathPrefix="/m/" />
+                <data android:pathPrefix="/t/" />
+            </intent-filter>
+
             <!-- Addresses on TMDB. Deliberately unverified: claiming a domain means publishing a
                  file on it, and neither of these domains is ours. Android 12 and later therefore
                  send a tapped link here only after someone picks this app under Open by default,

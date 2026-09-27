@@ -331,8 +331,8 @@ class ServiceRow extends StatelessWidget {
             width: width,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             decoration: BoxDecoration(
-              // A fixed plate: the logos are drawn for a dark ground.
-              color: const Color(0xFF1E1F22),
+              // A fixed light plate: the logos are app icons.
+              color: AppPalette.logoPlate,
               borderRadius: BorderRadius.circular(AppRadii.card),
             ),
             child: Image.asset(service.imagePath, fit: BoxFit.contain),

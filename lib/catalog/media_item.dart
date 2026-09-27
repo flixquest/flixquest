@@ -153,6 +153,9 @@ class MediaItem {
 
   String get stableId => stableKey ?? '${kind.name}:$id';
 
+  /// TMDB's popularity score, when the list this came from carried it.
+  num? get popularity => movie?.popularity ?? series?.popularity;
+
   /// TMDB genre ids, when the list this came from carried them.
   List<int> get genreIds =>
       movie?.genreIds ?? series?.genreIds ?? const <int>[];

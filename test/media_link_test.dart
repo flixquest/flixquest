@@ -158,6 +158,74 @@ void main() {
     });
   });
 
+  group('flix.quest addresses', () {
+    test('a film is its id', () {
+      final target = MediaLink.parse('https://flix.quest/m/123');
+      expect(target, isA<TmdbMovieLink>());
+      expect((target as TmdbMovieLink).id, 123);
+      expect(target.title, isNull);
+    });
+
+    test('a series is its id alone', () {
+      final target = MediaLink.parse('https://flix.quest/t/2316');
+      expect(target, isA<TmdbTvLink>());
+      expect((target as TmdbTvLink).id, 2316);
+    });
+
+    test('a season follows the id after a dot', () {
+      final target = MediaLink.parse('https://flix.quest/t/2316.4');
+      expect(target, isA<TmdbSeasonLink>());
+      final season = target as TmdbSeasonLink;
+      expect(season.seriesId, 2316);
+      expect(season.seasonNumber, 4);
+    });
+
+    test('an episode keeps both of its numbers', () {
+      final target = MediaLink.parse('https://flix.quest/t/2316.1.1');
+      expect(target, isA<TmdbEpisodeLink>());
+      final episode = target as TmdbEpisodeLink;
+      expect(episode.seriesId, 2316);
+      expect(episode.seasonNumber, 1);
+      expect(episode.episodeNumber, 1);
+    });
+
+    test('specials are season zero', () {
+      final target = MediaLink.parse('https://flix.quest/t/2316.0.3');
+      expect((target as TmdbEpisodeLink).seasonNumber, 0);
+    });
+
+    test('a full stop after a shared episode is not part of it', () {
+      final target = MediaLink.parse('Watch this: https://flix.quest/t/2316.1.1.');
+      expect((target as TmdbEpisodeLink).episodeNumber, 1);
+    });
+
+    test('an address typed without a scheme still reads', () {
+      final target = MediaLink.parse('flix.quest/m/550');
+      expect((target as TmdbMovieLink).id, 550);
+    });
+
+    test('a query on the end changes nothing', () {
+      final target = MediaLink.parse('https://flix.quest/m/550?utm_source=share');
+      expect((target as TmdbMovieLink).id, 550);
+    });
+
+    test('a malformed address is not guessed at', () {
+      expect(MediaLink.parse('https://flix.quest/'), isNull);
+      expect(MediaLink.parse('https://flix.quest/m/'), isNull);
+      expect(MediaLink.parse('https://flix.quest/m/abc'), isNull);
+      expect(MediaLink.parse('https://flix.quest/m/550.1'), isNull);
+      expect(MediaLink.parse('https://flix.quest/m/550/extra'), isNull);
+      expect(MediaLink.parse('https://flix.quest/t/2316.1.1.1'), isNull);
+      expect(MediaLink.parse('https://flix.quest/t/2316..1'), isNull);
+      expect(MediaLink.parse('https://flix.quest/x/550'), isNull);
+    });
+
+    test('another site with the same paths is not ours', () {
+      expect(MediaLink.parse('https://example.com/m/550'), isNull);
+      expect(MediaLink.parse('https://flix.quest.evil.com/m/550'), isNull);
+    });
+  });
+
   group('links as they actually arrive', () {
     test('a subdomain in front of either site is still that site', () {
       expect(MediaLink.parse('https://m.themoviedb.org/movie/550'),

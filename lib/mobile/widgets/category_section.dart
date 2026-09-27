@@ -128,9 +128,12 @@ class CategorySection extends StatelessWidget {
 
 /// A title given the width of the page: its still, its logo and what it is.
 class FeatureCard extends StatelessWidget {
-  const FeatureCard({required this.item, super.key});
+  const FeatureCard({required this.item, this.onTap, super.key});
 
   final MediaItem item;
+
+  /// In place of opening the title's details.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -141,7 +144,7 @@ class FeatureCard extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: gutter),
       child: Pressable(
         semanticLabel: mediaSemanticLabel(item),
-        onTap: () => MobilePlayback.openDetails(context, item),
+        onTap: onTap ?? () => MobilePlayback.openDetails(context, item),
         onLongPress: () => showTitleSheet(context, item),
         child: SizedBox(
           height: width * 9 / 16,

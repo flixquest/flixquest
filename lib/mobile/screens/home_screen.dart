@@ -27,6 +27,7 @@ import '../../widgets/common_widgets.dart'
     show AppStreamingService, appStreamingServices;
 import '../../widgets/hosted_ads_banner.dart';
 import '../app/mobile_tabs.dart';
+import '../collections.dart';
 import '../my_list.dart';
 import '../../screens/common/update_screen.dart';
 import '../widgets/category_section.dart';
@@ -163,23 +164,8 @@ class _HomeScreenState extends State<HomeScreen>
             .catchError((Object _) => const <MediaItem>[]),
       );
 
-  void _openCategory(HomeCategory category) {
-    _openCollection(
-      _translated(
-        const CatalogController().genreCollection(
-          kind: category.kind,
-          genre: category.genre,
-          settings: context.read<SettingsProvider>(),
-          dependencies: context.read<AppDependencyProvider>(),
-        ),
-        tr(
-          category.kind == MediaKind.movie ? 'movie_genres' : 'series_genres',
-        ),
-        adPlacement:
-            category.kind == MediaKind.movie ? 'genre_movies' : 'genre_tv',
-      ),
-    );
-  }
+  void _openCategory(HomeCategory category) =>
+      openGenreCollection(context, category.kind, category.genre);
 
   Future<void> _load(HomeFilter filter) {
     _failed.remove(filter);
@@ -356,19 +342,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
     if (picked == null || !mounted) return;
     final (kind, genre) = picked;
-    _openCollection(
-      _translated(
-        const CatalogController().genreCollection(
-          kind: kind,
-          genre: genre,
-          settings: context.read<SettingsProvider>(),
-          dependencies: context.read<AppDependencyProvider>(),
-        ),
-        tr(kind == MediaKind.movie ? 'movie_genres' : 'series_genres'),
-        // The placements of the old genre pages.
-        adPlacement: kind == MediaKind.movie ? 'genre_movies' : 'genre_tv',
-      ),
-    );
+    await openGenreCollection(context, kind, genre);
   }
 
   List<String> _genreNames(HomeFeed feed, MediaItem item) {

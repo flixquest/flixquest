@@ -44,14 +44,16 @@ class FilterChips extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: gutter),
         itemCount: chips.length,
         separatorBuilder: (_, __) => const SizedBox(width: AppSpace.sm),
-        itemBuilder: (context, index) => _Chip(spec: chips[index]),
+        itemBuilder: (context, index) => ChoicePill(spec: chips[index]),
       ),
     );
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({required this.spec});
+/// One pill: a filter that stays selected, or an action. Laid out by
+/// [FilterChips] in a row, or on its own in a wrap of choices.
+class ChoicePill extends StatelessWidget {
+  const ChoicePill({required this.spec, super.key});
 
   final FilterChipSpec spec;
 
@@ -64,43 +66,47 @@ class _Chip extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      child: Material(
-        color: selected ? palette.focusFill : palette.idleFill,
-        borderRadius: BorderRadius.circular(AppRadii.chip),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            spec.onTap();
-          },
-          child: Padding(
-            padding: EdgeInsetsDirectional.fromSTEB(
-              icon == null ? 14 : 11,
-              0,
-              spec.dropdown ? 10 : 14,
-              0,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                if (icon != null) ...<Widget>[
-                  Icon(icon, size: 16, color: foreground),
-                  const SizedBox(width: 6),
-                ],
-                Text(
-                  spec.label,
-                  style: TextStyle(
-                    fontFamily: AppType.semiBold,
-                    fontSize: 14,
-                    height: 1.1,
-                    color: foreground,
+      child: SizedBox(
+        height: FilterChips.height,
+        child: Material(
+          color: selected ? palette.focusFill : palette.idleFill,
+          borderRadius: BorderRadius.circular(AppRadii.chip),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              spec.onTap();
+            },
+            child: Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(
+                icon == null ? 14 : 11,
+                0,
+                spec.dropdown ? 10 : 14,
+                0,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  if (icon != null) ...<Widget>[
+                    Icon(icon, size: 16, color: foreground),
+                    const SizedBox(width: 6),
+                  ],
+                  Text(
+                    spec.label,
+                    style: TextStyle(
+                      fontFamily: AppType.semiBold,
+                      fontSize: 14,
+                      height: 1.1,
+                      color: foreground,
+                    ),
                   ),
-                ),
-                if (spec.dropdown) ...<Widget>[
-                  const SizedBox(width: 4),
-                  Icon(PhosphorIcons.caretDown(), size: 14, color: foreground),
+                  if (spec.dropdown) ...<Widget>[
+                    const SizedBox(width: 4),
+                    Icon(PhosphorIcons.caretDown(),
+                        size: 14, color: foreground),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

@@ -75,7 +75,7 @@ class _CollectionScreenState extends State<CollectionScreen> {
                 height: 30,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E1F22),
+                  color: AppPalette.logoPlate,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Image.asset(logo, fit: BoxFit.contain),

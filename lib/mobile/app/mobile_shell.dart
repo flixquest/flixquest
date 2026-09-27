@@ -10,10 +10,10 @@ import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../provider/settings_provider.dart';
-import '../../screens/common/discover.dart';
 import '../../screens/user/user_info.dart';
 import '../../services/app_session_state_store.dart';
 import '../screens/home_screen.dart';
+import '../screens/search_screen.dart';
 import 'mobile_nav_bar.dart';
 import 'mobile_tabs.dart';
 
@@ -82,7 +82,7 @@ class _MobileShellState extends State<MobileShell>
           _restoredTab.value,
     );
     if (restored != null && restored != _tabs.current) {
-      _tabs.select(restored);
+      _tabs.restore(restored);
     }
   }
 
@@ -180,7 +180,7 @@ class _AppTab extends StatelessWidget {
     return switch (tab) {
       MobileTab.home => const HomeScreen(),
       MobileTab.newAndHot => const _NotYet(),
-      MobileTab.search => legacy(const DiscoverPage()),
+      MobileTab.search => const SearchScreen(),
       MobileTab.mine => legacy(const UserInfo()),
     };
   }

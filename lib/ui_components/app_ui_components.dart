@@ -715,42 +715,6 @@ class AppFormSurface extends StatelessWidget {
   }
 }
 
-class AppFilterSection extends StatelessWidget {
-  const AppFilterSection({
-    required this.title,
-    required this.child,
-    this.trailing,
-    super.key,
-  });
-
-  final String title;
-  final Widget child;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child:
-                    Text(title, style: Theme.of(context).textTheme.titleMedium),
-              ),
-              if (trailing != null) trailing!,
-            ],
-          ),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
 class AppFilterPill extends StatelessWidget {
   const AppFilterPill({
     required this.label,
@@ -810,37 +774,6 @@ class AppFilterRail extends StatelessWidget {
           ],
         ],
       ),
-    );
-  }
-}
-
-class AppFilterActions extends StatelessWidget {
-  const AppFilterActions({
-    required this.onReset,
-    required this.onApply,
-    required this.resetLabel,
-    required this.applyLabel,
-    super.key,
-  });
-
-  final VoidCallback onReset;
-  final VoidCallback onApply;
-  final String resetLabel;
-  final String applyLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child:
-              FilledButton.tonal(onPressed: onReset, child: Text(resetLabel)),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: FilledButton(onPressed: onApply, child: Text(applyLabel)),
-        ),
-      ],
     );
   }
 }

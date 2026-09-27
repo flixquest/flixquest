@@ -47,52 +47,57 @@ class PillButton extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: onPressed != null,
-      child: Material(
-        color: background,
-        borderRadius: BorderRadius.circular(AppRadii.button),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onPressed == null || busy
-              ? null
-              : () {
-                  HapticFeedback.lightImpact();
-                  onPressed!();
-                },
-          splashColor: foreground.withValues(alpha: .12),
-          highlightColor: foreground.withValues(alpha: .06),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: height),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(14, 6, 16, 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  if (busy)
-                    SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: foreground,
-                      ),
-                    )
-                  else if (icon != null)
-                    Icon(icon, size: 20, color: foreground),
-                  if (busy || icon != null) const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: AppType.semiBold,
-                        fontSize: 15,
-                        height: 1.2,
-                        color: foreground,
+      // Unavailable reads as such, without changing the button's shape.
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        opacity: onPressed == null ? .45 : 1,
+        child: Material(
+          color: background,
+          borderRadius: BorderRadius.circular(AppRadii.button),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onPressed == null || busy
+                ? null
+                : () {
+                    HapticFeedback.lightImpact();
+                    onPressed!();
+                  },
+            splashColor: foreground.withValues(alpha: .12),
+            highlightColor: foreground.withValues(alpha: .06),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: height),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(14, 6, 16, 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    if (busy)
+                      SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: foreground,
+                        ),
+                      )
+                    else if (icon != null)
+                      Icon(icon, size: 20, color: foreground),
+                    if (busy || icon != null) const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: AppType.semiBold,
+                          fontSize: 15,
+                          height: 1.2,
+                          color: foreground,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
