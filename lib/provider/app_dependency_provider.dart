@@ -8,7 +8,6 @@ import '../constants/api_constants.dart';
 import '../models/occasional_theme.dart';
 import '../models/banner_ad.dart';
 import '../preferences/app_dependency_preferences.dart';
-import '../services/unity_ads_service.dart';
 
 class AppDependencyProvider extends ChangeNotifier {
   final AppDependencies _preferences = AppDependencies();
@@ -66,32 +65,41 @@ class AppDependencyProvider extends ChangeNotifier {
 
   String _bannerAdNetwork = 'native';
   String get bannerAdNetwork => _bannerAdNetwork;
-  bool get isUnityBannerActive => _bannerAdNetwork.trim().toLowerCase() == 'unity';
-  bool get isNativeBannerActive => _bannerAdNetwork.trim().toLowerCase() == 'native';
+  bool get isStartIoBannerActive =>
+      _startIoBannerEnabled &&
+      const {'native', 'unity', 'startio'}.contains(_bannerAdNetwork);
 
-  String _unityGameIdAndroid = UnityAdsService.fallbackAndroidGameId;
+  // These legacy values remain readable so existing Remote Config payloads
+  // and older clients can coexist while Unity itself is no longer linked.
+  String _unityGameIdAndroid = '5445375';
   String get unityGameIdAndroid => _unityGameIdAndroid;
 
-  String _unityBannerPlacementId = UnityAdsService.fallbackBannerPlacementId;
+  String _unityBannerPlacementId = 'Banner_Android';
   String get unityBannerPlacementId => _unityBannerPlacementId;
 
   bool _unityTestMode = false;
   bool get unityTestMode => _unityTestMode;
 
+  bool _startIoBannerEnabled = true;
+  bool get startIoBannerEnabled => _startIoBannerEnabled;
+
+  bool _startIoInterstitialEnabled = true;
+  bool get startIoInterstitialEnabled => _startIoInterstitialEnabled;
+
+  bool _startIoRewardedEnabled = true;
+  bool get startIoRewardedEnabled => _startIoRewardedEnabled;
+
   void setBannerAdNetwork(String network) {
     final sanitized = network.trim().toLowerCase();
     if (_bannerAdNetwork != sanitized) {
       _bannerAdNetwork = sanitized;
-      if (isUnityBannerActive) {
-        UnityAdsService.instance.initialize(
-          gameId: _unityGameIdAndroid,
-          testMode: _unityTestMode,
-        );
-      }
       notifyListeners();
     }
   }
 
+  /// Retains the old Unity-named values as compatibility inputs. Start.io uses
+  /// the existing test-mode flag; its application ID is supplied at build time
+  /// through the Android manifest.
   void setUnityAdsConfig({
     String? gameIdAndroid,
     String? bannerPlacementId,
@@ -116,15 +124,23 @@ class AppDependencyProvider extends ChangeNotifier {
       _unityTestMode = testMode;
       changed = true;
     }
-    if (changed) {
-      if (isUnityBannerActive) {
-        UnityAdsService.instance.initialize(
-          gameId: _unityGameIdAndroid,
-          testMode: _unityTestMode,
-        );
-      }
-      notifyListeners();
+    if (changed) notifyListeners();
+  }
+
+  void setStartIoAdsConfig({
+    required bool bannerEnabled,
+    required bool interstitialEnabled,
+    required bool rewardedEnabled,
+  }) {
+    if (_startIoBannerEnabled == bannerEnabled &&
+        _startIoInterstitialEnabled == interstitialEnabled &&
+        _startIoRewardedEnabled == rewardedEnabled) {
+      return;
     }
+    _startIoBannerEnabled = bannerEnabled;
+    _startIoInterstitialEnabled = interstitialEnabled;
+    _startIoRewardedEnabled = rewardedEnabled;
+    notifyListeners();
   }
 
   bool _isForcedUpdate = false;

@@ -17,6 +17,7 @@ import 'package:flixquest/models/tv.dart';
 import 'package:flixquest/models/videos.dart';
 import 'package:flixquest/models/watch_providers.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
+import 'package:flixquest/provider/bookmark_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -157,6 +158,46 @@ RecentEpisode _watching(int season, int episode) => RecentEpisode(
       seriesId: 9,
     );
 
+class _FakeBookmarks extends ChangeNotifier implements BookmarkProvider {
+  @override
+  final List<Movie> movies = <Movie>[];
+  @override
+  final List<TV> tvShows = <TV>[];
+
+  @override
+  bool isMovieBookmarked(int id) => movies.any((movie) => movie.id == id);
+
+  @override
+  bool isTVBookmarked(int id) => tvShows.any((series) => series.id == id);
+
+  @override
+  Future<void> addMovie(Movie movie) async {
+    movies.add(movie);
+    notifyListeners();
+  }
+
+  @override
+  Future<void> removeMovie(int id) async {
+    movies.removeWhere((movie) => movie.id == id);
+    notifyListeners();
+  }
+
+  @override
+  Future<void> addTV(TV series) async {
+    tvShows.add(series);
+    notifyListeners();
+  }
+
+  @override
+  Future<void> removeTV(int id) async {
+    tvShows.removeWhere((series) => series.id == id);
+    notifyListeners();
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 Future<void> _setUp() async {
   dotenv.testLoad(fileInput: 'TMDB_API_KEY=key\nFLIXQUEST_API_URL=x');
   SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -171,6 +212,7 @@ Widget _app(
   bool canDownload = true,
   String mode = 'dark',
   TextDirection direction = TextDirection.ltr,
+  BookmarkProvider? bookmarks,
 }) =>
     MultiProvider(
       providers: [
@@ -179,6 +221,9 @@ Widget _app(
           create: (_) => AppDependencyProvider()
             ..displayWatchNowButton = canPlay
             ..displayDownloadButton = canDownload,
+        ),
+        ChangeNotifierProvider<BookmarkProvider>(
+          create: (_) => bookmarks ?? _FakeBookmarks(),
         ),
       ],
       child: Builder(
@@ -287,6 +332,33 @@ void main() {
     expect(find.text('download_action'), findsNothing);
     // The rest of the page is still there.
     expect(find.text('my_list'), findsOneWidget);
+  });
+
+  testWidgets('My List toggles movies and series from their detail actions',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    for (final item in <MediaItem>[_movie, _series]) {
+      final bookmarks = _FakeBookmarks();
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await tester.pumpWidget(_app(item, bookmarks: bookmarks));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('my_list'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        item.kind == MediaKind.movie
+            ? bookmarks.isMovieBookmarked(item.id)
+            : bookmarks.isTVBookmarked(item.id),
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets('a movie part way through resumes, with the time left',

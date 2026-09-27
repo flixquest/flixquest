@@ -467,6 +467,9 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: AppSpace.md)),
+              const SliverToBoxAdapter(
+                child: HomeOptionalRow(child: UpdateBottom()),
+              ),
               ...content,
               SliverToBoxAdapter(
                 child: SizedBox(height: media.padding.bottom + AppSpace.sm),
@@ -704,8 +707,10 @@ String? _releaseBadge(BuildContext context, MediaItem item) {
 /// Home's rows for a loaded feed, top to bottom: the hero, then what to
 /// watch next. Under All each chart comes as a pair, movies then series, so
 /// no catalogue row mixes the two; only the viewer's own rows (Continue
-/// Watching, My List) hold both. The two ads sit well below the first screen
-/// and never above Continue Watching.
+/// Watching, My List) hold both. Four ads are spread down the page: one
+/// directly under the hero, then one after Trending, one after Streaming
+/// Services, and one before the genre rows. Each Home tab reports its own
+/// placement ids (`home_all_*`, `home_movies_*`, `home_series_*`).
 @visibleForTesting
 List<Widget> homeRows(
   BuildContext context, {
@@ -762,11 +767,15 @@ List<Widget> homeRows(
         onSeeAll: () => onOpenList(kind, list, title),
       );
 
-  // The placements the old Movies and Series pages reported.
-  final ad = HomeAdSlot(
-    placement: filter == HomeFilter.series ? 'home_tv' : 'home_movies',
-  );
+  // One ad unit per Home tab so each tab's slots report separately.
+  final adBase = switch (filter) {
+    HomeFilter.all => 'home_all',
+    HomeFilter.movies => 'home_movies',
+    HomeFilter.series => 'home_series',
+  };
+  HomeAdSlot adSlot(int slot) => HomeAdSlot(placement: '${adBase}_$slot');
   return <Widget>[
+    // The update notice is a fixed Home slot above these feed rows.
     if (heroes.isNotEmpty)
       HeroCarousel(
         key: ValueKey<HomeFilter>(filter),
@@ -774,8 +783,8 @@ List<Widget> homeRows(
         genresFor: genresFor,
         onShown: onHeroShown,
       ),
-    // Only there when an update is out.
-    const HomeOptionalRow(child: UpdateBottom()),
+    // Directly below the hero.
+    adSlot(1),
     if (shownContinue.isNotEmpty)
       ContinueRow(title: tr('continue_watching'), items: shownContinue),
     for (final kind in kinds)
@@ -792,7 +801,7 @@ List<Widget> homeRows(
           titled(kind, 'trending_movies_week', 'trending_series_week'),
           trending[kind]!,
         ),
-    ad,
+    adSlot(2),
     if (shownMyList.isNotEmpty)
       PosterRow(
         title: tr('my_list'),
@@ -835,7 +844,7 @@ List<Widget> homeRows(
       services: appStreamingServices,
       onOpen: onOpenService,
     ),
-    ad,
+    adSlot(3),
     for (final kind in kinds)
       if (feed.of(kind).topRated.isNotEmpty)
         listRow(
@@ -852,6 +861,7 @@ List<Widget> homeRows(
         feed.of(MediaKind.movie).upcoming,
         badgeFor: (item) => _releaseBadge(context, item),
       ),
+    adSlot(4),
     // FlixQuest's categorized feed: a few genres at random, each laid out its
     // own way, labelled with its kind where both are on show.
     for (final category in feed.categories)

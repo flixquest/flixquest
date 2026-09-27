@@ -16,6 +16,7 @@ import '../../provider/settings_provider.dart';
 import '../../screens/common/live_player.dart';
 import '../../services/analytics_service.dart';
 import '../../services/daddylive_service.dart';
+import '../../services/start_io_ads_service.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
 import '../app/tv_design.dart';
@@ -345,8 +346,15 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   }
 
   Future<void> _play(Channel channel) async {
-    final stopwatch = Stopwatch()..start();
     setState(() => _resolvingId = channel.id);
+    final dependencies = context.read<AppDependencyProvider>();
+    await StartIoAdsService.instance.showInterstitial(
+      enabled: dependencies.startIoInterstitialEnabled,
+      testMode: dependencies.unityTestMode,
+      adTag: 'live_watch_now_tv',
+    );
+    if (!mounted) return;
+    final stopwatch = Stopwatch()..start();
     try {
       final stream = await _api().getStream(channel.id);
       await _daddyDatabase.addRecent(channel.id);
@@ -363,6 +371,12 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         durationMs: stopwatch.elapsedMilliseconds,
         source: _mode.name,
       );
+      await StartIoAdsService.instance.showRewarded(
+        enabled: dependencies.startIoRewardedEnabled,
+        testMode: dependencies.unityTestMode,
+        adTag: 'live_stream_ready_tv',
+      );
+      if (!mounted) return;
       final theme = Theme.of(context);
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(

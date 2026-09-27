@@ -9,6 +9,7 @@ import 'package:flixquest/models/provider_video_source.dart';
 import 'package:flixquest/constants/app_constants.dart' show MediaType;
 import 'package:flixquest/models/provider_load_state.dart';
 import 'package:flixquest/services/globle_method.dart';
+import 'package:flixquest/services/start_io_ads_service.dart';
 import 'package:flixquest/services/stream_size_estimator.dart';
 import 'package:flixquest/video_providers/provider_loader.dart';
 import 'package:flixquest/video_providers/scraper_api.dart';
@@ -33,7 +34,6 @@ import '../../screens/common/player.dart';
 import '../../screens/common/download_selection_sheets.dart';
 import '../../screens/common/manual_source_picker.dart';
 import '../../tv/player/tv_player_screen.dart';
-import '../../widgets/hosted_ads_banner.dart';
 
 class TVVideoLoader extends StatefulWidget {
   const TVVideoLoader(
@@ -79,7 +79,18 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
   @override
   void initState() {
     super.initState();
-    loadVideo();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startPlayback());
+  }
+
+  Future<void> _startPlayback() async {
+    final dependencies = context.read<AppDependencyProvider>();
+    if (!widget.download) {
+      await StartIoAdsService.instance.showInterstitial(
+        enabled: dependencies.startIoInterstitialEnabled,
+        testMode: dependencies.unityTestMode,
+      );
+    }
+    if (mounted) await loadVideo();
   }
 
   Future<void> _loadProviders() async {
@@ -110,7 +121,7 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
     });
   }
 
-  void loadVideo() async {
+  Future<void> loadVideo() async {
     try {
       await _loadProviders();
       VideoProvider? selectedDownloadProvider;
@@ -255,12 +266,12 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
               );
         }
 
-        final dependencies =
-            Provider.of<AppDependencyProvider>(context, listen: false);
-        await showHostedInterstitialAd(
-          context,
-          loadAds: () => ScraperApi(dependencies.flixquestAPIURL).getAds(),
+        final dependencies = context.read<AppDependencyProvider>();
+        await StartIoAdsService.instance.showRewarded(
+          enabled: dependencies.startIoRewardedEnabled,
+          testMode: dependencies.unityTestMode,
         );
+        if (!mounted) return;
 
         // Navigate to player with provider list for lazy loading
         Navigator.pushReplacement(

@@ -19,6 +19,7 @@ import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/media_link.dart';
+import '../../services/start_io_ads_service.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
 import '../../services/analytics_service.dart';
@@ -335,8 +336,15 @@ class _ChannelListState extends State<ChannelList> {
   }
 
   Future<void> _play(Channel channel) async {
-    final stopwatch = Stopwatch()..start();
     setState(() => _resolvingId = channel.id);
+    final dependencies = context.read<AppDependencyProvider>();
+    await StartIoAdsService.instance.showInterstitial(
+      enabled: dependencies.startIoInterstitialEnabled,
+      testMode: dependencies.unityTestMode,
+      adTag: 'live_watch_now',
+    );
+    if (!mounted) return;
+    final stopwatch = Stopwatch()..start();
     try {
       final stream = await _api().getStream(channel.id);
       await _daddyDatabase.addRecent(channel.id);
@@ -353,10 +361,10 @@ class _ChannelListState extends State<ChannelList> {
         durationMs: stopwatch.elapsedMilliseconds,
         source: _mode.name,
       );
-      final dependencies = context.read<AppDependencyProvider>();
-      await showHostedInterstitialAd(
-        context,
-        loadAds: () => ScraperApi(dependencies.flixquestAPIURL).getAds(),
+      await StartIoAdsService.instance.showRewarded(
+        enabled: dependencies.startIoRewardedEnabled,
+        testMode: dependencies.unityTestMode,
+        adTag: 'live_stream_ready',
       );
       if (!mounted) return;
       final autoFullScreen = context.read<SettingsProvider>().defaultViewMode;
@@ -569,14 +577,7 @@ class _ChannelListState extends State<ChannelList> {
       child: CustomScrollView(
         slivers: <Widget>[
           SliverToBoxAdapter(child: _buildHeader()),
-          SliverToBoxAdapter(
-            child: RemoteHostedAdsBanner(
-              placement: 'live_tv',
-              loadAds: () => ScraperApi(
-                context.read<AppDependencyProvider>().flixquestAPIURL,
-              ).getAds(),
-            ),
-          ),
+          _bannerSliver('live_tv_1'),
           if (_mode == _LiveTvMode.channels)
             ..._buildChannelSlivers()
           else
@@ -589,6 +590,31 @@ class _ChannelListState extends State<ChannelList> {
         ],
       ),
     );
+  }
+
+  /// Live TV ads use the larger MREC unit; it is the best-paying placement
+  /// the Start.io plugin exposes.
+  Widget _bannerSliver(String placement) => SliverToBoxAdapter(
+        child: RemoteHostedAdsBanner(
+          placement: placement,
+          variant: HostedBannerVariant.tall,
+          loadAds: () => ScraperApi(
+            context.read<AppDependencyProvider>().flixquestAPIURL,
+          ).getAds(),
+        ),
+      );
+
+  /// Splits [items] into [parts] near-equal slices so banners can sit between
+  /// them. Empty slices are kept so the banner positions never shift.
+  static List<List<T>> _chunk<T>(List<T> items, int parts) {
+    final size = (items.length / parts).ceil();
+    return <List<T>>[
+      for (var i = 0; i < parts; i++)
+        items.sublist(
+          math.min(i * size, items.length),
+          math.min((i + 1) * size, items.length),
+        ),
+    ];
   }
 
   void _clearSearch() {
@@ -618,33 +644,44 @@ class _ChannelListState extends State<ChannelList> {
     }
     final gutter = AppSpace.gutter(context);
     final scale = MediaQuery.textScalerOf(context);
-    return <Widget>[
-      SliverPadding(
-        padding: EdgeInsets.fromLTRB(gutter, AppSpace.xs, gutter, 0),
-        sliver: SliverGrid.builder(
-          itemCount: visible.length,
-          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 520,
-            // The row's two lines of text, grown with the text size.
-            mainAxisExtent: math.max(68, scale.scale(39) + 30),
-            crossAxisSpacing: AppSpace.md,
-            mainAxisSpacing: AppSpace.sm,
+
+    Widget grid(List<Channel> channels) => SliverPadding(
+          padding: EdgeInsets.fromLTRB(gutter, AppSpace.xs, gutter, 0),
+          sliver: SliverGrid.builder(
+            itemCount: channels.length,
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 520,
+              // The row's two lines of text, grown with the text size.
+              mainAxisExtent: math.max(68, scale.scale(39) + 30),
+              crossAxisSpacing: AppSpace.md,
+              mainAxisSpacing: AppSpace.sm,
+            ),
+            itemBuilder: (_, index) {
+              final channel = channels[index];
+              return _ChannelCard(
+                channel: channel,
+                favorite: _favoriteIds.contains(channel.id),
+                resolving: _resolvingId == channel.id,
+                onFavorite: () => _toggleFavorite(channel),
+                onShare: MediaLink.liveChannelUrl(channel.id) == null
+                    ? null
+                    : () => _shareChannel(channel),
+                onPlay: () => _play(channel),
+              );
+            },
           ),
-          itemBuilder: (_, index) {
-            final channel = visible[index];
-            return _ChannelCard(
-              channel: channel,
-              favorite: _favoriteIds.contains(channel.id),
-              resolving: _resolvingId == channel.id,
-              onFavorite: () => _toggleFavorite(channel),
-              onShare: MediaLink.liveChannelUrl(channel.id) == null
-                  ? null
-                  : () => _shareChannel(channel),
-              onPlay: () => _play(channel),
-            );
-          },
-        ),
-      ),
+        );
+
+    // The header banner is `live_tv_1`; these three break the list up.
+    final chunks = _chunk(visible, 4);
+    return <Widget>[
+      grid(chunks[0]),
+      _bannerSliver('live_tv_2'),
+      grid(chunks[1]),
+      _bannerSliver('live_tv_3'),
+      grid(chunks[2]),
+      _bannerSliver('live_tv_4'),
+      grid(chunks[3]),
     ];
   }
 
@@ -672,8 +709,12 @@ class _ChannelListState extends State<ChannelList> {
     }
     final gutter = AppSpace.gutter(context);
     final palette = AppPalette.of(context);
-    return <Widget>[
-      for (final section in sections) ...<Widget>[
+    // The header banner is `live_tv_1`; spread the rest after the first
+    // sections, then append any slots the schedule is too short to reach.
+    final slivers = <Widget>[];
+    var banner = 2;
+    for (final section in sections) {
+      slivers.addAll(<Widget>[
         SliverToBoxAdapter(
           child: KickerHeading(
             section.label,
@@ -700,8 +741,15 @@ class _ChannelListState extends State<ChannelList> {
             },
           ),
         ),
-      ],
-    ];
+      ]);
+      if (banner <= 4) slivers.add(_bannerSliver('live_tv_$banner'));
+      banner++;
+    }
+    while (banner <= 4) {
+      slivers.add(_bannerSliver('live_tv_$banner'));
+      banner++;
+    }
+    return slivers;
   }
 
   String _count(int n) => NumberFormat.decimalPattern(

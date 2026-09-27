@@ -10,7 +10,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
-import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../design/skeleton.dart';
@@ -602,7 +601,6 @@ class UpdateBottom extends StatefulWidget {
 class _UpdateBottomState extends State<UpdateBottom> {
   late final Future<PackageInfo> _packageInfo;
   bool _visible = false;
-  String _notificationId = '';
 
   @override
   void initState() {
@@ -619,23 +617,14 @@ class _UpdateBottomState extends State<UpdateBottom> {
     }
     if (!mounted) return;
     final config = context.read<AppDependencyProvider>();
-    final notificationId = AppUpdateService.notificationId(
-      remoteVersion: config.latestAppVersion,
-      latestBuildNumber: config.latestBuildNumber,
-      minimumBuildNumber: config.minimumBuildNumber,
-    );
-    final ignored = sharedPrefsSingleton.getString('ignore_version') ?? '';
 
     setState(() {
-      _notificationId = notificationId;
-      _visible = notificationId.isNotEmpty &&
-          ignored != notificationId &&
-          AppUpdateService.isAvailable(
-            packageInfo: packageInfo,
-            remoteVersion: config.latestAppVersion,
-            latestBuildNumber: config.latestBuildNumber,
-            minimumBuildNumber: config.minimumBuildNumber,
-          );
+      _visible = AppUpdateService.isAvailable(
+        packageInfo: packageInfo,
+        remoteVersion: config.latestAppVersion,
+        latestBuildNumber: config.latestBuildNumber,
+        minimumBuildNumber: config.minimumBuildNumber,
+      );
     });
   }
 
@@ -644,16 +633,6 @@ class _UpdateBottomState extends State<UpdateBottom> {
     super.didChangeDependencies();
     context.watch<AppDependencyProvider>();
     _checkVisibility();
-  }
-
-  Future<void> _dismiss() async {
-    if (_notificationId.isNotEmpty) {
-      await sharedPrefsSingleton.setString('ignore_version', _notificationId);
-    }
-    if (mounted) {
-      if (widget.television) FocusScope.of(context).nextFocus();
-      setState(() => _visible = false);
-    }
   }
 
   @override
@@ -695,8 +674,6 @@ class _UpdateBottomState extends State<UpdateBottom> {
                       MaterialPageRoute<void>(
                           builder: (_) => const UpdateScreen(
                               isForced: false, television: true)))),
-              const SizedBox(width: 12),
-              TvUpdateAction(label: 'Not now', onPressed: _dismiss),
             ]),
           ));
     }
@@ -713,7 +690,7 @@ class _UpdateBottomState extends State<UpdateBottom> {
           border: Border.all(color: palette.hairline),
         ),
         child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(16, 14, 6, 14),
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 14, 14, 14),
           child: Row(
             children: [
               Icon(
@@ -751,13 +728,6 @@ class _UpdateBottomState extends State<UpdateBottom> {
                     builder: (_) => const UpdateScreen(isForced: false),
                   ),
                 ),
-              ),
-              IconButton(
-                onPressed: _dismiss,
-                tooltip: tr('disable_notification_version'),
-                color: palette.mutedText,
-                icon: Icon(PhosphorIcons.x(), size: 18),
-                visualDensity: VisualDensity.compact,
               ),
             ],
           ),

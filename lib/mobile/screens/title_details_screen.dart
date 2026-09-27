@@ -438,15 +438,14 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
   }
 
   Future<void> _toggleMyList() async {
-    final saved = MyList.contains(context, _item);
     HapticFeedback.lightImpact();
-    await MyList.toggle(context, _item);
+    final added = await MyList.toggle(context, _item);
     if (!mounted) return;
     context.read<SettingsProvider>().analytics.trackBookmarkToggle(
           mediaType: _isMovie ? 'Movie' : 'TV',
           mediaName: _item.title,
           mediaId: _item.id,
-          added: !saved,
+          added: added,
         );
   }
 

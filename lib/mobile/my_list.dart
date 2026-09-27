@@ -42,8 +42,8 @@ abstract final class MyList {
         .toList(growable: false);
   }
 
-  /// Adds or removes [item] and says which it did.
-  static Future<void> toggle(BuildContext context, MediaItem item) async {
+  /// Adds or removes [item] and returns whether it is saved afterwards.
+  static Future<bool> toggle(BuildContext context, MediaItem item) async {
     final bookmarks = context.read<BookmarkProvider>();
     final messenger = ScaffoldMessenger.maybeOf(context);
     final saved = item.kind == MediaKind.movie
@@ -67,6 +67,7 @@ abstract final class MyList {
           duration: const Duration(seconds: 2),
         ),
       );
+    return !saved;
   }
 
   static Movie _movieOf(MediaItem item) => (item.movie ??

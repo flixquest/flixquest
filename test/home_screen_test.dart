@@ -17,9 +17,11 @@ import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/provider/bookmark_provider.dart';
 import 'package:flixquest/provider/recently_watched_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
+import 'package:flixquest/screens/common/update_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -153,12 +155,15 @@ Widget _app({
   required Widget child,
   RecentProvider? recent,
   BookmarkProvider? bookmarks,
+  AppDependencyProvider? dependencies,
   String mode = 'dark',
 }) =>
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
-        ChangeNotifierProvider(create: (_) => AppDependencyProvider()),
+        ChangeNotifierProvider(
+          create: (_) => dependencies ?? AppDependencyProvider(),
+        ),
         ChangeNotifierProvider<RecentProvider>.value(
           value: recent ?? _FakeRecent(),
         ),
@@ -226,7 +231,7 @@ String _describe(Widget row) => switch (row) {
 void main() {
   setUp(_setUp);
 
-  testWidgets('All: the rows in order, ads well below Continue Watching',
+  testWidgets('All: the rows in order, four ads spread down the page',
       (tester) async {
     final feed = await HomeFeedController(_FakeSource()).load(HomeFilter.all);
     final rows = await _rows(
@@ -237,10 +242,10 @@ void main() {
       myList: _series([150]),
     );
     // Every chart comes as a pair, movies then series; only the viewer's
-    // own rows hold both.
+    // own rows hold both. One ad sits under the hero, three further down.
     expect(rows.map(_describe), <String>[
       'hero',
-      'update',
+      'ad',
       'continue_watching',
       'top_10_movies_today',
       'top_10_series_today',
@@ -258,7 +263,13 @@ void main() {
       'top_rated_movies',
       'top_rated_series',
       'upcoming_movies',
+      'ad',
     ]);
+    // Each slot carries its own ad-tag id, and the tab's own prefix.
+    expect(
+      rows.whereType<HomeAdSlot>().map((slot) => slot.placement),
+      <String>['home_all_1', 'home_all_2', 'home_all_3', 'home_all_4'],
+    );
     // And no catalogue row mixes the two.
     for (final row in rows.whereType<PosterRow>()) {
       if (row.title == 'my_list') continue;
@@ -342,6 +353,50 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('top_10_movies_today'), findsOneWidget);
     expect(source.loads, loads);
+  });
+
+  testWidgets('update notice stays below filters and above the hero',
+      (tester) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'FlixQuest',
+      packageName: 'com.test.fq',
+      version: '4.0.0',
+      buildNumber: '1',
+      buildSignature: '',
+    );
+    final dependencies = AppDependencyProvider()
+      ..setUpdateConfiguration(
+        forced: false,
+        latestVersion: '4.2.0',
+        latestBuild: 2,
+        minimumBuild: 0,
+        downloadUrl: 'https://example.com/update.apk',
+        changeLog: '',
+      );
+    await tester.pumpWidget(
+      _app(
+        dependencies: dependencies,
+        child: HomeScreen(
+          source: _FakeSource(),
+          findTint: null,
+          showTitleLogos: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(UpdateBottom), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byType(UpdateBottom)).dy,
+      lessThan(tester.getTopLeft(find.byType(HeroCarousel)).dy),
+    );
+    expect(
+      find.descendant(
+        of: find.byType(UpdateBottom),
+        matching: find.byType(IconButton),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('the featured title stays put across a refresh', (tester) async {

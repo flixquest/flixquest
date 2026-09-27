@@ -23,6 +23,9 @@ class AppRemoteConfig {
   static const unityGameIdAndroidKey = 'unity_game_id_android';
   static const unityBannerPlacementIdKey = 'unity_banner_placement_id';
   static const unityTestModeKey = 'unity_test_mode';
+  static const startIoBannerEnabledKey = 'startio_banner_enabled';
+  static const startIoInterstitialEnabledKey = 'startio_interstitial_enabled';
+  static const startIoRewardedEnabledKey = 'startio_rewarded_enabled';
 
   /// Live TV used to ride on the OTT flag before it got a dedicated key.
   static const legacyEnableLiveTvKey = 'enable_ott';
@@ -58,6 +61,9 @@ class AppRemoteConfig {
       unityGameIdAndroidKey: '5445375',
       unityBannerPlacementIdKey: 'Banner_Android',
       unityTestModeKey: false,
+      startIoBannerEnabledKey: true,
+      startIoInterstitialEnabledKey: true,
+      startIoRewardedEnabledKey: true,
     });
   }
 
@@ -125,6 +131,11 @@ class AppRemoteConfig {
       gameIdAndroid: unityGameId.isNotEmpty ? unityGameId : null,
       bannerPlacementId: unityPlacement.isNotEmpty ? unityPlacement : null,
       testMode: unityTestMode,
+    );
+    provider.setStartIoAdsConfig(
+      bannerEnabled: remoteConfig.getBool(startIoBannerEnabledKey),
+      interstitialEnabled: remoteConfig.getBool(startIoInterstitialEnabledKey),
+      rewardedEnabled: remoteConfig.getBool(startIoRewardedEnabledKey),
     );
 
     final instancesRaw = remoteConfig.getString(flixquestApiInstancesKey);
