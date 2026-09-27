@@ -1095,7 +1095,18 @@ class CodegenLoader extends AssetLoader{
   "player_channel_count": "{count} channels",
   "player_stream": "Stream",
   "player_season": "Season {number}",
-  "player_episode_count": "{count} episodes"
+  "player_episode_count": "{count} episodes",
+  "player_search_channels": "Search channels",
+  "player_no_channels": "No channels found",
+  "player_stream_count": "{count} streams",
+  "player_trying_backup": "Trying {name}…",
+  "player_waiting_for_live": "Waiting for live video to start.",
+  "player_channel_temporarily_unavailable": "This channel is temporarily unavailable.",
+  "player_live_stopped": "The live broadcast ended.",
+  "player_live_stalled": "The live stream stopped responding.",
+  "player_switch_channel_failed": "Unable to switch to that channel.",
+  "player_did_not_recover": "This channel did not recover after several attempts.",
+  "player_no_playable_stream": "This channel returned no playable stream."
 };
 static const Map<String,dynamic> _hi = {
   "popularity_descending": "लोकप्रियता घटती",
@@ -2178,7 +2189,18 @@ static const Map<String,dynamic> _hi = {
   "player_channel_count": "{count} चैनल",
   "player_stream": "स्ट्रीम",
   "player_season": "सीज़न {number}",
-  "player_episode_count": "{count} एपिसोड"
+  "player_episode_count": "{count} एपिसोड",
+  "player_search_channels": "चैनल खोजें",
+  "player_no_channels": "कोई चैनल नहीं मिला",
+  "player_stream_count": "{count} स्ट्रीम",
+  "player_trying_backup": "{name} आज़माया जा रहा है…",
+  "player_waiting_for_live": "लाइव वीडियो शुरू होने का इंतज़ार किया जा रहा है।",
+  "player_channel_temporarily_unavailable": "यह चैनल अभी अस्थायी रूप से उपलब्ध नहीं है।",
+  "player_live_stopped": "लाइव प्रसारण समाप्त हो गया।",
+  "player_live_stalled": "लाइव स्ट्रीम ने जवाब देना बंद कर दिया।",
+  "player_switch_channel_failed": "उस चैनल पर स्विच नहीं किया जा सका।",
+  "player_did_not_recover": "कई प्रयासों के बाद भी यह चैनल बहाल नहीं हुआ।",
+  "player_no_playable_stream": "इस चैनल से कोई चलाने योग्य स्ट्रीम नहीं मिली।"
 };
 static const Map<String,dynamic> _es = {
   "popularity_descending": "Popularidad descendiente",
@@ -3261,7 +3283,18 @@ static const Map<String,dynamic> _es = {
   "player_channel_count": "{count} canales",
   "player_stream": "Transmisión",
   "player_season": "Temporada {number}",
-  "player_episode_count": "{count} episodios"
+  "player_episode_count": "{count} episodios",
+  "player_search_channels": "Buscar canales",
+  "player_no_channels": "No se encontraron canales",
+  "player_stream_count": "{count} transmisiones",
+  "player_trying_backup": "Probando {name}…",
+  "player_waiting_for_live": "Esperando a que empiece el video en vivo.",
+  "player_channel_temporarily_unavailable": "Este canal no está disponible temporalmente.",
+  "player_live_stopped": "La transmisión en vivo terminó.",
+  "player_live_stalled": "La transmisión en vivo dejó de responder.",
+  "player_switch_channel_failed": "No se pudo cambiar a ese canal.",
+  "player_did_not_recover": "Este canal no se recuperó tras varios intentos.",
+  "player_no_playable_stream": "Este canal no devolvió ninguna transmisión reproducible."
 };
 static const Map<String,dynamic> _ar = {
   "popularity_descending": "ترتيب تنازلي حسب الشعبية",
@@ -4376,7 +4409,18 @@ static const Map<String,dynamic> _ar = {
   "player_channel_count": "{count} قناة",
   "player_stream": "البث",
   "player_season": "الموسم {number}",
-  "player_episode_count": "{count} حلقة"
+  "player_episode_count": "{count} حلقة",
+  "player_search_channels": "ابحث عن قناة",
+  "player_no_channels": "لا توجد قنوات",
+  "player_stream_count": "{count} بثوث",
+  "player_trying_backup": "جارٍ تجربة {name}…",
+  "player_waiting_for_live": "جارٍ انتظار بدء البث المباشر.",
+  "player_channel_temporarily_unavailable": "هذه القناة غير متاحة مؤقتًا.",
+  "player_live_stopped": "انتهى البث المباشر.",
+  "player_live_stalled": "توقف البث المباشر عن الاستجابة.",
+  "player_switch_channel_failed": "تعذّر التبديل إلى تلك القناة.",
+  "player_did_not_recover": "لم تتعافَ هذه القناة بعد عدة محاولات.",
+  "player_no_playable_stream": "لم تُرجع هذه القناة أي بث قابل للتشغيل."
 };
 static const Map<String, Map<String,dynamic>> mapLocales = {"en": _en, "hi": _hi, "es": _es, "ar": _ar};
 }

@@ -1111,5 +1111,16 @@
   "player_channel_count": "{count} قناة",
   "player_stream": "البث",
   "player_season": "الموسم {number}",
-  "player_episode_count": "{count} حلقة"
+  "player_episode_count": "{count} حلقة",
+  "player_search_channels": "ابحث عن قناة",
+  "player_no_channels": "لا توجد قنوات",
+  "player_stream_count": "{count} بثوث",
+  "player_trying_backup": "جارٍ تجربة {name}…",
+  "player_waiting_for_live": "جارٍ انتظار بدء البث المباشر.",
+  "player_channel_temporarily_unavailable": "هذه القناة غير متاحة مؤقتًا.",
+  "player_live_stopped": "انتهى البث المباشر.",
+  "player_live_stalled": "توقف البث المباشر عن الاستجابة.",
+  "player_switch_channel_failed": "تعذّر التبديل إلى تلك القناة.",
+  "player_did_not_recover": "لم تتعافَ هذه القناة بعد عدة محاولات.",
+  "player_no_playable_stream": "لم تُرجع هذه القناة أي بث قابل للتشغيل."
 }

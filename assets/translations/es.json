@@ -1079,5 +1079,16 @@
   "player_channel_count": "{count} canales",
   "player_stream": "Transmisión",
   "player_season": "Temporada {number}",
-  "player_episode_count": "{count} episodios"
+  "player_episode_count": "{count} episodios",
+  "player_search_channels": "Buscar canales",
+  "player_no_channels": "No se encontraron canales",
+  "player_stream_count": "{count} transmisiones",
+  "player_trying_backup": "Probando {name}…",
+  "player_waiting_for_live": "Esperando a que empiece el video en vivo.",
+  "player_channel_temporarily_unavailable": "Este canal no está disponible temporalmente.",
+  "player_live_stopped": "La transmisión en vivo terminó.",
+  "player_live_stalled": "La transmisión en vivo dejó de responder.",
+  "player_switch_channel_failed": "No se pudo cambiar a ese canal.",
+  "player_did_not_recover": "Este canal no se recuperó tras varios intentos.",
+  "player_no_playable_stream": "Este canal no devolvió ninguna transmisión reproducible."
 }

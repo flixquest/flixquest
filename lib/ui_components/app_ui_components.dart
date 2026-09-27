@@ -301,33 +301,31 @@ class AppStreamSourceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
+    return Material(
+      color: colors.surfaceContainerHighest.withValues(alpha: .5),
+      borderRadius: BorderRadius.circular(8),
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(9),
-        side: BorderSide(color: colors.outline.withValues(alpha: .14)),
-      ),
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(13),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Row(
             children: [
               Container(
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: colors.primary.withValues(alpha: .12),
+                  color: colors.surfaceContainerHighest.withValues(alpha: .8),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
                   child: Text(
                     index.toString().padLeft(2, '0'),
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: colors.primary,
-                          fontFamily: 'FigtreeSB',
-                        ),
+                    style: TextStyle(
+                      color: colors.onSurface,
+                      fontFamily: 'FigtreeSB',
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ),
@@ -341,17 +339,20 @@ class AppStreamSourceTile extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontFamily: 'FigtreeSB',
-                          ),
+                      style: TextStyle(
+                        color: colors.onSurface,
+                        fontFamily: 'FigtreeSB',
+                        fontSize: 15,
+                      ),
                     ),
                     if (subtitle != null) ...[
                       const SizedBox(height: 3),
                       Text(
                         subtitle!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
+                        style: TextStyle(
+                          color: colors.onSurfaceVariant,
+                          fontSize: 12.5,
+                        ),
                       ),
                     ],
                   ],
@@ -361,7 +362,7 @@ class AppStreamSourceTile extends StatelessWidget {
                 PhosphorIcons.playCircle(),
                 color: onTap == null
                     ? colors.onSurfaceVariant.withValues(alpha: .45)
-                    : colors.primary,
+                    : colors.onSurface,
               ),
             ],
           ),

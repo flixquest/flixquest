@@ -17,6 +17,7 @@ import '../../functions/video_utils.dart';
 import '../../functions/network.dart';
 import '../../functions/player_subtitle_configuration.dart';
 import '../../functions/player_buffering_configuration.dart';
+import '../../functions/language_names.dart';
 import '../../functions/subtitle_options.dart';
 import '/constants/app_constants.dart';
 import '/widgets/common_widgets.dart';
@@ -325,6 +326,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
             ? widget.movieMetadata!.releaseYear?.toString()
             : 'S${widget.tvMetadata!.seasonNumber}:E${widget.tvMetadata!.episodeNumber} · ${widget.tvMetadata!.episodeName ?? ''}',
         strings: playerControlsStrings(),
+        languageLabelBuilder: languageDisplayName,
         emphasisFontFamily: 'FigtreeSB',
         onNextEpisodeTap: widget.useTvControls ||
                 widget.mediaType != MediaType.tvShow ||
@@ -2998,24 +3000,23 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     required String subtitle,
     Widget? action,
   }) {
-    final colors = Theme.of(context).colorScheme;
     return Row(
       children: [
-        Icon(icon, size: 21, color: colors.primary),
+        Icon(icon, size: 20, color: BetterPlayerColors.secondary),
         const SizedBox(width: 9),
         Expanded(
           child: Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontFamily: 'FigtreeSB',
-                ),
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'FigtreeSB',
+              fontSize: 16,
+            ),
           ),
         ),
         Text(
           subtitle,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
+          style: const TextStyle(color: BetterPlayerColors.muted, fontSize: 13),
         ),
         if (action != null) action,
       ],
@@ -3057,53 +3058,58 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final selectedSeason = await showPlayerSheet<int>(
       context: context,
       builder: (sheetContext) {
-        final colors = Theme.of(sheetContext).colorScheme;
         final browsedSeason = _portraitBrowsedSeasonNumber ??
             metadata.seasonEpisodes?.firstOrNull?.seasonNumber ??
             metadata.seasonNumber;
         return ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 560),
-          child: ListView.separated(
-            shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-            itemCount: seasons.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 4),
-            itemBuilder: (context, index) {
-              final season = seasons[index];
-              final selected = season.seasonNumber == browsedSeason;
-              return PlayerChoiceCard(
-                title: season.seasonName,
-                subtitle: tr(
-                  'episodes_count',
-                  namedArgs: {'count': '${season.episodeCount}'},
-                ),
-                description: season.overview,
-                selected: selected,
-                thumbnail: PlayerThumbnail(
-                  width: 58,
-                  height: 78,
-                  child: season.posterPath == null
-                      ? Icon(PhosphorIcons.television())
-                      : CachedNetworkImage(
-                          cacheManager: cacheProp(),
-                          imageUrl:
-                              'https://image.tmdb.org/t/p/w185${season.posterPath}',
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) =>
-                              const AppCachedImagePlaceholder(),
-                          errorWidget: (_, __, ___) =>
-                              Icon(PhosphorIcons.television()),
-                        ),
-                ),
-                trailing: Icon(
-                  selected
-                      ? PhosphorIcons.checkCircle(PhosphorIconsStyle.fill)
-                      : PhosphorIcons.caretRight(),
-                  color: selected ? colors.primary : colors.onSurfaceVariant,
-                ),
-                onTap: () => Navigator.pop(sheetContext, season.seasonNumber),
-              );
-            },
+          child: PlayerSheetScaffold(
+            title: tr('select_season'),
+            subtitle: '${seasons.length} ${tr('select_season')}',
+            actions: [
+              PlayerSheetAction(
+                icon: PhosphorIcons.x(),
+                tooltip: tr('close'),
+                onPressed: () => Navigator.pop(sheetContext),
+              ),
+            ],
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+              itemCount: seasons.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 4),
+              itemBuilder: (context, index) {
+                final season = seasons[index];
+                final selected = season.seasonNumber == browsedSeason;
+                return PlayerChoiceCard(
+                  title: season.seasonName,
+                  subtitle: tr(
+                    'episodes_count',
+                    namedArgs: {'count': '${season.episodeCount}'},
+                  ),
+                  description: season.overview,
+                  selected: selected,
+                  thumbnail: PlayerThumbnail(
+                    width: 58,
+                    height: 78,
+                    child: season.posterPath == null
+                        ? Icon(PhosphorIcons.television())
+                        : CachedNetworkImage(
+                            cacheManager: cacheProp(),
+                            imageUrl:
+                                'https://image.tmdb.org/t/p/w185${season.posterPath}',
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) =>
+                                const AppCachedImagePlaceholder(),
+                            errorWidget: (_, __, ___) =>
+                                Icon(PhosphorIcons.television()),
+                          ),
+                  ),
+                  onTap: () =>
+                      Navigator.pop(sheetContext, season.seasonNumber),
+                );
+              },
+            ),
           ),
         );
       },
@@ -3521,85 +3527,71 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final cleanError = _sanitizeError(errorText);
     final hasProviders = widget.availableProviders != null &&
         widget.availableProviders!.isNotEmpty;
-    return Container(
-      color: Colors.black,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: const BoxDecoration(
-                color: Colors.white10,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                PhosphorIcons.warningCircle(),
-                size: 48,
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              cleanError,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'FigtreeSB',
-              ),
-            ),
-            const SizedBox(height: 24),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              alignment: WrapAlignment.center,
+    return PlayerTheme(
+      child: ColoredBox(
+        color: Colors.black,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (hasProviders)
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: widget.colors.first,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () {
-                      if (widget.useTvControls) {
-                        _showTvProviderMenu();
-                      } else {
-                        _showProviderSwitcher();
-                      }
-                    },
-                    icon: Icon(PhosphorIcons.arrowsLeftRight(), size: 18),
-                    label: Text(tr('switch_provider')),
-                  ),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white38),
-                  ),
-                  onPressed: () {
-                    final currentSource = _currentProviderCode;
-                    if (currentSource != null) {
-                      _switchToProvider(
-                        currentSource,
-                        closeMenu: () {},
-                        refreshMenu: () {},
-                      );
-                    }
-                  },
-                  icon: Icon(PhosphorIcons.arrowClockwise(), size: 18),
-                  label: Text(tr('retry')),
+                const BetterPlayerIconSurface(
+                  icon: PhosphorIconsRegular.warningCircle,
                 ),
-                IconButton(
-                  onPressed: _exitPlayer,
-                  icon: Icon(PhosphorIcons.x(), color: Colors.white70),
-                  tooltip: tr('close'),
+                const SizedBox(height: 18),
+                Text(
+                  cleanError,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontFamily: 'FigtreeSB',
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    if (hasProviders)
+                      FilledButton.icon(
+                        onPressed: () {
+                          if (widget.useTvControls) {
+                            _showTvProviderMenu();
+                          } else {
+                            _showProviderSwitcher();
+                          }
+                        },
+                        icon: Icon(PhosphorIcons.arrowsLeftRight(), size: 18),
+                        label: Text(tr('switch_provider')),
+                      ),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        final currentSource = _currentProviderCode;
+                        if (currentSource != null) {
+                          _switchToProvider(
+                            currentSource,
+                            closeMenu: () {},
+                            refreshMenu: () {},
+                          );
+                        }
+                      },
+                      icon: Icon(PhosphorIcons.arrowClockwise(), size: 18),
+                      label: Text(tr('retry')),
+                    ),
+                    IconButton(
+                      onPressed: _exitPlayer,
+                      icon: Icon(PhosphorIcons.x()),
+                      tooltip: tr('close'),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -4033,9 +4025,12 @@ class _SubtitleSwitcherSheetState extends State<_SubtitleSwitcherSheet> {
     // but whose fallbacks are untouched can still play.
     final hasFailed =
         option.sources.every(widget.controller.subtitlesSourceHasFailed);
+    final rawName = option.name?.trim();
     final label = isOff
         ? tr('player_off')
-        : option.name ?? widget.controller.translations.generalDefault;
+        : rawName?.isNotEmpty == true
+            ? languageDisplayName(rawName)
+            : widget.controller.translations.generalDefault;
     return PlayerChoiceCard(
       title: option.number == null ? label : '$label #${option.number}',
       subtitle: isOff || option.provider.isEmpty ? null : option.provider,
@@ -4075,14 +4070,8 @@ class _SubtitleSwitcherSheetState extends State<_SubtitleSwitcherSheet> {
     return [
       for (final (index, track) in tracks.indexed)
         BetterPlayerSelectionTile(
-          title: track.label?.trim().isNotEmpty == true
-              ? track.label!.trim()
-              : track.language?.trim().isNotEmpty == true
-                  ? track.language!.trim()
-                  : '${tr('player_audio')} ${index + 1}',
-          subtitle: track.label?.trim().isNotEmpty == true
-              ? track.language?.trim()
-              : null,
+          title: _audioTrackTitle(track, index),
+          subtitle: _audioTrackSubtitle(track),
           selected:
               selected == track || (selected == null && track.isDefault),
           onTap: () {
@@ -4091,6 +4080,21 @@ class _SubtitleSwitcherSheetState extends State<_SubtitleSwitcherSheet> {
           },
         ),
     ];
+  }
+
+  /// The audio track's own label when it has one, its language in full
+  /// otherwise ("en" and "eng" both become "English").
+  String _audioTrackTitle(BetterPlayerAsmsAudioTrack track, int index) {
+    final label = languageDisplayName(
+      track.label?.trim().isNotEmpty == true ? track.label : track.language,
+    );
+    return label.isEmpty ? '${tr('player_audio')} ${index + 1}' : label;
+  }
+
+  String? _audioTrackSubtitle(BetterPlayerAsmsAudioTrack track) {
+    if (track.label?.trim().isEmpty != false) return null;
+    final language = languageDisplayName(track.language);
+    return language.isEmpty ? null : language;
   }
 
   Widget _heading(String text) => Padding(

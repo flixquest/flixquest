@@ -1079,5 +1079,16 @@
   "player_channel_count": "{count} channels",
   "player_stream": "Stream",
   "player_season": "Season {number}",
-  "player_episode_count": "{count} episodes"
+  "player_episode_count": "{count} episodes",
+  "player_search_channels": "Search channels",
+  "player_no_channels": "No channels found",
+  "player_stream_count": "{count} streams",
+  "player_trying_backup": "Trying {name}…",
+  "player_waiting_for_live": "Waiting for live video to start.",
+  "player_channel_temporarily_unavailable": "This channel is temporarily unavailable.",
+  "player_live_stopped": "The live broadcast ended.",
+  "player_live_stalled": "The live stream stopped responding.",
+  "player_switch_channel_failed": "Unable to switch to that channel.",
+  "player_did_not_recover": "This channel did not recover after several attempts.",
+  "player_no_playable_stream": "This channel returned no playable stream."
 }

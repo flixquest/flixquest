@@ -6,7 +6,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
-import '../../../ui_components/app_ui_components.dart';
 import 'player_sheet_ui.dart';
 
 class _LocalSubtitleEntry {
@@ -65,20 +64,21 @@ class PlayerLocalSubtitles {
             if (_uploadedSubtitles.isEmpty) {
               content = ListView(
                 controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
                 children: [
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 340),
-                    child: AppEmptyState(
-                      icon: PhosphorIcons.fileArrowUp(),
-                      title: tr('no_file_selected'),
-                      message: tr('supported_formats_srt_vtt'),
-                      action: FilledButton.icon(
-                        onPressed: () =>
-                            _pickFiles(setBottomSheetState, context),
-                        icon: Icon(PhosphorIcons.fileArrowUp()),
-                        label: Text(tr('upload_subtitle_file')),
-                      ),
+                  const SizedBox(height: 8),
+                  BetterPlayerEmptyState(
+                    icon: PhosphorIcons.fileArrowUp(),
+                    title: tr('no_file_selected'),
+                    message: tr('supported_formats_srt_vtt'),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: FilledButton.icon(
+                      onPressed: () =>
+                          _pickFiles(setBottomSheetState, context),
+                      icon: Icon(PhosphorIcons.fileArrowUp()),
+                      label: Text(tr('upload_subtitle_file')),
                     ),
                   ),
                 ],
@@ -272,7 +272,7 @@ class PlayerLocalSubtitles {
           SnackBar(
             content: Text(tr('failed_upload_subtitle',
                 namedArgs: {'error': e.toString()})),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -315,14 +315,12 @@ class PlayerLocalSubtitles {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(tr('subtitle_added')),
-          backgroundColor: Colors.green,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(tr('subtitle_already_added')),
-          backgroundColor: Colors.orange,
         ),
       );
     }

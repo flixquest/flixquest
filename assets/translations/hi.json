@@ -1079,5 +1079,16 @@
   "player_channel_count": "{count} चैनल",
   "player_stream": "स्ट्रीम",
   "player_season": "सीज़न {number}",
-  "player_episode_count": "{count} एपिसोड"
+  "player_episode_count": "{count} एपिसोड",
+  "player_search_channels": "चैनल खोजें",
+  "player_no_channels": "कोई चैनल नहीं मिला",
+  "player_stream_count": "{count} स्ट्रीम",
+  "player_trying_backup": "{name} आज़माया जा रहा है…",
+  "player_waiting_for_live": "लाइव वीडियो शुरू होने का इंतज़ार किया जा रहा है।",
+  "player_channel_temporarily_unavailable": "यह चैनल अभी अस्थायी रूप से उपलब्ध नहीं है।",
+  "player_live_stopped": "लाइव प्रसारण समाप्त हो गया।",
+  "player_live_stalled": "लाइव स्ट्रीम ने जवाब देना बंद कर दिया।",
+  "player_switch_channel_failed": "उस चैनल पर स्विच नहीं किया जा सका।",
+  "player_did_not_recover": "कई प्रयासों के बाद भी यह चैनल बहाल नहीं हुआ।",
+  "player_no_playable_stream": "इस चैनल से कोई चलाने योग्य स्ट्रीम नहीं मिली।"
 }

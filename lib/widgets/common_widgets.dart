@@ -370,15 +370,12 @@ class ExternalPlay extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: .12),
+                    color: const Color(0x14FFFFFF),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     PhosphorIcons.arrowSquareOut(),
-                    color: Theme.of(context).colorScheme.primary,
+                    color: BetterPlayerColors.secondary,
                   ),
                 ),
                 const SizedBox(width: 13),
@@ -387,13 +384,19 @@ class ExternalPlay extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Open in external player',
-                        style: Theme.of(context).textTheme.titleLarge,
+                        tr('open_external'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'FigtreeBold',
+                          fontSize: 19,
+                          height: 1.2,
+                        ),
                       ),
                       Text(
                         tr('video_source'),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        style: const TextStyle(
+                          color: BetterPlayerColors.muted,
+                          fontSize: 13,
                         ),
                       ),
                     ],

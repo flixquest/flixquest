@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import '../../../constants/app_constants.dart';
+import '../../../functions/language_names.dart';
 import '../../../models/external_subtitles.dart';
 import '../../../models/movie_stream_metadata.dart';
 import '../../../models/tv_stream_metadata.dart';
@@ -63,7 +64,6 @@ class PlayerExternalSubtitles {
                   mediaType,
                   movieMetadata,
                   tvMetadata,
-                  colors,
                 );
               });
             }
@@ -79,23 +79,34 @@ class PlayerExternalSubtitles {
                 scrolls: true,
               );
             } else if (_availableExternalSubtitles.isEmpty) {
-              content = AppEmptyState(
-                icon: PhosphorIcons.closedCaptioning(),
-                title: tr('no_external_subtitles_found'),
-                message: tr('try_searching_for_subtitles'),
-                action: FilledButton.icon(
-                  onPressed: () => _fetchExternalSubtitles(
-                    setBottomSheetState,
-                    context,
-                    scraperApiUrl,
-                    mediaType,
-                    movieMetadata,
-                    tvMetadata,
-                    colors,
+              // Scrollable: on a short screen the empty state alone is taller
+              // than the sheet, and a Column here would overflow.
+              content = ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                children: [
+                  const SizedBox(height: 8),
+                  BetterPlayerEmptyState(
+                    icon: PhosphorIcons.closedCaptioning(),
+                    title: tr('no_external_subtitles_found'),
+                    message: tr('try_searching_for_subtitles'),
                   ),
-                  icon: Icon(PhosphorIcons.magnifyingGlass()),
-                  label: Text(tr('search_subtitles')),
-                ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: FilledButton.icon(
+                      onPressed: () => _fetchExternalSubtitles(
+                        setBottomSheetState,
+                        context,
+                        scraperApiUrl,
+                        mediaType,
+                        movieMetadata,
+                        tvMetadata,
+                      ),
+                      icon: Icon(PhosphorIcons.magnifyingGlass()),
+                      label: Text(tr('search_subtitles')),
+                    ),
+                  ),
+                ],
               );
             } else {
               content = ListView.separated(
@@ -107,10 +118,14 @@ class PlayerExternalSubtitles {
                   final subtitle = _availableExternalSubtitles[index];
                   final selected = _selectedExternalSubtitles
                       .any((item) => item.id == subtitle.id);
+                  final details = <String>[
+                    if (subtitle.isHearingImpaired) 'HI',
+                    subtitle.format.toUpperCase(),
+                    if (subtitle.release.isNotEmpty) subtitle.release,
+                  ];
                   return PlayerChoiceCard(
-                    title: subtitle.displayName,
-                    subtitle:
-                        subtitle.release.isEmpty ? null : subtitle.release,
+                    title: languageDisplayName(subtitle.display),
+                    subtitle: details.join('  •  '),
                     selected: selected,
                     onTap: () => _toggleExternalSubtitle(
                       subtitle,
@@ -158,7 +173,6 @@ class PlayerExternalSubtitles {
                               mediaType,
                               movieMetadata,
                               tvMetadata,
-                              colors,
                             ),
                     icon: Icon(PhosphorIcons.arrowsClockwise()),
                   ),
@@ -182,7 +196,6 @@ class PlayerExternalSubtitles {
                         Navigator.pop(bottomSheetContext);
                         await _applyExternalSubtitlesWithMessenger(
                           messenger,
-                          colors,
                           betterPlayerController,
                         );
                       },
@@ -205,7 +218,6 @@ class PlayerExternalSubtitles {
     MediaType? mediaType,
     MovieStreamMetadata? movieMetadata,
     TVStreamMetadata? tvMetadata,
-    List<Color> colors,
   ) async {
     _isLoadingExternalSubtitles = true;
     _setBottomSheetStateIfOpen(setBottomSheetState, () {
@@ -243,8 +255,7 @@ class PlayerExternalSubtitles {
           SnackBar(
             content: Text(tr('found_external_subtitles',
                 namedArgs: {'count': '${subtitles.length}'})),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -259,8 +270,8 @@ class PlayerExternalSubtitles {
           SnackBar(
             content: Text(tr('failed_load_subtitles',
                 namedArgs: {'error': e.toString()})),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -294,36 +305,42 @@ class PlayerExternalSubtitles {
   /// Apply selected external subtitles to the player
   Future<void> _applyExternalSubtitlesWithMessenger(
     ScaffoldMessengerState scaffoldMessenger,
-    List<Color> colors,
     BetterPlayerController betterPlayerController,
   ) async {
     if (_selectedExternalSubtitles.isEmpty) {
       return;
     }
+    // Read before the first await so the failure snackbar below needs no
+    // BuildContext afterwards.
+    final errorColor = Theme.of(scaffoldMessenger.context).colorScheme.error;
 
     // Show loading indicator
     scaffoldMessenger.showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            SizedBox(
+            const SizedBox(
               width: 20,
               height: 20,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(colors.last),
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
               ),
             ),
-            SizedBox(width: 16),
-            Text(
-              tr('downloading_processing_subtitles',
-                  namedArgs: {'count': '${_selectedExternalSubtitles.length}'}),
-              style: TextStyle(fontFamily: 'Figtree'),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                tr('downloading_processing_subtitles',
+                    namedArgs: {
+                      'count': '${_selectedExternalSubtitles.length}',
+                    }),
+                style: const TextStyle(fontFamily: 'Figtree'),
+              ),
             ),
           ],
         ),
-        backgroundColor: colors.first,
-        duration: Duration(seconds: 30),
+        backgroundColor: BetterPlayerColors.panelRaised,
+        duration: const Duration(seconds: 30),
       ),
     );
 
@@ -374,7 +391,6 @@ class PlayerExternalSubtitles {
                   namedArgs: {'count': '$successCount'}),
               style: TextStyle(fontFamily: 'Figtree'),
             ),
-            backgroundColor: Colors.green,
             duration: Duration(seconds: 3),
           ),
         );
@@ -385,7 +401,6 @@ class PlayerExternalSubtitles {
               tr('all_subtitles_already_added'),
               style: TextStyle(fontFamily: 'Figtree'),
             ),
-            backgroundColor: Colors.orange,
             duration: Duration(seconds: 2),
           ),
         );
@@ -403,8 +418,8 @@ class PlayerExternalSubtitles {
         SnackBar(
           content: Text(
               tr('failed_add_subtitles', namedArgs: {'error': e.toString()})),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
+          backgroundColor: errorColor,
+          duration: const Duration(seconds: 3),
         ),
       );
     }

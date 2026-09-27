@@ -1060,5 +1060,16 @@ abstract class  LocaleKeys {
   static const player_stream = 'player_stream';
   static const player_season = 'player_season';
   static const player_episode_count = 'player_episode_count';
+  static const player_search_channels = 'player_search_channels';
+  static const player_no_channels = 'player_no_channels';
+  static const player_stream_count = 'player_stream_count';
+  static const player_trying_backup = 'player_trying_backup';
+  static const player_waiting_for_live = 'player_waiting_for_live';
+  static const player_channel_temporarily_unavailable = 'player_channel_temporarily_unavailable';
+  static const player_live_stopped = 'player_live_stopped';
+  static const player_live_stalled = 'player_live_stalled';
+  static const player_switch_channel_failed = 'player_switch_channel_failed';
+  static const player_did_not_recover = 'player_did_not_recover';
+  static const player_no_playable_stream = 'player_no_playable_stream';
 
 }
