@@ -827,7 +827,6 @@
   "ad_free_pass_offer": "شاهد فيديو واحدًا وتخطَّ الإعلانات لمدة {duration}",
   "ad_free_pass_loading": "جارٍ تحميل الفيديو…",
   "ad_free_pass_active": "بلا إعلانات حتى {time}",
-  "ad_free_pass_unavailable": "لا يتوفر فيديو الآن. حاول مرة أخرى لاحقًا.",
   "ad_free_pass_hours": "{n} ساعة",
   "ad_free_pass_minutes": "{n} دقيقة",
   "collection": "مجموعة",

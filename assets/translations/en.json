@@ -815,7 +815,6 @@
   "ad_free_pass_offer": "Watch one video, skip ads for {duration}",
   "ad_free_pass_loading": "Loading video…",
   "ad_free_pass_active": "Ad-free until {time}",
-  "ad_free_pass_unavailable": "No video is available right now. Try again later.",
   "ad_free_pass_hours": "{n}h",
   "ad_free_pass_minutes": "{n} min",
   "collection": "Collection",

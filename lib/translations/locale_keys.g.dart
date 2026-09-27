@@ -810,7 +810,6 @@ abstract class  LocaleKeys {
   static const ad_free_pass_offer = 'ad_free_pass_offer';
   static const ad_free_pass_loading = 'ad_free_pass_loading';
   static const ad_free_pass_active = 'ad_free_pass_active';
-  static const ad_free_pass_unavailable = 'ad_free_pass_unavailable';
   static const ad_free_pass_hours = 'ad_free_pass_hours';
   static const ad_free_pass_minutes = 'ad_free_pass_minutes';
   static const collection = 'collection';

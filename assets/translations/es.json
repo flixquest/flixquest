@@ -815,7 +815,6 @@
   "ad_free_pass_offer": "Mira un video y evita anuncios durante {duration}",
   "ad_free_pass_loading": "Cargando video…",
   "ad_free_pass_active": "Sin anuncios hasta las {time}",
-  "ad_free_pass_unavailable": "No hay ningún video disponible ahora. Inténtalo más tarde.",
   "ad_free_pass_hours": "{n} h",
   "ad_free_pass_minutes": "{n} min",
   "collection": "Colección",
