@@ -20,6 +20,7 @@ import '../../provider/settings_provider.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/media_link.dart';
 import '../../services/start_io_ads_service.dart';
+import '../../widgets/playback_ads.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
 import '../../services/analytics_service.dart';
@@ -331,19 +332,18 @@ class _ChannelListState extends State<ChannelList> {
     final url = MediaLink.liveChannelUrl(channel.id);
     if (url == null) return;
     await Share.share(
-      '${tr('watch_channel_live', namedArgs: {'name': channel.name})}\n$url',
+      tr(
+        'watch_channel_live',
+        namedArgs: {'name': channel.name, 'url': '$url'},
+      ),
     );
   }
 
   Future<void> _play(Channel channel) async {
     setState(() => _resolvingId = channel.id);
-    final dependencies = context.read<AppDependencyProvider>();
-    await StartIoAdsService.instance.showInterstitial(
-      enabled: dependencies.startIoInterstitialEnabled,
-      testMode: dependencies.unityTestMode,
-      adTag: 'live_watch_now',
-    );
-    if (!mounted) return;
+    // The interstitial runs while the stream resolves; the player opens only
+    // once it is gone.
+    unawaited(StartIoAdsService.instance.showPlaybackInterstitial());
     final stopwatch = Stopwatch()..start();
     try {
       final stream = await _api().getStream(channel.id);
@@ -361,11 +361,7 @@ class _ChannelListState extends State<ChannelList> {
         durationMs: stopwatch.elapsedMilliseconds,
         source: _mode.name,
       );
-      await StartIoAdsService.instance.showRewarded(
-        enabled: dependencies.startIoRewardedEnabled,
-        testMode: dependencies.unityTestMode,
-        adTag: 'live_stream_ready',
-      );
+      await StartIoAdsService.instance.whenFullScreenAdClosed();
       if (!mounted) return;
       final autoFullScreen = context.read<SettingsProvider>().defaultViewMode;
       await Navigator.of(context).push<void>(
@@ -577,7 +573,10 @@ class _ChannelListState extends State<ChannelList> {
       child: CustomScrollView(
         slivers: <Widget>[
           SliverToBoxAdapter(child: _buildHeader()),
-          _bannerSliver('live_tv_1'),
+          _bannerSliver(_headerPlacement),
+          const SliverToBoxAdapter(
+            child: Center(child: AdFreePassButton()),
+          ),
           if (_mode == _LiveTvMode.channels)
             ..._buildChannelSlivers()
           else
@@ -592,12 +591,22 @@ class _ChannelListState extends State<ChannelList> {
     );
   }
 
+  /// Start.io ad tags must be letters only, so the slots are named, not
+  /// numbered.
+  static const _headerPlacement = 'live_tv_top';
+  static const _listPlacements = <String>[
+    'live_tv_list_a',
+    'live_tv_list_b',
+    'live_tv_list_c',
+  ];
+
   /// Live TV ads use the larger MREC unit; it is the best-paying placement
   /// the Start.io plugin exposes.
   Widget _bannerSliver(String placement) => SliverToBoxAdapter(
         child: RemoteHostedAdsBanner(
           placement: placement,
           variant: HostedBannerVariant.tall,
+          keywords: StartIoAdsService.liveKeywords,
           loadAds: () => ScraperApi(
             context.read<AppDependencyProvider>().flixquestAPIURL,
           ).getAds(),
@@ -672,16 +681,14 @@ class _ChannelListState extends State<ChannelList> {
           ),
         );
 
-    // The header banner is `live_tv_1`; these three break the list up.
-    final chunks = _chunk(visible, 4);
+    // The header banner sits above; these three break the list up.
+    final chunks = _chunk(visible, _listPlacements.length + 1);
     return <Widget>[
       grid(chunks[0]),
-      _bannerSliver('live_tv_2'),
-      grid(chunks[1]),
-      _bannerSliver('live_tv_3'),
-      grid(chunks[2]),
-      _bannerSliver('live_tv_4'),
-      grid(chunks[3]),
+      for (var i = 0; i < _listPlacements.length; i++) ...<Widget>[
+        _bannerSliver(_listPlacements[i]),
+        grid(chunks[i + 1]),
+      ],
     ];
   }
 
@@ -709,10 +716,10 @@ class _ChannelListState extends State<ChannelList> {
     }
     final gutter = AppSpace.gutter(context);
     final palette = AppPalette.of(context);
-    // The header banner is `live_tv_1`; spread the rest after the first
+    // The header banner sits above; spread the rest after the first
     // sections, then append any slots the schedule is too short to reach.
     final slivers = <Widget>[];
-    var banner = 2;
+    var banner = 0;
     for (final section in sections) {
       slivers.addAll(<Widget>[
         SliverToBoxAdapter(
@@ -742,11 +749,13 @@ class _ChannelListState extends State<ChannelList> {
           ),
         ),
       ]);
-      if (banner <= 4) slivers.add(_bannerSliver('live_tv_$banner'));
+      if (banner < _listPlacements.length) {
+        slivers.add(_bannerSliver(_listPlacements[banner]));
+      }
       banner++;
     }
-    while (banner <= 4) {
-      slivers.add(_bannerSliver('live_tv_$banner'));
+    while (banner < _listPlacements.length) {
+      slivers.add(_bannerSliver(_listPlacements[banner]));
       banner++;
     }
     return slivers;
@@ -798,7 +807,8 @@ class _ChannelListState extends State<ChannelList> {
                   ),
               ],
             ),
-            if (_letters case final letters when letters.length > 1) ...<Widget>[
+            if (_letters case final letters
+                when letters.length > 1) ...<Widget>[
               const SizedBox(height: AppSpace.sm),
               FilterChips(
                 chips: <FilterChipSpec>[
@@ -827,8 +837,8 @@ class _ChannelListState extends State<ChannelList> {
                   ),
               ],
             ),
-            if (_sportSections case final sports when sports.isNotEmpty) ...<
-                Widget>[
+            if (_sportSections case final sports
+                when sports.isNotEmpty) ...<Widget>[
               const SizedBox(height: AppSpace.sm),
               FilterChips(
                 chips: <FilterChipSpec>[

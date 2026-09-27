@@ -42,7 +42,10 @@ const kTextSmallAboutBodyStyle = TextStyle(
 const kTableLeftStyle =
     TextStyle(overflow: TextOverflow.ellipsis, fontWeight: FontWeight.bold);
 
-const String currentAppVersion = '4.0.0';
+/// The installed app version, resolved from the platform during startup in
+/// [appInitialize]. Empty until then, so UI should fall back to reading
+/// [PackageInfo] directly when it needs a guaranteed value.
+String currentAppVersion = '';
 
 final client = HttpClient();
 const retryOptions = RetryOptions(

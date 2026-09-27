@@ -20,6 +20,7 @@ import '../../provider/recently_watched_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../screens/common/photoview.dart';
 import '../../services/ambient_theme_service.dart';
+import '../../services/media_link.dart';
 import '../episode_playback.dart';
 import '../playback.dart';
 import '../widgets/details_header.dart';
@@ -28,6 +29,7 @@ import '../widgets/episode_row.dart';
 import '../widgets/media_art.dart';
 import '../widgets/section_header.dart';
 import 'credits_screen.dart';
+import '../../widgets/hosted_ads_banner.dart' show HostedBannerVariant;
 import 'home_screen.dart' show HomeAdSlot;
 
 /// An episode's page: its still, its name and facts, Play (or Resume) and
@@ -210,6 +212,11 @@ class _EpisodeScreenState extends State<EpisodeScreen>
           shareType: 'Episode',
           mediaName: '${widget.series.title} ${_label ?? ''}'.trim(),
         );
+    final url = MediaLink.episodeUrl(
+      _seriesId,
+      _seasonNumber ?? 0,
+      _number ?? 0,
+    );
     await Share.share(
       tr(
         'share_episode',
@@ -217,9 +224,7 @@ class _EpisodeScreenState extends State<EpisodeScreen>
           'et': _episode.name ?? '',
           'title': widget.series.title,
           'rating': (_episode.voteAverage ?? 0).toStringAsFixed(1),
-          'id': '$_seriesId',
-          'season': '${_seasonNumber ?? ''}',
-          'episode': '${_number ?? ''}',
+          'url': '$url',
         },
       ),
     );
@@ -260,7 +265,10 @@ class _EpisodeScreenState extends State<EpisodeScreen>
           SliverToBoxAdapter(child: _summary(context, title, history)),
           SliverToBoxAdapter(
             child: widget.adBuilder?.call(context) ??
-                HomeAdSlot(placement: 'episode_detail'),
+                HomeAdSlot(
+                  placement: 'episode_detail',
+                  variant: HostedBannerVariant.tall,
+                ),
           ),
           SliverToBoxAdapter(child: _seasonRow(context, history)),
           SliverToBoxAdapter(child: _cast(context, title)),

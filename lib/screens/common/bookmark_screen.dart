@@ -5,15 +5,17 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../constants/app_constants.dart';
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../mobile/widgets/page_kit.dart';
+import '../../mobile/widgets/pill_button.dart';
 import '../../provider/bookmark_provider.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../services/bookmark_sync_service.dart';
 import '../../services/globle_method.dart';
-import '../../ui_components/app_ui_components.dart';
 import '../movie/bookmark_movies_tab.dart';
 import '../tv/bookmark_tv_tab.dart';
 import '/screens/common/sync_screen.dart';
-import '../../widgets/app_logo.dart';
 import '../../video_providers/scraper_api.dart';
 import '../../widgets/hosted_ads_banner.dart';
 
@@ -26,16 +28,14 @@ class BookmarkScreen extends StatefulWidget {
   State<BookmarkScreen> createState() => _BookmarkScreenState();
 }
 
-class _BookmarkScreenState extends State<BookmarkScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController tabController;
+class _BookmarkScreenState extends State<BookmarkScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   User? user;
+  int _selectedKind = 0;
 
   @override
   void initState() {
     super.initState();
-    tabController = TabController(length: 2, vsync: this);
     getData();
     _triggerAutoSync();
   }
@@ -54,119 +54,67 @@ class _BookmarkScreenState extends State<BookmarkScreen>
   }
 
   @override
-  void dispose() {
-    tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
     final bookmarkProvider = Provider.of<BookmarkProvider>(context);
 
     return Scaffold(
+      backgroundColor: palette.page,
       appBar: widget.embedded
           ? null
-          : AppBar(
-              leading: IconButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  icon: Icon(PhosphorIcons.caretLeft())),
-              title: Text(tr('bookmarks')),
-              actions: [
-                  IconButton(
-                      onPressed: () {
-                        _syncBookmarks();
-                      },
-                      icon: Icon(PhosphorIcons.arrowsClockwise()))
-                ]),
+          : PageAppBar(
+              title: tr('bookmarks'),
+              actions: <Widget>[
+                IconButton(
+                  tooltip: tr('sync'),
+                  color: palette.mutedText,
+                  onPressed: _syncBookmarks,
+                  icon: Icon(PhosphorIcons.arrowsClockwise()),
+                ),
+              ],
+            ),
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
             if (widget.embedded)
-              AppResponsiveContent(
-                padding: const EdgeInsets.fromLTRB(20, 18, 8, 14),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpace.gutter(context),
+                  AppSpace.lg,
+                  AppSpace.gutter(context),
+                  AppSpace.md,
+                ),
                 child: Row(
                   children: [
-                    AppLogo(
-                      fallbackAsset: 'assets/images/fq_mark.svg',
-                      width: 30,
-                      height: 30,
-                      fallbackColor: colors.primary,
-                    ),
-                    const SizedBox(width: 14),
                     Expanded(
                       child: Text(
                         tr('bookmarks'),
-                        style: Theme.of(context).textTheme.headlineSmall,
+                        style: AppType.scaled(context, AppType.pageTitle)
+                            .copyWith(color: palette.foreground),
                       ),
                     ),
-                    IconButton.filledTonal(
-                      tooltip: tr('sync'),
+                    PillButton(
+                      label: tr('sync'),
+                      icon: PhosphorIcons.arrowsClockwise(),
                       onPressed: _syncBookmarks,
-                      icon: Icon(PhosphorIcons.arrowsClockwise(), size: 18),
                     ),
                   ],
                 ),
               ),
-            AppResponsiveContent(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: colors.onSurface.withValues(alpha: .06),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: TabBar(
-                  controller: tabController,
-                  dividerColor: Colors.transparent,
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  indicator: BoxDecoration(
-                    color: colors.primary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  labelColor: colors.onPrimary,
-                  unselectedLabelColor: colors.onSurfaceVariant,
-                  tabs: [
-                    Tab(
-                      height: 44,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(PhosphorIcons.filmStrip(), size: 16),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              tr('movies'),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Tab(
-                      height: 44,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(PhosphorIcons.television(), size: 18),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              tr('tv_series'),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpace.gutter(context)),
+              child: SegmentSwitch<int>(
+                selected: _selectedKind,
+                onChanged: (value) => setState(() => _selectedKind = value),
+                segments: <Segment<int>>[
+                  Segment<int>(0, tr('movies'), icon: PhosphorIcons.filmStrip()),
+                  Segment<int>(1, tr('tv_series'),
+                      icon: PhosphorIcons.television()),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpace.xs),
             RemoteHostedAdsBanner(
               placement: 'bookmarks',
               loadAds: () => ScraperApi(
@@ -174,9 +122,9 @@ class _BookmarkScreenState extends State<BookmarkScreen>
               ).getAds(),
             ),
             Expanded(
-              child: TabBarView(
-                controller: tabController,
-                children: [
+              child: IndexedStack(
+                index: _selectedKind,
+                children: <Widget>[
                   MovieBookmark(movieList: bookmarkProvider.movies),
                   TVBookmark(tvList: bookmarkProvider.tvShows),
                 ],

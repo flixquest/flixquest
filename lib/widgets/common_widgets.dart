@@ -3,6 +3,7 @@ import 'package:better_player_plus/better_player.dart';
 import 'package:clipboard/clipboard.dart';
 import 'package:flixquest/services/globle_method.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_constants.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -326,11 +327,17 @@ class ReportErrorWidget extends StatelessWidget {
               ),
             const SizedBox(height: 16),
             Center(
-              child: Text(
-                'v$currentAppVersion',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: colors.onSurfaceVariant.withValues(alpha: .7),
-                ),
+              child: FutureBuilder<PackageInfo>(
+                future: PackageInfo.fromPlatform(),
+                builder: (context, snapshot) {
+                  final version = snapshot.data?.version ?? currentAppVersion;
+                  return Text(
+                    'v$version',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant.withValues(alpha: .7),
+                    ),
+                  );
+                },
               ),
             ),
           ],

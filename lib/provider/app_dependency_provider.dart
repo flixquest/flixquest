@@ -8,6 +8,7 @@ import '../constants/api_constants.dart';
 import '../models/occasional_theme.dart';
 import '../models/banner_ad.dart';
 import '../preferences/app_dependency_preferences.dart';
+import '../services/start_io_ads_service.dart';
 
 class AppDependencyProvider extends ChangeNotifier {
   final AppDependencies _preferences = AppDependencies();
@@ -66,7 +67,7 @@ class AppDependencyProvider extends ChangeNotifier {
   String _bannerAdNetwork = 'native';
   String get bannerAdNetwork => _bannerAdNetwork;
   bool get isStartIoBannerActive =>
-      _startIoBannerEnabled &&
+      _startIoAds.bannerEnabled &&
       const {'native', 'unity', 'startio'}.contains(_bannerAdNetwork);
 
   // These legacy values remain readable so existing Remote Config payloads
@@ -80,14 +81,15 @@ class AppDependencyProvider extends ChangeNotifier {
   bool _unityTestMode = false;
   bool get unityTestMode => _unityTestMode;
 
-  bool _startIoBannerEnabled = true;
-  bool get startIoBannerEnabled => _startIoBannerEnabled;
+  StartIoAdsConfig _startIoAds = const StartIoAdsConfig();
 
-  bool _startIoInterstitialEnabled = true;
-  bool get startIoInterstitialEnabled => _startIoInterstitialEnabled;
+  /// Start.io behaviour, with the shared test-mode flag folded in.
+  StartIoAdsConfig get startIoAds =>
+      _startIoAds.copyWith(testMode: _unityTestMode);
 
-  bool _startIoRewardedEnabled = true;
-  bool get startIoRewardedEnabled => _startIoRewardedEnabled;
+  bool get startIoBannerEnabled => _startIoAds.bannerEnabled;
+  bool get startIoInterstitialEnabled => _startIoAds.interstitialEnabled;
+  bool get startIoRewardedEnabled => _startIoAds.rewardedEnabled;
 
   void setBannerAdNetwork(String network) {
     final sanitized = network.trim().toLowerCase();
@@ -131,15 +133,20 @@ class AppDependencyProvider extends ChangeNotifier {
     required bool bannerEnabled,
     required bool interstitialEnabled,
     required bool rewardedEnabled,
+    Duration? interstitialInterval,
+    Duration? adFreePassDuration,
+    StartIoInterstitialMode? tvInterstitialMode,
   }) {
-    if (_startIoBannerEnabled == bannerEnabled &&
-        _startIoInterstitialEnabled == interstitialEnabled &&
-        _startIoRewardedEnabled == rewardedEnabled) {
-      return;
-    }
-    _startIoBannerEnabled = bannerEnabled;
-    _startIoInterstitialEnabled = interstitialEnabled;
-    _startIoRewardedEnabled = rewardedEnabled;
+    final next = _startIoAds.copyWith(
+      bannerEnabled: bannerEnabled,
+      interstitialEnabled: interstitialEnabled,
+      rewardedEnabled: rewardedEnabled,
+      interstitialInterval: interstitialInterval,
+      adFreePassDuration: adFreePassDuration,
+      tvInterstitialMode: tvInterstitialMode,
+    );
+    if (next == _startIoAds) return;
+    _startIoAds = next;
     notifyListeners();
   }
 

@@ -44,6 +44,17 @@ class MediaLink {
   /// A live channel is the live TV provider's own id for it, which is not a TMDB number.
   static final RegExp _flixquestChannel = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
 
+  /// Shareable addresses for catalog titles and episodes on FlixQuest's verified domain.
+  static Uri movieUrl(int movieId) => Uri.https(_flixquest, '/m/$movieId');
+
+  static Uri tvUrl(int seriesId) => Uri.https(_flixquest, '/t/$seriesId');
+
+  static Uri episodeUrl(int seriesId, int seasonNumber, int episodeNumber) =>
+      Uri.https(
+        _flixquest,
+        '/t/$seriesId.$seasonNumber.$episodeNumber',
+      );
+
   /// A shareable address for a DLHD channel. Returns null for ids that our link parser cannot open.
   static Uri? liveChannelUrl(String channelId) =>
       _flixquestChannel.hasMatch(channelId)

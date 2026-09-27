@@ -2,10 +2,10 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
@@ -1336,7 +1336,7 @@ class WellnessPreviewCard extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              'Viewing Insights',
+                              tr('viewing_insights'),
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),

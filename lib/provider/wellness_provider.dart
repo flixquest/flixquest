@@ -17,11 +17,23 @@ class WellnessProvider extends ChangeNotifier {
   static const guestOwnerId = 'guest';
   static const _deviceIdKey = 'wellness.device_id.v1';
 
+  /// The least time between automatic pulls for one account. Launch and the
+  /// auth stream both ask for one as the app starts.
+  static const _autoSyncInterval = Duration(minutes: 2);
+
+  /// Coalesces the saves a player makes in a burst (pause, background,
+  /// completion and dispose can all land within seconds of each other).
+  static const _urgentPushDelay = Duration(seconds: 10);
+  static const _routinePushDelay = Duration(minutes: 2);
+
   final WellnessDatabaseController _database =
       WellnessDatabaseController.instance;
   late final WellnessSyncService _syncService;
   StreamSubscription<User?>? _authSubscription;
   Timer? _syncDebounce;
+  DateTime? _pushDueAt;
+  String? _lastAutoSyncOwner;
+  DateTime? _lastAutoSyncAt;
   List<WellnessViewingSession> _sessions = const <WellnessViewingSession>[];
   WellnessRange _range = WellnessRange.week;
   bool _loading = true;
@@ -61,7 +73,7 @@ class WellnessProvider extends ChangeNotifier {
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen(
           (user) => unawaited(_applyUser(user)),
         );
-    if (canSync) unawaited(syncNow());
+    if (canSync) unawaited(_autoSync());
   }
 
   String _newDeviceId() {
@@ -79,7 +91,40 @@ class WellnessProvider extends ChangeNotifier {
     await reload();
     _hasGuestHistory = await _database.ownerSessionCount(guestOwnerId) > 0;
     notifyListeners();
-    if (sync && registered) await syncNow();
+    if (sync && registered) await _autoSync();
+  }
+
+  /// A pull the user did not ask for, skipped when this account pulled
+  /// within [_autoSyncInterval].
+  Future<void> _autoSync() async {
+    final owner = _ownerId;
+    final lastAt = _lastAutoSyncAt;
+    if (_lastAutoSyncOwner == owner &&
+        lastAt != null &&
+        DateTime.now().difference(lastAt) < _autoSyncInterval) {
+      return;
+    }
+    if (await syncNow()) {
+      _lastAutoSyncOwner = owner;
+      _lastAutoSyncAt = DateTime.now();
+    }
+  }
+
+  /// Pushes after [delay], unless a push is already due sooner.
+  void _schedulePush(Duration delay) {
+    final dueAt = DateTime.now().add(delay);
+    final pendingDueAt = _pushDueAt;
+    if (_syncDebounce?.isActive == true &&
+        pendingDueAt != null &&
+        pendingDueAt.isBefore(dueAt)) {
+      return;
+    }
+    _syncDebounce?.cancel();
+    _pushDueAt = dueAt;
+    _syncDebounce = Timer(delay, () {
+      _pushDueAt = null;
+      unawaited(_syncService.pushPending());
+    });
   }
 
   Future<void> reload() async {
@@ -164,16 +209,7 @@ class WellnessProvider extends ChangeNotifier {
       notifyListeners();
     }
     if (ownerAtWrite.startsWith('user:')) {
-      if (syncImmediately) {
-        _syncDebounce?.cancel();
-        unawaited(syncNow());
-      } else {
-        _syncDebounce?.cancel();
-        _syncDebounce = Timer(
-          const Duration(minutes: 2),
-          () => unawaited(syncNow()),
-        );
-      }
+      _schedulePush(syncImmediately ? _urgentPushDelay : _routinePushDelay);
     }
   }
 
@@ -202,13 +238,13 @@ class WellnessProvider extends ChangeNotifier {
   Future<void> deleteSession(String id) async {
     await _database.tombstoneSession(_ownerId, id);
     await reload();
-    if (canSync) unawaited(syncNow());
+    if (canSync) _schedulePush(_urgentPushDelay);
   }
 
   Future<void> clearHistory() async {
     await _database.tombstoneAll(_ownerId);
     await reload();
-    if (canSync) unawaited(syncNow());
+    if (canSync) _schedulePush(_urgentPushDelay);
   }
 
   Future<String> exportJson() async {

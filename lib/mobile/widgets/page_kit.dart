@@ -484,6 +484,7 @@ class ListRow extends StatelessWidget {
   const ListRow({
     required this.label,
     this.icon,
+    this.leading,
     this.subtitle,
     this.value,
     this.trailing,
@@ -497,6 +498,9 @@ class ListRow extends StatelessWidget {
 
   final String label;
   final IconData? icon;
+
+  /// A picture where the icon would be, such as a flag.
+  final Widget? leading;
 
   /// A place in an order, in a soft circle where the icon would be.
   final int? leadingNumber;
@@ -524,6 +528,7 @@ class ListRow extends StatelessWidget {
     final palette = AppPalette.of(context);
     final gutter = AppSpace.gutter(context);
     final icon = this.icon;
+    final leading = this.leading;
     final subtitle = this.subtitle;
     final value = this.value;
     final trailing = this.trailing;
@@ -549,6 +554,9 @@ class ListRow extends StatelessWidget {
                     size: 22,
                     color: destructive ? labelColor : palette.mutedText,
                   ),
+                  const SizedBox(width: AppSpace.lg),
+                ] else if (leading != null) ...<Widget>[
+                  leading,
                   const SizedBox(width: AppSpace.lg),
                 ] else if (leadingNumber case final number?) ...<Widget>[
                   Container(
@@ -601,7 +609,12 @@ class ListRow extends StatelessWidget {
                   trailing,
                 ] else if (value != null) ...<Widget>[
                   const SizedBox(width: AppSpace.md),
-                  Flexible(
+                  // Sized to itself, so it sits against the caret instead of
+                  // taking half the row from the label.
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.sizeOf(context).width * .4,
+                    ),
                     child: Text(
                       value,
                       maxLines: 1,

@@ -28,6 +28,7 @@ import '../widgets/media_art.dart';
 import '../widgets/section_header.dart';
 import 'credits_screen.dart';
 import 'episode_screen.dart';
+import '../../widgets/hosted_ads_banner.dart' show HostedBannerVariant;
 import 'home_screen.dart' show HomeAdSlot;
 
 /// A season's page: the series' artwork, the season's name (tapped, the
@@ -239,7 +240,10 @@ class _SeasonScreenState extends State<SeasonScreen>
           SliverToBoxAdapter(child: _summary(context, current, history)),
           SliverToBoxAdapter(
             child: widget.adBuilder?.call(context) ??
-                HomeAdSlot(placement: 'season_detail'),
+                HomeAdSlot(
+                  placement: 'season_detail',
+                  variant: HostedBannerVariant.tall,
+                ),
           ),
           SliverToBoxAdapter(child: _episodeList(context, history)),
           SliverToBoxAdapter(child: _cast(context)),

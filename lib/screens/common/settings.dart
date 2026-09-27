@@ -4,17 +4,20 @@ import 'package:flixquest/models/default_home.dart';
 import 'package:flixquest/services/globle_method.dart';
 
 import '../../functions/function.dart';
-import '/models/app_languages.dart';
 import '/screens/common/language_choose.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '/provider/settings_provider.dart';
 import '/provider/app_dependency_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'player_settings.dart';
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../mobile/widgets/page_kit.dart';
+import '../../mobile/widgets/pill_button.dart';
+import '../../mobile/widgets/settings_kit.dart';
 import '../../ui_components/app_ui_components.dart';
 
 class Settings extends StatefulWidget {
@@ -58,7 +61,7 @@ class _SettingsState extends State<Settings> {
     required Color onColor,
     required bool selected,
     required VoidCallback onTap,
-    EdgeInsetsGeometry margin = const EdgeInsets.only(right: 14),
+    EdgeInsetsGeometry margin = const EdgeInsetsDirectional.only(end: 14),
     Widget? iconOverride,
   }) {
     return Padding(
@@ -94,16 +97,12 @@ class _SettingsState extends State<Settings> {
   }
 
   Future<void> _pickCustomColor(SettingsProvider settingsValues) async {
-    final picked = await showModalBottomSheet<Color>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => _CustomColorPickerSheet(
-        initialColor: settingsValues.customAppColor > 0
-            ? Color(settingsValues.customAppColor)
-            : Theme.of(context).colorScheme.primary,
-      ),
+    final picked = await showColorPickerSheet(
+      context,
+      title: tr('custom_color'),
+      initialColor: settingsValues.customAppColor > 0
+          ? Color(settingsValues.customAppColor)
+          : Theme.of(context).colorScheme.primary,
     );
     if (picked == null) return;
     setState(() {
@@ -115,28 +114,12 @@ class _SettingsState extends State<Settings> {
   @override
   Widget build(BuildContext context) {
     final settingsValues = Provider.of<SettingsProvider>(context);
+    final palette = AppPalette.of(context);
     final appDependencies = context.watch<AppDependencyProvider>();
     final occasionalCatalog = appDependencies.occasionalThemeCatalog;
     final occasionalThemes = appDependencies.availableOccasionalThemes;
 
-    List<AppLanguages> langs = [
-      AppLanguages(
-          languageFlag: 'assets/images/country_flags/united-kingdom.png',
-          languageName: tr('english'),
-          languageCode: 'en'),
-      AppLanguages(
-          languageFlag: 'assets/images/country_flags/united-arab-emirates.png',
-          languageName: tr('arabic'),
-          languageCode: 'ar'),
-      AppLanguages(
-          languageFlag: 'assets/images/country_flags/spain.png',
-          languageName: tr('spanish'),
-          languageCode: 'es'),
-      AppLanguages(
-          languageFlag: 'assets/images/country_flags/india.png',
-          languageName: tr('hindi'),
-          languageCode: 'hi')
-    ];
+    final langs = appLanguageChoices();
 
     for (final language in langs) {
       if (language.languageCode.contains(settingsValues.appLanguage)) {
@@ -147,24 +130,26 @@ class _SettingsState extends State<Settings> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          tr('settings'),
-        ),
-      ),
+      backgroundColor: palette.page,
+      appBar: PageAppBar(title: tr('settings')),
       body: AppResponsiveContent(
         padding: EdgeInsets.zero,
         maxWidth: 760,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+          padding: EdgeInsets.fromLTRB(
+            AppSpace.gutter(context),
+            AppSpace.sm,
+            AppSpace.gutter(context),
+            AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,
+          ),
           children: [
             const SizedBox(height: 12),
-            _SettingsGroup(
+            SettingsGroup(
               title: tr('appearance'),
               children: [
-                _SettingsChoiceTile<String>(
+                ChoiceRow<String>(
                   icon: PhosphorIcons.moon(),
-                  title: tr('theme_mode'),
+                  label: tr('theme_mode'),
                   value: settingsValues.appTheme,
                   options: {
                     'dark': tr('dark'),
@@ -174,31 +159,21 @@ class _SettingsState extends State<Settings> {
                   onChanged: (value) =>
                       setState(() => settingsValues.appTheme = value),
                 ),
-                SwitchListTile(
+                SwitchRow(
                   value: appDependencies.ambientModeEnabled,
-                  inactiveThumbColor: Colors.white,
-                  inactiveTrackColor: const Color(0xFF9B9B9B),
-                  secondary: Icon(
-                    PhosphorIcons.imageSquare(),
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  title: Text(tr('ambient_mode')),
-                  subtitle: Text(tr('ambient_mode_description')),
+                  icon: PhosphorIcons.imageSquare(),
+                  label: tr('ambient_mode'),
+                  subtitle: tr('ambient_mode_description'),
                   onChanged: (value) {
                     appDependencies.ambientModeEnabled = value;
                   },
                 ),
                 if (occasionalCatalog.enabled)
-                  SwitchListTile(
+                  SwitchRow(
                     value: appDependencies.occasionalThemeEnabled,
-                    inactiveThumbColor: Colors.white,
-                    inactiveTrackColor: const Color(0xFF9B9B9B),
-                    secondary: Icon(
-                      PhosphorIcons.sparkle(),
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    title: Text(tr('seasonal_themes')),
-                    subtitle: Text(tr('seasonal_themes_description')),
+                    icon: PhosphorIcons.sparkle(),
+                    label: tr('seasonal_themes'),
+                    subtitle: tr('seasonal_themes_description'),
                     onChanged: (value) {
                       appDependencies.occasionalThemeEnabled = value;
                     },
@@ -214,28 +189,18 @@ class _SettingsState extends State<Settings> {
                     appDependencies.occasionalThemeEnabled &&
                     occasionalCatalog.effectsEnabled &&
                     occasionalCatalog.allowUserEffectsToggle)
-                  SwitchListTile(
+                  SwitchRow(
                     value: appDependencies.occasionalEffectsEnabled,
-                    inactiveThumbColor: Colors.white,
-                    inactiveTrackColor: const Color(0xFF9B9B9B),
-                    secondary: Icon(
-                      PhosphorIcons.sparkle(),
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    title: Text(tr('seasonal_effects')),
-                    subtitle: Text(tr('seasonal_effects_description')),
+                    icon: PhosphorIcons.confetti(),
+                    label: tr('seasonal_effects'),
+                    subtitle: tr('seasonal_effects_description'),
                     onChanged: (value) {
                       appDependencies.occasionalEffectsEnabled = value;
                     },
                   ),
-                ListTile(
-                  leading: Icon(
-                    PhosphorIcons.play(),
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  title: Text(
-                    tr('player_settings'),
-                  ),
+                ListRow(
+                  icon: PhosphorIcons.play(),
+                  label: tr('player_settings'),
                   onTap: () {
                     Navigator.push(context,
                         MaterialPageRoute(builder: ((context) {
@@ -243,43 +208,23 @@ class _SettingsState extends State<Settings> {
                     })));
                   },
                 ),
-                Visibility(
-                  visible: !isBelow33,
-                  child: SwitchListTile(
-                    inactiveThumbColor: Colors.white,
-                    inactiveTrackColor: const Color(0xFF9B9B9B),
-                    subtitle: Text(
-                      tr('android_12'),
-                    ),
+                if (!isBelow33)
+                  SwitchRow(
+                    subtitle: tr('android_12'),
                     value: settingsValues.isMaterial3Enabled,
-                    secondary: Icon(
-                      PhosphorIcons.palette(),
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    title: Text(
-                      tr('material_theming'),
-                    ),
+                    icon: PhosphorIcons.palette(),
+                    label: tr('material_theming'),
                     onChanged: (bool value) {
                       setState(() {
                         settingsValues.isMaterial3Enabled = value;
                       });
                     },
                   ),
-                ),
-                SwitchListTile(
-                  inactiveThumbColor: Colors.white,
-                  inactiveTrackColor: const Color(0xFF9B9B9B),
-                  subtitle: Text(
-                    tr('enable_warning'),
-                  ),
+                SwitchRow(
+                  subtitle: tr('enable_warning'),
                   value: settingsValues.enableProxy,
-                  secondary: Icon(
-                    PhosphorIcons.globe(),
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  title: Text(
-                    tr('use_proxy'),
-                  ),
+                  icon: PhosphorIcons.globe(),
+                  label: tr('use_proxy'),
                   onChanged: (bool value) {
                     if (value) {
                       showDialog(
@@ -291,22 +236,21 @@ class _SettingsState extends State<Settings> {
                                 child: Text(tr('use_proxy_title')),
                               ),
                               content: Text(tr('use_proxy_detail')),
-                              actions: [
-                                ElevatedButton(
-                                    onPressed: () async {
-                                      Navigator.pop(context);
-                                    },
-                                    child: Text(tr('cancel'))),
-                                TextButton(
-                                    onPressed: () async {
-                                      setState(() {
-                                        settingsValues.enableProxy = value;
-                                      });
-                                      Navigator.pop(context);
-                                    },
-                                    child: Text(
-                                      tr('enable'),
-                                    ))
+                              actions: <Widget>[
+                                PillButton(
+                                  label: tr('cancel'),
+                                  onPressed: () => Navigator.pop(ctx),
+                                ),
+                                PillButton(
+                                  label: tr('enable'),
+                                  primary: true,
+                                  onPressed: () {
+                                    setState(() {
+                                      settingsValues.enableProxy = value;
+                                    });
+                                    Navigator.pop(ctx);
+                                  },
+                                ),
                               ],
                             );
                           });
@@ -320,12 +264,12 @@ class _SettingsState extends State<Settings> {
               ],
             ),
             const SizedBox(height: 24),
-            _SettingsGroup(
+            SettingsGroup(
               title: tr('content_preferences'),
               children: [
-                _SettingsChoiceTile<String>(
+                ChoiceRow<String>(
                   icon: PhosphorIcons.image(),
-                  title: tr('image_quality'),
+                  label: tr('image_quality'),
                   value: settingsValues.imageQuality,
                   options: {
                     'original/': tr('high'),
@@ -335,17 +279,17 @@ class _SettingsState extends State<Settings> {
                   onChanged: (value) =>
                       setState(() => settingsValues.imageQuality = value),
                 ),
-                _SettingsChoiceTile<String>(
+                ChoiceRow<String>(
                   icon: PhosphorIcons.list(),
-                  title: tr('list_view_type'),
+                  label: tr('list_view_type'),
                   value: settingsValues.defaultView,
                   options: {'list': tr('list'), 'grid': tr('grid')},
                   onChanged: (value) =>
                       setState(() => settingsValues.defaultView = value),
                 ),
-                _SettingsChoiceTile<DefaultHome>(
+                ChoiceRow<DefaultHome>(
                   icon: PhosphorIcons.deviceMobile(),
-                  title: tr('default_home_screen'),
+                  label: tr('default_home_screen'),
                   value: settingsValues.defaultHome,
                   options: {
                     DefaultHome.home: tr('home'),
@@ -357,42 +301,44 @@ class _SettingsState extends State<Settings> {
                   onChanged: (value) =>
                       setState(() => settingsValues.defaultHome = value),
                 ),
-                ListTile(
+                ListRow(
                   onTap: (() {
                     Navigator.push(context,
                         MaterialPageRoute(builder: ((context) {
                       return const AppLanguageChoose();
                     })));
                   }),
-                  leading: Icon(
-                    PhosphorIcons.translate(),
-                    color: Theme.of(context).colorScheme.primary,
+                  icon: PhosphorIcons.translate(),
+                  label: tr('app_language'),
+                  showsNext: true,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (languageFlag != null) ...[
+                        LanguageFlag(languageFlag!),
+                        const SizedBox(width: AppSpace.sm),
+                      ],
+                      Text(
+                        languageName ?? settingsValues.appLanguage,
+                        style:
+                            AppType.body.copyWith(color: palette.mutedText),
+                      ),
+                    ],
                   ),
-                  title: Text(
-                    tr('app_language'),
-                  ),
-                  trailing: Wrap(
-                      spacing: 10,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (languageFlag != null)
-                          Image.asset(languageFlag!, height: 25, width: 25),
-                        Text(languageName ?? settingsValues.appLanguage)
-                      ]),
                 ),
               ],
             ),
             const SizedBox(height: 24),
-            _SettingsGroup(
+            SettingsGroup(
               title: tr('storage'),
               children: [
-                ListTile(
-                  leading: Icon(
-                    PhosphorIcons.eraser(),
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  title: Text(tr('clear_cache')),
-                  trailing: ElevatedButton(
+                ListRow(
+                  icon: PhosphorIcons.eraser(),
+                  label: tr('clear_cache'),
+                  showsNext: false,
+                  trailing: PillButton(
+                      label: tr('clear'),
+                      icon: PhosphorIcons.eraser(),
                       onPressed: () async {
                         await clearCache().then((value) {
                           if (!context.mounted) {
@@ -420,13 +366,12 @@ class _SettingsState extends State<Settings> {
                                       : tr('cache_doesnt_exist'))),
                               context);
                         });
-                      },
-                      child: Text(tr('clear'))),
+                      }),
                 ),
               ],
             ),
             const SizedBox(height: 24),
-            _SettingsGroup(
+            SettingsGroup(
               title: tr('custom_color'),
               children: [
                 SizedBox(
@@ -479,14 +424,13 @@ class _SettingsState extends State<Settings> {
                           },
                         ),
                       _paletteSwatch(
-                        color:
-                            Theme.of(context).colorScheme.surfaceContainerHighest,
-                        onColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: palette.idleFill,
+                        onColor: palette.foreground,
                         selected: false,
                         margin: EdgeInsets.zero,
                         iconOverride: Icon(
                           PhosphorIcons.plus(),
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          color: palette.foreground,
                         ),
                         onTap: () => _pickCustomColor(settingsValues),
                       ),
@@ -499,181 +443,6 @@ class _SettingsState extends State<Settings> {
         ),
       ),
     );
-  }
-}
-
-class _CustomColorPickerSheet extends StatefulWidget {
-  const _CustomColorPickerSheet({required this.initialColor});
-
-  final Color initialColor;
-
-  @override
-  State<_CustomColorPickerSheet> createState() =>
-      _CustomColorPickerSheetState();
-}
-
-class _CustomColorPickerSheetState extends State<_CustomColorPickerSheet> {
-  late Color _pickerColor = widget.initialColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
-              child: Text(
-                tr('custom_color'),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            ColorPicker(
-              pickerColor: _pickerColor,
-              onColorChanged: (color) => _pickerColor = color,
-              enableAlpha: false,
-              hexInputBar: true,
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(tr('cancel')),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(context, _pickerColor),
-                      child: Text(tr('save')),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsGroup extends StatelessWidget {
-  const _SettingsGroup({
-    required this.title,
-    required this.children,
-  });
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-        ),
-        Card(
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              for (var i = 0; i < children.length; i++) ...[
-                children[i],
-                if (i != children.length - 1) const Divider(),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SettingsChoiceTile<T> extends StatelessWidget {
-  const _SettingsChoiceTile({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.options,
-    required this.onChanged,
-  });
-
-  final IconData icon;
-  final String title;
-  final T value;
-  final Map<T, String> options;
-  final ValueChanged<T> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      onTap: () => _showChoices(context),
-      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-      title: Text(title),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 130),
-            child: Text(
-              options[value] ?? '',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
-          ),
-          const SizedBox(width: 5),
-          Icon(PhosphorIcons.caretRight()),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showChoices(BuildContext context) async {
-    final selected = await showModalBottomSheet<T>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.only(bottom: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 4, 24, 16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child:
-                    Text(title, style: Theme.of(context).textTheme.titleLarge),
-              ),
-            ),
-            for (final option in options.entries)
-              ListTile(
-                title: Text(option.value),
-                trailing: option.key == value
-                    ? Icon(PhosphorIcons.check(),
-                        color: Theme.of(context).colorScheme.primary)
-                    : null,
-                onTap: () => Navigator.pop(context, option.key),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (selected != null) onChanged(selected);
   }
 }
 
@@ -696,60 +465,29 @@ class _OccasionalThemeChoiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
+    return ListRow(
       onTap: () => _showChoices(context),
-      leading: Icon(
-        PhosphorIcons.sparkle(),
-        color: Theme.of(context).colorScheme.primary,
-      ),
-      title: Text(tr('occasional_theme')),
-      subtitle: Text(
-        tr('seasonal_theme_selection_description'),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 120),
-            child: Text(
-              _selectedLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          const SizedBox(width: 5),
-          Icon(PhosphorIcons.caretRight()),
-        ],
-      ),
+      icon: PhosphorIcons.sparkle(),
+      label: tr('occasional_theme'),
+      subtitle: tr('seasonal_theme_selection_description'),
+      value: _selectedLabel,
     );
   }
 
   Future<void> _showChoices(BuildContext context) {
-    return showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
+    return showAppSheet<void>(
+      context,
       builder: (sheetContext) => ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(sheetContext).height * .78,
         ),
         child: ListView(
           shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.paddingOf(sheetContext).bottom + AppSpace.lg,
+          ),
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 14),
-              child: Text(
-                tr('occasional_theme'),
-                style: Theme.of(sheetContext).textTheme.titleLarge,
-              ),
-            ),
+            SheetTitle(tr('occasional_theme')),
             _OccasionalThemeOption(
               title: tr('automatic'),
               description: tr('automatic_theme_description'),
@@ -801,16 +539,18 @@ class _OccasionalThemeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
+    final titleColor = selected ? palette.onFocus : palette.foreground;
+    final detailColor =
+        selected ? palette.onFocus.withValues(alpha: .72) : palette.mutedText;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpace.sm),
       child: Material(
-        color: selected
-            ? scheme.primary.withValues(alpha: .1)
-            : scheme.surfaceContainerHighest.withValues(alpha: .45),
-        borderRadius: BorderRadius.circular(9),
+        color: selected ? palette.focusFill : palette.idleFill,
+        borderRadius: BorderRadius.circular(AppRadii.card),
         child: InkWell(
-          borderRadius: BorderRadius.circular(9),
+          borderRadius: BorderRadius.circular(AppRadii.card),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -820,12 +560,15 @@ class _OccasionalThemeOption extends StatelessWidget {
                   width: 48,
                   height: 34,
                   child: colors.isEmpty
-                      ? Icon(PhosphorIcons.magicWand(), color: scheme.primary)
+                      ? Icon(
+                          PhosphorIcons.magicWand(),
+                          color: selected ? palette.onFocus : palette.mutedText,
+                        )
                       : Stack(
                           children: [
                             for (var index = 0; index < colors.length; index++)
                               Positioned(
-                                left: index * 11,
+                                left: index * 11.0,
                                 top: index.isOdd ? 7 : 1,
                                 child: Container(
                                   width: 25,
@@ -834,7 +577,9 @@ class _OccasionalThemeOption extends StatelessWidget {
                                     color: colors[index],
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: scheme.surface,
+                                      color: selected
+                                          ? palette.focusFill
+                                          : palette.surface,
                                       width: 2,
                                     ),
                                   ),
@@ -850,20 +595,23 @@ class _OccasionalThemeOption extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: AppType.cardTitle.copyWith(
+                          fontSize: 15,
+                          color: titleColor,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         description,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: scheme.onSurfaceVariant),
+                        style: AppType.metadata.copyWith(color: detailColor),
                       ),
                     ],
                   ),
                 ),
                 if (selected)
-                  Icon(PhosphorIcons.check(), color: scheme.primary),
+                  Icon(PhosphorIcons.check(), color: palette.onFocus),
               ],
             ),
           ),

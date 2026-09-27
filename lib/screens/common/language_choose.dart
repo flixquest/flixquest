@@ -1,78 +1,79 @@
-// ignore_for_file: deprecated_member_use
-
-import '../../models/app_languages.dart';
 import 'package:easy_localization/easy_localization.dart';
-import '/provider/settings_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../ui_components/app_ui_components.dart';
 
-class AppLanguageChoose extends StatefulWidget {
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../mobile/widgets/page_kit.dart';
+import '../../mobile/widgets/settings_kit.dart';
+import '../../models/app_languages.dart';
+import '/provider/settings_provider.dart';
+
+/// The languages the app itself is translated into, named in the current
+/// language.
+List<AppLanguages> appLanguageChoices() => <AppLanguages>[
+      AppLanguages(
+        languageFlag: 'assets/images/country_flags/united-kingdom.png',
+        languageName: tr('english'),
+        languageCode: 'en',
+      ),
+      AppLanguages(
+        languageFlag: 'assets/images/country_flags/united-arab-emirates.png',
+        languageName: tr('arabic'),
+        languageCode: 'ar',
+      ),
+      AppLanguages(
+        languageFlag: 'assets/images/country_flags/spain.png',
+        languageName: tr('spanish'),
+        languageCode: 'es',
+      ),
+      AppLanguages(
+        languageFlag: 'assets/images/country_flags/india.png',
+        languageName: tr('hindi'),
+        languageCode: 'hi',
+      ),
+    ];
+
+class AppLanguageChoose extends StatelessWidget {
   const AppLanguageChoose({super.key});
 
   @override
-  State<AppLanguageChoose> createState() => _AppLanguageChooseState();
-}
-
-class _AppLanguageChooseState extends State<AppLanguageChoose> {
-  @override
   Widget build(BuildContext context) {
-    final languageChange = Provider.of<SettingsProvider>(context);
-
-    List<AppLanguages> langs = [
-      AppLanguages(
-          languageFlag: 'assets/images/country_flags/united-kingdom.png',
-          languageName: tr('english'),
-          languageCode: 'en'),
-      AppLanguages(
-          languageFlag: 'assets/images/country_flags/united-arab-emirates.png',
-          languageName: tr('arabic'),
-          languageCode: 'ar'),
-      AppLanguages(
-          languageFlag: 'assets/images/country_flags/spain.png',
-          languageName: tr('spanish'),
-          languageCode: 'es'),
-      AppLanguages(
-          languageFlag: 'assets/images/country_flags/india.png',
-          languageName: tr('hindi'),
-          languageCode: 'hi')
-    ];
-
+    final settings = context.watch<SettingsProvider>();
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
     return Scaffold(
-      appBar: AppBar(title: Text(tr('choose_language'))),
-      body: AppResponsiveContent(
-        maxWidth: 640,
-        padding: EdgeInsets.fromLTRB(
-          AppUI.pagePadding(context),
-          16,
-          AppUI.pagePadding(context),
-          24,
-        ),
-        child: ListView.separated(
-          physics: const BouncingScrollPhysics(),
-          itemCount: langs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (context, index) {
-            final language = langs[index];
-            return AppSelectionTile(
-              title: language.languageName,
-              selected: languageChange.appLanguage == language.languageCode,
-              leading: ClipRRect(
-                borderRadius: BorderRadius.circular(7),
-                child: Image.asset(
-                  language.languageFlag,
-                  width: 32,
-                  height: 24,
-                  fit: BoxFit.cover,
-                ),
+      backgroundColor: palette.page,
+      appBar: PageAppBar(title: tr('choose_language')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              gutter,
+              AppSpace.sm,
+              gutter,
+              AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,
+            ),
+            children: <Widget>[
+              SettingsGroup(
+                title: tr('app_language'),
+                children: <Widget>[
+                  for (final language in appLanguageChoices())
+                    SelectableRow(
+                      label: language.languageName,
+                      leading: LanguageFlag(language.languageFlag),
+                      selected: settings.appLanguage == language.languageCode,
+                      onTap: () {
+                        settings.appLanguage = language.languageCode;
+                        EasyLocalization.of(context)!
+                            .setLocale(Locale(language.languageCode));
+                      },
+                    ),
+                ],
               ),
-              onTap: () {
-                languageChange.appLanguage = language.languageCode;
-                EasyLocalization.of(context)!
-                    .setLocale(Locale(language.languageCode));
-              },
-            );
-          },
+            ],
+          ),
         ),
       ),
     );

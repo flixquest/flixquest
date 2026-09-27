@@ -707,10 +707,11 @@ String? _releaseBadge(BuildContext context, MediaItem item) {
 /// Home's rows for a loaded feed, top to bottom: the hero, then what to
 /// watch next. Under All each chart comes as a pair, movies then series, so
 /// no catalogue row mixes the two; only the viewer's own rows (Continue
-/// Watching, My List) hold both. Four ads are spread down the page: one
-/// directly under the hero, then one after Trending, one after Streaming
-/// Services, and one before the genre rows. Each Home tab reports its own
-/// placement ids (`home_all_*`, `home_movies_*`, `home_series_*`).
+/// Watching, My List) hold both. Three ads are spread down the page: a
+/// banner directly under the hero, a medium rectangle after Trending (the
+/// size advertisers bid on most) and a banner before the genre rows. Each
+/// Home tab reports its own placement ids (`home_all_*`, `home_movies_*`,
+/// `home_series_*`); Start.io tags are letters only, so slots are named.
 @visibleForTesting
 List<Widget> homeRows(
   BuildContext context, {
@@ -773,7 +774,11 @@ List<Widget> homeRows(
     HomeFilter.movies => 'home_movies',
     HomeFilter.series => 'home_series',
   };
-  HomeAdSlot adSlot(int slot) => HomeAdSlot(placement: '${adBase}_$slot');
+  HomeAdSlot adSlot(String slot, {bool tall = false}) => HomeAdSlot(
+        placement: '${adBase}_$slot',
+        variant:
+            tall ? HostedBannerVariant.tall : HostedBannerVariant.standard,
+      );
   return <Widget>[
     // The update notice is a fixed Home slot above these feed rows.
     if (heroes.isNotEmpty)
@@ -784,7 +789,7 @@ List<Widget> homeRows(
         onShown: onHeroShown,
       ),
     // Directly below the hero.
-    adSlot(1),
+    adSlot('hero'),
     if (shownContinue.isNotEmpty)
       ContinueRow(title: tr('continue_watching'), items: shownContinue),
     for (final kind in kinds)
@@ -801,7 +806,7 @@ List<Widget> homeRows(
           titled(kind, 'trending_movies_week', 'trending_series_week'),
           trending[kind]!,
         ),
-    adSlot(2),
+    adSlot('trending', tall: true),
     if (shownMyList.isNotEmpty)
       PosterRow(
         title: tr('my_list'),
@@ -844,7 +849,6 @@ List<Widget> homeRows(
       services: appStreamingServices,
       onOpen: onOpenService,
     ),
-    adSlot(3),
     for (final kind in kinds)
       if (feed.of(kind).topRated.isNotEmpty)
         listRow(
@@ -861,7 +865,7 @@ List<Widget> homeRows(
         feed.of(MediaKind.movie).upcoming,
         badgeFor: (item) => _releaseBadge(context, item),
       ),
-    adSlot(4),
+    adSlot('genres'),
     // FlixQuest's categorized feed: a few genres at random, each laid out its
     // own way, labelled with its kind where both are on show.
     for (final category in feed.categories)
@@ -891,22 +895,28 @@ class HomeOptionalRow extends StatelessWidget {
 
 /// A hosted ad between Home's rows.
 class HomeAdSlot extends HomeOptionalRow {
-  HomeAdSlot({required this.placement, super.key})
-      : super(
-          child: _HostedAd(placement: placement),
+  HomeAdSlot({
+    required this.placement,
+    this.variant = HostedBannerVariant.standard,
+    super.key,
+  }) : super(
+          child: _HostedAd(placement: placement, variant: variant),
         );
 
   final String placement;
+  final HostedBannerVariant variant;
 }
 
 class _HostedAd extends StatelessWidget {
-  const _HostedAd({required this.placement});
+  const _HostedAd({required this.placement, required this.variant});
 
   final String placement;
+  final HostedBannerVariant variant;
 
   @override
   Widget build(BuildContext context) => RemoteHostedAdsBanner(
         placement: placement,
+        variant: variant,
         loadAds: () => ScraperApi(
           context.read<AppDependencyProvider>().flixquestAPIURL,
         ).getAds(),

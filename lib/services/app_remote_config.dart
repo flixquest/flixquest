@@ -5,6 +5,7 @@ import 'package:firebase_remote_config/firebase_remote_config.dart';
 import '../constants/api_constants.dart';
 import '../models/banner_ad.dart';
 import '../provider/app_dependency_provider.dart';
+import 'start_io_ads_service.dart';
 
 class AppRemoteConfig {
   const AppRemoteConfig._();
@@ -26,6 +27,10 @@ class AppRemoteConfig {
   static const startIoBannerEnabledKey = 'startio_banner_enabled';
   static const startIoInterstitialEnabledKey = 'startio_interstitial_enabled';
   static const startIoRewardedEnabledKey = 'startio_rewarded_enabled';
+  static const startIoInterstitialIntervalKey =
+      'startio_interstitial_interval_seconds';
+  static const startIoAdFreePassMinutesKey = 'startio_ad_free_pass_minutes';
+  static const startIoTvInterstitialModeKey = 'startio_tv_interstitial_mode';
 
   /// Live TV used to ride on the OTT flag before it got a dedicated key.
   static const legacyEnableLiveTvKey = 'enable_ott';
@@ -64,6 +69,9 @@ class AppRemoteConfig {
       startIoBannerEnabledKey: true,
       startIoInterstitialEnabledKey: true,
       startIoRewardedEnabledKey: true,
+      startIoInterstitialIntervalKey: 600,
+      startIoAdFreePassMinutesKey: 120,
+      startIoTvInterstitialModeKey: 'video',
     });
   }
 
@@ -136,7 +144,24 @@ class AppRemoteConfig {
       bannerEnabled: remoteConfig.getBool(startIoBannerEnabledKey),
       interstitialEnabled: remoteConfig.getBool(startIoInterstitialEnabledKey),
       rewardedEnabled: remoteConfig.getBool(startIoRewardedEnabledKey),
+      // Floors keep a mistyped value from turning pacing off entirely.
+      interstitialInterval: Duration(
+        seconds: remoteConfig.getInt(startIoInterstitialIntervalKey).clamp(
+              60,
+              86400,
+            ),
+      ),
+      adFreePassDuration: Duration(
+        minutes: remoteConfig.getInt(startIoAdFreePassMinutesKey).clamp(
+              5,
+              1440,
+            ),
+      ),
+      tvInterstitialMode: StartIoInterstitialMode.parse(
+        remoteConfig.getString(startIoTvInterstitialModeKey),
+      ),
     );
+    StartIoAdsService.instance.updateConfig(provider.startIoAds);
 
     final instancesRaw = remoteConfig.getString(flixquestApiInstancesKey);
     final parsedInstances = parseApiInstances(instancesRaw);

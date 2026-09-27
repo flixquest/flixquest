@@ -10,6 +10,7 @@ import 'package:flixquest/constants/app_constants.dart' show MediaType;
 import 'package:flixquest/models/provider_load_state.dart';
 import 'package:flixquest/services/globle_method.dart';
 import 'package:flixquest/services/start_io_ads_service.dart';
+import 'package:flixquest/widgets/playback_ads.dart';
 import 'package:flixquest/services/stream_size_estimator.dart';
 import 'package:flixquest/video_providers/provider_loader.dart';
 import 'package:flixquest/video_providers/scraper_api.dart';
@@ -83,14 +84,13 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
   }
 
   Future<void> _startPlayback() async {
-    final dependencies = context.read<AppDependencyProvider>();
+    // The interstitial runs while the stream resolves, so its time on screen
+    // hides the wait instead of adding to it. [loadVideo] holds the player
+    // back until the ad is gone.
     if (!widget.download) {
-      await StartIoAdsService.instance.showInterstitial(
-        enabled: dependencies.startIoInterstitialEnabled,
-        testMode: dependencies.unityTestMode,
-      );
+      unawaited(StartIoAdsService.instance.showPlaybackInterstitial());
     }
-    if (mounted) await loadVideo();
+    await loadVideo();
   }
 
   Future<void> _loadProviders() async {
@@ -266,11 +266,8 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
               );
         }
 
-        final dependencies = context.read<AppDependencyProvider>();
-        await StartIoAdsService.instance.showRewarded(
-          enabled: dependencies.startIoRewardedEnabled,
-          testMode: dependencies.unityTestMode,
-        );
+        // Never start playback behind a full-screen ad.
+        await StartIoAdsService.instance.whenFullScreenAdClosed();
         if (!mounted) return;
 
         // Navigate to player with provider list for lazy loading
@@ -643,9 +640,11 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              child: ProviderLoadingWidget(
-                providers: providerStates,
-                currentIndex: currentProviderIndex,
+              child: StreamLoadingAds(
+                child: ProviderLoadingWidget(
+                  providers: providerStates,
+                  currentIndex: currentProviderIndex,
+                ),
               ),
             ),
           ),

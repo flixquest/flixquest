@@ -4,6 +4,7 @@ import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/services/app_remote_config.dart';
+import 'package:flixquest/services/start_io_ads_service.dart';
 import 'package:flixquest/singleton/sharedpreferences_singleton.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -214,6 +215,37 @@ UNITY_TEST_MODE=false
       expect(provider.isStartIoBannerActive, isFalse);
       expect(provider.startIoInterstitialEnabled, isFalse);
       expect(provider.startIoRewardedEnabled, isFalse);
+    });
+
+    test('pacing defaults: 10 minute interval, 2 hour pass, TV video',
+        () async {
+      await AppRemoteConfig.configure(fakeRemoteConfig);
+      AppRemoteConfig.apply(fakeRemoteConfig, provider);
+
+      final ads = provider.startIoAds;
+      expect(ads.interstitialInterval, const Duration(minutes: 10));
+      expect(ads.adFreePassDuration, const Duration(hours: 2));
+      expect(ads.tvInterstitialMode, StartIoInterstitialMode.video);
+      expect(StartIoAdsService.instance.config, ads);
+    });
+
+    test('pacing values come from Remote Config, with safe floors', () async {
+      await AppRemoteConfig.configure(fakeRemoteConfig);
+      fakeRemoteConfig
+        ..setMockInt(AppRemoteConfig.startIoInterstitialIntervalKey, 5)
+        ..setMockInt(AppRemoteConfig.startIoAdFreePassMinutesKey, 45)
+        ..setMockString(
+          AppRemoteConfig.startIoTvInterstitialModeKey,
+          'automatic',
+        );
+
+      AppRemoteConfig.apply(fakeRemoteConfig, provider);
+
+      final ads = provider.startIoAds;
+      // A near-zero interval would show an ad on every play.
+      expect(ads.interstitialInterval, const Duration(seconds: 60));
+      expect(ads.adFreePassDuration, const Duration(minutes: 45));
+      expect(ads.tvInterstitialMode, StartIoInterstitialMode.automatic);
     });
   });
 

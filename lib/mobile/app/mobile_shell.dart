@@ -7,9 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../provider/settings_provider.dart';
-import '../../screens/user/user_info.dart';
 import '../../services/app_session_state_store.dart';
 import '../screens/home_screen.dart';
+import '../screens/my_flixquest_screen.dart';
 import '../screens/new_and_hot_screen.dart';
 import '../screens/search_screen.dart';
 import 'mobile_nav_bar.dart';
@@ -168,18 +168,11 @@ class _AppTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The pages that predate the shell pad for the bar themselves.
-    Widget legacy(Widget page) => SafeArea(
-          top: false,
-          left: false,
-          right: false,
-          child: page,
-        );
     return switch (tab) {
       MobileTab.home => const HomeScreen(),
       MobileTab.newAndHot => const NewAndHotScreen(),
       MobileTab.search => const SearchScreen(),
-      MobileTab.mine => legacy(const UserInfo()),
+      MobileTab.mine => const MyFlixQuestScreen(),
     };
   }
 }

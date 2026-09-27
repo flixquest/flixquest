@@ -36,6 +36,7 @@ import '../../screens/movie/movie_castandcrew.dart';
 import '../../screens/movie/movie_video_loader.dart';
 import '../../screens/tv/tvdetail_castandcrew.dart';
 import '../../services/ambient_theme_service.dart';
+import '../../services/media_link.dart';
 import '../collections.dart';
 import '../episode_playback.dart';
 import '../my_list.dart';
@@ -48,6 +49,7 @@ import '../widgets/pill_button.dart';
 import '../widgets/poster_card.dart';
 import '../widgets/section_header.dart';
 import 'episode_screen.dart';
+import '../../widgets/hosted_ads_banner.dart' show HostedBannerVariant;
 import 'home_screen.dart' show HomeAdSlot;
 import 'season_screen.dart';
 
@@ -452,13 +454,15 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
   Future<void> _share() async {
     context.read<SettingsProvider>().analytics.trackShare(
         shareType: _isMovie ? 'Movie' : 'TV', mediaName: _item.title);
+    final url =
+        _isMovie ? MediaLink.movieUrl(_item.id) : MediaLink.tvUrl(_item.id);
     await Share.share(
       tr(
         _isMovie ? 'share_movie' : 'share_tv',
         namedArgs: <String, String>{
           'title': _item.title,
           'rating': (_item.rating ?? 0).toStringAsFixed(1),
-          'id': '${_item.id}',
+          'url': '$url',
         },
       ),
     );
@@ -532,7 +536,10 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
           SliverToBoxAdapter(child: _summary(context, history)),
           SliverToBoxAdapter(
             child: widget.adBuilder?.call(context) ??
-                HomeAdSlot(placement: _isMovie ? 'movie_detail' : 'tv_detail'),
+                HomeAdSlot(
+                  placement: _isMovie ? 'movie_detail' : 'tv_detail',
+                  variant: HostedBannerVariant.tall,
+                ),
           ),
           if (!_isMovie) SliverToBoxAdapter(child: _episodes(context, history)),
           SliverPersistentHeader(
@@ -1433,9 +1440,6 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
     );
   }
 }
-
-
-
 
 class _TabsHeader extends SliverPersistentHeaderDelegate {
   const _TabsHeader({

@@ -241,6 +241,23 @@ void main() {
       expect(MediaLink.liveChannelUrl('bad/id'), isNull);
     });
 
+    test('shareable catalog addresses use the verified app domain', () {
+      expect(MediaLink.movieUrl(550).toString(), 'https://flix.quest/m/550');
+      expect(MediaLink.tvUrl(1396).toString(), 'https://flix.quest/t/1396');
+      expect(
+        MediaLink.episodeUrl(1396, 4, 13).toString(),
+        'https://flix.quest/t/1396.4.13',
+      );
+
+      expect(
+          MediaLink.parse('${MediaLink.movieUrl(550)}'), isA<TmdbMovieLink>());
+      expect(MediaLink.parse('${MediaLink.tvUrl(1396)}'), isA<TmdbTvLink>());
+      expect(
+        MediaLink.parse('${MediaLink.episodeUrl(1396, 4, 13)}'),
+        isA<TmdbEpisodeLink>(),
+      );
+    });
+
     test('a channel id with anything else in it is not guessed at', () {
       expect(MediaLink.parse('https://flix.quest/l/'), isNull);
       expect(MediaLink.parse('https://flix.quest/l/51/extra'), isNull);

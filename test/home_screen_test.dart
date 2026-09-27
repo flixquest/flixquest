@@ -18,6 +18,7 @@ import 'package:flixquest/provider/bookmark_provider.dart';
 import 'package:flixquest/provider/recently_watched_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
 import 'package:flixquest/screens/common/update_screen.dart';
+import 'package:flixquest/widgets/hosted_ads_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -231,7 +232,7 @@ String _describe(Widget row) => switch (row) {
 void main() {
   setUp(_setUp);
 
-  testWidgets('All: the rows in order, four ads spread down the page',
+  testWidgets('All: the rows in order, three ads spread down the page',
       (tester) async {
     final feed = await HomeFeedController(_FakeSource()).load(HomeFilter.all);
     final rows = await _rows(
@@ -242,7 +243,7 @@ void main() {
       myList: _series([150]),
     );
     // Every chart comes as a pair, movies then series; only the viewer's
-    // own rows hold both. One ad sits under the hero, three further down.
+    // own rows hold both. One ad sits under the hero, two further down.
     expect(rows.map(_describe), <String>[
       'hero',
       'ad',
@@ -259,7 +260,6 @@ void main() {
       'popular_series',
       'popular_series_on',
       'streaming_services',
-      'ad',
       'top_rated_movies',
       'top_rated_series',
       'upcoming_movies',
@@ -268,7 +268,16 @@ void main() {
     // Each slot carries its own ad-tag id, and the tab's own prefix.
     expect(
       rows.whereType<HomeAdSlot>().map((slot) => slot.placement),
-      <String>['home_all_1', 'home_all_2', 'home_all_3', 'home_all_4'],
+      <String>['home_all_hero', 'home_all_trending', 'home_all_genres'],
+    );
+    // The mid-feed slot is the medium rectangle.
+    expect(
+      rows.whereType<HomeAdSlot>().map((slot) => slot.variant),
+      <HostedBannerVariant>[
+        HostedBannerVariant.standard,
+        HostedBannerVariant.tall,
+        HostedBannerVariant.standard,
+      ],
     );
     // And no catalogue row mixes the two.
     for (final row in rows.whereType<PosterRow>()) {

@@ -19,6 +19,7 @@ import '../../provider/recently_watched_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../screens/movie/movie_video_loader.dart';
 import '../../screens/tv/tv_video_loader.dart';
+import '../../widgets/hosted_ads_banner.dart';
 import '../app/tv_design.dart';
 import '../controllers/tv_media_details_controller.dart';
 import '../controllers/tv_title_logos.dart';
@@ -630,6 +631,19 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                             ),
                           ),
                         ),
+                      ),
+                    ),
+                    // The hero's info sits bottom-left, so the top-right
+                    // corner of the backdrop holds a rectangle while the
+                    // viewer reads and picks. It is kept loaded but hidden
+                    // while the rows below are in view.
+                    Positioned(
+                      top: inset,
+                      right: inset,
+                      child: Visibility(
+                        visible: !browsing,
+                        maintainState: true,
+                        child: const StartIoAdSlot(placement: 'title_detail'),
                       ),
                     ),
                   ],

@@ -115,7 +115,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   final PlayerMovieRecommendations _movieRecommendations =
       PlayerMovieRecommendations();
   final PlayerNextEpisodeWidget _nextEpisodeWidget = PlayerNextEpisodeWidget();
-  late final List<MovieRecommendation> _contentMenuRecommendations;
   late final List<EpisodeMetadata> _contentMenuEpisodes;
   late final List<SeasonMetadata> _contentMenuSeasons;
   int duration = 0;
@@ -220,17 +219,14 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       _rawVideoLinksByProvider[initialProviderCode] =
           List.of(widget.initialVideoLinks);
     }
-    _contentMenuRecommendations = List<MovieRecommendation>.of(
-      widget.movieMetadata?.recommendations ?? const <MovieRecommendation>[],
-    );
     if (widget.mediaType == MediaType.movie) {
+      final recommendations = widget.movieMetadata?.recommendations;
       debugPrint(
         '[MovieRecommendationsDebug][PLAYER_INIT] '
         'movieId=${widget.movieMetadata?.movieId} '
         'title=${widget.movieMetadata?.movieName} '
-        'metadataCount=${widget.movieMetadata?.recommendations?.length ?? 0} '
-        'snapshotCount=${_contentMenuRecommendations.length} '
-        'ids=${_contentMenuRecommendations.map((movie) => movie.movieId).join(',')}',
+        'metadataCount=${recommendations?.length ?? 0} '
+        'ids=${recommendations?.map((movie) => movie.movieId).join(',') ?? ''}',
       );
     }
     _contentMenuEpisodes = List<EpisodeMetadata>.of(
@@ -270,7 +266,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final hasEpisodeSelection =
         widget.mediaType == MediaType.tvShow && _contentMenuEpisodes.isNotEmpty;
     final hasMovieRecommendations = widget.mediaType == MediaType.movie &&
-        _contentMenuRecommendations.isNotEmpty;
+        (widget.movieMetadata?.recommendations?.isNotEmpty ?? false);
     debugPrint(
       '[PlayerContentMenu] configure '
       'mediaType=${widget.mediaType} '
@@ -1684,20 +1680,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     return navigator.overlay?.context ?? context;
   }
 
-  MovieStreamMetadata? get _movieMetadataForContentMenu {
-    final metadata = widget.movieMetadata;
-    if (metadata != null &&
-        metadata.recommendations?.isNotEmpty != true &&
-        _contentMenuRecommendations.isNotEmpty) {
-      metadata.recommendations =
-          List<MovieRecommendation>.of(_contentMenuRecommendations);
-      debugPrint(
-        '[PlayerContentMenu] restored '
-        '${metadata.recommendations!.length} movie recommendations',
-      );
-    }
-    return metadata;
-  }
+  MovieStreamMetadata? get _movieMetadataForContentMenu =>
+      widget.movieMetadata;
 
   TVStreamMetadata? get _tvMetadataForContentMenu {
     final metadata = widget.tvMetadata;
@@ -2964,7 +2948,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final episodes = widget.tvMetadata?.seasonEpisodes ?? _contentMenuEpisodes;
-    final recommendations = _contentMenuRecommendations;
+    final recommendations =
+        widget.movieMetadata?.recommendations ?? const <MovieRecommendation>[];
     final isTv = widget.mediaType == MediaType.tvShow;
     final title = isTv
         ? widget.tvMetadata?.seriesName ?? ''

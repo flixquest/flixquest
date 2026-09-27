@@ -17,6 +17,8 @@ import '../../screens/common/live_player.dart';
 import '../../services/analytics_service.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/start_io_ads_service.dart';
+import '../../widgets/hosted_ads_banner.dart';
+import '../../widgets/playback_ads.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
 import '../app/tv_design.dart';
@@ -347,13 +349,9 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
 
   Future<void> _play(Channel channel) async {
     setState(() => _resolvingId = channel.id);
-    final dependencies = context.read<AppDependencyProvider>();
-    await StartIoAdsService.instance.showInterstitial(
-      enabled: dependencies.startIoInterstitialEnabled,
-      testMode: dependencies.unityTestMode,
-      adTag: 'live_watch_now_tv',
-    );
-    if (!mounted) return;
+    // The interstitial runs while the stream resolves; the player opens only
+    // once it is gone.
+    unawaited(StartIoAdsService.instance.showPlaybackInterstitial());
     final stopwatch = Stopwatch()..start();
     try {
       final stream = await _api().getStream(channel.id);
@@ -371,11 +369,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         durationMs: stopwatch.elapsedMilliseconds,
         source: _mode.name,
       );
-      await StartIoAdsService.instance.showRewarded(
-        enabled: dependencies.startIoRewardedEnabled,
-        testMode: dependencies.unityTestMode,
-        adTag: 'live_stream_ready_tv',
-      );
+      await StartIoAdsService.instance.whenFullScreenAdClosed();
       if (!mounted) return;
       final theme = Theme.of(context);
       await Navigator.of(context).push<void>(
@@ -582,7 +576,30 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
             ],
             SizedBox(height: widget.metrics.compact ? 4 : 8),
             Expanded(
-              child: isSchedule ? _buildSchedule() : _buildGrid(),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    child: isSchedule ? _buildSchedule() : _buildGrid(),
+                  ),
+                  // A fixed rectangle beside the list stays on screen while
+                  // the viewer browses, so every refresh is a viewable
+                  // impression. Its column is reserved up front so the grid
+                  // never reflows when the ad arrives.
+                  if (context.watch<AppDependencyProvider>()
+                      .isStartIoBannerActive)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 20, top: 4),
+                      child: SizedBox(
+                        width: 300,
+                        child: StartIoAdSlot(
+                          placement: 'live_tv_side',
+                          keywords: StartIoAdsService.liveKeywords,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ],
         ),
@@ -668,6 +685,8 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
             label: 'Refresh',
           ),
         ),
+        const SizedBox(width: 8),
+        const AdFreePassButton(),
       ],
     );
   }

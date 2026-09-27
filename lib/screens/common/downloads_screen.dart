@@ -1,10 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/offline_download.dart';
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../mobile/widgets/page_kit.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/offline_download_provider.dart';
 import '../../services/analytics_service.dart';
@@ -22,15 +26,18 @@ class DownloadsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<OfflineDownloadProvider>();
+    final palette = AppPalette.of(context);
     final content = RefreshIndicator(
+      color: palette.foreground,
+      backgroundColor: palette.raisedSurface,
       onRefresh: provider.refresh,
       child: provider.downloads.isEmpty
           ? _EmptyDownloads(loading: provider.loading)
           : ListView.separated(
               padding: EdgeInsets.fromLTRB(
-                16,
+                AppSpace.gutter(context),
                 embedded ? 20 : 12,
-                16,
+                AppSpace.gutter(context),
                 112 + MediaQuery.paddingOf(context).bottom,
               ),
               itemCount: provider.downloads.length,
@@ -48,10 +55,9 @@ class DownloadsScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
               child: Text(
-                'Downloads',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                tr('downloads'),
+                style: AppType.scaled(context, AppType.pageTitle)
+                    .copyWith(color: palette.foreground),
               ),
             ),
             if (provider.error != null) _ErrorBanner(message: provider.error!),
@@ -68,7 +74,8 @@ class DownloadsScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Downloads')),
+      backgroundColor: palette.page,
+      appBar: PageAppBar(title: tr('downloads')),
       body: Column(
         children: [
           if (provider.error != null) _ErrorBanner(message: provider.error!),
@@ -92,6 +99,7 @@ class _EmptyDownloads extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(32),
@@ -99,23 +107,25 @@ class _EmptyDownloads extends StatelessWidget {
         SizedBox(height: MediaQuery.sizeOf(context).height * .18),
         Icon(
           loading ? PhosphorIcons.cloudArrowDown() : PhosphorIcons.download(),
-          size: 72,
-          color: Theme.of(context).colorScheme.primary,
+          size: 48,
+          color: palette.mutedText,
         ),
         const SizedBox(height: 20),
         Text(
-          loading ? 'Loading downloads…' : 'No downloads yet',
+          loading ? tr('loading_downloads') : tr('no_downloads_yet'),
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleLarge,
+          style: AppType.sectionHeader.copyWith(color: palette.foreground),
         ),
         if (!loading) ...[
           const SizedBox(height: 8),
           Text(
-            'Download a movie or episode from its details page to watch it offline.',
+            _localized(
+              context,
+              'downloads_empty_hint',
+              'Download a movie or episode from its details page to watch it offline.',
+            ),
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+            style: AppType.body.copyWith(color: palette.mutedText),
           ),
         ],
       ],
@@ -131,11 +141,14 @@ class _DownloadCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
     final export =
         context.select<OfflineDownloadProvider, OfflineExportProgress?>(
       (provider) => provider.exportFor(download.id),
     );
-    return Card(
+    return Material(
+      color: palette.surface,
+      borderRadius: BorderRadius.circular(AppRadii.card),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: download.isComplete ? () => _playOffline(context) : null,
@@ -193,7 +206,7 @@ class _DownloadCard extends StatelessWidget {
                           Icon(
                             PhosphorIcons.filmReel(),
                             size: 14,
-                            color: colors.primary,
+                            color: palette.mutedText,
                           ),
                           const SizedBox(width: 5),
                           Text(
@@ -204,7 +217,7 @@ class _DownloadCard extends StatelessWidget {
                                 .textTheme
                                 .labelSmall
                                 ?.copyWith(
-                                  color: colors.primary,
+                                  color: palette.mutedText,
                                   fontWeight: FontWeight.w700,
                                 ),
                           ),
@@ -245,7 +258,7 @@ class _DownloadCard extends StatelessWidget {
                           Icon(
                             PhosphorIcons.speedometer(),
                             size: 14,
-                            color: colors.primary,
+                            color: palette.mutedText,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -256,7 +269,7 @@ class _DownloadCard extends StatelessWidget {
                                 .textTheme
                                 .labelSmall
                                 ?.copyWith(
-                                  color: colors.primary,
+                                  color: palette.mutedText,
                                   fontWeight: FontWeight.w700,
                                 ),
                           ),
@@ -337,7 +350,7 @@ class _Poster extends StatelessWidget {
       child: Center(child: Icon(PhosphorIcons.filmSlate(), size: 28)),
     );
     return ClipRRect(
-      borderRadius: BorderRadius.circular(5),
+      borderRadius: BorderRadius.circular(AppRadii.card),
       child: SizedBox(
         width: 76,
         height: 112,
@@ -361,22 +374,31 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
+    final error = Theme.of(context).colorScheme.error;
     final (label, color) = switch (download.state) {
-      OfflineDownloadState.completed => ('Downloaded', colors.primary),
-      OfflineDownloadState.downloading => ('Downloading', colors.tertiary),
-      OfflineDownloadState.queued => ('Queued', colors.secondary),
-      OfflineDownloadState.stopped => ('Paused', colors.secondary),
-      OfflineDownloadState.failed => ('Failed', colors.error),
-      OfflineDownloadState.removing => ('Removing', colors.outline),
-      OfflineDownloadState.restarting => ('Restarting', colors.tertiary),
-      OfflineDownloadState.unknown => ('Unknown', colors.outline),
+      OfflineDownloadState.completed =>
+        (_localized(context, 'download_status_completed', 'Downloaded'), palette.mutedText),
+      OfflineDownloadState.downloading =>
+        (_localized(context, 'download_status_downloading', 'Downloading'), palette.mutedText),
+      OfflineDownloadState.queued =>
+        (_localized(context, 'download_status_queued', 'Queued'), palette.mutedText),
+      OfflineDownloadState.stopped =>
+        (_localized(context, 'download_status_stopped', 'Paused'), palette.mutedText),
+      OfflineDownloadState.failed =>
+        (_localized(context, 'download_status_failed', 'Failed'), error),
+      OfflineDownloadState.removing =>
+        (_localized(context, 'download_status_removing', 'Removing'), palette.mutedText),
+      OfflineDownloadState.restarting =>
+        (_localized(context, 'download_status_restarting', 'Restarting'), palette.mutedText),
+      OfflineDownloadState.unknown =>
+        (_localized(context, 'download_status_unknown', 'Unknown'), palette.mutedText),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: .13),
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(AppRadii.chip),
       ),
       child: Text(
         label,
@@ -384,6 +406,13 @@ class _StatusChip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The translation of [key], or [fallback] where no localization is loaded.
+String _localized(BuildContext context, String key, String fallback) {
+  if (EasyLocalization.of(context) == null) return fallback;
+  final localized = context.tr(key);
+  return localized == key ? fallback : localized;
 }
 
 class _DownloadActions extends StatelessWidget {
@@ -394,21 +423,18 @@ class _DownloadActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.read<OfflineDownloadProvider>();
-    final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
     return IconButton(
       key: ValueKey('download-actions-${download.id}'),
       tooltip: 'Download options',
       style: IconButton.styleFrom(
-        backgroundColor: colors.surfaceContainerHighest.withValues(alpha: .7),
-        foregroundColor: colors.onSurfaceVariant,
+        backgroundColor: palette.idleFill,
+        foregroundColor: palette.mutedText,
       ),
       icon: Icon(PhosphorIcons.dotsThreeVertical(PhosphorIconsStyle.bold)),
       onPressed: () async {
-        final action = await showModalBottomSheet<_DownloadAction>(
-          context: context,
-          useSafeArea: true,
-          showDragHandle: true,
-          isScrollControlled: true,
+        final action = await showAppSheet<_DownloadAction>(
+          context,
           builder: (_) => _DownloadActionsSheet(download: download),
         );
         switch (action) {
@@ -514,6 +540,7 @@ class _DownloadActionsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * .82,
@@ -530,12 +557,12 @@ class _DownloadActionsSheet extends StatelessWidget {
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(8),
+                    color: palette.idleFill,
+                    borderRadius: BorderRadius.circular(AppRadii.card),
                   ),
                   child: Icon(
                     PhosphorIcons.downloadSimple(PhosphorIconsStyle.bold),
-                    color: colors.primary,
+                    color: palette.foreground,
                   ),
                 ),
                 const SizedBox(width: 13),
@@ -616,7 +643,7 @@ class _DownloadActionsSheet extends StatelessWidget {
             const SizedBox(height: 14),
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(_localized(context, 'cancel', 'Cancel')),
             ),
           ],
         ),
@@ -643,12 +670,13 @@ class _DownloadActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final accent = destructive ? colors.error : colors.primary;
+    final palette = AppPalette.of(context);
+    final accent = destructive ? colors.error : palette.foreground;
     return Material(
-      color: accent.withValues(alpha: .08),
-      borderRadius: BorderRadius.circular(9),
+      color: destructive ? colors.error.withValues(alpha: .08) : palette.idleFill,
+      borderRadius: BorderRadius.circular(AppRadii.card),
       child: InkWell(
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: BorderRadius.circular(AppRadii.card),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -658,8 +686,10 @@ class _DownloadActionTile extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: .13),
-                  borderRadius: BorderRadius.circular(8),
+                  color: destructive
+                      ? colors.error.withValues(alpha: .13)
+                      : palette.surface,
+                  borderRadius: BorderRadius.circular(AppRadii.card),
                 ),
                 child: Icon(icon, size: 21, color: accent),
               ),
@@ -730,7 +760,7 @@ class _ErrorBanner extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: context.read<OfflineDownloadProvider>().refresh,
-          child: const Text('Retry'),
+          child: Text(_localized(context, 'retry', 'Retry')),
         ),
       ],
     );

@@ -54,6 +54,14 @@ class _ProfileEditState extends State<ProfileEdit> {
   DocumentSnapshot? userDoc;
   final ScrollController _profileScrollController = ScrollController();
 
+  /// Reads a field from [userDoc] without throwing when the document omits it.
+  /// `DocumentSnapshot.get` throws a `StateError` for missing keys, which is
+  /// common for older accounts that never stored `photoUrl`.
+  dynamic _userField(String key) {
+    final data = userDoc?.data();
+    return data is Map ? data[key] : null;
+  }
+
   void getData() async {
     User? user = _auth.currentUser;
     uid = user!.uid;
@@ -68,19 +76,22 @@ class _ProfileEditState extends State<ProfileEdit> {
 
       setState(() {
         userAnonymous = false;
-        name = userDoc!.get('name');
+        name = _userField('name');
         email = user.email;
-        joinedAt = userDoc!.get('joinedAt');
-        month = DateFormat('MMMM')
-            .format(DateTime(0, DateTime.parse(joinedAt!).month));
-        year = DateTime.parse(joinedAt!).year;
-        isVerified = userDoc!.get('verified');
-        profileId = userDoc!.get('profileId');
-        username = userDoc!.get('username');
-        photoUrl = userDoc!.get('photoUrl')?.toString();
-        createdAt = userDoc!.get('createdAt');
-        userEmail = userDoc!.get('email');
-        userId = userDoc!.get('id');
+        joinedAt = _userField('joinedAt');
+        final joinedDate =
+            joinedAt == null ? null : DateTime.tryParse(joinedAt!);
+        if (joinedDate != null) {
+          month = DateFormat('MMMM').format(DateTime(0, joinedDate.month));
+          year = joinedDate.year;
+        }
+        isVerified = _userField('verified') as bool?;
+        profileId = (_userField('profileId') as num?)?.toInt();
+        username = _userField('username');
+        photoUrl = _userField('photoUrl')?.toString();
+        createdAt = _userField('createdAt') as Timestamp?;
+        userEmail = _userField('email');
+        userId = _userField('id');
       });
 
       if (profileId != null && profileId! > 0) {
@@ -160,7 +171,7 @@ class _ProfileEditState extends State<ProfileEdit> {
                   context);
             }
             setState(() {
-              username = userDoc!.get('username');
+              username = _userField('username');
             });
             return;
           }
