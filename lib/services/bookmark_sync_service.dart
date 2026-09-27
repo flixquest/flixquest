@@ -132,6 +132,8 @@ class BookmarkSyncService {
           mergedMovies.add(local);
         }
       }
+      _keepGenres(mergedMovies, localMovies, (m) => m.id,
+          (m) => m.genreIds, (m, ids) => m.genreIds = ids);
 
       // 4. Merge TV Shows (Union by id)
       final mergedTvs = <TV>[...cloudTvs];
@@ -141,6 +143,8 @@ class BookmarkSyncService {
           mergedTvs.add(local);
         }
       }
+      _keepGenres(mergedTvs, localTvs, (t) => t.id, (t) => t.genreIds,
+          (t, ids) => t.genreIds = ids);
 
       // 5. Update Firestore with Merged Lists
       final moviesPayload = mergedMovies.map((m) => m.toMap()).toList();
@@ -157,6 +161,8 @@ class BookmarkSyncService {
           final exists = await _movieDb.contain(movie.id!);
           if (!exists) {
             await _movieDb.insertMovie(movie);
+          } else {
+            await _movieDb.backfillGenreIds(movie.id!, movie.genreIds);
           }
         }
       }
@@ -166,6 +172,8 @@ class BookmarkSyncService {
           final exists = await _tvDb.contain(tv.id!);
           if (!exists) {
             await _tvDb.insertTV(tv);
+          } else {
+            await _tvDb.backfillGenreIds(tv.id!, tv.genreIds);
           }
         }
       }
@@ -224,6 +232,8 @@ class BookmarkSyncService {
           mergedMovies.add(local);
         }
       }
+      _keepGenres(mergedMovies, localMovies, (m) => m.id,
+          (m) => m.genreIds, (m, ids) => m.genreIds = ids);
 
       final mergedTvs = <TV>[...cloudTvs];
       for (final local in localTvs) {
@@ -232,6 +242,8 @@ class BookmarkSyncService {
           mergedTvs.add(local);
         }
       }
+      _keepGenres(mergedTvs, localTvs, (t) => t.id, (t) => t.genreIds,
+          (t, ids) => t.genreIds = ids);
 
       await docRef.update({
         'movies': mergedMovies.map((m) => m.toMap()).toList(),
@@ -268,6 +280,8 @@ class BookmarkSyncService {
           final exists = await _movieDb.contain(movie.id!);
           if (!exists) {
             await _movieDb.insertMovie(movie);
+          } else {
+            await _movieDb.backfillGenreIds(movie.id!, movie.genreIds);
           }
         }
       }
@@ -278,6 +292,8 @@ class BookmarkSyncService {
           final exists = await _tvDb.contain(tv.id!);
           if (!exists) {
             await _tvDb.insertTV(tv);
+          } else {
+            await _tvDb.backfillGenreIds(tv.id!, tv.genreIds);
           }
         }
       }
@@ -327,6 +343,28 @@ class BookmarkSyncService {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// A cloud copy written before genres were kept has none; take them from
+  /// the same title's local row, so the merge doesn't drop them.
+  void _keepGenres<T>(
+    List<T> merged,
+    List<T> local,
+    int? Function(T item) idOf,
+    List<int>? Function(T item) genresOf,
+    void Function(T item, List<int> ids) setGenres,
+  ) {
+    final known = <int, List<int>>{
+      for (final item in local)
+        if (idOf(item) case final id?)
+          if (genresOf(item) case final ids? when ids.isNotEmpty) id: ids,
+    };
+    for (final item in merged) {
+      final ids = known[idOf(item)];
+      if (ids != null && (genresOf(item)?.isEmpty ?? true)) {
+        setGenres(item, ids);
+      }
     }
   }
 }

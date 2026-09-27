@@ -11,6 +11,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../constants/app_constants.dart';
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../mobile/widgets/pill_button.dart';
 import '../../tv/focus/tv_keymap.dart';
 import '../../tv/widgets/tv_dialog.dart';
 import '../../tv/widgets/tv_update_widgets.dart';
@@ -677,72 +680,62 @@ class _UpdateBottomState extends State<UpdateBottom> {
           ));
     }
 
+    // A quiet panel in the page's own tones: the accent only on the small
+    // kicker, the action in ink, as on the rest of Home.
+    final palette = AppPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: EdgeInsets.symmetric(horizontal: AppSpace.gutter(context)),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          gradient: LinearGradient(
-            colors: [
-              colors.primary.withValues(alpha: .20),
-              colors.secondary.withValues(alpha: .10),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          border: Border.all(color: colors.primary.withValues(alpha: .28)),
+          color: palette.surface,
+          borderRadius: BorderRadius.circular(AppRadii.hero),
+          border: Border.all(color: palette.hairline),
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 14, 6, 14),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: colors.primary,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Icon(
-                  PhosphorIcons.rocketLaunch(PhosphorIconsStyle.fill),
-                  color: colors.onPrimary,
-                ),
+              Icon(
+                PhosphorIcons.rocketLaunch(),
+                size: 26,
+                color: palette.foreground,
               ),
-              const SizedBox(width: 13),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      tr('update_available'),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                      tr('update_available').toUpperCase(),
+                      style: AppType.kicker.copyWith(color: colors.primary),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       tr('new_version', namedArgs: {'v': version}),
-                      style: TextStyle(color: colors.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 11),
-                    FilledButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const UpdateScreen(isForced: false),
-                        ),
+                      style: AppType.body.copyWith(
+                        color: palette.secondaryText,
                       ),
-                      icon: Icon(PhosphorIcons.arrowUpRight()),
-                      label: Text(tr('update')),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              PillButton(
+                primary: true,
+                height: 36,
+                label: tr('update'),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const UpdateScreen(isForced: false),
+                  ),
                 ),
               ),
               IconButton(
                 onPressed: _dismiss,
                 tooltip: tr('disable_notification_version'),
-                icon: Icon(PhosphorIcons.x(), size: 19),
+                color: palette.mutedText,
+                icon: Icon(PhosphorIcons.x(), size: 18),
                 visualDensity: VisualDensity.compact,
               ),
             ],

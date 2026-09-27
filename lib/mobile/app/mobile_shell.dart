@@ -6,17 +6,14 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../catalog/home_feed_controller.dart';
 import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../provider/settings_provider.dart';
-import '../../screens/common/bookmark_screen.dart';
 import '../../screens/common/discover.dart';
 import '../../screens/user/user_info.dart';
 import '../../services/app_session_state_store.dart';
-import '../../widgets/movie_widgets.dart';
-import '../../widgets/tv_widgets.dart';
+import '../screens/home_screen.dart';
 import 'mobile_nav_bar.dart';
 import 'mobile_tabs.dart';
 
@@ -181,35 +178,11 @@ class _AppTab extends StatelessWidget {
           child: page,
         );
     return switch (tab) {
-      MobileTab.home => legacy(const _InterimHome()),
+      MobileTab.home => const HomeScreen(),
       MobileTab.newAndHot => const _NotYet(),
       MobileTab.search => legacy(const DiscoverPage()),
       MobileTab.mine => legacy(const UserInfo()),
     };
-  }
-}
-
-/// Home until the new one lands: the old Movies page, or the old Series page
-/// when the app is set to open on Series.
-class _InterimHome extends StatelessWidget {
-  const _InterimHome();
-
-  @override
-  Widget build(BuildContext context) {
-    final tabs = MobileTabScope.of(context);
-    void openMyList() => Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const BookmarkScreen()),
-        );
-    void openSearch() => tabs.select(MobileTab.search);
-    return tabs.initialHomeFilter == HomeFilter.series
-        ? MainTVDisplay(
-            onBookmarksPressed: openMyList,
-            onSearchPressed: openSearch,
-          )
-        : MainMoviesDisplay(
-            onBookmarksPressed: openMyList,
-            onSearchPressed: openSearch,
-          );
   }
 }
 

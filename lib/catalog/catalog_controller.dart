@@ -57,10 +57,14 @@ class MediaCollection {
     required this.kicker,
     required this.loadPage,
     this.logoAsset,
+    this.adPlacement,
   });
 
   final String id;
   final String title;
+
+  /// The hosted ad placement the collection's page reports, if it shows one.
+  final String? adPlacement;
 
   /// What kind of collection it is, shown above the title.
   final String kicker;
@@ -249,6 +253,40 @@ class CatalogController {
         dependencies,
         strict: true,
       ),
+    );
+  }
+
+  /// Any TMDB list of [kind] at [url], a page at a time.
+  MediaCollection listCollection({
+    required String id,
+    required MediaKind kind,
+    required String url,
+    required String title,
+    required String kicker,
+    required SettingsProvider settings,
+    required AppDependencyProvider dependencies,
+    String? adPlacement,
+  }) {
+    return MediaCollection(
+      id: id,
+      title: title,
+      kicker: kicker,
+      adPlacement: adPlacement,
+      loadPage: (page) {
+        final uri = Uri.parse(url);
+        return _fetch(
+          kind,
+          uri.replace(
+            queryParameters: <String, String>{
+              ...uri.queryParameters,
+              'page': '$page',
+            },
+          ).toString(),
+          settings,
+          dependencies,
+          strict: true,
+        );
+      },
     );
   }
 

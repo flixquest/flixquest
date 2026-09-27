@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
+import '../../catalog/episode_choice.dart';
 import '../../constants/api_constants.dart';
 import '../../constants/app_constants.dart';
 import '../../functions/function.dart';
@@ -394,44 +395,18 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
   Future<void> _playSeries({bool fromStart = false}) async {
     final data = await _details?.then((data) => data, onError: (_) => null);
     if (data == null || !mounted) return;
-    final seasons = data.seasons;
-    final resume = fromStart ? null : _resume();
-    final watched = resume?.episode;
-
     try {
-      if (watched != null) {
-        final season = await _episodesOf(watched.seasonNum!);
-        if (!resume!.finished) {
-          final episode = season.firstWhere(
-            (episode) => episode.episodeNumber == watched.episodeNum,
-            orElse: () => EpisodeList(
-              episodeId: watched.id,
-              episodeNumber: watched.episodeNum,
-              seasonNumber: watched.seasonNum,
-              name: watched.episodeName,
-            ),
-          );
-          return _playEpisode(episode, season, elapsed: resume.elapsed);
-        }
-        final next = episodeAfter(season, watched.episodeNum!);
-        if (next != null && hasAired(next)) {
-          return _playEpisode(next, season);
-        }
-        final nextSeason = seasons
-            .map((season) => season.seasonNumber!)
-            .where((number) => number > watched.seasonNum!)
-            .firstOrNull;
-        if (nextSeason != null) {
-          final episodes = await _episodesOf(nextSeason);
-          if (episodes.isNotEmpty && hasAired(episodes.first)) {
-            return _playEpisode(episodes.first, episodes);
-          }
-        }
-      }
-      final first = seasons.firstOrNull?.seasonNumber;
-      if (first == null) return;
-      final episodes = await _episodesOf(first);
-      if (episodes.isNotEmpty) await _playEpisode(episodes.first, episodes);
+      final choice = await chooseEpisode(
+        seasons: data.seasons,
+        resume: fromStart ? null : _resume(),
+        loadSeason: _episodesOf,
+      );
+      if (choice == null) return;
+      await _playEpisode(
+        choice.episode,
+        choice.seasonEpisodes,
+        elapsed: choice.elapsed,
+      );
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

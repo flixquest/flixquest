@@ -123,6 +123,10 @@ class MediaItem {
 
   String get stableId => stableKey ?? '${kind.name}:$id';
 
+  /// TMDB genre ids, when the list this came from carried them.
+  List<int> get genreIds =>
+      movie?.genreIds ?? series?.genreIds ?? const <int>[];
+
   String? get year {
     final value = releaseDate;
     return value != null && value.length >= 4 ? value.substring(0, 4) : null;

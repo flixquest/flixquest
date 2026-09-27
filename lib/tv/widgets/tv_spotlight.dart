@@ -12,8 +12,10 @@ import '../../functions/function.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../app/tv_design.dart';
-import '../controllers/tv_title_logos.dart';
 import '../models/tv_media_item.dart';
+import '../../design/title_logo.dart';
+
+export '../../design/title_logo.dart';
 
 /// Full-bleed artwork for the item in the spotlight.
 ///
@@ -308,133 +310,5 @@ class TvSpotlightInfo extends StatelessWidget {
   }
 }
 
-/// [item]'s logo artwork from TMDB, or [fallback] (its name as text) until the
-/// logo is found, or when it has none.
-///
-/// Logos are drawn in the space the text would take, left aligned and never
-/// wider than the spotlight, so a wide wordmark and a stacked one read at a
-/// similar size.
-class TvTitleLogo extends StatefulWidget {
-  const TvTitleLogo({
-    required this.item,
-    required this.maxHeight,
-    required this.fallback,
-    this.settleDelay = Duration.zero,
-    super.key,
-  });
-
-  final TvMediaItem item;
-  final double maxHeight;
-  final Widget fallback;
-
-  /// How long [item] must stay put before its logo is looked up. A logo
-  /// already found shows at once.
-  final Duration settleDelay;
-
-  @override
-  State<TvTitleLogo> createState() => _TvTitleLogoState();
-}
-
-class _TvTitleLogoState extends State<TvTitleLogo> {
-  /// Sharp enough at the billboard's size on a 1080p panel, and a fraction of
-  /// `original`.
-  static const _imageSize = 'w500';
-
-  TvTitleLogos? _logos;
-  String? _path;
-  Timer? _settleTimer;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final logos = TvTitleLogoScope.maybeOf(context);
-    if (!identical(logos, _logos)) {
-      _logos = logos;
-      _lookUp();
-    }
-  }
-
-  @override
-  void didUpdateWidget(TvTitleLogo oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.item.kind != widget.item.kind ||
-        oldWidget.item.id != widget.item.id) {
-      _lookUp();
-    }
-  }
-
-  void _lookUp() {
-    _settleTimer?.cancel();
-    final logos = _logos;
-    final item = widget.item;
-    _path = logos != null && logos.isKnown(item) ? logos.known(item) : null;
-    if (logos == null || logos.isKnown(item)) return;
-    void resolve() {
-      logos.resolve(item).then((path) {
-        if (!mounted || path == null) return;
-        if (!identical(widget.item, item) || !identical(_logos, logos)) return;
-        setState(() => _path = path);
-      });
-    }
-
-    if (widget.settleDelay == Duration.zero) {
-      resolve();
-    } else {
-      _settleTimer = Timer(widget.settleDelay, resolve);
-    }
-  }
-
-  @override
-  void dispose() {
-    _settleTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final path = _path;
-    if (path == null) return widget.fallback;
-    final settings = context.watch<SettingsProvider>();
-    final proxy = context.watch<AppDependencyProvider>().tmdbProxy;
-    final baseUrl = buildImageUrl(
-      TMDB_BASE_IMAGE_URL,
-      proxy,
-      settings.enableProxy,
-      context,
-    );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxWidth = math.min(constraints.maxWidth, widget.maxHeight * 5);
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: maxWidth,
-            maxHeight: widget.maxHeight,
-          ),
-          child: CachedNetworkImage(
-            cacheManager: cacheProp(),
-            imageUrl: '$baseUrl$_imageSize$path',
-            memCacheWidth:
-                (maxWidth * MediaQuery.devicePixelRatioOf(context)).round(),
-            fit: BoxFit.contain,
-            alignment: Alignment.bottomLeft,
-            fadeInDuration: const Duration(milliseconds: 220),
-            fadeOutDuration: Duration.zero,
-            // The name holds the space until the artwork has decoded, and
-            // stays if it never does.
-            placeholder: (_, __) => widget.fallback,
-            errorWidget: (_, __, ___) => widget.fallback,
-            imageBuilder: (_, image) => Semantics(
-              label: widget.item.title,
-              image: true,
-              child: Image(
-                image: image,
-                fit: BoxFit.contain,
-                alignment: Alignment.bottomLeft,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
+/// The TV's name for the shared title logo.
+typedef TvTitleLogo = TitleLogo;
