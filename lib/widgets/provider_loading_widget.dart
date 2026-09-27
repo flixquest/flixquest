@@ -2,7 +2,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../models/provider_load_state.dart';
-import 'app_logo.dart';
 import '../design/app_palette.dart';
 import '../design/app_tokens.dart';
 import '../design/skeleton.dart';
@@ -58,101 +57,97 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final viewport = MediaQuery.sizeOf(context);
-    final isLandscape = viewport.width > viewport.height;
-    final useSplitLayout = isLandscape && viewport.width >= 620;
-    final horizontalMargin = useSplitLayout ? 16.0 : 20.0;
-
-    return Container(
-      width: double.infinity,
-      margin: EdgeInsets.symmetric(
-        horizontal: horizontalMargin,
-        vertical: useSplitLayout ? 10 : 20,
-      ),
-      padding: EdgeInsets.symmetric(
-        horizontal: useSplitLayout ? 26 : 32,
-        vertical: useSplitLayout ? 22 : 34,
-      ),
-      constraints: BoxConstraints(
-        maxWidth: useSplitLayout ? 780 : 440,
-        minHeight: useSplitLayout ? 0 : 340,
-      ),
-      decoration: BoxDecoration(
-        color: AppPalette.of(context).surface,
-        borderRadius: BorderRadius.circular(AppRadii.hero),
-      ),
-      child: useSplitLayout
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(child: _buildIdentity(compact: true)),
-                Container(
-                  width: 1,
-                  height: 150,
-                  margin: const EdgeInsets.symmetric(horizontal: 24),
-                  color: colors.outlineVariant.withValues(alpha: .42),
+    final palette = AppPalette.of(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useSplitLayout = constraints.maxWidth >= 680;
+        return Container(
+          key: const ValueKey<String>('provider-loading-panel'),
+          width: double.infinity,
+          padding: EdgeInsets.all(useSplitLayout ? AppSpace.xxl : AppSpace.xl),
+          constraints: const BoxConstraints(maxWidth: 760),
+          decoration: BoxDecoration(
+            color: palette.surface,
+            borderRadius: BorderRadius.circular(AppRadii.hero),
+            border: Border.all(color: palette.hairline),
+          ),
+          child: useSplitLayout
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: <Widget>[
+                    Expanded(child: _buildIdentity(compact: true)),
+                    Container(
+                      width: 1,
+                      height: 132,
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: AppSpace.xxl,
+                      ),
+                      color: palette.hairline,
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: _buildProviderProgress(compact: true),
+                    ),
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    _buildIdentity(compact: false),
+                    const SizedBox(height: AppSpace.xl),
+                    _buildProviderProgress(compact: false),
+                  ],
                 ),
-                Expanded(
-                  flex: 2,
-                  child: _buildProviderProgress(compact: true),
-                ),
-              ],
-            )
-          : Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildIdentity(compact: false),
-                const SizedBox(height: 24),
-                _buildProviderProgress(compact: false),
-              ],
-            ),
+        );
+      },
     );
   }
 
   Widget _buildIdentity({required bool compact}) {
-    final colors = Theme.of(context).colorScheme;
-    final logoSize = compact ? 52.0 : 72.0;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment:
-          compact ? CrossAxisAlignment.start : CrossAxisAlignment.center,
-      children: [
+    final palette = AppPalette.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
         Container(
-          padding: EdgeInsets.all(compact ? 12 : 18),
+          width: compact ? 42 : 46,
+          height: compact ? 42 : 46,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppPalette.of(context).idleFill,
+            color: palette.idleFill,
+            borderRadius: BorderRadius.circular(AppRadii.card),
           ),
-          child: AppLogo(height: logoSize, width: logoSize),
-        ),
-        SizedBox(height: compact ? 14 : 22),
-        Text(
-          tr('loading_video_sources'),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: compact ? TextAlign.start : TextAlign.center,
-          style: TextStyle(
-            color: colors.onSurface,
-            fontSize: compact ? 17 : 19,
-            fontWeight: FontWeight.w600,
-            fontFamily: 'Figtree',
-            letterSpacing: .2,
-            height: 1.2,
+          child: Icon(
+            PhosphorIcons.play(PhosphorIconsStyle.fill),
+            size: compact ? 19 : 21,
+            color: palette.foreground,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          tr('finding_best_source'),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: compact ? TextAlign.start : TextAlign.center,
-          style: TextStyle(
-            color: colors.onSurfaceVariant.withValues(alpha: .78),
-            fontSize: 13,
-            fontFamily: 'Figtree',
-            height: 1.3,
+        const SizedBox(width: AppSpace.md),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                tr('loading_video_sources'),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppType.scaled(context, AppType.sectionHeader).copyWith(
+                  color: palette.foreground,
+                  fontSize: compact ? 16 : null,
+                ),
+              ),
+              const SizedBox(height: AppSpace.xs),
+              Text(
+                tr('finding_best_source'),
+                maxLines: compact ? 3 : 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppType.scaled(context, AppType.metadata).copyWith(
+                  color: palette.mutedText,
+                  fontSize: 13,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -161,6 +156,7 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
 
   Widget _buildProviderProgress({required bool compact}) {
     final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
     final completed = widget.providers.where((provider) {
       return provider.status == ProviderStatus.success ||
           provider.status == ProviderStatus.failed;
@@ -179,8 +175,8 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
                 borderRadius: BorderRadius.circular(10),
                 child: LinearProgressIndicator(
                   value: progress,
-                  minHeight: 5,
-                  backgroundColor: colors.primary.withValues(alpha: .11),
+                  minHeight: 4,
+                  backgroundColor: palette.idleFill,
                   valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
                 ),
               ),
@@ -197,7 +193,7 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
             ],
           ],
         ),
-        SizedBox(height: compact ? 15 : 22),
+        SizedBox(height: compact ? AppSpace.md : AppSpace.lg),
         FadeTransition(
           opacity: _fadeAnimation,
           child: _buildProviderCarousel(compact: compact),

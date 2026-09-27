@@ -20,5 +20,11 @@ match /wellness-v1/{userId} {
 }
 ```
 
-The client uses document IDs for session upserts and performs no compound
-Firestore queries, so no additional Firestore index is required.
+The client uses document IDs for session upserts. To keep reads down it pulls
+only sessions whose server-set `syncedAt` timestamp is newer than the last one
+it applied (a single-field range query, covered by Firestore's automatic
+indexes), and reads the whole collection once a week to catch writes from older
+app versions that do not stamp `syncedAt`. Daily summaries are diffed against a
+ledger kept on the device, so the `daily` collection is only read the first
+time a device syncs and after each weekly full read. No composite index is
+required, but rules must not reject the extra `syncedAt` field.

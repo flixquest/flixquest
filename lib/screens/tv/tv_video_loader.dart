@@ -10,11 +10,10 @@ import 'package:flixquest/constants/app_constants.dart' show MediaType;
 import 'package:flixquest/models/provider_load_state.dart';
 import 'package:flixquest/services/globle_method.dart';
 import 'package:flixquest/services/start_io_ads_service.dart';
-import 'package:flixquest/widgets/playback_ads.dart';
+import 'package:flixquest/widgets/playback_loading_screen.dart';
 import 'package:flixquest/services/stream_size_estimator.dart';
 import 'package:flixquest/video_providers/provider_loader.dart';
 import 'package:flixquest/video_providers/scraper_api.dart';
-import 'package:flixquest/widgets/provider_loading_widget.dart';
 import '../../controllers/recently_watched_database_controller.dart';
 import '../../provider/recently_watched_provider.dart';
 import '../../video_providers/common.dart';
@@ -625,31 +624,23 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.topCenter,
-            radius: 1.2,
-            colors: [
-              Theme.of(context).colorScheme.primary.withValues(alpha: .12),
-              Theme.of(context).scaffoldBackgroundColor,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              child: StreamLoadingAds(
-                child: ProviderLoadingWidget(
-                  providers: providerStates,
-                  currentIndex: currentProviderIndex,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    final season = widget.metadata.seasonNumber;
+    final episode = widget.metadata.episodeNumber;
+    final contextLine = <String>[
+      if (widget.download) tr('download'),
+      if (season != null && episode != null) 'S$season:E$episode',
+      if (widget.metadata.episodeName?.trim().isNotEmpty == true)
+        widget.metadata.episodeName!.trim(),
+    ].join('  ·  ');
+    return PlaybackLoadingScreen(
+      title: widget.metadata.seriesName?.trim().isNotEmpty == true
+          ? widget.metadata.seriesName!.trim()
+          : widget.metadata.episodeName?.trim() ?? '',
+      subtitle: contextLine,
+      backdropPath: widget.metadata.backdropPath,
+      posterPath: widget.metadata.posterPath,
+      providers: providerStates,
+      currentProviderIndex: currentProviderIndex,
     );
   }
 

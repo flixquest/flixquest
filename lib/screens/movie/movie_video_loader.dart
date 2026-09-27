@@ -10,11 +10,10 @@ import 'package:flixquest/models/provider_video_source.dart';
 import 'package:flixquest/models/provider_load_state.dart';
 import 'package:flixquest/services/globle_method.dart';
 import 'package:flixquest/services/start_io_ads_service.dart';
-import 'package:flixquest/widgets/playback_ads.dart';
+import 'package:flixquest/widgets/playback_loading_screen.dart';
 import 'package:flixquest/services/stream_size_estimator.dart';
 import 'package:flixquest/video_providers/provider_loader.dart';
 import 'package:flixquest/video_providers/scraper_api.dart';
-import 'package:flixquest/widgets/provider_loading_widget.dart';
 import '../../controllers/recently_watched_database_controller.dart';
 import '../../provider/recently_watched_provider.dart';
 import '../../video_providers/common.dart';
@@ -177,14 +176,14 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
         'recommendations=${_metadata.recommendations?.length ?? 0}',
       );
 
-      var isBookmarked = await recentlyWatchedMoviesController
-          .contain(_metadata.movieId!);
+      var isBookmarked =
+          await recentlyWatchedMoviesController.contain(_metadata.movieId!);
       int elapsed = 0;
       if (isBookmarked) {
         var rMovies =
             Provider.of<RecentProvider>(context, listen: false).movies;
-        int index = rMovies
-            .indexWhere((element) => element.id == _metadata.movieId);
+        int index =
+            rMovies.indexWhere((element) => element.id == _metadata.movieId);
         // A cloud merge can add the row to the database before this snapshot of
         // the provider list catches up, so resume from the start if it is not
         // here yet rather than indexing past the end.
@@ -198,8 +197,8 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
         _metadata.elapsed = 0;
       }
 
-      final isUnreleased = _metadata.releaseDate != null &&
-          !isReleased(_metadata.releaseDate!);
+      final isUnreleased =
+          _metadata.releaseDate != null && !isReleased(_metadata.releaseDate!);
       if (isUnreleased) {
         GlobalMethods.showScaffoldMessage(
             tr('movie_may_not_be_available'), context);
@@ -636,31 +635,21 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.topCenter,
-            radius: 1.2,
-            colors: [
-              Theme.of(context).colorScheme.primary.withValues(alpha: .12),
-              Theme.of(context).scaffoldBackgroundColor,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              child: StreamLoadingAds(
-                child: ProviderLoadingWidget(
-                  providers: providerStates,
-                  currentIndex: currentProviderIndex,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    final releaseYear = _metadata.releaseYear?.toString() ??
+        _metadata.releaseDate?.split('-').first;
+    final contextLine = <String>[
+      if (widget.download) tr('download'),
+      if (releaseYear?.isNotEmpty == true && releaseYear != '0') releaseYear!,
+    ].join('  ·  ');
+    return PlaybackLoadingScreen(
+      title: _metadata.movieName?.trim().isNotEmpty == true
+          ? _metadata.movieName!.trim()
+          : tr('movie'),
+      subtitle: contextLine,
+      backdropPath: _metadata.backdropPath,
+      posterPath: _metadata.posterPath,
+      providers: providerStates,
+      currentProviderIndex: currentProviderIndex,
     );
   }
 

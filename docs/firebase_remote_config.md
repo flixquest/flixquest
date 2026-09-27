@@ -60,11 +60,24 @@ splash remains bundled because it appears before Firebase initializes.
 
 | Parameter | Firebase type | Default | Purpose |
 | --- | --- | --- | --- |
-| `banner_ad_network` | String | `native` | Toggles which ad network is active for in-app banner surfaces. Allowed values: `native` (hosted carousel banner), `unity` (Unity Ads banner), or `none` (hides banner ads completely). Only one network is shown at a time. |
-| `unity_game_id_android` | String | `5445375` | Unity Game ID for Android. Can be updated dynamically without publishing a new APK. |
-| `unity_banner_placement_id` | String | `Banner_Android` | Unity Banner Placement ID (Ad Unit). Defaults to `Banner_Android`. |
-| `unity_test_mode` | Boolean | `false` | Enables test mode for Unity Ads. Set to `true` for test impressions or development devices. |
-| `banners` | String | `{"banners":[]}` | JSON array or map controlling enabled native/hosted banners, sizes, aspect ratios, and surface placement rules. |
+| `banner_ad_network` | String | `native` | Legacy banner selector. `native`, `unity`, and `startio` all render Start.io banners so existing published values remain compatible; `none` hides banner ads. |
+| `unity_game_id_android` | String | `5445375` | Legacy compatibility key retained for older app versions. New builds do not initialize Unity from it. |
+| `unity_banner_placement_id` | String | `Banner_Android` | Legacy compatibility key retained for older app versions. |
+| `unity_test_mode` | Boolean | `false` | Legacy-named test-mode switch now also controls Start.io test ads. |
+| `startio_banner_enabled` | Boolean | `true` | Enables Start.io banners on all existing banner surfaces. `banner_ad_network=none` remains the global banner kill switch. |
+| `startio_interstitial_enabled` | Boolean | `true` | Enables the preloaded Start.io interstitial shown when playback starts (movies, episodes, Live TV). It runs while the stream resolves and the player opens once it closes. |
+| `startio_rewarded_enabled` | Boolean | `true` | Enables the opt-in rewarded video behind the ad-free pass button (stream loader and Live TV). A completed view skips playback interstitials for `startio_ad_free_pass_minutes`. Rewarded video is never forced. |
+| `startio_interstitial_interval_seconds` | Number | `600` | Minimum gap between two playback interstitials, so replays, retries and channel surfing see one ad. Values below `60` are raised to `60`. |
+| `startio_ad_free_pass_minutes` | Number | `120` | How long a completed rewarded video keeps playback interstitials away (5 to 1440). Banners still show during a pass. |
+| `startio_tv_interstitial_mode` | String | `video` | Android TV interstitial creative: `video` (video only; Android TV requires non-video full-screen ads to be dismissable at once) or `automatic` (Start.io picks display or video). The TV tag becomes `preroll_tv_video` or `preroll_tv_automatic`, so both can be compared in the portal. |
+| `banners` | String | `{"banners":[]}` | Legacy hosted-banner configuration retained for older app versions. |
+
+The Start.io application ID is build-time Android metadata, not a Remote Config
+value. Set `startapp.appId` in `android/local.properties` or provide the
+`STARTAPP_APP_ID` build environment variable. Return and splash ads are disabled;
+only the three explicitly configured formats above are used. Local builds fall
+back to Start.io's demo application ID (`205489527`); production builds should
+always supply the FlixQuest Start.io application ID.
 
 ## Ready-to-paste complete catalog
 
