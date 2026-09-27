@@ -94,6 +94,7 @@ Finder _navItem(MobileTab tab) => find.descendant(
       matching: find.text(switch (tab) {
         MobileTab.home => 'home',
         MobileTab.newAndHot => 'new_and_hot',
+        MobileTab.discover => 'discover',
         MobileTab.search => 'search',
         MobileTab.mine => 'my_flixquest',
       }),
@@ -185,6 +186,7 @@ void main() {
       (tester) async {
     for (final tab in <MobileTab>[
       MobileTab.newAndHot,
+      MobileTab.discover,
       MobileTab.search,
       MobileTab.mine,
     ]) {

@@ -633,17 +633,20 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                         ),
                       ),
                     ),
-                    // The hero's info sits bottom-left, so the top-right
-                    // corner of the backdrop holds a rectangle while the
-                    // viewer reads and picks. It is kept loaded but hidden
-                    // while the rows below are in view.
+                    // A thin banner along the backdrop's top edge, clear of
+                    // the artwork's subject and the bottom-left info, while
+                    // the viewer reads and picks. It is kept loaded but
+                    // hidden while the rows below are in view.
                     Positioned(
-                      top: inset,
+                      top: inset * 0.6,
                       right: inset,
                       child: Visibility(
                         visible: !browsing,
                         maintainState: true,
-                        child: const StartIoAdSlot(placement: 'title_detail'),
+                        child: const StartIoAdSlot(
+                          placement: 'title_detail',
+                          variant: HostedBannerVariant.standard,
+                        ),
                       ),
                     ),
                   ],

@@ -48,12 +48,8 @@ class PlayerLocalSubtitles {
     required BetterPlayerController betterPlayerController,
   }) {
     final sheetController = DraggableScrollableController();
-    showModalBottomSheet<void>(
+    showPlayerSheet<void>(
       context: context,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
-      showDragHandle: true,
       builder: (bottomSheetContext) => DraggableScrollableSheet(
         controller: sheetController,
         initialChildSize: _initialSheetSize,
@@ -143,7 +139,6 @@ class PlayerLocalSubtitles {
                 _uploadedSubtitles.where((s) => s.isSelected).length;
 
             return PlayerSheetScaffold(
-              icon: PhosphorIcons.fileArrowUp(),
               title: tr('upload_subtitles'),
               subtitle: _uploadedSubtitles.isEmpty
                   ? tr('select_subtitle_file')

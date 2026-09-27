@@ -14,6 +14,7 @@ import '../../design/app_tokens.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../widgets/common_widgets.dart' show appStreamingServices;
+import '../app/mobile_tabs.dart';
 import '../widgets/page_kit.dart';
 import '../widgets/pill_button.dart';
 import 'collection_screen.dart';
@@ -236,6 +237,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         ),
       ),
       body: CustomScrollView(
+        // As a tab, pressing Discover again takes the choices to the top.
+        controller: MobileTabScope.maybeOf(context)
+            ?.scrollController(MobileTab.discover),
         slivers: <Widget>[
           if (active.isNotEmpty)
             SliverPadding(

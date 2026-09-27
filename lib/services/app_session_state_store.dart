@@ -11,16 +11,17 @@ class AppSessionStateStore {
   static const handheldDestinations = <String>{
     'home',
     'new',
+    'discover',
     'search',
     'mine',
   };
 
   /// Tabs the phone had before Movies and Series became Home filters, and
-  /// where each one's content lives now.
+  /// where each one's content lives now. Discover, once folded into Home,
+  /// is a tab of its own again.
   static const legacyHandheldDestinations = <String, String>{
     'movies': 'home',
     'series': 'home',
-    'discover': 'home',
     'downloads': 'mine',
     'profile': 'mine',
     'bookmarks': 'mine',

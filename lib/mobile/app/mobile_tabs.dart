@@ -8,6 +8,7 @@ import '../../models/default_home.dart';
 enum MobileTab {
   home('home'),
   newAndHot('new'),
+  discover('discover'),
   search('search'),
   mine('mine');
 

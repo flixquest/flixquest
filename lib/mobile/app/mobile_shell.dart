@@ -8,6 +8,7 @@ import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/app_session_state_store.dart';
+import '../screens/discover_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/my_flixquest_screen.dart';
 import '../screens/new_and_hot_screen.dart';
@@ -15,7 +16,7 @@ import '../screens/search_screen.dart';
 import 'mobile_nav_bar.dart';
 import 'mobile_tabs.dart';
 
-/// The phone app's frame: four tabs under a flush bottom bar.
+/// The phone app's frame: five tabs under a flush bottom bar.
 ///
 /// Each tab is built the first time it is shown and kept alive after, so
 /// switching back finds it as it was left. Back from any tab but Home goes to
@@ -171,6 +172,7 @@ class _AppTab extends StatelessWidget {
     return switch (tab) {
       MobileTab.home => const HomeScreen(),
       MobileTab.newAndHot => const NewAndHotScreen(),
+      MobileTab.discover => const DiscoverScreen(),
       MobileTab.search => const SearchScreen(),
       MobileTab.mine => const MyFlixQuestScreen(),
     };

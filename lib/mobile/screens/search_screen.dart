@@ -248,9 +248,15 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  void _openFilters() => Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(builder: (_) => const DiscoverScreen()),
-      );
+  /// Discover's tab where there is one; its page pushed over Search
+  /// otherwise.
+  void _openFilters() {
+    final tabs = _tabs;
+    if (tabs != null) return tabs.select(MobileTab.discover);
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const DiscoverScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

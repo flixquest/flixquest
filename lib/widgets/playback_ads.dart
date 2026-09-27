@@ -17,8 +17,8 @@ String adFreePassLength(Duration duration) =>
 /// Offers an opt-in rewarded video that switches playback interstitials off
 /// for a while, and says so once the pass is active.
 ///
-/// Renders nothing when rewarded ads or interstitials are switched off, since
-/// the pass would then have nothing to trade.
+/// Renders nothing until a rewarded video is loaded, so pressing it always
+/// plays something, and nothing when either format is switched off.
 class AdFreePassButton extends StatefulWidget {
   const AdFreePassButton({super.key});
 
@@ -34,25 +34,25 @@ class _AdFreePassButtonState extends State<AdFreePassButton> {
   Future<void> _watch() async {
     if (_busy) return;
     setState(() => _busy = true);
-    final granted = await _ads.watchForAdFreePass();
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (!granted) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text(tr('ad_free_pass_unavailable'))),
-      );
-    }
+    await _ads.watchForAdFreePass();
+    if (mounted) setState(() => _busy = false);
   }
 
   @override
   Widget build(BuildContext context) {
     // Rebuilds when Remote Config switches the formats on or off.
     context.watch<AppDependencyProvider?>();
-    return ValueListenableBuilder<DateTime?>(
-      valueListenable: _ads.adFreeUntil,
-      builder: (context, until, _) {
+    return ListenableBuilder(
+      listenable: Listenable.merge(<Listenable>[
+        _ads.adFreeUntil,
+        _ads.adFreePassReady,
+      ]),
+      builder: (context, _) {
+        final until = _ads.adFreeUntil.value;
         if (until != null) return _ActivePass(until: until);
-        if (!_ads.canOfferAdFreePass) return const SizedBox.shrink();
+        if (!_busy && !_ads.canOfferAdFreePass) {
+          return const SizedBox.shrink();
+        }
         final label = _busy
             ? tr('ad_free_pass_loading')
             : tr(
@@ -137,13 +137,17 @@ class StreamLoadingAds extends StatelessWidget {
       ],
     );
     if (wide) {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Flexible(child: child),
-          const SizedBox(width: 40),
-          extras,
-        ],
+      // Kept clear of TV overscan at the screen's edges.
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 48),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Flexible(child: child),
+            const SizedBox(width: 40),
+            extras,
+          ],
+        ),
       );
     }
     return Column(

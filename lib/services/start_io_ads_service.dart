@@ -133,12 +133,23 @@ class _AdSession {
 }
 
 class _PreparedInterstitial {
-  _PreparedInterstitial(this.ad, this.session, this.loadedAt, this.tag);
+  _PreparedInterstitial(this.ad, this.session, this.loadedAt, this.setup);
 
   final StartAppInterstitialAd ad;
   final _AdSession session;
   final DateTime loadedAt;
-  final String tag;
+
+  /// The configuration it was loaded for; a change discards it.
+  final String setup;
+}
+
+class _PreparedRewarded {
+  _PreparedRewarded(this.session);
+
+  final _AdSession session;
+  late final StartAppRewardedVideoAd ad;
+  late final DateTime loadedAt;
+  bool completed = false;
 }
 
 /// Coordinates Start.io ads without ever blocking playback on an SDK,
@@ -164,6 +175,9 @@ class StartIoAdsService {
   /// Preloaded creatives are refreshed before Start.io can expire them.
   static const Duration _preloadMaxAge = Duration(minutes: 45);
 
+  /// How long to wait before asking again after a rewarded video no-fill.
+  static const Duration _rewardedRetry = Duration(minutes: 10);
+
   static const String _adFreeUntilKey = 'startio_ad_free_until';
 
   /// Targeting hints for a movie and series streaming audience.
@@ -177,13 +191,20 @@ class StartIoAdsService {
   /// The active ad-free pass's expiry, or null. Drives the pass button.
   final ValueNotifier<DateTime?> adFreeUntil = ValueNotifier<DateTime?>(null);
 
+  /// Whether a rewarded video is loaded, so the pass button is only offered
+  /// when pressing it will actually play something.
+  final ValueNotifier<bool> adFreePassReady = ValueNotifier<bool>(false);
+
   StartIoAdsConfig _config = const StartIoAdsConfig();
   bool _television = false;
   bool? _configuredTestMode;
   _PreparedInterstitial? _preroll;
   Future<void>? _prerollLoading;
+  _PreparedRewarded? _rewarded;
+  Future<void>? _rewardedLoading;
   Completer<void>? _fullScreen;
   Timer? _passExpiry;
+  Timer? _rewardedRetryTimer;
 
   StartIoAdsConfig get config => _config;
 
@@ -195,17 +216,22 @@ class StartIoAdsService {
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
 
-  /// Whether the viewer can be offered a rewarded ad-free pass right now.
-  bool get canOfferAdFreePass =>
+  /// Whether an ad-free pass may be sold at all: both formats are on and no
+  /// pass is running.
+  bool get _passAllowed =>
       _isSupported &&
       _config.rewardedEnabled &&
       _config.interstitialEnabled &&
       !_pacing.adFreeActive;
 
+  /// Whether the viewer can be offered a rewarded ad-free pass right now.
+  bool get canOfferAdFreePass => _passAllowed && adFreePassReady.value;
+
   void setTelevision(bool value) {
     if (_television == value) return;
     _television = value;
     _discardPreroll();
+    _discardRewarded();
   }
 
   /// Suffixes TV placements so the Start.io portal reports them separately.
@@ -215,11 +241,27 @@ class StartIoAdsService {
       ? _config.tvInterstitialMode
       : StartIoInterstitialMode.automatic;
 
-  String get _prerollTag =>
-      _television ? 'preroll_tv_${_interstitialMode.name}' : 'preroll';
+  /// Identifies the device class and mode a preloaded ad was loaded for.
+  String get _prerollSetup => '$_television/${_interstitialMode.name}';
 
+  /// The report tag for [mode]. TV tags carry the creative mode, so video and
+  /// automatic fills can be compared in the portal.
+  String _prerollTag(StartIoInterstitialMode mode) =>
+      _television ? 'preroll_tv_${mode.name}' : 'preroll';
+
+  /// Video first where configured, then any creative: video demand on TV can
+  /// come back empty, and an unfilled slot earns nothing.
+  List<StartIoInterstitialMode> get _prerollModes =>
+      _interstitialMode == StartIoInterstitialMode.video
+          ? const <StartIoInterstitialMode>[
+              StartIoInterstitialMode.video,
+              StartIoInterstitialMode.automatic,
+            ]
+          : const <StartIoInterstitialMode>[StartIoInterstitialMode.automatic];
+
+  /// Applies Remote Config and makes sure an interstitial is ready. Also runs
+  /// when nothing changed, since the first fetch usually matches defaults.
   void updateConfig(StartIoAdsConfig config) {
-    if (config == _config) return;
     final previous = _config;
     _config = config;
     if (previous.testMode != config.testMode ||
@@ -228,6 +270,10 @@ class StartIoAdsService {
       _discardPreroll();
     }
     if (config.interstitialEnabled) unawaited(preloadPlaybackInterstitial());
+    if (previous.testMode != config.testMode || !_passAllowed) {
+      _discardRewarded();
+    }
+    unawaited(preloadAdFreePass());
   }
 
   Future<void> configure({required bool testMode}) async {
@@ -258,10 +304,10 @@ class StartIoAdsService {
     final active = _pacing.adFreeUntil;
     adFreeUntil.value = active;
     if (active != null) {
-      _passExpiry = Timer(
-        active.difference(DateTime.now()),
-        () => _setAdFreeUntil(null),
-      );
+      _passExpiry = Timer(active.difference(DateTime.now()), () {
+        _setAdFreeUntil(null);
+        unawaited(preloadAdFreePass());
+      });
     }
   }
 
@@ -315,7 +361,7 @@ class StartIoAdsService {
     }
     final ready = _preroll;
     if (ready != null &&
-        ready.tag == _prerollTag &&
+        ready.setup == _prerollSetup &&
         DateTime.now().difference(ready.loadedAt) < _preloadMaxAge) {
       return Future<void>.value();
     }
@@ -326,25 +372,31 @@ class StartIoAdsService {
 
   Future<void> _loadPreroll() async {
     await configure(testMode: _config.testMode);
-    final tag = _prerollTag;
-    final session = _AdSession();
-    final ad = await _load(
-      'interstitial',
-      () => _sdk.loadInterstitialAd(
-        mode: _interstitialMode == StartIoInterstitialMode.video
-            ? StartAppInterstitialAdMode.video
-            : StartAppInterstitialAdMode.automatic,
-        prefs: StartAppAdPreferences(adTag: tag, keywords: catalogKeywords),
-        onAdHidden: session.close,
-        onAdNotDisplayed: session.close,
-      ),
-    );
-    if (ad == null) return;
-    if (tag != _prerollTag || !_config.interstitialEnabled) {
-      ad.dispose();
+    final setup = _prerollSetup;
+    for (final mode in _prerollModes) {
+      final session = _AdSession();
+      final ad = await _load(
+        'interstitial (${mode.name})',
+        () => _sdk.loadInterstitialAd(
+          mode: mode == StartIoInterstitialMode.video
+              ? StartAppInterstitialAdMode.video
+              : StartAppInterstitialAdMode.automatic,
+          prefs: StartAppAdPreferences(
+            adTag: _prerollTag(mode),
+            keywords: catalogKeywords,
+          ),
+          onAdHidden: session.close,
+          onAdNotDisplayed: session.close,
+        ),
+      );
+      if (ad == null) continue;
+      if (setup != _prerollSetup || !_config.interstitialEnabled) {
+        ad.dispose();
+        return;
+      }
+      _preroll = _PreparedInterstitial(ad, session, DateTime.now(), setup);
       return;
     }
-    _preroll = _PreparedInterstitial(ad, session, DateTime.now(), tag);
   }
 
   void _discardPreroll() {
@@ -398,39 +450,80 @@ class StartIoAdsService {
     });
   }
 
-  /// Plays an opt-in rewarded video. A completed view grants an ad-free pass
-  /// for [StartIoAdsConfig.adFreePassDuration]; returns whether it did.
-  Future<bool> watchForAdFreePass() async {
-    if (!canOfferAdFreePass || _fullScreen != null) return false;
-    var granted = false;
-    await _runFullScreen(() async {
-      await configure(testMode: _config.testMode);
-      final session = _AdSession();
-      var completed = false;
-      final ad = await _load(
-        'rewarded',
-        () => _sdk.loadRewardedVideoAd(
-          prefs: StartAppAdPreferences(
-            adTag: tagFor('ad_free_pass'),
-            keywords: catalogKeywords,
-          ),
-          onAdHidden: session.close,
-          onAdNotDisplayed: session.close,
-          onVideoCompleted: () => completed = true,
+  /// Keeps one rewarded video ready while a pass can be sold. After a
+  /// no-fill it tries again later rather than hammering the exchange.
+  Future<void> preloadAdFreePass() {
+    if (!_passAllowed) return Future<void>.value();
+    final ready = _rewarded;
+    if (ready != null &&
+        DateTime.now().difference(ready.loadedAt) < _preloadMaxAge) {
+      return Future<void>.value();
+    }
+    _discardRewarded();
+    return _rewardedLoading ??=
+        _loadRewarded().whenComplete(() => _rewardedLoading = null);
+  }
+
+  Future<void> _loadRewarded() async {
+    _rewardedRetryTimer?.cancel();
+    await configure(testMode: _config.testMode);
+    final prepared = _PreparedRewarded(_AdSession());
+    final ad = await _load(
+      'rewarded',
+      () => _sdk.loadRewardedVideoAd(
+        prefs: StartAppAdPreferences(
+          adTag: tagFor('ad_free_pass'),
+          keywords: catalogKeywords,
         ),
-      );
-      if (ad == null) return;
+        onAdHidden: prepared.session.close,
+        onAdNotDisplayed: prepared.session.close,
+        onVideoCompleted: () => prepared.completed = true,
+      ),
+    );
+    if (ad == null) {
+      _rewardedRetryTimer = Timer(_rewardedRetry, () {
+        unawaited(preloadAdFreePass());
+      });
+      return;
+    }
+    if (!_passAllowed) {
+      ad.dispose();
+      return;
+    }
+    prepared
+      ..ad = ad
+      ..loadedAt = DateTime.now();
+    _rewarded = prepared;
+    adFreePassReady.value = true;
+  }
+
+  void _discardRewarded() {
+    _rewarded?.ad.dispose();
+    _rewarded = null;
+    adFreePassReady.value = false;
+  }
+
+  /// Plays the preloaded opt-in rewarded video. A completed view grants an
+  /// ad-free pass for [StartIoAdsConfig.adFreePassDuration]; returns whether
+  /// it did.
+  Future<bool> watchForAdFreePass() async {
+    final prepared = _rewarded;
+    if (!canOfferAdFreePass || prepared == null || _fullScreen != null) {
+      return false;
+    }
+    _rewarded = null;
+    adFreePassReady.value = false;
+    await _runFullScreen(() async {
       try {
-        if (!await ad.show()) session.close();
-        await session.closed.timeout(
+        if (!await prepared.ad.show()) prepared.session.close();
+        await prepared.session.closed.timeout(
           const Duration(seconds: 90),
           onTimeout: () {},
         );
       } finally {
-        ad.dispose();
+        prepared.ad.dispose();
       }
-      if (!completed) return;
-      granted = true;
+      if (!prepared.completed) return;
       final until = _pacing.grantAdFree(_config.adFreePassDuration);
       _setAdFreeUntil(until);
       try {
@@ -440,6 +533,8 @@ class StartIoAdsService {
         debugPrint('StartIoAdsService: unable to save ad-free pass: $error');
       }
     });
-    return granted;
+    // Ready for the next offer, or for when this pass runs out.
+    unawaited(preloadAdFreePass());
+    return prepared.completed;
   }
 }

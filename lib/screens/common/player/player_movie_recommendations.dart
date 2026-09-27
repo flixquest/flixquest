@@ -93,12 +93,9 @@ class PlayerMovieRecommendations {
     final playerContext = context;
 
     debugPrint('[PlayerContentMenu] pushing recommendations modal');
-    return showModalBottomSheet<void>(
+    return showPlayerSheet<void>(
       context: context,
       useRootNavigator: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
       builder: (sheetContext) {
         debugPrint(
           '[PlayerContentMenu] recommendations modal builder '
@@ -115,7 +112,6 @@ class PlayerMovieRecommendations {
             snap: true,
             snapSizes: const [.55, .8, .95],
             builder: (context, scrollController) => PlayerSheetScaffold(
-              icon: PhosphorIcons.sparkle(),
               title: tr('recommended_movies'),
               subtitle: tr('more_recommendations'),
               actions: [

@@ -576,30 +576,16 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
             ],
             SizedBox(height: widget.metrics.compact ? 4 : 8),
             Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Expanded(
-                    child: isSchedule ? _buildSchedule() : _buildGrid(),
-                  ),
-                  // A fixed rectangle beside the list stays on screen while
-                  // the viewer browses, so every refresh is a viewable
-                  // impression. Its column is reserved up front so the grid
-                  // never reflows when the ad arrives.
-                  if (context.watch<AppDependencyProvider>()
-                      .isStartIoBannerActive)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 20, top: 4),
-                      child: SizedBox(
-                        width: 300,
-                        child: StartIoAdSlot(
-                          placement: 'live_tv_side',
-                          keywords: StartIoAdsService.liveKeywords,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              child: isSchedule ? _buildSchedule() : _buildGrid(),
+            ),
+            // A thin strip under the list stays on screen while the viewer
+            // browses, so every refresh is a viewable impression, and it
+            // only takes one banner's height from the grid, never a column.
+            const StartIoAdSlot(
+              placement: 'live_tv_strip',
+              variant: HostedBannerVariant.standard,
+              keywords: StartIoAdsService.liveKeywords,
+              padding: EdgeInsets.only(top: 8, bottom: 12),
             ),
           ],
         ),
@@ -685,8 +671,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
             label: 'Refresh',
           ),
         ),
-        const SizedBox(width: 8),
-        const AdFreePassButton(),
       ],
     );
   }
@@ -717,59 +701,16 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         //   ],
         // ),
         // const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
-          child: Row(
-            children: <Widget>[
-              _TvSegmentedTrack(
-                options: <_TvSegmentedOption>[
-                  _TvSegmentedOption(
-                    icon: PhosphorIcons.televisionSimple(),
-                    label: 'Channels',
-                    semanticLabel: 'Channels view',
-                    selected: _mode == _TvLiveMode.channels,
-                    onActivate: () => _selectMode(_TvLiveMode.channels),
-                  ),
-                  _TvSegmentedOption(
-                    icon: PhosphorIcons.calendarDots(),
-                    label: 'Schedule',
-                    semanticLabel: 'Schedule view',
-                    selected: _mode == _TvLiveMode.schedule,
-                    onActivate: () => _selectMode(_TvLiveMode.schedule),
-                  ),
-                ],
-              ),
-              if (!isSchedule) ...<Widget>[
-                const SizedBox(width: 28),
-                _TvSegmentedTrack(
-                  options: <_TvSegmentedOption>[
-                    _TvSegmentedOption(
-                      icon: PhosphorIcons.broadcast(),
-                      label: 'All',
-                      semanticLabel: 'All channels',
-                      selected: _scope == _TvLiveScope.all,
-                      onActivate: () => _selectScope(_TvLiveScope.all),
-                    ),
-                    _TvSegmentedOption(
-                      icon: PhosphorIcons.heart(),
-                      label: 'Favorites',
-                      semanticLabel: 'Favorites channels',
-                      selected: _scope == _TvLiveScope.favorites,
-                      onActivate: () => _selectScope(_TvLiveScope.favorites),
-                    ),
-                    _TvSegmentedOption(
-                      icon: PhosphorIcons.clockCounterClockwise(),
-                      label: 'Recent',
-                      semanticLabel: 'Recent channels',
-                      selected: _scope == _TvLiveScope.recent,
-                      onActivate: () => _selectScope(_TvLiveScope.recent),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
+        Row(
+          children: <Widget>[
+            Expanded(child: _buildModeTracks(isSchedule)),
+            // The opt-in pass sits with the list's own controls, clear of
+            // the title row's channel count.
+            const Padding(
+              padding: EdgeInsets.only(left: 12),
+              child: AdFreePassButton(),
+            ),
+          ],
         ),
         if (_showSearch) ...<Widget>[
           const SizedBox(height: 10),
@@ -821,6 +762,63 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildModeTracks(bool isSchedule) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+      child: Row(
+        children: <Widget>[
+          _TvSegmentedTrack(
+            options: <_TvSegmentedOption>[
+              _TvSegmentedOption(
+                icon: PhosphorIcons.televisionSimple(),
+                label: 'Channels',
+                semanticLabel: 'Channels view',
+                selected: _mode == _TvLiveMode.channels,
+                onActivate: () => _selectMode(_TvLiveMode.channels),
+              ),
+              _TvSegmentedOption(
+                icon: PhosphorIcons.calendarDots(),
+                label: 'Schedule',
+                semanticLabel: 'Schedule view',
+                selected: _mode == _TvLiveMode.schedule,
+                onActivate: () => _selectMode(_TvLiveMode.schedule),
+              ),
+            ],
+          ),
+          if (!isSchedule) ...<Widget>[
+            const SizedBox(width: 28),
+            _TvSegmentedTrack(
+              options: <_TvSegmentedOption>[
+                _TvSegmentedOption(
+                  icon: PhosphorIcons.broadcast(),
+                  label: 'All',
+                  semanticLabel: 'All channels',
+                  selected: _scope == _TvLiveScope.all,
+                  onActivate: () => _selectScope(_TvLiveScope.all),
+                ),
+                _TvSegmentedOption(
+                  icon: PhosphorIcons.heart(),
+                  label: 'Favorites',
+                  semanticLabel: 'Favorites channels',
+                  selected: _scope == _TvLiveScope.favorites,
+                  onActivate: () => _selectScope(_TvLiveScope.favorites),
+                ),
+                _TvSegmentedOption(
+                  icon: PhosphorIcons.clockCounterClockwise(),
+                  label: 'Recent',
+                  semanticLabel: 'Recent channels',
+                  selected: _scope == _TvLiveScope.recent,
+                  onActivate: () => _selectScope(_TvLiveScope.recent),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 

@@ -17,6 +17,7 @@ import '../../provider/wellness_provider.dart';
 import '../../services/analytics_service.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/stream_intro_service.dart';
+import 'player/player_sheet_ui.dart';
 
 class LivePlayer extends StatefulWidget {
   const LivePlayer({
@@ -911,11 +912,8 @@ class _LivePlayerState extends State<LivePlayer> {
       action: 'channel_switcher_opened',
       resultCount: widget.channels.length,
     );
-    final selected = await showModalBottomSheet<Channel>(
+    final selected = await showPlayerSheet<Channel>(
       context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
       builder: (context) => _ChannelSwitcherSheet(
         channels: widget.channels,
         currentChannelId: _currentChannelId,
@@ -932,10 +930,8 @@ class _LivePlayerState extends State<LivePlayer> {
   }
 
   Future<void> _showStreamVariantSwitcher() async {
-    final selected = await showModalBottomSheet<LiveStreamVariant>(
+    final selected = await showPlayerSheet<LiveStreamVariant>(
       context: context,
-      useSafeArea: true,
-      showDragHandle: true,
       builder: (context) => SafeArea(
         child: ListView(
           shrinkWrap: true,

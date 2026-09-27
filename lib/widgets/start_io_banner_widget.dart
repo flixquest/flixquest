@@ -83,19 +83,27 @@ class _StartIoBannerWidgetState extends State<StartIoBannerWidget> {
     if (ad == null) return const SizedBox.shrink();
     Widget banner = StartAppBanner(ad);
     if (_television) {
-      banner = ExcludeFocus(
-        child: IgnorePointer(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const _AdLabel(),
-              const SizedBox(height: 6),
-              banner,
-            ],
-          ),
-        ),
-      );
+      // A thin banner keeps its label beside it, so the unit stays one
+      // banner high; a rectangle has room for the label on top.
+      final labelled = widget.variant == StartIoBannerVariant.standard
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const _AdLabel(),
+                const SizedBox(width: 10),
+                banner,
+              ],
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const _AdLabel(),
+                const SizedBox(height: 6),
+                banner,
+              ],
+            );
+      banner = ExcludeFocus(child: IgnorePointer(child: labelled));
     }
     return Padding(
       padding: widget.padding,

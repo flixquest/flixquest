@@ -17,6 +17,7 @@ class PlayerExternalSubtitles {
   final List<ExternalSubtitle> _selectedExternalSubtitles = [];
   bool _isLoadingExternalSubtitles = false;
   bool _isExternalSubtitlesMenuOpen = false;
+  bool _hasAutoLoadedExternalSubtitles = false;
   final Set<String> _addedExternalSubtitleIds = {}; // Track added subtitle IDs
 
   final List<BetterPlayerSubtitlesSource> _appliedSubtitles = [];
@@ -34,11 +35,9 @@ class PlayerExternalSubtitles {
     required BetterPlayerController betterPlayerController,
   }) {
     _isExternalSubtitlesMenuOpen = true;
-    showModalBottomSheet<void>(
+    _hasAutoLoadedExternalSubtitles = false;
+    showPlayerSheet<void>(
       context: context,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
       builder: (bottomSheetContext) => DraggableScrollableSheet(
         initialChildSize: .78,
         minChildSize: .52,
@@ -48,8 +47,12 @@ class PlayerExternalSubtitles {
         snapSizes: const [.52, .78, .95],
         builder: (context, scrollController) => StatefulBuilder(
           builder: (context, setBottomSheetState) {
+            // Load once per menu open. Guarding on "the list is empty" alone
+            // would re-trigger this on every rebuild whenever the API
+            // legitimately returns no subtitles, looping forever.
             if (_availableExternalSubtitles.isEmpty &&
-                !_isLoadingExternalSubtitles) {
+                !_hasAutoLoadedExternalSubtitles) {
+              _hasAutoLoadedExternalSubtitles = true;
               _isLoadingExternalSubtitles = true;
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (!context.mounted) return;
@@ -133,7 +136,6 @@ class PlayerExternalSubtitles {
             }
 
             return PlayerSheetScaffold(
-              icon: PhosphorIcons.closedCaptioning(),
               title: tr('external_subtitles'),
               subtitle: _availableExternalSubtitles.isEmpty
                   ? tr('search_subtitles')

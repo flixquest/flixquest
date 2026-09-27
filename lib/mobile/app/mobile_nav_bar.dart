@@ -88,6 +88,11 @@ class _NavItem extends StatelessWidget {
             PhosphorIcons.fire(PhosphorIconsStyle.fill),
             'new_and_hot',
           ),
+        MobileTab.discover => (
+            PhosphorIcons.compass(),
+            PhosphorIcons.compass(PhosphorIconsStyle.fill),
+            'discover',
+          ),
         MobileTab.search => (
             PhosphorIcons.magnifyingGlass(),
             PhosphorIcons.magnifyingGlass(PhosphorIconsStyle.bold),

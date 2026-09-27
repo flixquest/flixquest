@@ -46,7 +46,6 @@ void main() {
     const expected = <String, String>{
       'movies': 'home',
       'series': 'home',
-      'discover': 'home',
       'downloads': 'mine',
       'profile': 'mine',
       'bookmarks': 'mine',

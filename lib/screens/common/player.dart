@@ -46,7 +46,7 @@ import 'player/player_episode_selection.dart';
 import 'player/player_movie_recommendations.dart';
 import 'player/player_next_episode_policy.dart';
 import 'player/player_sheet_ui.dart';
-import 'player/player_widgets.dart';
+import 'player/player_strings.dart';
 import 'download_selection_sheets.dart';
 
 class PlayerOne extends StatefulWidget {
@@ -114,7 +114,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   late final PlayerEpisodeSelection _episodeSelection;
   final PlayerMovieRecommendations _movieRecommendations =
       PlayerMovieRecommendations();
-  final PlayerNextEpisodeWidget _nextEpisodeWidget = PlayerNextEpisodeWidget();
   late final List<EpisodeMetadata> _contentMenuEpisodes;
   late final List<SeasonMetadata> _contentMenuSeasons;
   int duration = 0;
@@ -148,6 +147,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   );
   Timer? _progressCheckTimer;
   OverlayEntry? _nextEpisodeOverlay;
+
+  /// The phone's next-episode card: which episode it offers, and the count
+  /// once the episode has ended (null while it is only a teaser).
+  EpisodeMetadata? _phoneNextEpisode;
+  int? _phoneNextEpisodeCountdown;
+  Timer? _phoneNextEpisodeTimer;
   bool _playerControlsVisible = false;
   String? _lastNextEpisodeDebugSignature;
   Timer? _tvNextEpisodeTimer;
@@ -314,16 +319,27 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         // devices when its platform-view background resolves to transparent.
         enableCast: false,
         name: widget.mediaType == MediaType.movie
-            ? '${widget.movieMetadata!.movieName!} (${widget.movieMetadata!.releaseYear!})'
-            : '${widget.tvMetadata!.seriesName!} - ${widget.tvMetadata!.episodeName!} | ${episodeSeasonFormatter(widget.tvMetadata!.episodeNumber!, widget.tvMetadata!.seasonNumber!)}',
+            ? widget.movieMetadata!.movieName!
+            : widget.tvMetadata!.seriesName!,
+        subtitle: widget.mediaType == MediaType.movie
+            ? widget.movieMetadata!.releaseYear?.toString()
+            : 'S${widget.tvMetadata!.seasonNumber}:E${widget.tvMetadata!.episodeNumber} · ${widget.tvMetadata!.episodeName ?? ''}',
+        strings: playerControlsStrings(),
+        emphasisFontFamily: 'FigtreeSB',
+        onNextEpisodeTap: widget.useTvControls ||
+                widget.mediaType != MediaType.tvShow ||
+                !_hasNextEpisode()
+            ? null
+            : () => unawaited(_playNextEpisodeFromControls()),
         backgroundColor: Colors.black,
-        progressBarBackgroundColor: Colors.white,
+        progressBarBackgroundColor: Colors.white24,
+        progressBarHandleColor: widget.colors.first,
         controlBarColor: Colors.black.withValues(alpha: 0.48),
         muteIcon: PhosphorIcons.speakerSimpleSlash(),
         unMuteIcon: PhosphorIcons.speakerHigh(),
-        pauseIcon: PhosphorIcons.pause(),
-        pipMenuIcon: PhosphorIcons.appWindow(),
-        playIcon: PhosphorIcons.play(),
+        pauseIcon: PhosphorIcons.pause(PhosphorIconsStyle.fill),
+        pipMenuIcon: PhosphorIcons.pictureInpicture(),
+        playIcon: PhosphorIcons.play(PhosphorIconsStyle.fill),
         showControlsOnInitialize: widget.useTvControls,
         controlsHideTime: widget.useTvControls
             ? const Duration(seconds: 4)
@@ -338,22 +354,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                   onExit: _exitPlayer,
                 )
             : null,
-        // On TV only the timeline's played part carries the brand colour.
-        loadingColor: _tvNeutral ?? widget.colors.first,
-        loadingWidget: SizedBox(
-          width: 60,
-          height: 3,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: LinearProgressIndicator(
-              minHeight: 3,
-              color: _tvNeutral ?? widget.colors.first,
-              backgroundColor:
-                  (_tvNeutral ?? widget.colors.first).withValues(alpha: .24),
-            ),
-          ),
-        ),
-        iconsColor: widget.colors.first,
+        // Only the timeline's played part carries the brand colour.
+        loadingColor: Colors.white,
+        iconsColor: Colors.white,
         backwardSkipTimeInMilliseconds:
             Duration(seconds: widget.settings.defaultSeekDuration)
                 .inMilliseconds,
@@ -361,15 +364,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
             Duration(seconds: widget.settings.defaultSeekDuration)
                 .inMilliseconds,
         progressBarPlayedColor: widget.colors.first,
-        progressBarBufferedColor: Colors.black45,
-        skipForwardIcon: PhosphorIcons.fastForward(),
-        skipBackIcon: PhosphorIcons.rewind(),
+        progressBarBufferedColor: Colors.white38,
+        skipForwardIcon: PhosphorIcons.arrowClockwise(),
+        skipBackIcon: PhosphorIcons.arrowCounterClockwise(),
         fullscreenEnableIcon: PhosphorIcons.cornersOut(),
         fullscreenDisableIcon: PhosphorIcons.cornersIn(),
-        overflowMenuIcon: PhosphorIcons.list(),
-        overflowMenuIconsColor: widget.colors.first,
-        overflowModalTextColor: widget.colors.first,
-        overflowModalColor: widget.colors.last,
+        overflowMenuIcon: PhosphorIcons.dotsThreeVertical(),
         subtitlesIcon: PhosphorIcons.closedCaptioning(),
         enableSubtitles: true,
         showSubtitlesButton: !widget.useTvControls,
@@ -411,44 +411,20 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                     _showTvProviderMenu,
                   ),
               ]
+            // Subtitle timing, searching online and uploading live in the
+            // Audio & Subtitles panel.
             : [
-                BetterPlayerOverflowMenuItem(
-                  PhosphorIcons.timer(),
-                  tr('subtitle_timing'),
-                  _showSubtitleTimingAdjuster,
-                ),
-                BetterPlayerOverflowMenuItem(
-                  PhosphorIcons.closedCaptioning(),
-                  tr('external_subtitles'),
-                  () {
-                    _externalSubtitles.showExternalSubtitlesMenu(
-                      context: context,
-                      colors: widget.colors,
-                      scraperApiUrl: _resolveScraperApiUrl(),
-                      mediaType: widget.mediaType,
-                      movieMetadata: widget.movieMetadata,
-                      tvMetadata: widget.tvMetadata,
-                      betterPlayerController: _betterPlayerController,
-                    );
-                  },
-                ),
-                BetterPlayerOverflowMenuItem(
-                  PhosphorIcons.fileArrowUp(),
-                  tr('upload_subtitles'),
-                  () {
-                    _localSubtitles.showLocalSubtitlesUpload(
-                      context: context,
-                      colors: widget.colors,
-                      betterPlayerController: _betterPlayerController,
-                    );
-                  },
-                ),
                 if (widget.availableProviders?.isNotEmpty == true)
                   BetterPlayerOverflowMenuItem(
                     PhosphorIcons.arrowsLeftRight(),
                     tr('switch_provider'),
                     _showProviderSwitcher,
                   ),
+                BetterPlayerOverflowMenuItem(
+                  PhosphorIcons.arrowSquareOut(),
+                  tr('open_external'),
+                  _showExternalPlayerSheet,
+                ),
               ]);
     BetterPlayerConfiguration betterPlayerConfiguration =
         BetterPlayerConfiguration(
@@ -606,10 +582,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     if (code == null || code.trim().isEmpty) return null;
     return _providerDisplayName(code);
   }
-
-  /// White in place of the accent on TV, where the brand colour is kept for
-  /// the timeline alone.
-  Color? get _tvNeutral => widget.useTvControls ? Colors.white : null;
 
   String get _analyticsSurface => widget.useTvControls ? 'tv' : 'standard';
 
@@ -1077,16 +1049,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     if (segment == null || !_canSkipIntroDbSegment()) {
       return const SizedBox.shrink();
     }
-    if (widget.useTvControls) {
-      return _TvSkipButton(
-        label: _introDbLabel(segment.type),
-        onPressed: _skipActiveIntroDbSegment,
-      );
-    }
-    return FilledButton.icon(
+    return _TvSkipButton(
+      label: _introDbLabel(segment.type),
       onPressed: _skipActiveIntroDbSegment,
-      icon: Icon(PhosphorIcons.skipForward()),
-      label: Text(_introDbLabel(segment.type)),
     );
   }
 
@@ -1227,16 +1192,11 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       return;
     }
 
-    _nextEpisodeOverlay = OverlayEntry(
-      builder: (context) => _nextEpisodeWidget.buildNextEpisodeFloatingButton(
-        context: context,
-        tvMetadata: widget.tvMetadata!,
-        showNextEpisodeButton: _showNextEpisodeButton,
-        controlsVisible: _playerControlsVisible,
-        onSaveProgress: _handleContentSwitch,
-        closePlayer: () => Navigator.pop(context),
-      ),
-    );
+    final nextEpisode = _nextTvEpisode;
+    if (nextEpisode == null) return;
+    _phoneNextEpisode = nextEpisode;
+    _phoneNextEpisodeCountdown = null;
+    _nextEpisodeOverlay = OverlayEntry(builder: _buildPhoneNextEpisodeCard);
 
     Overlay.of(context, rootOverlay: true).insert(_nextEpisodeOverlay!);
     debugPrint(
@@ -1246,8 +1206,63 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   void _hideNextEpisodeOverlay() {
+    _phoneNextEpisodeTimer?.cancel();
+    _phoneNextEpisodeTimer = null;
+    _phoneNextEpisode = null;
+    _phoneNextEpisodeCountdown = null;
     _nextEpisodeOverlay?.remove();
     _nextEpisodeOverlay = null;
+  }
+
+  /// At the end of an episode on the phone: the card, counting down to the
+  /// next one.
+  void _showPhoneNextEpisodeCountdown(EpisodeMetadata nextEpisode) {
+    _hideNextEpisodeOverlay();
+    if (!mounted) return;
+    _phoneNextEpisode = nextEpisode;
+    _phoneNextEpisodeCountdown = _endCountdown;
+    _nextEpisodeOverlay = OverlayEntry(builder: _buildPhoneNextEpisodeCard);
+    Overlay.of(context, rootOverlay: true).insert(_nextEpisodeOverlay!);
+    _phoneNextEpisodeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final countdown = _phoneNextEpisodeCountdown;
+      if (!mounted || countdown == null) {
+        timer.cancel();
+        return;
+      }
+      if (countdown <= 1) {
+        timer.cancel();
+        _hideNextEpisodeOverlay();
+        unawaited(_playNextEpisodeFromControls());
+        return;
+      }
+      _phoneNextEpisodeCountdown = countdown - 1;
+      _nextEpisodeOverlay?.markNeedsBuild();
+    });
+  }
+
+  Widget _buildPhoneNextEpisodeCard(BuildContext context) {
+    final episode = _phoneNextEpisode;
+    if (episode == null) return const SizedBox.shrink();
+    final counting = _phoneNextEpisodeCountdown != null;
+    return _TvNextEpisodeOverlay(
+      touch: true,
+      liftedBy: _playerControlsVisible ? 128 : 0,
+      episode: episode,
+      countdown: _phoneNextEpisodeCountdown,
+      countdownTotal: _endCountdown,
+      cancelLabel: counting ? tr('cancel') : tr('watch_credits'),
+      onCancel: () {
+        if (!counting) {
+          _nextEpisodeButtonDismissed = true;
+          _showNextEpisodeButton = false;
+        }
+        _hideNextEpisodeOverlay();
+      },
+      onPlay: () {
+        _hideNextEpisodeOverlay();
+        unawaited(_playNextEpisodeFromControls());
+      },
+    );
   }
 
   void startDurationTimer() {
@@ -2007,14 +2022,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
             'contextMounted=${_playerModalContext.mounted} '
             'scheduler=${WidgetsBinding.instance.schedulerPhase}',
           );
-          _nextEpisodeWidget.showNextEpisodeCountdown(
-            context: _playerModalContext,
-            nextEpisode: nextEpisode,
-            colors: widget.colors,
-            tvMetadata: widget.tvMetadata!,
-            onSaveProgress: _handleContentSwitch,
-            closePlayer: _closePlayer,
-          );
+          _showPhoneNextEpisodeCountdown(nextEpisode);
         }
       } else {
         // No next episode, show episode list
@@ -2480,11 +2488,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final providers = widget.availableProviders;
     if (providers == null || providers.isEmpty) return;
 
-    showModalBottomSheet<void>(
+    showPlayerSheet<void>(
       context: context,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) {
           return DraggableScrollableSheet(
@@ -2493,136 +2498,63 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
             minChildSize: .45,
             maxChildSize: .96,
             snap: true,
-            builder: (context, scrollController) => AppResponsiveContent(
-              maxWidth: 680,
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withValues(alpha: .12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          PhosphorIcons.hardDrives(),
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 13),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              tr('select_provider'),
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${providers.length} ${tr('video_source')}',
-                              style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
+            builder: (context, scrollController) => PlayerSheetScaffold(
+              title: tr('select_provider'),
+              subtitle: '${providers.length} ${tr('video_source')}',
+              actions: [
+                PlayerSheetAction(
+                  icon: PhosphorIcons.x(),
+                  tooltip: tr('close'),
+                  onPressed: () => Navigator.pop(sheetContext),
+                ),
+              ],
+              child: ListView.separated(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                itemCount: providers.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 2),
+                itemBuilder: (context, index) {
+                  final provider = providers[index];
+                  final selected = provider.codeName == _currentProviderCode;
+                  final loading = _loadingProviders.contains(provider.codeName);
+                  final error = _providerErrors[provider.codeName];
+                  final content = provider.content?.trim();
+                  return PlayerChoiceCard(
+                    kicker: selected ? tr('player_now_playing') : null,
+                    title: provider.displayName,
+                    selected: selected,
+                    subtitle: loading
+                        ? tr('loading_video_sources')
+                        : error ??
+                            (content?.isNotEmpty == true
+                                ? content
+                                : tr('video_source')),
+                    trailing: loading
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : error == null
+                            ? null
+                            : Icon(
+                                PhosphorIcons.warningCircle(),
+                                color: Theme.of(context).colorScheme.error,
                               ),
+                    onTap: selected || loading || _isSwitchingProvider
+                        ? null
+                        : () => _switchToProvider(
+                              provider.codeName,
+                              refreshMenu: () {
+                                if (sheetContext.mounted) setSheetState(() {});
+                              },
+                              closeMenu: () {
+                                if (sheetContext.mounted) {
+                                  Navigator.pop(sheetContext);
+                                }
+                              },
                             ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(sheetContext),
-                        icon: Icon(PhosphorIcons.x()),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Expanded(
-                    child: ListView.separated(
-                      controller: scrollController,
-                      itemCount: providers.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 4),
-                      itemBuilder: (context, index) {
-                        final provider = providers[index];
-                        final selected =
-                            provider.codeName == _currentProviderCode;
-                        final loading =
-                            _loadingProviders.contains(provider.codeName);
-                        final error = _providerErrors[provider.codeName];
-                        final content = provider.content?.trim();
-                        return AppSelectionTile(
-                          title: provider.displayName,
-                          selected: selected,
-                          subtitle: loading
-                              ? tr('loading_video_sources')
-                              : error ??
-                                  [
-                                    if (selected) tr('currently_playing'),
-                                    if (content?.isNotEmpty == true) content!,
-                                    if (!selected &&
-                                        content?.isNotEmpty != true)
-                                      tr('video_source'),
-                                  ].join('  •  '),
-                          leading: Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: .1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: loading
-                                ? const Padding(
-                                    padding: EdgeInsets.all(11),
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Icon(
-                                    selected
-                                        ? PhosphorIcons.playCircle(
-                                            PhosphorIconsStyle.fill,
-                                          )
-                                        : PhosphorIcons.playCircle(),
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                  ),
-                          ),
-                          trailing: error == null
-                              ? null
-                              : Icon(
-                                  PhosphorIcons.warningCircle(),
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                          onTap: selected || loading || _isSwitchingProvider
-                              ? () {}
-                              : () => _switchToProvider(
-                                    provider.codeName,
-                                    refreshMenu: () {
-                                      if (sheetContext.mounted) {
-                                        setSheetState(() {});
-                                      }
-                                    },
-                                    closeMenu: () {
-                                      if (sheetContext.mounted) {
-                                        Navigator.pop(sheetContext);
-                                      }
-                                    },
-                                  ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           );
@@ -2844,12 +2776,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         },
         child: Scaffold(
           backgroundColor: Colors.black,
-          body: _buildPortraitInlineLayout(context),
-          floatingActionButton: FloatingActionButton.small(
-            tooltip: tr('video_source'),
-            onPressed: _showExternalPlayerSheet,
-            child: Icon(PhosphorIcons.arrowSquareOut()),
-          ),
+          body: PlayerTheme(child: _buildPortraitInlineLayout(context)),
         ),
       );
     }
@@ -2900,13 +2827,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               ),
           ],
         ),
-        floatingActionButton: widget.useTvControls
-            ? null
-            : FloatingActionButton.small(
-                tooltip: tr('video_source'),
-                onPressed: _showExternalPlayerSheet,
-                child: Icon(PhosphorIcons.arrowSquareOut()),
-              ),
       ),
     );
   }
@@ -3134,11 +3054,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final seasons = metadata.allSeasons;
     if (!mounted || seasons == null || seasons.length < 2) return;
 
-    final selectedSeason = await showModalBottomSheet<int>(
+    final selectedSeason = await showPlayerSheet<int>(
       context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
       builder: (sheetContext) {
         final colors = Theme.of(sheetContext).colorScheme;
         final browsedSeason = _portraitBrowsedSeasonNumber ??
@@ -3239,6 +3156,29 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     return details.isEmpty ? null : details.join('  •  ');
   }
 
+  /// The Next episode control. Fullscreen playback is its own route, so it
+  /// is left first, the way the next-episode card does it.
+  Future<void> _playNextEpisodeFromControls() async {
+    final next = _nextTvEpisode;
+    if (next == null || !mounted) return;
+    if (!_betterPlayerController.isFullScreen) {
+      await _playTvEpisode(next);
+      return;
+    }
+    await _handleContentSwitch();
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    _closePlayer();
+    await navigator.pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => TVVideoLoader(
+          download: false,
+          metadata: _metadataForTvEpisode(next),
+        ),
+      ),
+    );
+  }
+
   void _exitPlayer() {
     final playerRoute = ModalRoute.of(context);
     final onTvPlayerExit = widget.onTvPlayerExit;
@@ -3259,10 +3199,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   void _showExternalPlayerSheet() {
-    showModalBottomSheet<void>(
+    showPlayerSheet<void>(
       context: context,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (context) => AppResponsiveContent(
         maxWidth: 680,
         padding: EdgeInsets.zero,
@@ -3447,16 +3385,39 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
 
     final options = buildSubtitleOptions(subtitles);
 
-    showModalBottomSheet<void>(
+    showPlayerSheet<void>(
       context: context,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
-      builder: (sheetContext) => _SubtitleSwitcherSheet(
-        controller: _betterPlayerController,
-        options: options,
-        onClose: () => Navigator.pop(sheetContext),
-      ),
+      builder: (sheetContext) {
+        void then(VoidCallback action) {
+          Navigator.pop(sheetContext);
+          action();
+        }
+
+        return _SubtitleSwitcherSheet(
+          controller: _betterPlayerController,
+          options: options,
+          onClose: () => Navigator.pop(sheetContext),
+          onTiming: () => then(_showSubtitleTimingAdjuster),
+          onSearchOnline: () => then(() {
+            _externalSubtitles.showExternalSubtitlesMenu(
+              context: context,
+              colors: widget.colors,
+              scraperApiUrl: _resolveScraperApiUrl(),
+              mediaType: widget.mediaType,
+              movieMetadata: widget.movieMetadata,
+              tvMetadata: widget.tvMetadata,
+              betterPlayerController: _betterPlayerController,
+            );
+          }),
+          onUpload: () => then(() {
+            _localSubtitles.showLocalSubtitlesUpload(
+              context: context,
+              colors: widget.colors,
+              betterPlayerController: _betterPlayerController,
+            );
+          }),
+        );
+      },
     );
   }
 
@@ -3496,11 +3457,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       );
     }
 
-    showModalBottomSheet<void>(
+    showPlayerSheet<void>(
       context: context,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
       builder: (sheetContext) => DraggableScrollableSheet(
         controller: dragController,
         initialChildSize: initialSize,
@@ -3509,7 +3467,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         expand: false,
         snap: true,
         builder: (context, scrollController) => PlayerSheetScaffold(
-          icon: PhosphorIcons.timer(),
           title: tr('subtitle_timing'),
           subtitle: tr('subtitle_timing_help'),
           showDragHandle: true,
@@ -3656,8 +3613,10 @@ class _TvPlayerMenuData {
   final List<BetterPlayerTvMenuItem> items;
 }
 
-/// Netflix's next-episode card: bottom right, over the picture rather than
-/// dimming it, with the countdown filling the Next episode button.
+/// Netflix's next-episode card: bottom end, over the picture rather than
+/// dimming it, with the countdown filling the Next episode button. The phone
+/// uses it too, with [touch] sizing, lifted by [liftedBy] while the controls'
+/// bottom bar is showing.
 class _TvNextEpisodeOverlay extends StatelessWidget {
   const _TvNextEpisodeOverlay({
     required this.episode,
@@ -3666,7 +3625,12 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
     required this.cancelLabel,
     this.countdown,
     this.countdownTotal = 10,
+    this.touch = false,
+    this.liftedBy = 0,
   });
+
+  final bool touch;
+  final double liftedBy;
 
   final EpisodeMetadata episode;
   final int? countdown;
@@ -3692,21 +3656,34 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
         }
         return KeyEventResult.ignored;
       },
-      child: DecoratedBox(
-        // Only the corner the card sits in is shaded.
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.bottomRight,
-            radius: 1.1,
-            colors: [Color(0xb3000000), Color(0x00000000)],
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+        // Only the corner the card sits in is shaded, and the shade takes no
+        // taps: the picture and its controls stay usable around the card.
+        const IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: AlignmentDirectional.bottomEnd,
+                radius: 1.1,
+                colors: [Color(0xb3000000), Color(0x00000000)],
+              ),
+            ),
           ),
         ),
-        child: SafeArea(
-          minimum: const EdgeInsets.fromLTRB(48, 30, 48, 36),
+        AnimatedPadding(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          padding: EdgeInsets.only(bottom: liftedBy),
+          child: SafeArea(
+          minimum: touch
+              ? const EdgeInsets.fromLTRB(20, 16, 20, 20)
+              : const EdgeInsets.fromLTRB(48, 30, 48, 36),
           child: Align(
-            alignment: Alignment.bottomRight,
+            alignment: AlignmentDirectional.bottomEnd,
             child: SizedBox(
-              width: 440,
+              width: touch ? 380 : 440,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -3717,8 +3694,8 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(5),
                         child: SizedBox(
-                          width: 160,
-                          height: 90,
+                          width: touch ? 128 : 160,
+                          height: touch ? 72 : 90,
                           child: episode.stillPath == null
                               ? const ColoredBox(
                                   color: Color(0xff1b1c1c),
@@ -3793,7 +3770,7 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
                             : '${tr('next_episode')}  $seconds',
                         icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
                         progress: elapsed,
-                        autofocus: true,
+                        autofocus: !touch,
                         onPressed: onPlay,
                       ),
                       const SizedBox(width: 10),
@@ -3809,6 +3786,8 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
             ),
           ),
         ),
+        ),
+        ],
       ),
     );
   }
@@ -3837,10 +3816,17 @@ class _TvPromptButton extends StatefulWidget {
 
 class _TvPromptButtonState extends State<_TvPromptButton> {
   bool _focused = false;
+  bool _pressed = false;
+
+  void _press(bool pressed) {
+    if (_pressed != pressed) setState(() => _pressed = pressed);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final foreground = _focused ? Colors.black : Colors.white;
+    // Focus on a remote, a finger on a phone: either lights it white.
+    final lit = _focused || _pressed;
+    final foreground = lit ? Colors.black : Colors.white;
     return FocusableActionDetector(
       autofocus: widget.autofocus,
       onFocusChange: (focused) => setState(() => _focused = focused),
@@ -3860,6 +3846,9 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
       },
       child: GestureDetector(
         onTap: widget.onPressed,
+        onTapDown: (_) => _press(true),
+        onTapUp: (_) => _press(false),
+        onTapCancel: () => _press(false),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(5),
           child: Stack(
@@ -3868,7 +3857,7 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
                 duration: const Duration(milliseconds: 120),
                 height: 44,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                color: _focused
+                color: lit
                     ? const Color(0xf2ffffff)
                     : const Color(0x40ffffff),
                 child: Row(
@@ -3895,10 +3884,10 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
                       tween: Tween<double>(end: progress),
                       duration: const Duration(seconds: 1),
                       builder: (_, value, __) => FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
+                        alignment: AlignmentDirectional.centerStart,
                         widthFactor: value,
                         child: ColoredBox(
-                          color: _focused
+                          color: lit
                               ? const Color(0x26000000)
                               : const Color(0x33ffffff),
                         ),
@@ -3914,8 +3903,8 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
   }
 }
 
-/// IntroDB's skip action on TV: a white-edged pill over the picture that
-/// fills white under focus.
+/// IntroDB's skip action: a white-edged pill over the picture that fills
+/// white under focus or a finger.
 class _TvSkipButton extends StatelessWidget {
   const _TvSkipButton({required this.label, required this.onPressed});
 
@@ -3943,12 +3932,14 @@ class _TvSkipButton extends StatelessWidget {
           BorderSide(color: Colors.white, width: 1.5),
         ),
         backgroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.focused)
+          (states) => states.contains(WidgetState.focused) ||
+                  states.contains(WidgetState.pressed)
               ? const Color(0xf2ffffff)
               : const Color(0x99000000),
         ),
         foregroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.focused)
+          (states) => states.contains(WidgetState.focused) ||
+                  states.contains(WidgetState.pressed)
               ? Colors.black
               : Colors.white,
         ),
@@ -3958,16 +3949,25 @@ class _TvSkipButton extends StatelessWidget {
   }
 }
 
+/// Audio and subtitles in one panel, as Netflix has it: soundtracks beside
+/// the subtitle languages when there is more than one soundtrack, and the
+/// subtitle tools (timing, searching online, a file) along the bottom.
 class _SubtitleSwitcherSheet extends StatefulWidget {
   const _SubtitleSwitcherSheet({
     required this.controller,
     required this.options,
     required this.onClose,
+    required this.onTiming,
+    required this.onSearchOnline,
+    required this.onUpload,
   });
 
   final BetterPlayerController controller;
   final List<SubtitleOption> options;
   final VoidCallback onClose;
+  final VoidCallback onTiming;
+  final VoidCallback onSearchOnline;
+  final VoidCallback onUpload;
 
   @override
   State<_SubtitleSwitcherSheet> createState() => _SubtitleSwitcherSheetState();
@@ -4021,90 +4021,211 @@ class _SubtitleSwitcherSheetState extends State<_SubtitleSwitcherSheet> {
     // open on the marked row so the user can pick something that works.
   }
 
+  Widget _subtitleRow(SubtitleOption option) {
+    final selected = widget.controller.betterPlayerSubtitlesSource;
+    final isOff = option.isOff;
+    final isSelected = isOff
+        ? selected == null ||
+            selected.type == BetterPlayerSubtitlesSourceType.none
+        : identical(option.source, selected);
+    final isLoading = identical(option, _loadingOption);
+    // Only a row with nothing left to try is marked: one whose own track died
+    // but whose fallbacks are untouched can still play.
+    final hasFailed =
+        option.sources.every(widget.controller.subtitlesSourceHasFailed);
+    final label = isOff
+        ? tr('player_off')
+        : option.name ?? widget.controller.translations.generalDefault;
+    return PlayerChoiceCard(
+      title: option.number == null ? label : '$label #${option.number}',
+      subtitle: isOff || option.provider.isEmpty ? null : option.provider,
+      selected: isSelected,
+      trailing: isLoading
+          ? Semantics(
+              liveRegion: true,
+              label: tr('loading_subtitles'),
+              child: const SizedBox.square(
+                key: Key('subtitle_selection_progress'),
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          : hasFailed
+              ? Semantics(
+                  liveRegion: true,
+                  label: tr('subtitle_unavailable_pick_another'),
+                  child: Icon(
+                    PhosphorIcons.xCircle(PhosphorIconsStyle.fill),
+                    key: const Key('subtitle_selection_failed'),
+                    size: 20,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                )
+              : isSelected
+                  ? null
+                  : const SizedBox.shrink(),
+      onTap: _loadingOption == null ? () => _selectSubtitle(option) : null,
+    );
+  }
+
+  List<Widget> _audioRows() {
+    final tracks = widget.controller.betterPlayerAsmsAudioTracks ??
+        const <BetterPlayerAsmsAudioTrack>[];
+    final selected = widget.controller.betterPlayerAsmsAudioTrack;
+    return [
+      for (final (index, track) in tracks.indexed)
+        BetterPlayerSelectionTile(
+          title: track.label?.trim().isNotEmpty == true
+              ? track.label!.trim()
+              : track.language?.trim().isNotEmpty == true
+                  ? track.language!.trim()
+                  : '${tr('player_audio')} ${index + 1}',
+          subtitle: track.label?.trim().isNotEmpty == true
+              ? track.language?.trim()
+              : null,
+          selected:
+              selected == track || (selected == null && track.isDefault),
+          onTap: () {
+            widget.controller.setAudioTrack(track);
+            widget.onClose();
+          },
+        ),
+    ];
+  }
+
+  Widget _heading(String text) => Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(10, 4, 10, 8),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontFamily: 'FigtreeBold',
+            fontSize: 16,
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    final selected = widget.controller.betterPlayerSubtitlesSource;
+    final audio = _audioRows();
+    final withAudio = audio.length > 1;
+    final subtitles = [for (final option in widget.options) _subtitleRow(option)];
     return DraggableScrollableSheet(
-      initialChildSize: .78,
-      minChildSize: .55,
+      initialChildSize: .82,
+      minChildSize: .5,
       maxChildSize: .95,
       expand: false,
       snap: true,
       builder: (context, scrollController) => PlayerSheetScaffold(
-        icon: PhosphorIcons.closedCaptioning(),
-        title: tr('subtitle'),
+        title: withAudio ? tr('player_audio_subtitles') : tr('player_subtitles'),
         subtitle: tr('choose_subtitle_language'),
         actions: [
-          IconButton(
+          PlayerSheetAction(
+            icon: PhosphorIcons.x(),
             tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
             onPressed: widget.onClose,
-            icon: Icon(PhosphorIcons.x()),
           ),
         ],
-        child: ListView.separated(
-          controller: scrollController,
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-          itemCount: widget.options.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 4),
-          itemBuilder: (context, index) {
-            final option = widget.options[index];
-            final isOff = option.isOff;
-            final isSelected = isOff
-                ? selected == null ||
-                    selected.type == BetterPlayerSubtitlesSourceType.none
-                : identical(option.source, selected);
-            final isLoading = identical(option, _loadingOption);
-            // Only a row with nothing left to try is marked: one whose own
-            // track died but whose fallbacks are untouched can still play.
-            final hasFailed = option.sources.every(
-              widget.controller.subtitlesSourceHasFailed,
-            );
-            final label = isOff
-                ? widget.controller.translations.generalNone
-                : option.name ?? widget.controller.translations.generalDefault;
-            return PlayerChoiceCard(
-              title: option.number == null ? label : '$label #${option.number}',
-              subtitle: isOff
-                  ? null
-                  : option.provider.isEmpty
-                      ? tr('subtitle')
-                      : option.provider,
-              selected: isSelected,
-              thumbnail: PlayerThumbnail(
-                width: 48,
-                height: 48,
-                child: Icon(
-                  isOff
-                      ? PhosphorIcons.subtitlesSlash()
-                      : PhosphorIcons.closedCaptioning(),
-                ),
-              ),
-              trailing: isLoading
-                  ? Semantics(
-                      liveRegion: true,
-                      label: tr('loading_subtitles'),
-                      child: const SizedBox.square(
-                        key: Key('subtitle_selection_progress'),
-                        dimension: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      ),
-                    )
-                  : hasFailed
-                      ? Semantics(
-                          liveRegion: true,
-                          label: tr('subtitle_unavailable_pick_another'),
-                          child: Icon(
-                            PhosphorIcons.xCircle(PhosphorIconsStyle.fill),
-                            key: const Key('subtitle_selection_failed'),
-                            size: 24,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        )
-                      : null,
-              onTap:
-                  _loadingOption == null ? () => _selectSubtitle(option) : null,
+        footer: _SubtitleTools(
+          onTiming: widget.onTiming,
+          onSearchOnline: widget.onSearchOnline,
+          onUpload: widget.onUpload,
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (withAudio && constraints.maxWidth >= 560) {
+              Widget column(String title, List<Widget> rows,
+                      {ScrollController? controller}) =>
+                  Expanded(
+                    child: ListView(
+                      controller: controller,
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
+                      children: [_heading(title), ...rows],
+                    ),
+                  );
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  column(tr('player_audio'), audio),
+                  column(
+                    tr('player_subtitles'),
+                    subtitles,
+                    controller: scrollController,
+                  ),
+                ],
+              );
+            }
+            return ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+              children: [
+                if (withAudio) ...[
+                  _heading(tr('player_audio')),
+                  ...audio,
+                  const SizedBox(height: 16),
+                  _heading(tr('player_subtitles')),
+                ],
+                ...subtitles,
+              ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// The subtitle tools under the list: timing, searching online, a file.
+class _SubtitleTools extends StatelessWidget {
+  const _SubtitleTools({
+    required this.onTiming,
+    required this.onSearchOnline,
+    required this.onUpload,
+  });
+
+  final VoidCallback onTiming;
+  final VoidCallback onSearchOnline;
+  final VoidCallback onUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget tool(IconData icon, String label, VoidCallback onPressed) =>
+        OutlinedButton.icon(
+          onPressed: onPressed,
+          icon: Icon(icon, size: 18),
+          label: Text(label),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 40),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            textStyle: const TextStyle(fontFamily: 'FigtreeSB', fontSize: 14),
+          ),
+        );
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: BetterPlayerColors.hairline)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              tool(PhosphorIcons.timer(), tr('subtitle_timing'), onTiming),
+              const SizedBox(width: 8),
+              tool(
+                PhosphorIcons.magnifyingGlass(),
+                tr('external_subtitles'),
+                onSearchOnline,
+              ),
+              const SizedBox(width: 8),
+              tool(
+                PhosphorIcons.fileArrowUp(),
+                tr('upload_subtitles'),
+                onUpload,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -4152,185 +4273,98 @@ class _SubtitleTimingControlState extends State<_SubtitleTimingControl> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = Theme.of(context).colorScheme;
     final offset = _offset;
     final isSynced = offset == Duration.zero;
     final status = isSynced
         ? tr('subtitle_timing_synced')
         : tr(offset.isNegative ? 'subtitle_earlier' : 'subtitle_later');
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest.withValues(alpha: .42),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: .5),
+    Widget step(Key key, IconData icon, String tooltip, VoidCallback? onTap) =>
+        IconButton.filledTonal(
+          key: key,
+          tooltip: tooltip,
+          onPressed: onTap,
+          style: IconButton.styleFrom(
+            backgroundColor: const Color(0x1FFFFFFF),
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: const Color(0x0DFFFFFF),
+            disabledForegroundColor: Colors.white30,
+            fixedSize: const Size(48, 48),
+          ),
+          icon: Icon(icon, size: 20),
+        );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // The offset, large, with what it means under it.
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 160),
+          child: Text(
+            _subtitleOffsetValue(offset),
+            key: ValueKey(offset.inMilliseconds),
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'FigtreeBold',
+              fontSize: 40,
+              height: 1.1,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
         ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isSynced
-                    ? PhosphorIcons.checkCircle(PhosphorIconsStyle.fill)
-                    : PhosphorIcons.timer(),
-                color: colors.primary,
-                size: 22,
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  status,
-                  key: const Key('subtitle_timing_value'),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                    fontFamily: 'FigtreeSB',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 160),
-                child: Container(
-                  key: ValueKey(offset.inMilliseconds),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    _subtitleOffsetValue(offset),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: colors.primary,
-                      fontFamily: 'FigtreeSB',
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 5,
-              activeTrackColor: colors.primary,
-              inactiveTrackColor: colors.primary.withValues(alpha: .16),
-              thumbColor: colors.primary,
-              overlayColor: colors.primary.withValues(alpha: .12),
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
+        const SizedBox(height: 4),
+        Text(
+          status,
+          key: const Key('subtitle_timing_value'),
+          style: const TextStyle(color: BetterPlayerColors.muted, fontSize: 14),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            step(
+              const Key('subtitle_timing_earlier'),
+              PhosphorIcons.minus(),
+              '${tr('subtitle_earlier')} 0.5s',
+              offset <= _minimum ? null : () => _setOffset(offset - _step),
             ),
-            child: Slider(
-              key: const Key('subtitle_timing_slider'),
-              value: offset.inMilliseconds
-                  .clamp(-_limit.inMilliseconds, _limit.inMilliseconds)
-                  .toDouble(),
-              min: -_limit.inMilliseconds.toDouble(),
-              max: _limit.inMilliseconds.toDouble(),
-              divisions: 80,
-              semanticFormatterCallback: (_) => _subtitleOffsetLabel(offset),
-              onChanged: (value) => _setOffset(
-                Duration(milliseconds: value.round()),
+            Expanded(
+              child: Slider(
+                key: const Key('subtitle_timing_slider'),
+                value: offset.inMilliseconds
+                    .clamp(-_limit.inMilliseconds, _limit.inMilliseconds)
+                    .toDouble(),
+                min: -_limit.inMilliseconds.toDouble(),
+                max: _limit.inMilliseconds.toDouble(),
+                divisions: 80,
+                semanticFormatterCallback: (_) => _subtitleOffsetLabel(offset),
+                onChanged: (value) =>
+                    _setOffset(Duration(milliseconds: value.round())),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            step(
+              const Key('subtitle_timing_later'),
+              PhosphorIcons.plus(),
+              '${tr('subtitle_later')} 0.5s',
+              offset >= _limit ? null : () => _setOffset(offset + _step),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 60),
+          child: DefaultTextStyle(
+            style: const TextStyle(color: BetterPlayerColors.muted, fontSize: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('−10s', style: theme.textTheme.labelSmall),
-                Text('0s', style: theme.textTheme.labelSmall),
-                Text('+10s', style: theme.textTheme.labelSmall),
-              ],
+              children: const [Text('−10s'), Text('0s'), Text('+10s')],
             ),
           ),
-          const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: colors.primary.withValues(alpha: .13),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: colors.primary.withValues(alpha: .28),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Tooltip(
-                  message: '${tr('subtitle_earlier')} 0.5s',
-                  child: IconButton(
-                    key: const Key('subtitle_timing_earlier'),
-                    onPressed: offset <= _minimum
-                        ? null
-                        : () => _setOffset(offset - _step),
-                    icon: Icon(PhosphorIcons.minus(), size: 18),
-                    constraints: const BoxConstraints.tightFor(
-                      width: 42,
-                      height: 38,
-                    ),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    color: colors.primary,
-                    disabledColor: colors.onSurface.withValues(alpha: .28),
-                  ),
-                ),
-                SizedBox(
-                  height: 22,
-                  child: VerticalDivider(
-                    width: 1,
-                    color: colors.outlineVariant,
-                  ),
-                ),
-                TextButton(
-                  key: const Key('subtitle_timing_reset'),
-                  onPressed: isSynced ? null : () => _setOffset(Duration.zero),
-                  style: TextButton.styleFrom(
-                    foregroundColor: colors.primary,
-                    disabledForegroundColor:
-                        colors.onSurface.withValues(alpha: .32),
-                    minimumSize: const Size(86, 38),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  child: Text(tr('subtitle_timing_reset')),
-                ),
-                SizedBox(
-                  height: 22,
-                  child: VerticalDivider(
-                    width: 1,
-                    color: colors.outlineVariant,
-                  ),
-                ),
-                Tooltip(
-                  message: '${tr('subtitle_later')} 0.5s',
-                  child: IconButton(
-                    key: const Key('subtitle_timing_later'),
-                    onPressed: offset >= _limit
-                        ? null
-                        : () => _setOffset(offset + _step),
-                    icon: Icon(PhosphorIcons.plus(), size: 18),
-                    constraints: const BoxConstraints.tightFor(
-                      width: 42,
-                      height: 38,
-                    ),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    color: colors.primary,
-                    disabledColor: colors.onSurface.withValues(alpha: .28),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 16),
+        TextButton.icon(
+          key: const Key('subtitle_timing_reset'),
+          onPressed: isSynced ? null : () => _setOffset(Duration.zero),
+          icon: Icon(PhosphorIcons.arrowCounterClockwise(), size: 18),
+          label: Text(tr('subtitle_timing_reset')),
+        ),
+      ],
     );
   }
 }

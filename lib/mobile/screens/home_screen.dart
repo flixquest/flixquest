@@ -19,6 +19,7 @@ import '../../provider/app_dependency_provider.dart';
 import '../../provider/recently_watched_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../screens/common/bookmark_screen.dart';
+import '../../screens/common/downloads_screen.dart';
 import '../../screens/common/live_tv_screen.dart';
 import '../../services/ambient_theme_service.dart';
 import '../../video_providers/scraper_api.dart';
@@ -463,7 +464,11 @@ class _HomeScreenState extends State<HomeScreen>
                   reduceMotion: media.disableAnimations,
                   chips: _chips(feed),
                   onSearch: () => _tabs?.select(MobileTab.search),
-                  onProfile: () => _tabs?.select(MobileTab.mine),
+                  onDownloads: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const DownloadsScreen(),
+                    ),
+                  ),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: AppSpace.md)),
@@ -523,7 +528,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-/// Home's top: the logo, Search and My FlixQuest, and the filter chips. It
+/// Home's top: the logo, Downloads and Search, and the filter chips. It
 /// sits clear over the featured title's wash, and takes on the page colour,
 /// frosted, once the page scrolls under it.
 class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
@@ -533,7 +538,7 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.reduceMotion,
     required this.chips,
     required this.onSearch,
-    required this.onProfile,
+    required this.onDownloads,
   });
 
   final double topInset;
@@ -541,7 +546,7 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   final bool reduceMotion;
   final List<FilterChipSpec> chips;
   final VoidCallback onSearch;
-  final VoidCallback onProfile;
+  final VoidCallback onDownloads;
 
   /// Scrolled this far, the bar is fully solid.
   static const _solidAfter = 80.0;
@@ -563,7 +568,7 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
       topInset: topInset,
       chips: chips,
       onSearch: onSearch,
-      onProfile: onProfile,
+      onDownloads: onDownloads,
     );
     final background = ColoredBox(
       color: palette.scrim(solid * (reduceMotion ? 1 : .94)),
@@ -601,13 +606,13 @@ class _HomeHeader extends StatelessWidget {
     required this.topInset,
     required this.chips,
     required this.onSearch,
-    required this.onProfile,
+    required this.onDownloads,
   });
 
   final double topInset;
   final List<FilterChipSpec> chips;
   final VoidCallback onSearch;
-  final VoidCallback onProfile;
+  final VoidCallback onDownloads;
 
   static const _appBarHeight = 52.0;
   static const barHeight = _appBarHeight + FilterChips.height + 12;
@@ -669,16 +674,17 @@ class _HomeHeader extends StatelessWidget {
                   ),
                   const Spacer(),
                   IconButton(
+                    tooltip: tr('downloads'),
+                    color: palette.foreground,
+                    onPressed: onDownloads,
+                    icon: Icon(PhosphorIcons.downloadSimple(), size: 24),
+                  ),
+                  // Search last, at the bar's far end.
+                  IconButton(
                     tooltip: tr('search'),
                     color: palette.foreground,
                     onPressed: onSearch,
                     icon: Icon(PhosphorIcons.magnifyingGlass(), size: 24),
-                  ),
-                  IconButton(
-                    tooltip: tr('my_flixquest'),
-                    color: palette.foreground,
-                    onPressed: onProfile,
-                    icon: Icon(PhosphorIcons.userCircle(), size: 26),
                   ),
                 ],
               ),

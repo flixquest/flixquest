@@ -46,12 +46,9 @@ class PlayerEpisodeSelection {
     debugPrint(
       '[PlayerContentMenu] pushing episode modal season=$seasonNumber',
     );
-    return showModalBottomSheet<void>(
+    return showPlayerSheet<void>(
       context: context,
       useRootNavigator: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
       builder: (sheetContext) {
         debugPrint(
           '[PlayerContentMenu] episode modal builder '
@@ -68,7 +65,6 @@ class PlayerEpisodeSelection {
             snap: true,
             snapSizes: const [.55, .82, .95],
             builder: (context, scrollController) => PlayerSheetScaffold(
-              icon: PhosphorIcons.playlist(),
               title: tr(
                 'season_episodes',
                 namedArgs: {'season': '$seasonNumber'},
@@ -219,12 +215,9 @@ class PlayerEpisodeSelection {
     if (seasons == null || seasons.isEmpty) return;
     final playerContext = context;
 
-    showModalBottomSheet<void>(
+    showPlayerSheet<void>(
       context: context,
       useRootNavigator: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
       builder: (sheetContext) => DraggableScrollableSheet(
         initialChildSize: .72,
         minChildSize: .5,
@@ -233,7 +226,6 @@ class PlayerEpisodeSelection {
         snap: true,
         snapSizes: const [.5, .72, .92],
         builder: (context, scrollController) => PlayerSheetScaffold(
-          icon: PhosphorIcons.stack(),
           title: tr('select_season'),
           subtitle: '${seasons.length} ${tr('select_season')}',
           actions: [
