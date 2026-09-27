@@ -7,6 +7,7 @@ import '../../provider/app_dependency_provider.dart';
 import '../../screens/common/update_screen.dart';
 import '../../services/app_update_service.dart';
 import '../focus/tv_keymap.dart';
+import 'tv_loading_skeletons.dart';
 import 'tv_update_widgets.dart';
 
 /// Wraps the entire TV navigator so a new mandatory release also blocks routes
@@ -75,7 +76,7 @@ class _TvUpdateGateState extends State<TvUpdateGate>
                             onPressed: () => setState(() =>
                                 _packageInfo = PackageInfo.fromPlatform()))
                       else
-                        const Center(child: CircularProgressIndicator()),
+                        const TvUpdateSkeleton(),
                       const SizedBox(height: 16),
                       TvUpdateAction(
                           label: 'Exit app',

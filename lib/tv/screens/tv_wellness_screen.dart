@@ -10,6 +10,7 @@ import '../app/tv_design.dart';
 import '../focus/tv_screen_focus_controller.dart';
 import '../widgets/tv_page_header.dart';
 import '../widgets/tv_pill_button.dart';
+import '../widgets/tv_loading_skeletons.dart';
 
 class TvWellnessScreen extends StatelessWidget {
   const TvWellnessScreen(
@@ -163,12 +164,7 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
               ),
               const SizedBox(height: 20),
               if (widget.loading)
-                Padding(
-                  padding: EdgeInsets.symmetric(vertical: 100),
-                  child: Center(
-                    child: CircularProgressIndicator(color: palette.mutedText),
-                  ),
-                )
+                TvInsightsSkeleton(metrics: widget.metrics)
               else if (insights.isEmpty)
                 const _InsightPanel(
                   title: 'Your story starts here',

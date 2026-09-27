@@ -25,6 +25,7 @@ import '../player/tv_player_screen.dart';
 import '../widgets/tv_state_panel.dart';
 import '../widgets/tv_content_grid.dart';
 import '../widgets/tv_dialog.dart';
+import '../widgets/tv_loading_skeletons.dart';
 
 enum _TvLiveScope { all, favorites, recent }
 
@@ -528,7 +529,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading && _channels.isEmpty) {
-      return const _TvLiveLoading();
+      return TvLiveSkeleton(metrics: widget.metrics);
     }
     if (_error != null) return _buildError();
     final isSchedule = _mode == _TvLiveMode.schedule;
@@ -1569,28 +1570,6 @@ class _TvChannelCard extends StatelessWidget {
               color: palette.foreground,
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _TvLiveLoading extends StatelessWidget {
-  const _TvLiveLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = TvPalette.of(context);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          CircularProgressIndicator(color: palette.mutedText),
-          const SizedBox(height: 18),
-          Text(
-            'Loading Live TV',
-            style: TextStyle(color: palette.mutedText, fontSize: 19),
-          ),
         ],
       ),
     );

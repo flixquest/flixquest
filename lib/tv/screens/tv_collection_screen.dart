@@ -6,6 +6,7 @@ import '../controllers/tv_catalog_controller.dart';
 import '../focus/tv_focusable.dart';
 import '../models/tv_media_item.dart';
 import '../widgets/tv_content_grid.dart';
+import '../widgets/tv_loading_skeletons.dart';
 import '../widgets/tv_media_card.dart';
 import '../widgets/tv_state_panel.dart';
 
@@ -112,7 +113,7 @@ class _TvCollectionScreenState extends State<TvCollectionScreen> {
           icon: PhosphorIcons.filmStrip(),
         );
       }
-      return const Center(child: CircularProgressIndicator());
+      return TvCollectionGridSkeleton(metrics: metrics);
     }
     return TvContentGrid<TvMediaItem>(
       scopeId: 'collection-${widget.collection.id}',

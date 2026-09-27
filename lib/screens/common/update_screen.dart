@@ -18,6 +18,7 @@ import '../../mobile/widgets/page_kit.dart';
 import '../../mobile/widgets/pill_button.dart';
 import '../../tv/focus/tv_keymap.dart';
 import '../../tv/widgets/tv_dialog.dart';
+import '../../tv/widgets/tv_loading_skeletons.dart';
 import '../../tv/widgets/tv_update_widgets.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
@@ -187,7 +188,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
               primary: true,
               onPressed: _prepare)
         else if (_packageInfo == null)
-          const Center(child: CircularProgressIndicator())
+          const TvUpdateSkeleton()
         else if (available) ...[
           if (config.appDownloadUrl.isNotEmpty)
             _DownloadCard(
