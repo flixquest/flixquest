@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../controllers/live_tv_database_controller.dart';
 import '../../functions/function.dart';
@@ -13,6 +14,7 @@ import '../../models/live_tv.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/daddylive_service.dart';
+import '../../services/media_link.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
 import '../../services/analytics_service.dart';
@@ -31,7 +33,10 @@ enum _LiveTvMode { channels, schedule }
 const _allCategoriesKey = '__all_categories__';
 
 class ChannelList extends StatefulWidget {
-  const ChannelList({super.key});
+  const ChannelList({this.initialChannelId, super.key});
+
+  /// A channel to start playing as soon as the list has loaded, for a flix.quest/l/… link.
+  final String? initialChannelId;
 
   @override
   State<ChannelList> createState() => _ChannelListState();
@@ -71,8 +76,20 @@ class _ChannelListState extends State<ChannelList> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _analytics.trackLiveTVScreenOpened(surface: _analyticsSurface);
-      _load();
+      _load().then((_) => _playInitialChannel());
     });
+  }
+
+  /// Plays the channel a link asked for. The catalog supplies its name when it is listed; a channel
+  /// that isn't (a stale cache, say) is still tried by id, and a failure says so like any other.
+  Future<void> _playInitialChannel() async {
+    final id = widget.initialChannelId;
+    if (id == null || !mounted) return;
+    final channel = _channels.firstWhere(
+      (channel) => channel.id == id,
+      orElse: () => Channel(id: id, name: id),
+    );
+    await _play(channel);
   }
 
   @override
@@ -303,6 +320,12 @@ class _ChannelListState extends State<ChannelList> {
     );
   }
 
+  Future<void> _shareChannel(Channel channel) async {
+    final url = MediaLink.liveChannelUrl(channel.id);
+    if (url == null) return;
+    await Share.share('Watch ${channel.name} live on FlixQuest\n$url');
+  }
+
   Future<void> _play(Channel channel) async {
     final stopwatch = Stopwatch()..start();
     setState(() => _resolvingId = channel.id);
@@ -327,6 +350,7 @@ class _ChannelListState extends State<ChannelList> {
         context,
         loadAds: () => ScraperApi(dependencies.flixquestAPIURL).getAds(),
       );
+      if (!mounted) return;
       final autoFullScreen = context.read<SettingsProvider>().defaultViewMode;
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -573,6 +597,9 @@ class _ChannelListState extends State<ChannelList> {
             favorite: _favoriteIds.contains(visible[index].id),
             resolving: _resolvingId == visible[index].id,
             onFavorite: () => _toggleFavorite(visible[index]),
+            onShare: MediaLink.liveChannelUrl(visible[index].id) == null
+                ? null
+                : () => _shareChannel(visible[index]),
             onPlay: () => _play(visible[index]),
           ),
         ),
@@ -953,6 +980,7 @@ class _ChannelCard extends StatelessWidget {
     required this.favorite,
     required this.resolving,
     required this.onFavorite,
+    required this.onShare,
     required this.onPlay,
   });
 
@@ -960,6 +988,7 @@ class _ChannelCard extends StatelessWidget {
   final bool favorite;
   final bool resolving;
   final VoidCallback onFavorite;
+  final VoidCallback? onShare;
   final VoidCallback onPlay;
 
   bool get _isLive => channel.nowPlaying != null;
@@ -1031,6 +1060,15 @@ class _ChannelCard extends StatelessWidget {
               ),
               Row(
                 children: <Widget>[
+                  if (onShare != null)
+                    IconButton(
+                      tooltip: 'Share channel',
+                      onPressed: onShare,
+                      visualDensity: VisualDensity.compact,
+                      constraints:
+                          const BoxConstraints(minWidth: 36, minHeight: 36),
+                      icon: Icon(PhosphorIcons.shareNetwork(), size: 20),
+                    ),
                   IconButton(
                     tooltip: favorite ? 'Remove favorite' : 'Add favorite',
                     onPressed: onFavorite,

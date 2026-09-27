@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
@@ -81,7 +82,9 @@ class PillButton extends StatelessWidget {
                         ),
                       )
                     else if (icon != null)
-                      Icon(icon, size: 20, color: foreground),
+                      PlaybackIcon.keeps(icon)
+                          ? PlaybackIcon(icon, size: 20, color: foreground)
+                          : Icon(icon, size: 20, color: foreground),
                     if (busy || icon != null) const SizedBox(width: 8),
                     Flexible(
                       child: Text(
@@ -105,4 +108,31 @@ class PillButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Play, which points the same way in every language. Phosphor mirrors all
+/// of its icons in right-to-left layouts, and a mirrored Play reads as
+/// rewind.
+class PlaybackIcon extends StatelessWidget {
+  const PlaybackIcon(this.icon, {this.size, this.color, super.key});
+
+  final IconData icon;
+  final double? size;
+  final Color? color;
+
+  static final Set<IconData> _playback = <IconData>{
+    PhosphorIcons.play(),
+    PhosphorIcons.play(PhosphorIconsStyle.fill),
+    PhosphorIcons.playCircle(),
+    PhosphorIcons.playCircle(PhosphorIconsStyle.fill),
+  };
+
+  /// Whether [icon] is a playback icon that mustn't mirror.
+  static bool keeps(IconData icon) => _playback.contains(icon);
+
+  @override
+  Widget build(BuildContext context) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: Icon(icon, size: size, color: color),
+      );
 }

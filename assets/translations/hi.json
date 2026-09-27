@@ -712,5 +712,13 @@
   "no_titles_match": "कोई टाइटल मेल नहीं खाता",
   "year": "वर्ष",
   "minimum_ratings": "न्यूनतम रेटिंग",
-  "ratings_at_least": "{n}+ रेटिंग"
+  "ratings_at_least": "{n}+ रेटिंग",
+  "coming_soon": "जल्द आ रहा है",
+  "everyone_watching": "सब क्या देख रहे हैं",
+  "top_10_movies": "शीर्ष 10 फ़िल्में",
+  "top_10_series": "शीर्ष 10 सीरीज़",
+  "coming_date": "{date} को आ रही है",
+  "premieres_date": "{date} को शुरू होगी",
+  "new_and_hot_load_failed": "नया और लोकप्रिय लोड नहीं हो सका। अपना कनेक्शन जाँचें।",
+  "new_and_hot_empty": "फ़िलहाल यहाँ कुछ नया नहीं है"
 }

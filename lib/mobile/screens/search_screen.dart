@@ -25,6 +25,7 @@ import 'discover_screen.dart';
 import '../widgets/category_section.dart';
 import '../widgets/filter_chips.dart';
 import '../widgets/media_art.dart';
+import '../widgets/pill_button.dart';
 import '../widgets/poster_card.dart';
 import '../widgets/section_header.dart';
 import '../widgets/title_sheet.dart';
@@ -927,7 +928,7 @@ class _TopSearches extends StatelessWidget {
                         tooltip: tr('play'),
                         color: palette.foreground,
                         onPressed: () => MobilePlayback.play(context, item),
-                        icon: Icon(PhosphorIcons.playCircle(), size: 30),
+                        icon: PlaybackIcon(PhosphorIcons.playCircle(), size: 30),
                       ),
                   ],
                 ),

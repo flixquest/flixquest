@@ -1,13 +1,18 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+
+import '../provider/app_dependency_provider.dart';
+import '../screens/common/live_tv_screen.dart';
+import 'daddylive_service.dart';
 
 import 'deep_link_dispatcher.dart';
 import 'deep_link_routes.dart';
 import 'media_link.dart';
 import 'home_widget_navigation_service.dart';
 
-/// Opens the TMDB and IMDb addresses the platform hands over.
+/// Opens the TMDB, IMDb and flix.quest addresses the platform hands over.
 ///
 /// Two things send them. A browser or another app can hand over a URL directly, and anything with a
 /// share sheet can hand over the text it was showing with the URL somewhere inside it. Both arrive
@@ -63,7 +68,32 @@ class MediaLinkNavigationService {
     }
     DeepLinkDispatcher.submit(
       key: value,
-      open: (navigator) => navigator.push(_route(target)),
+      open: (navigator) => target is LiveChannelLink
+          ? _openChannel(navigator, target)
+          : navigator.push(_route(target)),
+    );
+  }
+
+  /// A live channel plays from the Live TV screen, so it gets that screen's ads, recents and
+  /// channel switching. It is refused while live TV is switched off remotely, as the tab is.
+  static void _openChannel(NavigatorState navigator, LiveChannelLink target) {
+    final dependencies = navigator.context.read<AppDependencyProvider?>();
+    if (!(dependencies?.displayLiveTV ?? false)) {
+      ScaffoldMessenger.maybeOf(navigator.context)?.showSnackBar(
+        const SnackBar(
+          duration: Duration(seconds: 4),
+          content: Text(
+            liveTvUnavailableMessage,
+            style: TextStyle(fontFamily: 'Figtree'),
+          ),
+        ),
+      );
+      return;
+    }
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChannelList(initialChannelId: target.channelId),
+      ),
     );
   }
 
@@ -97,6 +127,7 @@ class MediaLinkNavigationService {
             seasonNumber: target.seasonNumber,
           ),
         ImdbNameLink() => DeepLinkRoutes.imdbName(imdbId: target.imdbId),
+        LiveChannelLink() => throw StateError('Live channels open via _openChannel'),
       };
 
   /// Text handed over with no address in it that this app knows.

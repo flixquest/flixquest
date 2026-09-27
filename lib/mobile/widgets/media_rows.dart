@@ -10,6 +10,7 @@ import '../../design/top_ten_rank.dart';
 import '../../widgets/common_widgets.dart' show AppStreamingService;
 import '../playback.dart';
 import 'media_art.dart';
+import 'pill_button.dart';
 import 'poster_card.dart';
 import 'continue_sheet.dart';
 import 'section_header.dart';
@@ -219,7 +220,7 @@ class ContinueCard extends StatelessWidget {
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(9),
-                          child: Icon(
+                          child: PlaybackIcon(
                             PhosphorIcons.play(PhosphorIconsStyle.fill),
                             size: 18,
                             color: const Color(0xFFFFFFFF),

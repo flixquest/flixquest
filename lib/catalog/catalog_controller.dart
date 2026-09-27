@@ -296,8 +296,9 @@ class CatalogController {
     required String url,
     required SettingsProvider settings,
     required AppDependencyProvider dependencies,
+    bool strict = false,
   }) =>
-      _fetch(kind, url, settings, dependencies);
+      _fetch(kind, url, settings, dependencies, strict: strict);
 
   /// A service's most popular titles of [kind], empty if it fails.
   Future<List<MediaItem>> loadServiceRow({

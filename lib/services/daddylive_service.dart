@@ -32,8 +32,11 @@ class DaddyLiveException implements Exception {
 /// Converts network and API failures into copy that is safe to show in the
 /// player UI. In particular, this keeps API URLs, platform exception details,
 /// and stack-like messages out of the user-facing error state.
+const liveTvUnavailableMessage =
+    'Live TV is temporarily unavailable. Please try again.';
+
 String friendlyLiveTvError(Object error) {
-  const unavailable = 'Live TV is temporarily unavailable. Please try again.';
+  const unavailable = liveTvUnavailableMessage;
   final raw =
       (error is DaddyLiveException ? error.message : error.toString()).trim();
   if (raw.isEmpty) return unavailable;

@@ -728,7 +728,15 @@ class CodegenLoader extends AssetLoader{
   "no_titles_match": "No titles match",
   "year": "Year",
   "minimum_ratings": "Minimum ratings",
-  "ratings_at_least": "{n}+ ratings"
+  "ratings_at_least": "{n}+ ratings",
+  "coming_soon": "Coming Soon",
+  "everyone_watching": "Everyone's Watching",
+  "top_10_movies": "Top 10 Movies",
+  "top_10_series": "Top 10 Series",
+  "coming_date": "Coming {date}",
+  "premieres_date": "Premieres {date}",
+  "new_and_hot_load_failed": "New & Hot couldn't load. Check your connection.",
+  "new_and_hot_empty": "Nothing new here yet"
 };
 static const Map<String,dynamic> _hi = {
   "popularity_descending": "लोकप्रियता घटती",
@@ -1444,7 +1452,15 @@ static const Map<String,dynamic> _hi = {
   "no_titles_match": "कोई टाइटल मेल नहीं खाता",
   "year": "वर्ष",
   "minimum_ratings": "न्यूनतम रेटिंग",
-  "ratings_at_least": "{n}+ रेटिंग"
+  "ratings_at_least": "{n}+ रेटिंग",
+  "coming_soon": "जल्द आ रहा है",
+  "everyone_watching": "सब क्या देख रहे हैं",
+  "top_10_movies": "शीर्ष 10 फ़िल्में",
+  "top_10_series": "शीर्ष 10 सीरीज़",
+  "coming_date": "{date} को आ रही है",
+  "premieres_date": "{date} को शुरू होगी",
+  "new_and_hot_load_failed": "नया और लोकप्रिय लोड नहीं हो सका। अपना कनेक्शन जाँचें।",
+  "new_and_hot_empty": "फ़िलहाल यहाँ कुछ नया नहीं है"
 };
 static const Map<String,dynamic> _es = {
   "popularity_descending": "Popularidad descendiente",
@@ -2160,7 +2176,15 @@ static const Map<String,dynamic> _es = {
   "no_titles_match": "Ningún título coincide",
   "year": "Año",
   "minimum_ratings": "Valoraciones mínimas",
-  "ratings_at_least": "{n}+ valoraciones"
+  "ratings_at_least": "{n}+ valoraciones",
+  "coming_soon": "Próximamente",
+  "everyone_watching": "Lo que todos ven",
+  "top_10_movies": "Las 10 mejores películas",
+  "top_10_series": "Las 10 mejores series",
+  "coming_date": "Llega el {date}",
+  "premieres_date": "Se estrena el {date}",
+  "new_and_hot_load_failed": "No se pudo cargar Novedades. Comprueba tu conexión.",
+  "new_and_hot_empty": "Todavía no hay novedades"
 };
 static const Map<String,dynamic> _ar = {
   "popularity_descending": "ترتيب تنازلي حسب الشعبية",
@@ -2876,7 +2900,15 @@ static const Map<String,dynamic> _ar = {
   "no_titles_match": "لا توجد عناوين مطابقة",
   "year": "السنة",
   "minimum_ratings": "الحد الأدنى من التقييمات",
-  "ratings_at_least": "{n}+ تقييم"
+  "ratings_at_least": "{n}+ تقييم",
+  "coming_soon": "قريبًا",
+  "everyone_watching": "ما يشاهده الجميع",
+  "top_10_movies": "أفضل ١٠ أفلام",
+  "top_10_series": "أفضل ١٠ مسلسلات",
+  "coming_date": "قادم في {date}",
+  "premieres_date": "يبدأ عرضه في {date}",
+  "new_and_hot_load_failed": "تعذّر تحميل الجديد والرائج. تحقّق من اتصالك.",
+  "new_and_hot_empty": "لا جديد هنا بعد"
 };
 static const Map<String, Map<String,dynamic>> mapLocales = {"en": _en, "hi": _hi, "es": _es, "ar": _ar};
 }

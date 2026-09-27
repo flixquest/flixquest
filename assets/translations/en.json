@@ -712,5 +712,13 @@
   "no_titles_match": "No titles match",
   "year": "Year",
   "minimum_ratings": "Minimum ratings",
-  "ratings_at_least": "{n}+ ratings"
+  "ratings_at_least": "{n}+ ratings",
+  "coming_soon": "Coming Soon",
+  "everyone_watching": "Everyone's Watching",
+  "top_10_movies": "Top 10 Movies",
+  "top_10_series": "Top 10 Series",
+  "coming_date": "Coming {date}",
+  "premieres_date": "Premieres {date}",
+  "new_and_hot_load_failed": "New & Hot couldn't load. Check your connection.",
+  "new_and_hot_empty": "Nothing new here yet"
 }

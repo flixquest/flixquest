@@ -712,5 +712,13 @@
   "no_titles_match": "Ningún título coincide",
   "year": "Año",
   "minimum_ratings": "Valoraciones mínimas",
-  "ratings_at_least": "{n}+ valoraciones"
+  "ratings_at_least": "{n}+ valoraciones",
+  "coming_soon": "Próximamente",
+  "everyone_watching": "Lo que todos ven",
+  "top_10_movies": "Las 10 mejores películas",
+  "top_10_series": "Las 10 mejores series",
+  "coming_date": "Llega el {date}",
+  "premieres_date": "Se estrena el {date}",
+  "new_and_hot_load_failed": "No se pudo cargar Novedades. Comprueba tu conexión.",
+  "new_and_hot_empty": "Todavía no hay novedades"
 }

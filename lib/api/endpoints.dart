@@ -103,6 +103,23 @@ class Endpoints {
         '&language=$l';
   }
 
+  static String upcomingSeriesPremieresUrl(
+    String l,
+    DateTime today, {
+    bool includeAdult = false,
+  }) {
+    String date(DateTime value) =>
+        '${value.year.toString().padLeft(4, '0')}-'
+        '${value.month.toString().padLeft(2, '0')}-'
+        '${value.day.toString().padLeft(2, '0')}';
+    final start = DateTime.utc(today.year, today.month, today.day);
+    final end = start.add(const Duration(days: 60));
+    return '$TMDB_API_BASE_URL/discover/tv?api_key=$TMDB_API_KEY'
+        '&language=$l&sort_by=popularity.desc&include_adult=$includeAdult'
+        '&first_air_date.gte=${date(start)}'
+        '&first_air_date.lte=${date(end)}';
+  }
+
   static String movieDetailsUrl(int movieId, String l) {
     return '$TMDB_API_BASE_URL/movie/$movieId?api_key=$TMDB_API_KEY&language=$l';
   }

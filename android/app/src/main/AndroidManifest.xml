@@ -85,6 +85,7 @@
                 <data android:host="flix.quest" />
                 <data android:pathPrefix="/m/" />
                 <data android:pathPrefix="/t/" />
+                <data android:pathPrefix="/l/" />
             </intent-filter>
 
             <!-- Addresses on TMDB. Deliberately unverified: claiming a domain means publishing a

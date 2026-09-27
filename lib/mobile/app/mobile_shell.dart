@@ -1,18 +1,16 @@
 import 'dart:async';
 
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
-import '../../design/app_tokens.dart';
 import '../../provider/settings_provider.dart';
 import '../../screens/user/user_info.dart';
 import '../../services/app_session_state_store.dart';
 import '../screens/home_screen.dart';
+import '../screens/new_and_hot_screen.dart';
 import '../screens/search_screen.dart';
 import 'mobile_nav_bar.dart';
 import 'mobile_tabs.dart';
@@ -179,32 +177,9 @@ class _AppTab extends StatelessWidget {
         );
     return switch (tab) {
       MobileTab.home => const HomeScreen(),
-      MobileTab.newAndHot => const _NotYet(),
+      MobileTab.newAndHot => const NewAndHotScreen(),
       MobileTab.search => const SearchScreen(),
       MobileTab.mine => legacy(const UserInfo()),
     };
-  }
-}
-
-/// A tab whose page is still being built.
-class _NotYet extends StatelessWidget {
-  const _NotYet();
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(PhosphorIcons.fire(), size: 40, color: palette.mutedText),
-          const SizedBox(height: AppSpace.md),
-          Text(
-            tr('new_and_hot'),
-            style: AppType.sectionHeader.copyWith(color: palette.foreground),
-          ),
-        ],
-      ),
-    );
   }
 }

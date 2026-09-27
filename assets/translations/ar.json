@@ -712,5 +712,13 @@
   "no_titles_match": "لا توجد عناوين مطابقة",
   "year": "السنة",
   "minimum_ratings": "الحد الأدنى من التقييمات",
-  "ratings_at_least": "{n}+ تقييم"
+  "ratings_at_least": "{n}+ تقييم",
+  "coming_soon": "قريبًا",
+  "everyone_watching": "ما يشاهده الجميع",
+  "top_10_movies": "أفضل ١٠ أفلام",
+  "top_10_series": "أفضل ١٠ مسلسلات",
+  "coming_date": "قادم في {date}",
+  "premieres_date": "يبدأ عرضه في {date}",
+  "new_and_hot_load_failed": "تعذّر تحميل الجديد والرائج. تحقّق من اتصالك.",
+  "new_and_hot_empty": "لا جديد هنا بعد"
 }

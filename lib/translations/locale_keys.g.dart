@@ -717,5 +717,13 @@ abstract class  LocaleKeys {
   static const year = 'year';
   static const minimum_ratings = 'minimum_ratings';
   static const ratings_at_least = 'ratings_at_least';
+  static const coming_soon = 'coming_soon';
+  static const everyone_watching = 'everyone_watching';
+  static const top_10_movies = 'top_10_movies';
+  static const top_10_series = 'top_10_series';
+  static const coming_date = 'coming_date';
+  static const premieres_date = 'premieres_date';
+  static const new_and_hot_load_failed = 'new_and_hot_load_failed';
+  static const new_and_hot_empty = 'new_and_hot_empty';
 
 }

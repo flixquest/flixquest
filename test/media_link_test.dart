@@ -195,7 +195,8 @@ void main() {
     });
 
     test('a full stop after a shared episode is not part of it', () {
-      final target = MediaLink.parse('Watch this: https://flix.quest/t/2316.1.1.');
+      final target =
+          MediaLink.parse('Watch this: https://flix.quest/t/2316.1.1.');
       expect((target as TmdbEpisodeLink).episodeNumber, 1);
     });
 
@@ -205,7 +206,8 @@ void main() {
     });
 
     test('a query on the end changes nothing', () {
-      final target = MediaLink.parse('https://flix.quest/m/550?utm_source=share');
+      final target =
+          MediaLink.parse('https://flix.quest/m/550?utm_source=share');
       expect((target as TmdbMovieLink).id, 550);
     });
 
@@ -218,6 +220,32 @@ void main() {
       expect(MediaLink.parse('https://flix.quest/t/2316.1.1.1'), isNull);
       expect(MediaLink.parse('https://flix.quest/t/2316..1'), isNull);
       expect(MediaLink.parse('https://flix.quest/x/550'), isNull);
+    });
+
+    test('a live channel is the provider\'s id for it', () {
+      final target = MediaLink.parse('https://flix.quest/l/51');
+      expect(target, isA<LiveChannelLink>());
+      expect((target as LiveChannelLink).channelId, '51');
+    });
+
+    test('a channel id need not be a number', () {
+      final target = MediaLink.parse('https://flix.quest/l/sky-sports_1');
+      expect((target as LiveChannelLink).channelId, 'sky-sports_1');
+    });
+
+    test('shared channel addresses open the same channel', () {
+      final url = MediaLink.liveChannelUrl('sky-sports_1');
+      expect(url.toString(), 'https://flix.quest/l/sky-sports_1');
+      expect((MediaLink.parse(url.toString()) as LiveChannelLink).channelId,
+          'sky-sports_1');
+      expect(MediaLink.liveChannelUrl('bad/id'), isNull);
+    });
+
+    test('a channel id with anything else in it is not guessed at', () {
+      expect(MediaLink.parse('https://flix.quest/l/'), isNull);
+      expect(MediaLink.parse('https://flix.quest/l/51/extra'), isNull);
+      expect(MediaLink.parse('https://flix.quest/l/51%20x'), isNull);
+      expect(MediaLink.parse('https://flix.quest/l/${'a' * 65}'), isNull);
     });
 
     test('another site with the same paths is not ours', () {

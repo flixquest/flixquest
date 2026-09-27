@@ -61,6 +61,7 @@ class TopTenRank extends StatelessWidget {
               fontSize: cardWidth * 1.5,
               tuck: cardWidth * _tuck,
               bottomInset: bottomInset,
+              direction: Directionality.of(context),
               fill: palette.page,
               outline: outline ?? outlineColor,
             ),
@@ -77,6 +78,7 @@ class _RankPainter extends CustomPainter {
     required this.fontSize,
     required this.tuck,
     required this.bottomInset,
+    required this.direction,
     required this.fill,
     required this.outline,
   });
@@ -85,6 +87,7 @@ class _RankPainter extends CustomPainter {
   final double fontSize;
   final double tuck;
   final double bottomInset;
+  final TextDirection direction;
 
   /// Inside the digits: the page, so they read as hollow.
   final Color fill;
@@ -117,7 +120,9 @@ class _RankPainter extends CustomPainter {
       TextBaseline.alphabetic,
     );
     final offset = Offset(
-      size.width + tuck - fillText.width,
+      direction == TextDirection.rtl
+          ? -tuck
+          : size.width + tuck - fillText.width,
       size.height - bottomInset - baseline,
     );
     fillText.paint(canvas, offset);
@@ -132,6 +137,7 @@ class _RankPainter extends CustomPainter {
       fontSize != oldDelegate.fontSize ||
       tuck != oldDelegate.tuck ||
       bottomInset != oldDelegate.bottomInset ||
+      direction != oldDelegate.direction ||
       fill != oldDelegate.fill ||
       outline != oldDelegate.outline;
 }

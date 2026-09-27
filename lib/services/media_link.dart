@@ -11,8 +11,9 @@
 /// that names an episode opens that episode, rather than both landing on the series.
 ///
 /// flix.quest is this app's own short form of a TMDB address: `/m/550` is a film, and `/t/1396`,
-/// `/t/1396.4` and `/t/1396.4.13` are a series, one of its seasons and one of its episodes. Being our
-/// domain, it is the one Android verifies, so these open the app straight from a tap.
+/// `/t/1396.4` and `/t/1396.4.13` are a series, one of its seasons and one of its episodes, and
+/// `/l/51` is a live TV channel. Being our domain, it is the one Android verifies, so these open the
+/// app straight from a tap.
 class MediaLink {
   const MediaLink._();
 
@@ -37,7 +38,17 @@ class MediaLink {
   /// A flix.quest film is its id alone. A series is its id with, optionally, a season and then an
   /// episode after it, joined by dots.
   static final RegExp _flixquestMovie = RegExp(r'^\d+$');
-  static final RegExp _flixquestSeries = RegExp(r'^(\d+)(?:\.(\d+)(?:\.(\d+))?)?$');
+  static final RegExp _flixquestSeries =
+      RegExp(r'^(\d+)(?:\.(\d+)(?:\.(\d+))?)?$');
+
+  /// A live channel is the live TV provider's own id for it, which is not a TMDB number.
+  static final RegExp _flixquestChannel = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
+
+  /// A shareable address for a DLHD channel. Returns null for ids that our link parser cannot open.
+  static Uri? liveChannelUrl(String channelId) =>
+      _flixquestChannel.hasMatch(channelId)
+          ? Uri.https(_flixquest, '/l/$channelId')
+          : null;
 
   /// Reads whatever link [value] carries.
   ///
@@ -77,11 +88,13 @@ class MediaLink {
   /// Text around a link comes with the punctuation of the sentence it sat in, and `\S+` swallows it.
   static Uri? _toUri(String match) {
     var text = match;
-    while (text.isNotEmpty && '.,;:!?)]}\'"<>»'.contains(text[text.length - 1])) {
+    while (
+        text.isNotEmpty && '.,;:!?)]}\'"<>»'.contains(text[text.length - 1])) {
       text = text.substring(0, text.length - 1);
     }
     if (text.isEmpty) return null;
-    final absolute = text.toLowerCase().startsWith('http') ? text : 'https://$text';
+    final absolute =
+        text.toLowerCase().startsWith('http') ? text : 'https://$text';
     final uri = Uri.tryParse(absolute);
     return uri == null || uri.host.isEmpty ? null : uri;
   }
@@ -101,7 +114,8 @@ class MediaLink {
   /// URL has a version in front of it. Everything after the address itself — `/cast`, `/images`,
   /// `/watch` — describes a tab of the same page and is ignored.
   static MediaLinkTarget? _tmdbTarget(Uri uri) {
-    final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
+    final segments =
+        uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
     for (var index = 0; index + 1 < segments.length; index++) {
       final id = _id(segments[index + 1]);
       if (id == null) continue;
@@ -121,10 +135,12 @@ class MediaLink {
   }
 
   /// Which part of a series a `/tv/…` address names: the series, one of its seasons, or one episode.
-  static MediaLinkTarget _tmdbSeriesTarget(int id, String? name, List<String> rest) {
+  static MediaLinkTarget _tmdbSeriesTarget(
+      int id, String? name, List<String> rest) {
     final season = _number(rest, 'season');
     if (season == null) return TmdbTvLink(id: id, name: name);
-    final episode = _number(rest.length > 2 ? rest.sublist(2) : const <String>[], 'episode');
+    final episode = _number(
+        rest.length > 2 ? rest.sublist(2) : const <String>[], 'episode');
     return episode == null
         ? TmdbSeasonLink(seriesId: id, seasonNumber: season, seriesName: name)
         : TmdbEpisodeLink(
@@ -147,12 +163,15 @@ class MediaLink {
   /// it. Anything that does not fit that exactly is not read at all, since these addresses are ours
   /// and a malformed one is a broken link rather than a layout to guess at.
   static MediaLinkTarget? _flixquestTarget(Uri uri) {
-    final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
+    final segments =
+        uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
     if (segments.length != 2) return null;
     final value = segments[1];
     switch (segments[0].toLowerCase()) {
       case 'm':
-        return _flixquestMovie.hasMatch(value) ? TmdbMovieLink(id: int.parse(value)) : null;
+        return _flixquestMovie.hasMatch(value)
+            ? TmdbMovieLink(id: int.parse(value))
+            : null;
       case 't':
         final match = _flixquestSeries.firstMatch(value);
         if (match == null) return null;
@@ -168,6 +187,10 @@ class MediaLink {
           seasonNumber: int.parse(season),
           episodeNumber: int.parse(episode),
         );
+      case 'l':
+        return _flixquestChannel.hasMatch(value)
+            ? LiveChannelLink(channelId: value)
+            : null;
     }
     return null;
   }
@@ -175,7 +198,8 @@ class MediaLink {
   /// IMDb addresses a title under `/title/tt…` and a person under `/name/nm…`, and says nothing more
   /// about either. The one exception is its season view, which puts the season in the query.
   static MediaLinkTarget? _imdbTarget(Uri uri) {
-    final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
+    final segments =
+        uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
     for (var index = 0; index + 1 < segments.length; index++) {
       final kind = segments[index].toLowerCase();
       final id = segments[index + 1].toLowerCase();
@@ -193,7 +217,9 @@ class MediaLink {
   }
 
   static int? _imdbSeason(Uri uri, List<String> rest) {
-    if (!rest.any((segment) => segment.toLowerCase() == 'episodes')) return null;
+    if (!rest.any((segment) => segment.toLowerCase() == 'episodes')) {
+      return null;
+    }
     final season = int.tryParse(uri.queryParameters['season'] ?? '');
     return season == null || season < 0 ? null : season;
   }
@@ -294,6 +320,13 @@ class ImdbTitleLink extends MediaLinkTarget {
 
   /// Set when the link was IMDb's season view, so a series resolved from it can open on that season.
   final int? seasonNumber;
+}
+
+/// A live TV channel, by the id the live TV provider gives it.
+class LiveChannelLink extends MediaLinkTarget {
+  const LiveChannelLink({required this.channelId});
+
+  final String channelId;
 }
 
 class ImdbNameLink extends MediaLinkTarget {
