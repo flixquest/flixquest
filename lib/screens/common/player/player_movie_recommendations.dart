@@ -114,7 +114,6 @@ class PlayerMovieRecommendations {
             snapSizes: const [.55, .8, .95],
             builder: (context, scrollController) => PlayerSheetScaffold(
               title: tr('recommended_movies'),
-              subtitle: tr('more_recommendations'),
               actions: [
                 IconButton(
                   onPressed: () => Navigator.pop(sheetContext),
@@ -264,15 +263,6 @@ class PlayerMovieRecommendations {
                         ),
                         if (recommendations.length > 1) ...[
                           const SizedBox(height: 20),
-                          Text(
-                            tr('more_recommendations'),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontFamily: 'FigtreeSB',
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
                           SizedBox(
                             height: 122,
                             child: ListView.separated(

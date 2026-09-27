@@ -376,42 +376,59 @@ class _ProfileHeaderContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Row(
-      children: <Widget>[
-        _ProfileAvatar(profile: profile),
-        const SizedBox(width: AppSpace.lg),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                profile.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style:
-                    AppType.sectionHeader.copyWith(color: palette.foreground),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // The pill may take everything but the avatar and its gaps, so it
+        // stays against the far end and gives way only when it must.
+        final maxPill = (constraints.maxWidth -
+                _ProfileAvatar.size -
+                AppSpace.lg -
+                AppSpace.md)
+            .clamp(0.0, double.infinity);
+        return Row(
+          children: <Widget>[
+            _ProfileAvatar(profile: profile),
+            const SizedBox(width: AppSpace.lg),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    profile.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppType.sectionHeader.copyWith(
+                      color: palette.foreground,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    status,
+                    style: AppType.metadata.copyWith(color: palette.mutedText),
+                  ),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                status,
-                style: AppType.metadata.copyWith(color: palette.mutedText),
+            ),
+            const SizedBox(width: AppSpace.md),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxPill),
+              child: PillButton(
+                label: actionLabel,
+                icon: actionIcon,
+                onPressed: onAction,
               ),
-            ],
-          ),
-        ),
-        const SizedBox(width: AppSpace.md),
-        PillButton(
-          label: actionLabel,
-          icon: actionIcon,
-          onPressed: onAction,
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
 class _ProfileAvatar extends StatelessWidget {
   const _ProfileAvatar({required this.profile});
+
+  static const size = 64.0;
 
   final _ProfileSnapshot profile;
 
@@ -427,8 +444,8 @@ class _ProfileAvatar extends StatelessWidget {
           ),
         );
     return Container(
-      width: 64,
-      height: 64,
+      width: size,
+      height: size,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         shape: BoxShape.circle,

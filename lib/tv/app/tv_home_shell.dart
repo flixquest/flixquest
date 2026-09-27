@@ -268,6 +268,12 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
     Widget? loader;
 
     if (recentMovie?.id != null) {
+      final movie = recentMovie!;
+      debugPrint(
+        '[MovieRecommendationsDebug][TV_CONTINUE_PLAY] '
+        'movieId=${movie.id} title=${movie.title} '
+        'recommendationsProvided=false (fetched by MovieVideoLoader)',
+      );
       loader = MovieVideoLoader(
         download: false,
         useTvPlayer: true,
@@ -277,12 +283,12 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
           _restoreFocusAfterRoute(previousFocus);
         },
         metadata: MovieStreamMetadata(
-          backdropPath: recentMovie!.backdropPath,
-          elapsed: recentMovie.elapsed,
-          movieId: recentMovie.id,
-          movieName: recentMovie.title,
-          posterPath: recentMovie.posterPath,
-          releaseYear: recentMovie.releaseYear,
+          backdropPath: movie.backdropPath,
+          elapsed: movie.elapsed,
+          movieId: movie.id,
+          movieName: movie.title,
+          posterPath: movie.posterPath,
+          releaseYear: movie.releaseYear,
           isAdult: null,
           releaseDate: null,
         ),

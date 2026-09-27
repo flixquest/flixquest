@@ -369,24 +369,30 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
   Future<void> _playMovie({int? elapsed}) async {
     final movie = _item.movie;
     if (movie == null || movie.id == null) return;
+    debugPrint(
+      '[MovieRecommendationsDebug][TV_DETAILS_PLAY] '
+      'movieId=${movie.id} title=${movie.title} '
+      'recommendationsProvided=false (fetched by MovieVideoLoader)',
+    );
     if (!await _online() || !mounted) return;
     final previousFocus = FocusManager.instance.primaryFocus;
+    final metadata = MovieStreamMetadata(
+      backdropPath: movie.backdropPath,
+      elapsed: elapsed,
+      movieId: movie.id,
+      movieName: movie.title,
+      posterPath: movie.posterPath,
+      releaseYear: int.tryParse(_item.year ?? '') ?? 0,
+      isAdult: movie.adult,
+      releaseDate: movie.releaseDate,
+    );
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => MovieVideoLoader(
           download: false,
           useTvPlayer: true,
           onTvPlayerExit: () => _restoreFocus(previousFocus),
-          metadata: MovieStreamMetadata(
-            backdropPath: movie.backdropPath,
-            elapsed: elapsed,
-            movieId: movie.id,
-            movieName: movie.title,
-            posterPath: movie.posterPath,
-            releaseYear: int.tryParse(_item.year ?? '') ?? 0,
-            isAdult: movie.adult,
-            releaseDate: movie.releaseDate,
-          ),
+          metadata: metadata,
         ),
       ),
     );

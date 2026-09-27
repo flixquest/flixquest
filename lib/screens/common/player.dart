@@ -156,6 +156,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   Timer? _phoneNextEpisodeTimer;
   bool _playerControlsVisible = false;
   String? _lastNextEpisodeDebugSignature;
+  String? _lastMovieRecommendationsRenderSignature;
   Timer? _tvNextEpisodeTimer;
   EpisodeMetadata? _tvNextEpisode;
   int? _tvNextEpisodeCountdown;
@@ -226,13 +227,20 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
           List.of(widget.initialVideoLinks);
     }
     if (widget.mediaType == MediaType.movie) {
-      final recommendations = widget.movieMetadata?.recommendations;
+      final metadata = widget.movieMetadata;
+      final recommendations = metadata?.recommendations;
       debugPrint(
         '[MovieRecommendationsDebug][PLAYER_INIT] '
-        'movieId=${widget.movieMetadata?.movieId} '
-        'title=${widget.movieMetadata?.movieName} '
+        'movieId=${metadata?.movieId} '
+        'title=${metadata?.movieName} '
+        'metadataNull=${metadata == null} '
+        'recommendationsNull=${recommendations == null} '
         'metadataCount=${recommendations?.length ?? 0} '
-        'ids=${recommendations?.map((movie) => movie.movieId).join(',') ?? ''}',
+        'ids=${recommendations?.map((movie) => movie.movieId).join(',') ?? ''} '
+        'useTvControls=${widget.useTvControls} '
+        'proxyEnabled=${settings.enableProxy} '
+        'language=${settings.appLanguage} '
+        'country=${settings.defaultCountry}',
       );
     }
     _contentMenuEpisodes = List<EpisodeMetadata>.of(
@@ -2439,27 +2447,33 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   Future<void> _playTvMovie(MovieRecommendation movie) async {
+    debugPrint(
+      '[MovieRecommendationsDebug][MOVIE_SELECTED] '
+      'movieId=${movie.movieId} title=${movie.title} '
+      'source=player_recommendations',
+    );
     if (mounted) setState(() => _tvMenu = null);
     await _handleContentSwitch();
     if (!mounted) return;
+    final metadata = MovieStreamMetadata(
+      movieId: movie.movieId,
+      movieName: movie.title,
+      posterPath: movie.posterPath,
+      backdropPath: movie.backdropPath,
+      releaseDate: movie.releaseDate,
+      releaseYear: movie.releaseDate == null
+          ? null
+          : DateTime.tryParse(movie.releaseDate!)?.year,
+      isAdult: false,
+      elapsed: 0,
+    );
     await Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => MovieVideoLoader(
           download: false,
           useTvPlayer: widget.useTvControls,
           onTvPlayerExit: widget.onTvPlayerExit,
-          metadata: MovieStreamMetadata(
-            movieId: movie.movieId,
-            movieName: movie.title,
-            posterPath: movie.posterPath,
-            backdropPath: movie.backdropPath,
-            releaseDate: movie.releaseDate,
-            releaseYear: movie.releaseDate == null
-                ? null
-                : DateTime.tryParse(movie.releaseDate!)?.year,
-            isAdult: false,
-            elapsed: 0,
-          ),
+          metadata: metadata,
         ),
       ),
     );
@@ -2876,6 +2890,16 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final title = isTv
         ? widget.tvMetadata?.seriesName ?? ''
         : widget.movieMetadata?.movieName ?? '';
+    final renderSignature = 'isTv=$isTv recommendations=${recommendations.length} '
+        'sectionShown=${!isTv && recommendations.isNotEmpty}';
+    if (renderSignature != _lastMovieRecommendationsRenderSignature) {
+      _lastMovieRecommendationsRenderSignature = renderSignature;
+      debugPrint(
+        '[MovieRecommendationsDebug][PORTRAIT_RENDER] $renderSignature '
+        'mediaType=${widget.mediaType} '
+        'movieId=${widget.movieMetadata?.movieId}',
+      );
+    }
 
     return SafeArea(
       bottom: false,
@@ -2966,7 +2990,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                     context,
                     icon: PhosphorIcons.sparkle(),
                     title: tr('recommended_movies'),
-                    subtitle: tr('more_recommendations'),
                   ),
                   const SizedBox(height: 8),
                   ...recommendations.map((movie) => Padding(
@@ -2997,7 +3020,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     BuildContext context, {
     required IconData icon,
     required String title,
-    required String subtitle,
+    String? subtitle,
     Widget? action,
   }) {
     return Row(
@@ -3014,10 +3037,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
             ),
           ),
         ),
-        Text(
-          subtitle,
-          style: const TextStyle(color: BetterPlayerColors.muted, fontSize: 13),
-        ),
+        if (subtitle != null)
+          Text(
+            subtitle,
+            style:
+                const TextStyle(color: BetterPlayerColors.muted, fontSize: 13),
+          ),
         if (action != null) action,
       ],
     );
@@ -3533,63 +3558,68 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const BetterPlayerIconSurface(
-                  icon: PhosphorIconsRegular.warningCircle,
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  cleanError,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontFamily: 'FigtreeSB',
+            // A 16:9 playback area is short; scrolling keeps the message and
+            // its actions reachable instead of overflowing the Column.
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const BetterPlayerIconSurface(
+                    icon: PhosphorIconsRegular.warningCircle,
                   ),
-                ),
-                const SizedBox(height: 22),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    if (hasProviders)
-                      FilledButton.icon(
+                  const SizedBox(height: 18),
+                  Text(
+                    cleanError,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontFamily: 'FigtreeSB',
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      if (hasProviders)
+                        FilledButton.icon(
+                          onPressed: () {
+                            if (widget.useTvControls) {
+                              _showTvProviderMenu();
+                            } else {
+                              _showProviderSwitcher();
+                            }
+                          },
+                          icon:
+                              Icon(PhosphorIcons.arrowsLeftRight(), size: 18),
+                          label: Text(tr('switch_provider')),
+                        ),
+                      OutlinedButton.icon(
                         onPressed: () {
-                          if (widget.useTvControls) {
-                            _showTvProviderMenu();
-                          } else {
-                            _showProviderSwitcher();
+                          final currentSource = _currentProviderCode;
+                          if (currentSource != null) {
+                            _switchToProvider(
+                              currentSource,
+                              closeMenu: () {},
+                              refreshMenu: () {},
+                            );
                           }
                         },
-                        icon: Icon(PhosphorIcons.arrowsLeftRight(), size: 18),
-                        label: Text(tr('switch_provider')),
+                        icon: Icon(PhosphorIcons.arrowClockwise(), size: 18),
+                        label: Text(tr('retry')),
                       ),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        final currentSource = _currentProviderCode;
-                        if (currentSource != null) {
-                          _switchToProvider(
-                            currentSource,
-                            closeMenu: () {},
-                            refreshMenu: () {},
-                          );
-                        }
-                      },
-                      icon: Icon(PhosphorIcons.arrowClockwise(), size: 18),
-                      label: Text(tr('retry')),
-                    ),
-                    IconButton(
-                      onPressed: _exitPlayer,
-                      icon: Icon(PhosphorIcons.x()),
-                      tooltip: tr('close'),
-                    ),
-                  ],
-                ),
-              ],
+                      IconButton(
+                        onPressed: _exitPlayer,
+                        icon: Icon(PhosphorIcons.x()),
+                        tooltip: tr('close'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

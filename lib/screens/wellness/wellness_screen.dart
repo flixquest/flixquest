@@ -747,7 +747,7 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
                   final selected = period.id == _period.id;
                   return ChoicePill(
                     spec: FilterChipSpec(
-                      label: period.label,
+                      label: _recapPeriodLabel(period),
                       selected: selected,
                       onTap: () => setState(() => _period = period),
                     ),
@@ -1058,7 +1058,7 @@ class _ShareRecapCard extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        period.label.toUpperCase(),
+                        _recapPeriodLabel(period).toUpperCase(),
                         style: TextStyle(
                           color: foreground,
                           fontFamily: 'FigtreeSB',
@@ -2035,7 +2035,7 @@ class _QuickRecapButton extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    period.label,
+                    _recapPeriodLabel(period),
                     style: const TextStyle(
                       fontFamily: 'FigtreeSB',
                       fontWeight: FontWeight.w600,

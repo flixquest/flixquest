@@ -307,27 +307,33 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
   }
 
   Future<void> _playMovie({int? elapsed, bool download = false}) async {
+    debugPrint(
+      '[MovieRecommendationsDebug][PHONE_DETAILS_PLAY] '
+      'movieId=${_item.id} title=${_item.title} download=$download '
+      'recommendationsProvided=false (fetched by MovieVideoLoader)',
+    );
     if (!await _online() || !mounted) return;
     final insights = await _insights();
     if (!mounted) return;
     final item = _item;
+    final metadata = MovieStreamMetadata(
+      backdropPath: item.backdropPath,
+      elapsed: elapsed,
+      movieId: item.id,
+      movieName: item.title,
+      posterPath: item.posterPath,
+      releaseYear: int.tryParse(item.year ?? '') ?? 0,
+      isAdult: item.movie?.adult,
+      releaseDate: item.releaseDate,
+      genres: insights.genres,
+      languages: insights.languages,
+      countries: insights.countries,
+    );
     final queued = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => MovieVideoLoader(
           download: download,
-          metadata: MovieStreamMetadata(
-            backdropPath: item.backdropPath,
-            elapsed: elapsed,
-            movieId: item.id,
-            movieName: item.title,
-            posterPath: item.posterPath,
-            releaseYear: int.tryParse(item.year ?? '') ?? 0,
-            isAdult: item.movie?.adult,
-            releaseDate: item.releaseDate,
-            genres: insights.genres,
-            languages: insights.languages,
-            countries: insights.countries,
-          ),
+          metadata: metadata,
         ),
       ),
     );
@@ -892,16 +898,6 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
                 icon: PhosphorIcons.shareNetwork(),
                 label: tr('share'),
                 onPressed: _share,
-              ),
-            ),
-            Expanded(
-              child: DetailsAction(
-                icon: PhosphorIcons.television(),
-                label: tr('where_to_watch'),
-                onPressed: () => showWatchProvidersSheet(
-                  context,
-                  _source.watchProviders(_item),
-                ),
               ),
             ),
           ],
