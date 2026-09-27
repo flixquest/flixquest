@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../api/endpoints.dart';
 import '../../constants/api_constants.dart';
 import '../../constants/app_constants.dart';
+import '../../design/app_palette.dart';
 import '../../functions/function.dart';
 import '../../functions/network.dart';
 import '../../models/tv.dart';
@@ -26,7 +27,7 @@ Future<TVStreamMetadata?> showTVEpisodePickerSheet(
     useSafeArea: true,
     isScrollControlled: true,
     showDragHandle: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
+    backgroundColor: AppPalette.of(context).surface,
     builder: (_) => DraggableScrollableSheet(
       initialChildSize: .84,
       minChildSize: .58,
@@ -274,7 +275,7 @@ class _TVEpisodePickerSheetState extends State<_TVEpisodePickerSheet> {
           onTap: () => _selectEpisode(episode),
           trailing: Icon(
             PhosphorIcons.playCircle(PhosphorIconsStyle.fill),
-            color: Theme.of(context).colorScheme.primary,
+            color: AppPalette.of(context).foreground,
           ),
           thumbnail: PlayerThumbnail(
             width: 124,
@@ -346,25 +347,20 @@ class _SeasonSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    // Selection in ink, as elsewhere; the accent is kept for small marks.
+    final palette = AppPalette.of(context);
     final seasonNumber = season.seasonNumber ?? 0;
     final title = season.name?.trim().isNotEmpty == true
         ? season.name!.trim()
         : '${tr('seasons')} $seasonNumber';
-    final background = selected
-        ? colors.primary
-        : colors.surfaceContainerHighest.withValues(alpha: .7);
-    final foreground = selected ? colors.onPrimary : colors.onSurface;
+    final background = selected ? palette.focusFill : palette.idleFill;
+    final foreground = selected ? palette.onFocus : palette.foreground;
 
     return Material(
       color: background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: selected
-              ? colors.primary
-              : colors.outlineVariant.withValues(alpha: .7),
-        ),
+        side: BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -379,15 +375,14 @@ class _SeasonSelector extends StatelessWidget {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: (selected ? colors.onPrimary : colors.primary)
-                        .withValues(alpha: selected ? .18 : .12),
+                    color: foreground.withValues(alpha: selected ? .16 : .1),
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     '$seasonNumber',
                     style: TextStyle(
-                      color: selected ? colors.onPrimary : colors.primary,
+                      color: foreground,
                       fontFamily: 'FigtreeSB',
                       fontSize: 13,
                     ),
@@ -425,7 +420,7 @@ class _SeasonSelector extends StatelessWidget {
                 if (selected)
                   Icon(
                     PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
-                    color: colors.onPrimary,
+                    color: foreground,
                     size: 17,
                   ),
               ],

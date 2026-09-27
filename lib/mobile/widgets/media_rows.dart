@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
-import '../../catalog/details_controller.dart';
 import '../../catalog/media_item.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
@@ -12,6 +11,7 @@ import '../../widgets/common_widgets.dart' show AppStreamingService;
 import '../playback.dart';
 import 'media_art.dart';
 import 'poster_card.dart';
+import 'continue_sheet.dart';
 import 'section_header.dart';
 import 'title_sheet.dart';
 
@@ -166,33 +166,12 @@ class ContinueCard extends StatelessWidget {
           34 +
       8;
 
-  /// "S2:E4 · 23m left", or "1h 04m left" for a movie.
-  String _subtitle() {
-    final recentMovie = item.recentMovie;
-    final recentEpisode = item.recentEpisode;
-    final remaining = recentMovie?.remaining ?? recentEpisode?.remaining;
-    final left = remaining != null && remaining > 0
-        ? tr(
-            'time_left',
-            namedArgs: <String, String>{
-              'time': formatRuntime(Duration(seconds: remaining)),
-            },
-          )
-        : null;
-    final season = recentEpisode?.seasonNum;
-    final episode = recentEpisode?.episodeNum;
-    return <String>[
-      if (season != null && episode != null) 'S$season:E$episode',
-      if (left != null) left,
-    ].join('  ·  ');
-  }
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final accent = Theme.of(context).colorScheme.primary;
     final progress = (item.progress ?? 0).clamp(0.0, 1.0);
-    final subtitle = _subtitle();
+    final subtitle = continueSubtitle(item);
     return SizedBox(
       width: width,
       child: Column(
@@ -201,7 +180,7 @@ class ContinueCard extends StatelessWidget {
           Pressable(
             semanticLabel: '${item.title}, $subtitle',
             onTap: () => MobilePlayback.play(context, item),
-            onLongPress: () => showTitleSheet(context, item),
+            onLongPress: () => showContinueSheet(context, item),
             child: AspectRatio(
               aspectRatio: 16 / 9,
               child: ClipRRect(
@@ -248,25 +227,27 @@ class ContinueCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    PositionedDirectional(
-                      start: 0,
-                      end: 0,
-                      bottom: 0,
-                      child: SizedBox(
-                        height: 3,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: <Widget>[
-                            const ColoredBox(color: Color(0x3DFFFFFF)),
-                            FractionallySizedBox(
-                              alignment: AlignmentDirectional.centerStart,
-                              widthFactor: progress,
-                              child: ColoredBox(color: accent),
-                            ),
-                          ],
+                    // A next episode has no progress yet.
+                    if (item.upNext == null)
+                      PositionedDirectional(
+                        start: 0,
+                        end: 0,
+                        bottom: 0,
+                        child: SizedBox(
+                          height: 3,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: <Widget>[
+                              const ColoredBox(color: Color(0x3DFFFFFF)),
+                              FractionallySizedBox(
+                                alignment: AlignmentDirectional.centerStart,
+                                widthFactor: progress,
+                                child: ColoredBox(color: accent),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -309,7 +290,7 @@ class ContinueCard extends StatelessWidget {
                   tooltip: tr('more_options'),
                   iconSize: 20,
                   color: palette.mutedText,
-                  onPressed: () => showTitleSheet(context, item),
+                  onPressed: () => showContinueSheet(context, item),
                   icon: Icon(PhosphorIcons.dotsThreeVertical()),
                 ),
               ),

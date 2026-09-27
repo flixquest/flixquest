@@ -3,6 +3,7 @@ import 'package:flixquest/models/movie_stream_metadata.dart';
 import 'package:flixquest/models/tv_stream_metadata.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../catalog/up_next.dart';
 import '../../../constants/app_constants.dart';
 import '../../../controllers/recently_watched_database_controller.dart';
 import '../../../functions/function.dart';
@@ -113,6 +114,14 @@ class PlayerDataManagement {
       if (isBookmarked) {
         prv.deleteEpisode(tvMetadata.episodeId!, tvMetadata.episodeNumber!,
             tvMetadata.seasonNumber!);
+      }
+      // Keep the series in Continue Watching, one episode on; a series with
+      // nothing more to watch leaves it.
+      if (prv is RecentProvider) {
+        final next = UpNext.after(tvMetadata);
+        next == null
+            ? await prv.clearUpNext(tvMetadata.tvId!)
+            : await prv.recordUpNext(next);
       }
       // Don't add to recents if already completed
     } else {

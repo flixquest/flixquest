@@ -687,5 +687,9 @@
   "top_rated_series": "सर्वश्रेष्ठ रेटेड सीरीज़",
   "upcoming_movies": "आने वाली फिल्में",
   "popular_movies_on": "{service} पर लोकप्रिय फिल्में",
-  "popular_series_on": "{service} पर लोकप्रिय सीरीज़"
+  "popular_series_on": "{service} पर लोकप्रिय सीरीज़",
+  "undo": "पूर्ववत करें",
+  "play_episode": "{episode} चलाएँ",
+  "remove_from_row": "देखना जारी रखें से हटाएँ",
+  "removed_from_row": "देखना जारी रखें से हटाया गया"
 }

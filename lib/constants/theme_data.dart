@@ -1250,6 +1250,8 @@ ThemeData _applyFlixQuestUI(
       backgroundColor: surface,
       surfaceTintColor: Colors.transparent,
       showDragHandle: false,
+      // A neutral handle rather than Material's accent-tinted one.
+      dragHandleColor: ink.withValues(alpha: .28),
       shape: RoundedRectangleBorder(
         borderRadius:
             BorderRadius.vertical(top: Radius.circular(corner(12, 28))),

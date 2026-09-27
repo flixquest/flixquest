@@ -396,10 +396,21 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
     final data = await _details?.then((data) => data, onError: (_) => null);
     if (data == null || !mounted) return;
     try {
+      final recent = context.read<RecentProvider?>();
+      // A finished episode's successor, when that's newer than any episode
+      // in progress.
+      final next = fromStart || recent == null
+          ? null
+          : upNextFor(
+              _item,
+              episodes: recent.episodes,
+              upNext: recent.upNext,
+            );
       final choice = await chooseEpisode(
         seasons: data.seasons,
-        resume: fromStart ? null : _resume(),
+        resume: fromStart || next != null ? null : _resume(),
         loadSeason: _episodesOf,
+        upNext: next,
       );
       if (choice == null) return;
       await _playEpisode(

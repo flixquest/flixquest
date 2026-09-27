@@ -1,4 +1,5 @@
 import '../models/movie.dart';
+import 'up_next.dart';
 import '../models/recently_watched.dart';
 import '../models/tv.dart';
 
@@ -21,6 +22,7 @@ class MediaItem {
     this.series,
     this.recentMovie,
     this.recentEpisode,
+    this.upNext,
   });
 
   factory MediaItem.fromMovie(Movie movie) {
@@ -77,6 +79,31 @@ class MediaItem {
     );
   }
 
+  /// A series' next episode, after the viewer finished the one before.
+  factory MediaItem.fromUpNext(UpNext next) {
+    return MediaItem(
+      kind: MediaKind.series,
+      id: next.seriesId,
+      title: next.seriesName.isEmpty ? 'Untitled series' : next.seriesName,
+      overview: '',
+      posterPath: next.posterPath,
+      backdropPath: next.backdropPath,
+      rating: null,
+      releaseDate: null,
+      progress: 0,
+      progressLabel: next.label,
+      stableKey: 'up-next:${next.seriesId}:${next.season}:${next.episode}',
+      series: TV(
+        id: next.seriesId,
+        name: next.seriesName,
+        originalName: next.seriesName,
+        posterPath: next.posterPath,
+        backdropPath: next.backdropPath,
+      ),
+      upNext: next,
+    );
+  }
+
   factory MediaItem.fromRecentEpisode(RecentEpisode recent) {
     final series = TV(
       id: recent.seriesId,
@@ -120,6 +147,9 @@ class MediaItem {
   final TV? series;
   final RecentMovie? recentMovie;
   final RecentEpisode? recentEpisode;
+
+  /// Set when this is a series' next episode rather than one in progress.
+  final UpNext? upNext;
 
   String get stableId => stableKey ?? '${kind.name}:$id';
 

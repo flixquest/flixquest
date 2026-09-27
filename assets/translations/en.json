@@ -687,5 +687,9 @@
   "top_rated_series": "Top rated series",
   "upcoming_movies": "Upcoming movies",
   "popular_movies_on": "Popular movies on {service}",
-  "popular_series_on": "Popular series on {service}"
+  "popular_series_on": "Popular series on {service}",
+  "undo": "Undo",
+  "play_episode": "Play {episode}",
+  "remove_from_row": "Remove from Continue Watching",
+  "removed_from_row": "Removed from Continue Watching"
 }

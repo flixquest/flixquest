@@ -1,5 +1,9 @@
 import '../models/tv.dart';
+import '../models/recently_watched.dart';
+import 'continue_watching.dart';
 import 'details_controller.dart';
+import 'media_item.dart';
+import 'up_next.dart';
 
 /// The episode Play starts for a series, with its season's episodes for the
 /// player's episode list, and where to pick up if it was started.
@@ -17,8 +21,9 @@ class EpisodeChoice {
   final int? elapsed;
 }
 
-/// What Play means for a series: the episode in progress, else the one after
-/// a finished episode (on into the next season), else the very first.
+/// What Play means for a series: [upNext] when given, else the episode in
+/// progress, else the one after a finished episode (on into the next
+/// season), else the very first.
 ///
 /// [seasons] are in the order a series page offers them (specials last).
 /// [loadSeason] fetches a season's episodes; its failure is passed on.
@@ -27,8 +32,19 @@ Future<EpisodeChoice?> chooseEpisode({
   required List<Seasons> seasons,
   required ResumePoint? resume,
   required Future<List<EpisodeList>> Function(int seasonNumber) loadSeason,
+  UpNext? upNext,
   DateTime? now,
 }) async {
+  // The episode after one just finished, as Continue Watching offered it.
+  if (upNext != null) {
+    final season = await loadSeason(upNext.season);
+    final next = season
+        .where((episode) => episode.episodeNumber == upNext.episode)
+        .firstOrNull;
+    if (next != null && hasAired(next, now: now)) {
+      return EpisodeChoice(episode: next, seasonEpisodes: season);
+    }
+  }
   final watched = resume?.episode;
   final watchedSeason = watched?.seasonNum;
   final watchedNumber = watched?.episodeNum;
@@ -74,4 +90,24 @@ Future<EpisodeChoice?> chooseEpisode({
   final episodes = await loadSeason(first);
   if (episodes.isEmpty) return null;
   return EpisodeChoice(episode: episodes.first, seasonEpisodes: episodes);
+}
+
+/// The next episode to start [item] from, if its latest is a finished
+/// episode rather than one in progress: [item]'s own, from Continue
+/// Watching, else the series' entry in [upNext], if newer than its latest
+/// episode in [episodes].
+UpNext? upNextFor(
+  MediaItem item, {
+  required List<RecentEpisode> episodes,
+  required List<UpNext> upNext,
+}) {
+  if (item.kind != MediaKind.series) return null;
+  final next = item.upNext ??
+      upNext.where((entry) => entry.seriesId == item.id).firstOrNull;
+  if (next == null) return null;
+  final latest =
+      episodes.where((episode) => episode.seriesId == item.id).firstOrNull;
+  if (latest == null) return next;
+  final played = lastWatched(latest.dateTime, latest.updatedAtUtc);
+  return next.watchedAt.isAfter(played) ? next : null;
 }

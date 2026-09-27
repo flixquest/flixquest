@@ -5,9 +5,11 @@ import 'package:provider/provider.dart';
 import '../catalog/details_controller.dart';
 import '../catalog/episode_choice.dart';
 import '../catalog/media_item.dart';
+import '../catalog/up_next.dart';
 import '../functions/function.dart';
 import '../models/movie.dart';
 import '../models/movie_stream_metadata.dart';
+import '../models/recently_watched.dart';
 import '../models/tv.dart';
 import '../models/tv_stream_metadata.dart';
 import '../provider/app_dependency_provider.dart';
@@ -80,7 +82,13 @@ abstract final class MobilePlayback {
     if (item.kind == MediaKind.movie) {
       return _playMovie(context, item, elapsed: resume?.elapsed);
     }
-    return _playSeries(context, item, resume);
+    final recent = context.read<RecentProvider?>();
+    final next = upNextFor(
+      item,
+      episodes: recent?.episodes ?? const <RecentEpisode>[],
+      upNext: recent?.upNext ?? const <UpNext>[],
+    );
+    return _playSeries(context, item, next == null ? resume : null, next);
   }
 
   static Future<bool> _online(BuildContext context) async {
@@ -124,6 +132,7 @@ abstract final class MobilePlayback {
     BuildContext context,
     MediaItem item,
     ResumePoint? resume,
+    UpNext? upNext,
   ) async {
     final settings = context.read<SettingsProvider>();
     final dependencies = context.read<AppDependencyProvider>();
@@ -137,6 +146,7 @@ abstract final class MobilePlayback {
       final choice = await chooseEpisode(
         seasons: details.seasons,
         resume: resume,
+        upNext: upNext,
         loadSeason: (season) => controller.loadSeason(
           seriesId: item.id,
           seasonNumber: season,

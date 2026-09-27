@@ -227,6 +227,7 @@ class _HomeScreenState extends State<HomeScreen>
     return continueWatchingItems(
       movies: recent.movies,
       episodes: recent.episodes,
+      upNext: recent.upNext,
       filter: _filter,
     );
   }

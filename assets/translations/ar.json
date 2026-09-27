@@ -687,5 +687,9 @@
   "top_rated_series": "المسلسلات الأعلى تقييمًا",
   "upcoming_movies": "أفلام قادمة",
   "popular_movies_on": "أفلام شائعة على {service}",
-  "popular_series_on": "مسلسلات شائعة على {service}"
+  "popular_series_on": "مسلسلات شائعة على {service}",
+  "undo": "تراجع",
+  "play_episode": "تشغيل {episode}",
+  "remove_from_row": "إزالة من متابعة المشاهدة",
+  "removed_from_row": "أزيل من متابعة المشاهدة"
 }

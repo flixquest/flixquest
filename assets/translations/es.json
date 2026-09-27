@@ -687,5 +687,9 @@
   "top_rated_series": "Series mejor valoradas",
   "upcoming_movies": "Próximas películas",
   "popular_movies_on": "Películas populares en {service}",
-  "popular_series_on": "Series populares en {service}"
+  "popular_series_on": "Series populares en {service}",
+  "undo": "Deshacer",
+  "play_episode": "Reproducir {episode}",
+  "remove_from_row": "Quitar de Seguir viendo",
+  "removed_from_row": "Quitado de Seguir viendo"
 }

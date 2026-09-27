@@ -5,16 +5,20 @@ import '../provider/recently_watched_provider.dart';
 import 'details_controller.dart';
 import 'home_feed_controller.dart';
 import 'media_item.dart';
+import 'up_next.dart';
 
 /// The Continue Watching row: movies part way through and each series at its
 /// latest episode, newest first, narrowed to [filter].
 ///
-/// The store keeps a row per episode, newest first, so only a series' first
-/// row is kept. Movies within [ResumePoint.finishedWithin] of the end are
-/// left out; the player drops most of those itself.
+/// A series shows whichever is newer: its episode in progress, or the
+/// episode after one it finished ([upNext]). The store keeps a row per
+/// episode, newest first, so only a series' first row counts. Movies within
+/// [ResumePoint.finishedWithin] of the end are left out; the player drops
+/// most of those itself.
 List<MediaItem> continueWatchingItems({
   required List<RecentMovie> movies,
   required List<RecentEpisode> episodes,
+  List<UpNext> upNext = const <UpNext>[],
   HomeFilter filter = HomeFilter.all,
   int limit = 16,
 }) {
@@ -36,15 +40,23 @@ List<MediaItem> continueWatchingItems({
     }
   }
   if (filter.shows(MediaKind.series)) {
-    final seen = <int>{};
+    final latest = <int, (DateTime, MediaItem)>{};
     for (final episode in episodes) {
       final seriesId = episode.seriesId;
-      if (seriesId == null || !seen.add(seriesId)) continue;
-      entries.add((
+      if (seriesId == null || latest.containsKey(seriesId)) continue;
+      latest[seriesId] = (
         lastWatched(episode.dateTime, episode.updatedAtUtc),
-        order++,
         MediaItem.fromRecentEpisode(episode),
-      ));
+      );
+    }
+    for (final next in upNext) {
+      final current = latest[next.seriesId];
+      if (current == null || next.watchedAt.isAfter(current.$1)) {
+        latest[next.seriesId] = (next.watchedAt, MediaItem.fromUpNext(next));
+      }
+    }
+    for (final entry in latest.values) {
+      entries.add((entry.$1, order++, entry.$2));
     }
   }
   entries.sort((a, b) {
@@ -68,7 +80,7 @@ DateTime? lastWatchedItem(MediaItem item) {
   if (item.recentEpisode case final episode?) {
     return lastWatched(episode.dateTime, episode.updatedAtUtc);
   }
-  return null;
+  return item.upNext?.watchedAt;
 }
 
 /// The recently watched keys a Continue watching removal needs.
@@ -142,3 +154,75 @@ class ContinueWatchingRemoval {
       : 'ContinueWatchingRemoval.episode($episodeId, '
           'S$seasonNumber E$episodeNumber)';
 }
+
+/// Takes [item] off Continue Watching and returns what puts it back.
+///
+/// A movie loses its row; a series loses every episode row it has and its
+/// next episode, so an older episode doesn't surface in its place. Rows are
+/// tombstoned, so the removal reaches the viewer's other devices. Undo
+/// brings them back as they were, newer than the tombstones so it wins on
+/// the next sync too, and in the same place in the row.
+Future<Future<void> Function()> removeFromContinueWatching(
+  RecentProvider recent,
+  MediaItem item,
+) async {
+  if (item.kind == MediaKind.movie) {
+    final rows = recent.movies
+        .where((movie) => movie.id == item.id)
+        .toList(growable: false);
+    for (final row in rows) {
+      await recent.deleteMovie(row.id!);
+    }
+    return () async {
+      for (final row in rows) {
+        await recent.addMovie(_restoredMovie(row));
+      }
+    };
+  }
+  final rows = recent.episodes
+      .where(
+        (episode) =>
+            episode.seriesId == item.id &&
+            episode.id != null &&
+            episode.episodeNum != null &&
+            episode.seasonNum != null,
+      )
+      .toList(growable: false);
+  final next =
+      recent.upNext.where((entry) => entry.seriesId == item.id).firstOrNull;
+  for (final row in rows) {
+    await recent.deleteEpisode(row.id!, row.episodeNum!, row.seasonNum!);
+  }
+  if (next != null) await recent.clearUpNext(item.id);
+  return () async {
+    for (final row in rows) {
+      await recent.addEpisode(_restoredEpisode(row));
+    }
+    if (next != null) await recent.recordUpNext(next);
+  };
+}
+
+RecentMovie _restoredMovie(RecentMovie row) => RecentMovie(
+      backdropPath: row.backdropPath,
+      dateTime: row.dateTime,
+      elapsed: row.elapsed,
+      id: row.id,
+      posterPath: row.posterPath,
+      releaseYear: row.releaseYear,
+      remaining: row.remaining,
+      title: row.title,
+    );
+
+RecentEpisode _restoredEpisode(RecentEpisode row) => RecentEpisode(
+      dateTime: row.dateTime,
+      elapsed: row.elapsed,
+      episodeName: row.episodeName,
+      episodeNum: row.episodeNum,
+      id: row.id,
+      posterPath: row.posterPath,
+      remaining: row.remaining,
+      seasonNum: row.seasonNum,
+      seriesName: row.seriesName,
+      seriesId: row.seriesId,
+      backdropPath: row.backdropPath,
+    );

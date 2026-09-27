@@ -1,6 +1,7 @@
 import 'package:flixquest/catalog/home_feed_controller.dart';
 import 'package:flixquest/catalog/home_hero.dart';
 import 'package:flixquest/catalog/media_item.dart';
+import 'package:flixquest/catalog/up_next.dart';
 import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/constants/theme_data.dart';
 import 'package:flixquest/mobile/screens/home_screen.dart';
@@ -81,12 +82,27 @@ class _FakeSource implements HomeFeedSource {
 }
 
 class _FakeRecent extends ChangeNotifier implements RecentProvider {
-  _FakeRecent({this.movies = const []});
+  _FakeRecent({List<RecentMovie> movies = const [], this.upNext = const []})
+      : movies = List.of(movies);
 
   @override
   final List<RecentMovie> movies;
   @override
-  final List<RecentEpisode> episodes = const <RecentEpisode>[];
+  final List<RecentEpisode> episodes = <RecentEpisode>[];
+  @override
+  final List<UpNext> upNext;
+
+  @override
+  Future<void> deleteMovie(int id) async {
+    movies.removeWhere((movie) => movie.id == id);
+    notifyListeners();
+  }
+
+  @override
+  Future<void> addMovie(RecentMovie movie) async {
+    movies.add(movie);
+    notifyListeners();
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -607,6 +623,88 @@ void main() {
     await tester.pump(const Duration(seconds: 7));
     await tester.pumpAndSettle();
     expect(asked, hasLength(2));
+  });
+
+  testWidgets(
+      'Continue Watching: ⋮ offers Resume, Details and Remove, '
+      'with Undo', (tester) async {
+    final recent = _FakeRecent(movies: <RecentMovie>[_recentMovie(90)]);
+    await tester.pumpWidget(
+      _app(
+        recent: recent,
+        child: HomeScreen(
+          source: _FakeSource(),
+          findTint: null,
+          showTitleLogos: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byTooltip('more_options'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('more_options'));
+    await tester.pumpAndSettle();
+    expect(find.text('resume_title'), findsWidgets);
+    expect(find.text('details'), findsOneWidget);
+    // A movie has no episodes to pick.
+    expect(find.text('episodes'), findsNothing);
+
+    await tester.tap(find.text('remove_from_row'));
+    await tester.pumpAndSettle();
+    expect(recent.movies, isEmpty);
+    expect(find.byType(ContinueRow), findsNothing);
+    expect(find.text('removed_from_row'), findsOneWidget);
+
+    await tester.tap(find.text('undo'));
+    await tester.pumpAndSettle();
+    expect(recent.movies.single.id, 90);
+    expect(find.byType(ContinueRow), findsOneWidget);
+  });
+
+  testWidgets("a series' next episode shows as one, and plays as one",
+      (tester) async {
+    final next = UpNext(
+      seriesId: 7,
+      seriesName: 'Severance',
+      finishedSeason: 2,
+      finishedEpisode: 4,
+      season: 2,
+      episode: 5,
+      backdropPath: '/b.jpg',
+      watchedAt: DateTime.now(),
+    );
+    await tester.pumpWidget(
+      _app(
+        recent: _FakeRecent(upNext: <UpNext>[next]),
+        child: HomeScreen(
+          source: _FakeSource(),
+          findTint: null,
+          showTitleLogos: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // It leads the hero, offering the episode itself.
+    final hero =
+        tester.widget<HeroCarousel>(find.byType(HeroCarousel)).heroes.first;
+    expect(hero.item.upNext?.label, 'S2:E5');
+    expect(find.text('play_episode'), findsWidgets);
+
+    await tester.scrollUntilVisible(
+      find.byTooltip('more_options'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('S2:E5'), findsWidgets);
+    expect(find.textContaining('next_episode'), findsOneWidget);
+    await tester.tap(find.byTooltip('more_options'));
+    await tester.pumpAndSettle();
+    expect(find.text('episodes'), findsOneWidget);
   });
 }
 

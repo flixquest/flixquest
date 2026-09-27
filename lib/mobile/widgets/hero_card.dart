@@ -71,10 +71,14 @@ class _HeroCardState extends State<HeroCard> {
     }
   }
 
-  /// "Resume S2:E4" for an episode in progress, "Resume" for a movie, else
-  /// "Play".
+  /// "Resume S2:E4" for an episode in progress, "Play S2:E5" for the one
+  /// after a finished episode, "Resume" for a movie, else "Play".
   String _playLabel() {
     if (!widget.hero.continuing) return tr('play');
+    if (_item.upNext case final next?) {
+      return tr('play_episode',
+          namedArgs: <String, String>{'episode': next.label});
+    }
     final episode = _item.recentEpisode;
     final season = episode?.seasonNum;
     final number = episode?.episodeNum;

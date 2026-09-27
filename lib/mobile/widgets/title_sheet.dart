@@ -25,6 +25,7 @@ Future<void> showTitleSheet(BuildContext context, MediaItem item) {
   return showModalBottomSheet<void>(
     context: context,
     useRootNavigator: true,
+    isScrollControlled: true,
     showDragHandle: true,
     backgroundColor: palette.surface,
     shape: const RoundedRectangleBorder(
@@ -50,104 +51,107 @@ class _TitleSheet extends StatelessWidget {
     void close() => Navigator.of(context).pop();
     return SafeArea(
       top: false,
-      child: Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.card),
-                  child: SizedBox(
-                    width: 84,
-                    height: 126,
-                    child: MediaArt(
-                      item: item,
-                      path: item.posterPath ?? item.backdropPath,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                    child: SizedBox(
                       width: 84,
+                      height: 126,
+                      child: MediaArt(
+                        item: item,
+                        path: item.posterPath ?? item.backdropPath,
+                        width: 84,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: AppSpace.lg),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        item.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppType.sectionHeader.copyWith(
-                          fontFamily: AppType.bold,
-                          color: palette.foreground,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpace.xs),
-                      Text(
-                        mediaFacts(item),
-                        style: AppType.metadata.copyWith(
-                          color: palette.mutedText,
-                        ),
-                      ),
-                      if (item.overview.isNotEmpty) ...<Widget>[
-                        const SizedBox(height: AppSpace.sm),
+                  const SizedBox(width: AppSpace.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
                         Text(
-                          item.overview,
-                          maxLines: 4,
+                          item.title,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: AppType.body.copyWith(
-                            color: palette.secondaryText,
-                            fontSize: 13,
-                            height: 18 / 13,
+                          style: AppType.sectionHeader.copyWith(
+                            fontFamily: AppType.bold,
+                            color: palette.foreground,
                           ),
                         ),
+                        const SizedBox(height: AppSpace.xs),
+                        Text(
+                          mediaFacts(item),
+                          style: AppType.metadata.copyWith(
+                            color: palette.mutedText,
+                          ),
+                        ),
+                        if (item.overview.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: AppSpace.sm),
+                          Text(
+                            item.overview,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppType.body.copyWith(
+                              color: palette.secondaryText,
+                              fontSize: 13,
+                              height: 18 / 13,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpace.xl),
-            Row(
-              children: <Widget>[
-                if (MobilePlayback.canPlay(context)) ...<Widget>[
+                ],
+              ),
+              const SizedBox(height: AppSpace.xl),
+              Row(
+                children: <Widget>[
+                  if (MobilePlayback.canPlay(context)) ...<Widget>[
+                    Expanded(
+                      child: PillButton(
+                        primary: true,
+                        icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
+                        label: tr('play'),
+                        onPressed: () {
+                          close();
+                          MobilePlayback.play(host, item);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                  ],
                   Expanded(
                     child: PillButton(
-                      primary: true,
-                      icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
-                      label: tr('play'),
-                      onPressed: () {
-                        close();
-                        MobilePlayback.play(host, item);
-                      },
+                      icon:
+                          saved ? PhosphorIcons.check() : PhosphorIcons.plus(),
+                      label: tr('my_list'),
+                      onPressed: () => MyList.toggle(context, item),
                     ),
                   ),
                   const SizedBox(width: AppSpace.sm),
+                  Expanded(
+                    child: PillButton(
+                      icon: PhosphorIcons.info(),
+                      label: tr('details'),
+                      onPressed: () {
+                        close();
+                        MobilePlayback.openDetails(host, item);
+                      },
+                    ),
+                  ),
                 ],
-                Expanded(
-                  child: PillButton(
-                    icon: saved ? PhosphorIcons.check() : PhosphorIcons.plus(),
-                    label: tr('my_list'),
-                    onPressed: () => MyList.toggle(context, item),
-                  ),
-                ),
-                const SizedBox(width: AppSpace.sm),
-                Expanded(
-                  child: PillButton(
-                    icon: PhosphorIcons.info(),
-                    label: tr('details'),
-                    onPressed: () {
-                      close();
-                      MobilePlayback.openDetails(host, item);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
