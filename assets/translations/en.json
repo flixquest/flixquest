@@ -720,5 +720,21 @@
   "coming_date": "Coming {date}",
   "premieres_date": "Premieres {date}",
   "new_and_hot_load_failed": "New & Hot couldn't load. Check your connection.",
-  "new_and_hot_empty": "Nothing new here yet"
+  "new_and_hot_empty": "Nothing new here yet",
+  "season_number": "Season {number}",
+  "about_season": "About this season",
+  "download_episode": "Download episode",
+  "added_to_downloads": "Added to downloads",
+  "season_one": "1 Season",
+  "seasons_count": "{count} Seasons",
+  "download_action": "Download",
+  "starring_line": "Starring: {names}",
+  "director_line": "Director: {names}",
+  "creators_line": "Creators: {names}",
+  "trailer": "Trailer",
+  "show_more": "Show more",
+  "more_like_this": "More Like This",
+  "trailers_and_more": "Trailers & More",
+  "first_aired": "First aired",
+  "networks": "Networks"
 }

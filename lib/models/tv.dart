@@ -313,11 +313,15 @@ class EpisodeList {
   num? voteAverage;
   num? voteCount;
   String? overview;
+
+  /// Minutes, when TMDB knows it.
+  int? runtime;
   List<EpisodeCrew>? episodeCrew;
   List<EpisodeGuestStars>? episodeGuestStars;
 
   EpisodeList(
       {this.airDate,
+      this.runtime,
       this.episodeNumber,
       this.name,
       this.stillPath,
@@ -338,6 +342,7 @@ class EpisodeList {
     voteAverage = json['vote_average'];
     voteCount = json['vote_count'];
     episodeId = json['id'];
+    runtime = (json['runtime'] as num?)?.toInt();
     if (json['crew'] != null) {
       episodeCrew = [];
       json['crew'].forEach((v) {
@@ -362,6 +367,7 @@ class EpisodeList {
     data['vote_average'] = voteAverage;
     data['vote_count'] = voteCount;
     data['id'] = episodeId;
+    if (runtime != null) data['runtime'] = runtime;
     if (episodeCrew != null) {
       data['crew'] = episodeCrew?.map((v) => v.toJson()).toList();
     }

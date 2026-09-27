@@ -736,7 +736,23 @@ class CodegenLoader extends AssetLoader{
   "coming_date": "Coming {date}",
   "premieres_date": "Premieres {date}",
   "new_and_hot_load_failed": "New & Hot couldn't load. Check your connection.",
-  "new_and_hot_empty": "Nothing new here yet"
+  "new_and_hot_empty": "Nothing new here yet",
+  "season_number": "Season {number}",
+  "about_season": "About this season",
+  "download_episode": "Download episode",
+  "added_to_downloads": "Added to downloads",
+  "season_one": "1 Season",
+  "seasons_count": "{count} Seasons",
+  "download_action": "Download",
+  "starring_line": "Starring: {names}",
+  "director_line": "Director: {names}",
+  "creators_line": "Creators: {names}",
+  "trailer": "Trailer",
+  "show_more": "Show more",
+  "more_like_this": "More Like This",
+  "trailers_and_more": "Trailers & More",
+  "first_aired": "First aired",
+  "networks": "Networks"
 };
 static const Map<String,dynamic> _hi = {
   "popularity_descending": "लोकप्रियता घटती",
@@ -1460,7 +1476,23 @@ static const Map<String,dynamic> _hi = {
   "coming_date": "{date} को आ रही है",
   "premieres_date": "{date} को शुरू होगी",
   "new_and_hot_load_failed": "नया और लोकप्रिय लोड नहीं हो सका। अपना कनेक्शन जाँचें।",
-  "new_and_hot_empty": "फ़िलहाल यहाँ कुछ नया नहीं है"
+  "new_and_hot_empty": "फ़िलहाल यहाँ कुछ नया नहीं है",
+  "season_number": "सीज़न {number}",
+  "about_season": "इस सीज़न के बारे में",
+  "download_episode": "एपिसोड डाउनलोड करें",
+  "added_to_downloads": "डाउनलोड में जोड़ा गया",
+  "season_one": "1 सीज़न",
+  "seasons_count": "{count} सीज़न",
+  "download_action": "डाउनलोड करें",
+  "starring_line": "कलाकार: {names}",
+  "director_line": "निर्देशक: {names}",
+  "creators_line": "निर्माता: {names}",
+  "trailer": "ट्रेलर",
+  "show_more": "और दिखाएँ",
+  "more_like_this": "ऐसे और शीर्षक",
+  "trailers_and_more": "ट्रेलर और अन्य",
+  "first_aired": "पहला प्रसारण",
+  "networks": "नेटवर्क"
 };
 static const Map<String,dynamic> _es = {
   "popularity_descending": "Popularidad descendiente",
@@ -2184,7 +2216,23 @@ static const Map<String,dynamic> _es = {
   "coming_date": "Llega el {date}",
   "premieres_date": "Se estrena el {date}",
   "new_and_hot_load_failed": "No se pudo cargar Novedades. Comprueba tu conexión.",
-  "new_and_hot_empty": "Todavía no hay novedades"
+  "new_and_hot_empty": "Todavía no hay novedades",
+  "season_number": "Temporada {number}",
+  "about_season": "Sobre esta temporada",
+  "download_episode": "Descargar episodio",
+  "added_to_downloads": "Añadido a descargas",
+  "season_one": "1 temporada",
+  "seasons_count": "{count} temporadas",
+  "download_action": "Descargar",
+  "starring_line": "Reparto: {names}",
+  "director_line": "Dirección: {names}",
+  "creators_line": "Creación: {names}",
+  "trailer": "Tráiler",
+  "show_more": "Ver más",
+  "more_like_this": "Similares",
+  "trailers_and_more": "Tráileres y más",
+  "first_aired": "Primera emisión",
+  "networks": "Cadenas"
 };
 static const Map<String,dynamic> _ar = {
   "popularity_descending": "ترتيب تنازلي حسب الشعبية",
@@ -2908,7 +2956,23 @@ static const Map<String,dynamic> _ar = {
   "coming_date": "قادم في {date}",
   "premieres_date": "يبدأ عرضه في {date}",
   "new_and_hot_load_failed": "تعذّر تحميل الجديد والرائج. تحقّق من اتصالك.",
-  "new_and_hot_empty": "لا جديد هنا بعد"
+  "new_and_hot_empty": "لا جديد هنا بعد",
+  "season_number": "الموسم {number}",
+  "about_season": "عن هذا الموسم",
+  "download_episode": "تنزيل الحلقة",
+  "added_to_downloads": "أُضيف إلى التنزيلات",
+  "season_one": "موسم واحد",
+  "seasons_count": "{count} مواسم",
+  "download_action": "تنزيل",
+  "starring_line": "بطولة: {names}",
+  "director_line": "إخراج: {names}",
+  "creators_line": "من ابتكار: {names}",
+  "trailer": "الإعلان",
+  "show_more": "عرض المزيد",
+  "more_like_this": "أعمال مشابهة",
+  "trailers_and_more": "الإعلانات والمزيد",
+  "first_aired": "أول عرض",
+  "networks": "الشبكات"
 };
 static const Map<String, Map<String,dynamic>> mapLocales = {"en": _en, "hi": _hi, "es": _es, "ar": _ar};
 }

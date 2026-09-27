@@ -725,5 +725,21 @@ abstract class  LocaleKeys {
   static const premieres_date = 'premieres_date';
   static const new_and_hot_load_failed = 'new_and_hot_load_failed';
   static const new_and_hot_empty = 'new_and_hot_empty';
+  static const season_number = 'season_number';
+  static const about_season = 'about_season';
+  static const download_episode = 'download_episode';
+  static const added_to_downloads = 'added_to_downloads';
+  static const season_one = 'season_one';
+  static const seasons_count = 'seasons_count';
+  static const download_action = 'download_action';
+  static const starring_line = 'starring_line';
+  static const director_line = 'director_line';
+  static const creators_line = 'creators_line';
+  static const trailer = 'trailer';
+  static const show_more = 'show_more';
+  static const more_like_this = 'more_like_this';
+  static const trailers_and_more = 'trailers_and_more';
+  static const first_aired = 'first_aired';
+  static const networks = 'networks';
 
 }

@@ -720,5 +720,21 @@
   "coming_date": "قادم في {date}",
   "premieres_date": "يبدأ عرضه في {date}",
   "new_and_hot_load_failed": "تعذّر تحميل الجديد والرائج. تحقّق من اتصالك.",
-  "new_and_hot_empty": "لا جديد هنا بعد"
+  "new_and_hot_empty": "لا جديد هنا بعد",
+  "season_number": "الموسم {number}",
+  "about_season": "عن هذا الموسم",
+  "download_episode": "تنزيل الحلقة",
+  "added_to_downloads": "أُضيف إلى التنزيلات",
+  "season_one": "موسم واحد",
+  "seasons_count": "{count} مواسم",
+  "download_action": "تنزيل",
+  "starring_line": "بطولة: {names}",
+  "director_line": "إخراج: {names}",
+  "creators_line": "من ابتكار: {names}",
+  "trailer": "الإعلان",
+  "show_more": "عرض المزيد",
+  "more_like_this": "أعمال مشابهة",
+  "trailers_and_more": "الإعلانات والمزيد",
+  "first_aired": "أول عرض",
+  "networks": "الشبكات"
 }

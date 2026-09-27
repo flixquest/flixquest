@@ -720,5 +720,21 @@
   "coming_date": "Llega el {date}",
   "premieres_date": "Se estrena el {date}",
   "new_and_hot_load_failed": "No se pudo cargar Novedades. Comprueba tu conexión.",
-  "new_and_hot_empty": "Todavía no hay novedades"
+  "new_and_hot_empty": "Todavía no hay novedades",
+  "season_number": "Temporada {number}",
+  "about_season": "Sobre esta temporada",
+  "download_episode": "Descargar episodio",
+  "added_to_downloads": "Añadido a descargas",
+  "season_one": "1 temporada",
+  "seasons_count": "{count} temporadas",
+  "download_action": "Descargar",
+  "starring_line": "Reparto: {names}",
+  "director_line": "Dirección: {names}",
+  "creators_line": "Creación: {names}",
+  "trailer": "Tráiler",
+  "show_more": "Ver más",
+  "more_like_this": "Similares",
+  "trailers_and_more": "Tráileres y más",
+  "first_aired": "Primera emisión",
+  "networks": "Cadenas"
 }

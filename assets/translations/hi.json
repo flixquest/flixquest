@@ -720,5 +720,21 @@
   "coming_date": "{date} को आ रही है",
   "premieres_date": "{date} को शुरू होगी",
   "new_and_hot_load_failed": "नया और लोकप्रिय लोड नहीं हो सका। अपना कनेक्शन जाँचें।",
-  "new_and_hot_empty": "फ़िलहाल यहाँ कुछ नया नहीं है"
+  "new_and_hot_empty": "फ़िलहाल यहाँ कुछ नया नहीं है",
+  "season_number": "सीज़न {number}",
+  "about_season": "इस सीज़न के बारे में",
+  "download_episode": "एपिसोड डाउनलोड करें",
+  "added_to_downloads": "डाउनलोड में जोड़ा गया",
+  "season_one": "1 सीज़न",
+  "seasons_count": "{count} सीज़न",
+  "download_action": "डाउनलोड करें",
+  "starring_line": "कलाकार: {names}",
+  "director_line": "निर्देशक: {names}",
+  "creators_line": "निर्माता: {names}",
+  "trailer": "ट्रेलर",
+  "show_more": "और दिखाएँ",
+  "more_like_this": "ऐसे और शीर्षक",
+  "trailers_and_more": "ट्रेलर और अन्य",
+  "first_aired": "पहला प्रसारण",
+  "networks": "नेटवर्क"
 }
