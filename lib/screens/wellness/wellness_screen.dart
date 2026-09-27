@@ -49,19 +49,25 @@ class _WellnessScreenState extends State<WellnessScreen> {
     return Scaffold(
       backgroundColor: palette.page,
       appBar: PageAppBar(
-        title: 'Viewing Insights',
+        title: tr('ins_title'),
         actions: [
           IconButton(
-            tooltip: 'Viewing Insights options',
+            tooltip: tr('ins_options'),
             onPressed: () => _showInsightsActions(wellness),
             icon: Icon(PhosphorIcons.dotsThreeVertical()),
           ),
         ],
       ),
-      body: SkeletonSwitcher(
-        loading: wellness.loading,
-        skeleton: const _InsightsSkeleton(),
-        child: RefreshIndicator(
+      body: WellnessChartLabels(
+        less: tr('ins_less'),
+        more: tr('ins_more'),
+        peakPerHour: (duration) =>
+            tr('ins_peak_hour', namedArgs: {'time': duration}),
+        nothingYet: tr('ins_nothing_yet'),
+        child: SkeletonSwitcher(
+          loading: wellness.loading,
+          skeleton: const _InsightsSkeleton(),
+          child: RefreshIndicator(
               color: palette.foreground,
               backgroundColor: palette.raisedSurface,
               onRefresh: wellness.canSync ? wellness.syncNow : wellness.reload,
@@ -126,7 +132,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                             busy: _sharing,
                             onPressed: () => _openShareRecap(wellness),
                             icon: PhosphorIcons.shareNetwork(),
-                            label: 'Share recap',
+                            label: tr('ins_share_recap'),
                           ),
                         ],
                       ),
@@ -154,10 +160,10 @@ class _WellnessScreenState extends State<WellnessScreen> {
                       _SectionHeader(
                         key: _timeSectionKey,
                         icon: PhosphorIcons.clockCounterClockwise(),
-                        eyebrow: 'TIME',
-                        title: 'Your viewing rhythm',
+                        eyebrow: tr('ins_time').toUpperCase(),
+                        title: tr('ins_time_title'),
                         description:
-                            'Active playback only—pauses and buffering are excluded.',
+                            tr('ins_time_desc'),
                       ),
                       const SizedBox(height: 14),
                       _TimelinePanel(
@@ -173,27 +179,27 @@ class _WellnessScreenState extends State<WellnessScreen> {
                       _SectionHeader(
                         key: _titlesSectionKey,
                         icon: PhosphorIcons.filmSlate(),
-                        eyebrow: 'TITLES',
-                        title: 'What held your attention',
+                        eyebrow: tr('ins_titles').toUpperCase(),
+                        title: tr('ins_titles_title'),
                         description:
-                            'Completed titles, returning favorites, and recent sessions.',
+                            tr('ins_titles_desc'),
                       ),
                       const SizedBox(height: 14),
                       _CompletionPanel(insights: insights),
                       const SizedBox(height: 14),
                       _RankedPanel(
-                        title: 'Most watched',
+                        title: tr('ins_most_watched'),
                         values: insights.topTitles.take(5).toList(),
                         emptyMessage:
-                            'More viewing will reveal your top titles.',
+                            tr('ins_most_watched_empty'),
                       ),
                       const SizedBox(height: 14),
                       if (insights.topSeriesEpisodes.isNotEmpty) ...[
                         _RankedPanel(
-                          title: 'Series you kept going',
+                          title: tr('ins_series_kept'),
                           values: insights.topSeriesEpisodes.take(5).toList(),
                           emptyMessage:
-                              'Episode counts appear once you watch a series.',
+                              tr('ins_series_kept_empty'),
                           valueLabel: _episodeCount,
                         ),
                         const SizedBox(height: 14),
@@ -204,10 +210,10 @@ class _WellnessScreenState extends State<WellnessScreen> {
                       _SectionHeader(
                         key: _tasteSectionKey,
                         icon: PhosphorIcons.palette(),
-                        eyebrow: 'TASTE',
-                        title: 'The shape of your taste',
+                        eyebrow: tr('ins_taste').toUpperCase(),
+                        title: tr('ins_taste_title'),
                         description:
-                            'Built from the metadata available when you watched.',
+                            tr('ins_taste_desc'),
                       ),
                       const SizedBox(height: 14),
                       LayoutBuilder(
@@ -218,34 +224,34 @@ class _WellnessScreenState extends State<WellnessScreen> {
                               : constraints.maxWidth;
                           final panels = <Widget>[
                             _RankedPanel(
-                              title: 'Genres',
+                              title: tr('genres'),
                               values: insights.topGenres.take(5).toList(),
                               emptyMessage:
-                                  'Genre insights will appear as title metadata is collected.',
+                                  tr('ins_genres_empty'),
                             ),
                             _RankedPanel(
-                              title: 'Languages',
+                              title: tr('ins_languages'),
                               values: insights.topLanguages.take(5).toList(),
                               emptyMessage:
-                                  'Language insights will appear with enriched titles.',
+                                  tr('ins_languages_empty'),
                             ),
                             _RankedPanel(
-                              title: 'Countries',
+                              title: tr('ins_countries'),
                               values: insights.topCountries.take(5).toList(),
                               emptyMessage:
-                                  'Country insights will appear with enriched titles.',
+                                  tr('ins_countries_empty'),
                             ),
                             _RankedPanel(
-                              title: 'Release decades',
+                              title: tr('ins_decades'),
                               values: insights.topDecades.take(5).toList(),
                               emptyMessage:
-                                  'Release-era insights will appear after more viewing.',
+                                  tr('ins_decades_empty'),
                             ),
                             _RankedPanel(
-                              title: 'Stream providers',
+                              title: tr('ins_providers'),
                               values: insights.topProviders.take(5).toList(),
                               emptyMessage:
-                                  'Provider insights will appear after streaming sessions.',
+                                  tr('ins_providers_empty'),
                             ),
                           ];
                           return Wrap(
@@ -262,10 +268,10 @@ class _WellnessScreenState extends State<WellnessScreen> {
                       _SectionHeader(
                         key: _patternsSectionKey,
                         icon: PhosphorIcons.calendarDots(),
-                        eyebrow: 'PATTERNS',
-                        title: 'When stories fit your day',
+                        eyebrow: tr('ins_patterns').toUpperCase(),
+                        title: tr('ins_patterns_title'),
                         description:
-                            'A private view of your own routine—not a score or a warning.',
+                            tr('ins_patterns_desc'),
                       ),
                       const SizedBox(height: 14),
                       _RhythmPanel(
@@ -283,6 +289,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                 ),
               ),
             ),
+          ),
       ),
     );
   }
@@ -324,27 +331,27 @@ class _WellnessScreenState extends State<WellnessScreen> {
             XFile(jsonFile.path, mimeType: 'application/json'),
             XFile(csvFile.path, mimeType: 'text/csv'),
           ],
-          text: 'My private FlixQuest Viewing Insights archive',
+          text: tr('ins_export_text'),
         );
       case _WellnessAction.clear:
         if (!mounted) return;
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Clear viewing history?'),
+            title: Text(tr('ins_clear_q')),
             content: Text(
               wellness.canSync
-                  ? 'This removes your viewing sessions from this device and every synced device. This cannot be undone.'
-                  : 'This removes the viewing sessions stored on this device. This cannot be undone.',
+                  ? tr('ins_clear_synced')
+                  : tr('ins_clear_local'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+                child: Text(tr('cancel')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Clear history'),
+                child: Text(tr('ins_clear_history')),
               ),
             ],
           ),
@@ -436,11 +443,11 @@ class _InsightsActionsSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Your insights data',
+                      tr('ins_data_title'),
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     Text(
-                      'Export a copy or manage your history.',
+                      tr('ins_data_desc'),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: colors.onSurfaceVariant,
                           ),
@@ -449,7 +456,7 @@ class _InsightsActionsSheet extends StatelessWidget {
                 ),
               ),
               IconButton(
-                tooltip: 'Close',
+                tooltip: tr('close'),
                 onPressed: () => Navigator.pop(context),
                 icon: Icon(PhosphorIcons.x()),
               ),
@@ -458,15 +465,15 @@ class _InsightsActionsSheet extends StatelessWidget {
           const SizedBox(height: 20),
           _InsightsActionTile(
             icon: PhosphorIcons.export(),
-            title: 'Export my data',
-            description: 'Download your sessions as JSON and CSV.',
+            title: tr('ins_export'),
+            description: tr('ins_export_desc'),
             onTap: () => Navigator.pop(context, _WellnessAction.export),
           ),
           const SizedBox(height: 10),
           _InsightsActionTile(
             icon: PhosphorIcons.trash(),
-            title: 'Clear viewing history',
-            description: 'Remove all locally stored and synced sessions.',
+            title: tr('ins_clear_title'),
+            description: tr('ins_clear_desc'),
             destructive: true,
             onTap: () => Navigator.pop(context, _WellnessAction.clear),
           ),
@@ -598,18 +605,21 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
   String get _caption {
     final insights = _insights;
     final title = _includeTopTitle && insights.topTitles.isNotEmpty
-        ? ' My most-watched title was ${insights.topTitles.first.label}.'
+        ? tr('ins_caption_top',
+            namedArgs: {'title': insights.topTitles.first.label})
         : '';
-    return '${_period.captionLabel} on FlixQuest: '
-        '${_duration(insights.totalWatchedMs)} of stories across '
-        '${insights.activeDays} active ${insights.activeDays == 1 ? 'day' : 'days'}.$title';
+    return '${tr('ins_caption', namedArgs: {
+          'period': _recapCaptionLabel(_period),
+          'time': _duration(insights.totalWatchedMs),
+          'days': plural('ins_active_days', insights.activeDays),
+        })}$title';
   }
 
   Future<void> _copyCaption() async {
     await Clipboard.setData(ClipboardData(text: _caption));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Caption copied')),
+      SnackBar(content: Text(tr('ins_caption_copied'))),
     );
   }
 
@@ -636,7 +646,8 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
       final box = context.findRenderObject() as RenderBox?;
       await Share.shareXFiles(
         <XFile>[XFile(file.path, mimeType: 'image/png')],
-        subject: '${_period.label} FlixQuest recap',
+        subject: tr('ins_recap_subject',
+            namedArgs: {'period': _recapPeriodLabel(_period)}),
         text: _caption,
         sharePositionOrigin:
             box == null ? null : box.localToGlobal(Offset.zero) & box.size,
@@ -644,8 +655,8 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not create the recap. Please try again.'),
+        SnackBar(
+          content: Text(tr('ins_recap_failed')),
         ),
       );
     } finally {
@@ -696,19 +707,19 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Share your viewing story',
+                        tr('ins_share_story'),
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Pick a moment, choose a look, then make it yours.',
+                        tr('ins_share_story_desc'),
                         style: TextStyle(color: colors.onSurfaceVariant),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Close',
+                  tooltip: tr('close'),
                   onPressed: () => Navigator.pop(context),
                   icon: Icon(PhosphorIcons.x()),
                 ),
@@ -716,7 +727,7 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
             ),
             const SizedBox(height: 18),
             Text(
-              'RECAP PERIOD',
+              tr('ins_recap_period').toUpperCase(),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: colors.onSurfaceVariant,
                     fontFamily: 'FigtreeSB',
@@ -746,7 +757,7 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
             ),
             const SizedBox(height: 18),
             Text(
-              'FLIXQUEST THEMES',
+              tr('ins_themes').toUpperCase(),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: colors.onSurfaceVariant,
                     fontFamily: 'FigtreeSB',
@@ -760,21 +771,21 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
               child: Row(
                 children: [
                   _RecapStyleChip(
-                    label: 'Light',
+                    label: tr('ins_theme_light'),
                     colors: const [Color(0xFFFAF9FC), Color(0xFFF57C00)],
                     selected: _style == _RecapStyle.light,
                     onTap: () => setState(() => _style = _RecapStyle.light),
                   ),
                   const SizedBox(width: 8),
                   _RecapStyleChip(
-                    label: 'Dark',
+                    label: tr('ins_theme_dark'),
                     colors: const [Color(0xFF181A1D), Color(0xFFF57C00)],
                     selected: _style == _RecapStyle.dark,
                     onTap: () => setState(() => _style = _RecapStyle.dark),
                   ),
                   const SizedBox(width: 8),
                   _RecapStyleChip(
-                    label: 'Lights out',
+                    label: tr('ins_theme_lights_out'),
                     colors: const [Color(0xFF000000), Color(0xFFF57C00)],
                     selected: _style == _RecapStyle.lightsOut,
                     onTap: () => setState(() => _style = _RecapStyle.lightsOut),
@@ -810,7 +821,8 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
             if (insights.isEmpty) ...[
               const SizedBox(height: 12),
               Text(
-                'There isn’t enough viewing activity in ${_period.label.toLowerCase()} to make a recap yet.',
+                tr('ins_not_enough',
+                    namedArgs: {'period': _recapPeriodLabel(_period).toLowerCase()}),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: colors.onSurfaceVariant,
@@ -827,8 +839,8 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
                 value: _includeTopTitle,
                 onChanged: (value) => setState(() => _includeTopTitle = value),
                 secondary: Icon(PhosphorIcons.eye()),
-                title: const Text('Include my top title'),
-                subtitle: const Text('Turn this off for a more private recap.'),
+                title: Text(tr('ins_include_top')),
+                subtitle: Text(tr('ins_include_top_desc')),
               ),
             ),
             const SizedBox(height: 14),
@@ -839,7 +851,7 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
                     height: 48,
                     onPressed: insights.isEmpty ? null : _copyCaption,
                     icon: PhosphorIcons.copy(),
-                    label: 'Copy caption',
+                    label: tr('ins_copy_caption'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -850,7 +862,7 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
                     busy: _sharing,
                     onPressed: insights.isEmpty ? null : _shareImage,
                     icon: PhosphorIcons.shareNetwork(),
-                    label: _sharing ? 'Creating…' : 'Share image',
+                    label: _sharing ? tr('ins_creating') : tr('ins_share_image'),
                   ),
                 ),
               ],
@@ -1060,7 +1072,7 @@ class _ShareRecapCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 25),
                 Text(
-                  'MY VIEWING\nSTORY',
+                  tr('ins_card_story').toUpperCase(),
                   style: TextStyle(
                     color: foreground.withValues(alpha: .7),
                     fontFamily: 'FigtreeSB',
@@ -1084,7 +1096,7 @@ class _ShareRecapCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  'of active playback',
+                  tr('ins_card_playback'),
                   style: TextStyle(
                     color: foreground.withValues(alpha: .76),
                     fontFamily: 'Figtree',
@@ -1095,7 +1107,7 @@ class _ShareRecapCard extends StatelessWidget {
                 const Spacer(),
                 if (includeTopTitle && topTitle != null) ...[
                   Text(
-                    'MOST WATCHED',
+                    tr('ins_most_watched').toUpperCase(),
                     style: TextStyle(
                       color: palette.$4,
                       fontFamily: 'FigtreeSB',
@@ -1118,7 +1130,7 @@ class _ShareRecapCard extends StatelessWidget {
                   ),
                   if (topGenre != null)
                     Text(
-                      'Top genre • $topGenre',
+                      tr('ins_top_genre', namedArgs: {'genre': topGenre}),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1135,21 +1147,21 @@ class _ShareRecapCard extends StatelessWidget {
                     Expanded(
                       child: _RecapMetric(
                         value: '${insights.completedTitles}',
-                        label: 'completed',
+                        label: tr('ins_completed'),
                         foreground: foreground,
                       ),
                     ),
                     Expanded(
                       child: _RecapMetric(
                         value: '${insights.activeDays}',
-                        label: 'active days',
+                        label: tr('ins_active_days_label'),
                         foreground: foreground,
                       ),
                     ),
                     Expanded(
                       child: _RecapMetric(
                         value: '${insights.sessionCount}',
-                        label: 'sessions',
+                        label: tr('ins_sessions'),
                         foreground: foreground,
                       ),
                     ),
@@ -1216,7 +1228,7 @@ class _ShareRecapCard extends StatelessWidget {
                         color: foreground.withValues(alpha: .52), size: 10),
                     const SizedBox(width: 4),
                     Text(
-                      'Active playback only • Pauses excluded',
+                      tr('ins_active_only'),
                       style: TextStyle(
                         color: foreground.withValues(alpha: .52),
                         fontFamily: 'Figtree',
@@ -1346,7 +1358,7 @@ class WellnessPreviewCard extends StatelessWidget {
                                 start: 8,
                               ),
                               child: Text(
-                                'RECAP READY',
+                                tr('ins_recap_ready').toUpperCase(),
                                 style: TextStyle(
                                   color: colors.primary,
                                   fontFamily: 'FigtreeSB',
@@ -1360,10 +1372,13 @@ class WellnessPreviewCard extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         recapReady
-                            ? '${featured.label} recap is ready to revisit'
+                            ? tr('ins_recap_ready_revisit', namedArgs: {'period': _recapPeriodLabel(featured)})
                             : insights.isEmpty
-                                ? 'Your private viewing insights start here'
-                                : '${_duration(insights.totalWatchedMs)} this week • ${insights.completedTitles} completed',
+                                ? tr('ins_start_here')
+                                : tr('ins_this_week_summary', namedArgs: {
+                                    'time': _duration(insights.totalWatchedMs),
+                                    'n': '${insights.completedTitles}',
+                                  }),
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -1398,14 +1413,17 @@ class _InsightsToolbar extends StatelessWidget {
     final status = provider.syncService.status.value;
     final syncing = status == WellnessSyncStatus.syncing;
     final statusLabel = !provider.canSync
-        ? 'On this device'
+        ? tr('on_this_device')
         : syncing
-            ? 'Syncing…'
+            ? tr('ins_syncing')
             : status == WellnessSyncStatus.error
-                ? 'Sync paused'
+                ? tr('ins_sync_paused')
                 : provider.syncService.lastSynced.value == null
-                    ? 'Ready to sync'
-                    : 'Synced ${_relativeTime(provider.syncService.lastSynced.value!)}';
+                    ? tr('ins_ready_sync')
+                    : tr('ins_synced', namedArgs: {
+                        'time': _relativeTime(
+                            provider.syncService.lastSynced.value!),
+                      });
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1438,7 +1456,7 @@ class _InsightsToolbar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Your private viewing story',
+                      tr('ins_private_story'),
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     Text(
@@ -1457,7 +1475,7 @@ class _InsightsToolbar extends StatelessWidget {
                   busy: syncing,
                   onPressed: provider.syncNow,
                   icon: PhosphorIcons.arrowsClockwise(),
-                  label: 'Sync',
+                  label: tr('sync'),
                 ),
             ],
           ),
@@ -1481,10 +1499,10 @@ class _RangePicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labels = <WellnessRange, String>{
-      WellnessRange.week: 'Week',
-      WellnessRange.month: 'Month',
-      WellnessRange.year: 'Year',
-      WellnessRange.allTime: 'All time',
+      WellnessRange.week: tr('ins_week'),
+      WellnessRange.month: tr('ins_month'),
+      WellnessRange.year: tr('ins_year'),
+      WellnessRange.allTime: tr('ins_all_time'),
     };
     return Wrap(
       spacing: 8,
@@ -1513,10 +1531,14 @@ class _SectionNavigator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <(_InsightsSection, IconData, String)>[
-      (_InsightsSection.time, PhosphorIcons.clock(), 'Time'),
-      (_InsightsSection.titles, PhosphorIcons.filmSlate(), 'Titles'),
-      (_InsightsSection.taste, PhosphorIcons.palette(), 'Taste'),
-      (_InsightsSection.patterns, PhosphorIcons.calendarDots(), 'Patterns'),
+      (_InsightsSection.time, PhosphorIcons.clock(), tr('ins_time')),
+      (_InsightsSection.titles, PhosphorIcons.filmSlate(), tr('ins_titles')),
+      (_InsightsSection.taste, PhosphorIcons.palette(), tr('ins_taste')),
+      (
+        _InsightsSection.patterns,
+        PhosphorIcons.calendarDots(),
+        tr('ins_patterns')
+      ),
     ];
     return Wrap(
       spacing: 8,
@@ -1577,10 +1599,18 @@ class _HeroCard extends StatelessWidget {
     // has to be an opaque color rather than a wash over the gradient.
     final trailSurface = Color.alphaBlend(translucentSurface, rawGradient[1]);
     final comparison = range == WellnessRange.allTime
-        ? 'Across ${insights.activeDays} viewing days'
+        ? tr('ins_across_days', namedArgs: {'n': '${insights.activeDays}'})
         : previous.totalWatchedMs == 0
-            ? 'Your story is taking shape'
-            : '${_duration(difference.abs())} ${difference >= 0 ? 'more' : 'less'} than the previous ${_rangeName(range)}';
+            ? tr('ins_taking_shape')
+            : difference >= 0
+                ? tr('ins_more_than', namedArgs: {
+                    'time': _duration(difference.abs()),
+                    'range': _rangeName(range),
+                  })
+                : tr('ins_less_than', namedArgs: {
+                    'time': _duration(difference.abs()),
+                    'range': _rangeName(range),
+                  });
     return Container(
       key: const Key('wellness-hero-card'),
       clipBehavior: Clip.antiAlias,
@@ -1653,7 +1683,7 @@ class _HeroCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                'YOUR VIEWING STORY',
+                                tr('ins_your_story').toUpperCase(),
                                 style: Theme.of(context)
                                     .textTheme
                                     .labelSmall
@@ -1680,7 +1710,8 @@ class _HeroCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'active playback this ${_rangeName(range)}',
+                      tr('ins_playback_this',
+                          namedArgs: {'range': _rangeName(range)}),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: foreground.withValues(alpha: .82),
                           ),
@@ -1728,13 +1759,14 @@ class _HeroCard extends StatelessWidget {
                               height: 38,
                               color: foreground,
                               surfaceColor: trailSurface,
-                              semanticsLabel:
-                                  'Watch time for each of the last 14 days, '
-                                  'ending today at ${_duration(trail.last)}.',
+                              semanticsLabel: tr(
+                                'ins_trail_semantics',
+                                namedArgs: {'time': _duration(trail.last)},
+                              ),
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'LAST 14 DAYS',
+                              tr('ins_last_14').toUpperCase(),
                               style: Theme.of(context)
                                   .textTheme
                                   .labelSmall
@@ -1756,19 +1788,19 @@ class _HeroCard extends StatelessWidget {
                   children: [
                     _HeroMetric(
                       value: '${insights.completedTitles}',
-                      label: 'completed',
+                      label: tr('ins_completed'),
                       foreground: foreground,
                       surface: translucentSurface,
                     ),
                     _HeroMetric(
                       value: '${insights.activeDays}',
-                      label: 'active days',
+                      label: tr('ins_active_days_label'),
                       foreground: foreground,
                       surface: translucentSurface,
                     ),
                     _HeroMetric(
                       value: '${insights.sessionCount}',
-                      label: 'sessions',
+                      label: tr('ins_sessions'),
                       foreground: foreground,
                       surface: translucentSurface,
                     ),
@@ -1891,7 +1923,7 @@ class _RecapShelf extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      ready ? 'RECAP READY' : 'YOUR RECAPS',
+                      (ready ? tr('ins_recap_ready') : tr('ins_your_recaps')).toUpperCase(),
                       style: TextStyle(
                         color: ready ? colors.primary : colors.onSurfaceVariant,
                         fontFamily: 'FigtreeSB',
@@ -1912,15 +1944,21 @@ class _RecapShelf extends StatelessWidget {
                 const SizedBox(height: 14),
                 Text(
                   ready
-                      ? '${featured.label} recap is ready'
-                      : '${featured.label} recap is taking shape',
+                      ? tr('ins_recap_is_ready', namedArgs: {'period': _recapPeriodLabel(featured)})
+                      : tr('ins_recap_shaping', namedArgs: {'period': _recapPeriodLabel(featured)}),
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 5),
                 Text(
                   featuredInsights.isEmpty
-                      ? 'Your next viewing session will start filling in this story.'
-                      : '${_duration(featuredInsights.totalWatchedMs)} watched · ${featuredInsights.completedTitles} completed · ${featuredInsights.activeDays} active ${featuredInsights.activeDays == 1 ? 'day' : 'days'}',
+                      ? tr('ins_next_session')
+                      : tr('ins_shelf_summary', namedArgs: {
+                          'time':
+                              _duration(featuredInsights.totalWatchedMs),
+                          'completed': '${featuredInsights.completedTitles}',
+                          'days': plural(
+                              'ins_active_days', featuredInsights.activeDays),
+                        }),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colors.onSurfaceVariant,
                       ),
@@ -1934,7 +1972,7 @@ class _RecapShelf extends StatelessWidget {
                   icon: ready
                       ? PhosphorIcons.sparkle()
                       : PhosphorIcons.arrowUpRight(),
-                  label: ready ? 'See my recap' : 'Preview recap',
+                  label: ready ? tr('ins_see_recap') : tr('ins_preview_recap'),
                 ),
                 if (quickPeriods.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -2030,15 +2068,15 @@ class _StatGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stats = <(IconData, String, String)>[
-      (PhosphorIcons.filmSlate(), '${insights.completedMovies}', 'movies'),
-      (PhosphorIcons.television(), '${insights.completedEpisodes}', 'episodes'),
-      (PhosphorIcons.stack(), '${insights.uniqueSeries}', 'series'),
-      (PhosphorIcons.playCircle(), '${insights.sessionCount}', 'sessions'),
-      (PhosphorIcons.calendarDots(), '${insights.activeDays}', 'active days'),
+      (PhosphorIcons.filmSlate(), '${insights.completedMovies}', tr('ins_stat_movies')),
+      (PhosphorIcons.television(), '${insights.completedEpisodes}', tr('ins_stat_episodes')),
+      (PhosphorIcons.stack(), '${insights.uniqueSeries}', tr('ins_stat_series')),
+      (PhosphorIcons.playCircle(), '${insights.sessionCount}', tr('ins_sessions')),
+      (PhosphorIcons.calendarDots(), '${insights.activeDays}', tr('ins_active_days_label')),
       (
         PhosphorIcons.arrowCounterClockwise(),
         '${insights.rewatches}',
-        'rewatches'
+        tr('ins_stat_rewatches')
       ),
     ];
     return LayoutBuilder(
@@ -2139,16 +2177,16 @@ class _MediaBreakdownState extends State<_MediaBreakdown> {
     // Fixed order, fixed slots: movies always wear slot 1, so a period with no
     // live TV never repaints episodes.
     final entries = <(String, int, Color)>[
-      ('Movies', insights.movieMs, palette.categorical[0]),
-      ('Episodes', insights.episodeMs, palette.categorical[1]),
-      ('Live TV', insights.liveMs, palette.categorical[2]),
+      (tr('movies'), insights.movieMs, palette.categorical[0]),
+      (tr('episodes'), insights.episodeMs, palette.categorical[1]),
+      (tr('live_tv'), insights.liveMs, palette.categorical[2]),
     ];
     final total = entries.fold<int>(0, (sum, entry) => sum + entry.$2);
     final selected = _selected;
     final centerLabel =
         selected == null ? _duration(total) : _duration(entries[selected].$2);
     final centerCaption = selected == null
-        ? 'total playback'
+        ? tr('ins_total_playback')
         : '${entries[selected].$1} · ${_share(entries[selected].$2, total)}';
 
     void select(int? index) => setState(() => _selected = index);
@@ -2193,12 +2231,12 @@ class _MediaBreakdownState extends State<_MediaBreakdown> {
             children: [
               Expanded(
                 child: Text(
-                  'Playback mix',
+                  tr('ins_playback_mix'),
                   style: theme.textTheme.titleMedium,
                 ),
               ),
               Text(
-                'Tap a slice',
+                tr('ins_tap_slice'),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -2413,12 +2451,12 @@ class _HistoryPanel extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Viewing history',
+                tr('ins_history'),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
             Text(
-              '${sessions.length} recent',
+              tr('ins_recent_count', namedArgs: {'n': '${sessions.length}'}),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
                     fontFamily: 'Figtree',
@@ -2522,7 +2560,11 @@ class _HistoryRow extends StatelessWidget {
                     icon: session.completed
                         ? PhosphorIcons.checkCircle()
                         : PhosphorIcons.playCircle(),
-                    label: session.viewingStatus,
+                    label: switch (session.viewingStatus) {
+                      'completed' => tr('ins_completed'),
+                      'sampled' => tr('ins_sampled'),
+                      _ => tr('ins_in_progress'),
+                    },
                     color: statusColor,
                   ),
                 ],
@@ -2542,7 +2584,7 @@ class _HistoryRow extends StatelessWidget {
           ),
         ),
         IconButton(
-          tooltip: 'Remove from insights',
+          tooltip: tr('ins_remove_tooltip'),
           visualDensity: VisualDensity.compact,
           onPressed: () => _confirmDelete(context),
           icon: Icon(
@@ -2559,18 +2601,18 @@ class _HistoryRow extends StatelessWidget {
     final remove = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove this activity?'),
+        title: Text(tr('ins_remove_q')),
         content: Text(
-          '${session.title} will no longer be included in your viewing insights.',
+          tr('ins_remove_body', namedArgs: {'title': session.title}),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep'),
+            child: Text(tr('ins_keep')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
+            child: Text(tr('remove')),
           ),
         ],
       ),
@@ -2628,55 +2670,68 @@ class _InsightStrip extends StatelessWidget {
       if (streak > 1)
         (
           PhosphorIcons.flame(),
-          'You have watched something $streak days running — your longest run '
-              'is ${insights.longestStreakDays} days.',
+          tr('ins_obs_streak', namedArgs: {
+            'n': '$streak',
+            'longest': '${insights.longestStreakDays}',
+          }),
         ),
       if (peak != null)
         (
           PhosphorIcons.clock(),
-          'Your most reliable window is ${_weekdayName(peak.$1)} at '
-              '${_hourRange(peak.$2)}, ${_duration(peak.$3)} in total.',
+          tr('ins_obs_window', namedArgs: {
+            'day': _weekdayName(peak.$1),
+            'hours': _hourRange(peak.$2),
+            'time': _duration(peak.$3),
+          }),
         ),
       if (busiest != null)
         (
           PhosphorIcons.calendarStar(),
-          'Your heaviest day was ${DateFormat.MMMEd().format(busiest.$1)} at '
-              '${_duration(busiest.$2)}.',
+          tr('ins_obs_heaviest', namedArgs: {
+            'date': DateFormat.MMMEd().format(busiest.$1),
+            'time': _duration(busiest.$2),
+          }),
         ),
       if (insights.averageSessionMs > 0)
         (
           PhosphorIcons.hourglass(),
-          'A typical sitting runs ${_duration(insights.averageSessionMs)}, and '
-              'a typical active day ${_duration(insights.medianActiveDayMs)}.',
+          tr('ins_obs_typical', namedArgs: {
+            'session': _duration(insights.averageSessionMs),
+            'day': _duration(insights.medianActiveDayMs),
+          }),
         ),
       if (total > 0 && insights.lateNightMs > 0)
         (
           PhosphorIcons.moon(),
-          '${_share(insights.lateNightMs, total)} of your viewing happens '
-              'after 10pm.',
+          tr('ins_obs_late',
+              namedArgs: {'share': _share(insights.lateNightMs, total)}),
         ),
       if (insights.titlesStarted > 0)
         (
           PhosphorIcons.checkCircle(),
-          'You finish ${_percent(insights.completionRate)} of what you start '
-              '(${insights.completedTitles} of ${insights.titlesStarted}).',
+          tr('ins_obs_finish', namedArgs: {
+            'share': _percent(insights.completionRate),
+            'done': '${insights.completedTitles}',
+            'started': '${insights.titlesStarted}',
+          }),
         ),
       if (insights.longestSessionMs > 0)
         (
           PhosphorIcons.filmSlate(),
-          'Your longest single session was '
-              '${_duration(insights.longestSessionMs)}.',
+          tr('ins_obs_longest',
+              namedArgs: {'time': _duration(insights.longestSessionMs)}),
         ),
       if (insights.topTitles.isNotEmpty)
         (
           PhosphorIcons.crown(),
-          '${insights.topTitles.first.label} held the most viewing time.',
+          tr('ins_obs_top',
+              namedArgs: {'title': insights.topTitles.first.label}),
         ),
     ];
     if (observations.isEmpty) {
       return _Panel(
         child: Text(
-          'Watch a few things and this is where the patterns show up.',
+          tr('ins_obs_empty'),
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -2687,7 +2742,7 @@ class _InsightStrip extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('What stands out', style: theme.textTheme.titleMedium),
+          Text(tr('ins_stands_out'), style: theme.textTheme.titleMedium),
           const SizedBox(height: 6),
           for (final observation in observations)
             Padding(
@@ -2770,9 +2825,12 @@ class _TimelinePanelState extends State<_TimelinePanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Watch time', style: theme.textTheme.titleMedium),
+                    Text(tr('ins_watch_time'), style: theme.textTheme.titleMedium),
                     Text(
-                      'by ${series.unitLabel} · ${_rangeName(widget.range)}',
+                      tr('ins_by_unit', namedArgs: {
+                        'unit': _unitName(series.unitLabel),
+                        'range': _rangeName(widget.range),
+                      }),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -2804,9 +2862,12 @@ class _TimelinePanelState extends State<_TimelinePanel> {
             onSelected: (index) => setState(() => _selected = index),
             averageMs: series.averageMs,
             surfaceColor: surface,
-            semanticsLabel: 'Watch time by ${series.unitLabel}. Total '
-                '${_duration(series.totalMs)} across ${series.activeBuckets} '
-                'active ${series.unitLabel}s.',
+            semanticsLabel: tr('ins_timeline_semantics', namedArgs: {
+              'unit': _unitName(series.unitLabel),
+              'time': _duration(series.totalMs),
+              'n': '${series.activeBuckets}',
+              'units': _unitNames(series.unitLabel),
+            }),
           ),
           const SizedBox(height: 14),
           if (selected == null)
@@ -2816,7 +2877,7 @@ class _TimelinePanelState extends State<_TimelinePanel> {
               bucket: series.buckets[selected],
               periodTotalMs: series.totalMs,
               sessions: widget.insights.sessions,
-              unitLabel: series.unitLabel,
+              unitLabel: _unitName(series.unitLabel),
               onClose: () => setState(() => _selected = null),
             ),
           const SizedBox(height: 6),
@@ -2828,7 +2889,7 @@ class _TimelinePanelState extends State<_TimelinePanel> {
                 _showTable ? PhosphorIcons.caretUp() : PhosphorIcons.table(),
                 size: 16,
               ),
-              label: Text(_showTable ? 'Hide values' : 'All values'),
+              label: Text(_showTable ? tr('ins_hide_values') : tr('ins_all_values')),
             ),
           ),
           if (_showTable)
@@ -2858,7 +2919,7 @@ class _TimelineSummary extends StatelessWidget {
       color: theme.colorScheme.onSurfaceVariant,
     );
     if (series.isEmpty) {
-      return Text('Nothing recorded in this range yet.', style: style);
+      return Text(tr('ins_nothing_range'), style: style);
     }
     final peak = series.buckets[busiest];
     return Row(
@@ -2872,11 +2933,14 @@ class _TimelineSummary extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Tap any bar for that ${series.unitLabel}. Busiest was '
-            '${peak.fullLabel} at ${_duration(peak.totalMs)}; the level line '
-            'marks your ${_duration(series.averageMs.round())} average across '
-            '${series.activeBuckets} active ${series.unitLabel}'
-            '${series.activeBuckets == 1 ? '' : 's'}.',
+            tr('ins_timeline_summary', namedArgs: {
+              'unit': _unitName(series.unitLabel),
+              'label': peak.fullLabel,
+              'time': _duration(peak.totalMs),
+              'average': _duration(series.averageMs.round()),
+              'n': '${series.activeBuckets}',
+              'units': _unitNames(series.unitLabel),
+            }),
             style: style,
           ),
         ),
@@ -2938,7 +3002,7 @@ class _BucketCallout extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         bucket.isEmpty
-                            ? 'No viewing recorded'
+                            ? tr('ins_no_viewing')
                             : _duration(bucket.totalMs),
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w800,
@@ -2946,9 +3010,11 @@ class _BucketCallout extends StatelessWidget {
                       ),
                       if (!bucket.isEmpty)
                         Text(
-                          '${_share(bucket.totalMs, periodTotalMs)} of the '
-                          'range · ${inside.length} '
-                          'session${inside.length == 1 ? '' : 's'}',
+                          tr('ins_bucket_share', namedArgs: {
+                            'share': _share(bucket.totalMs, periodTotalMs),
+                            'sessions':
+                                plural('ins_session_count', inside.length),
+                          }),
                           style: theme.textTheme.labelMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -2957,7 +3023,7 @@ class _BucketCallout extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Clear selection',
+                  tooltip: tr('ins_clear_selection'),
                   visualDensity: VisualDensity.compact,
                   onPressed: onClose,
                   icon: Icon(PhosphorIcons.x(), size: 16),
@@ -2969,17 +3035,17 @@ class _BucketCallout extends StatelessWidget {
               WellnessSplitMeter(
                 parts: [
                   WellnessSplitPart(
-                    label: 'Movies',
+                    label: tr('movies'),
                     value: split.movieMs,
                     color: palette.categorical[0],
                   ),
                   WellnessSplitPart(
-                    label: 'Episodes',
+                    label: tr('episodes'),
                     value: split.episodeMs,
                     color: palette.categorical[1],
                   ),
                   WellnessSplitPart(
-                    label: 'Live TV',
+                    label: tr('live_tv'),
                     value: split.liveMs,
                     color: palette.categorical[2],
                   ),
@@ -3027,7 +3093,11 @@ class _BucketCallout extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    '+${inside.length - 3} more this $unitLabel',
+                    tr('ins_more_this',
+                        namedArgs: {
+                          'n': '${inside.length - 3}',
+                          'unit': unitLabel,
+                        }),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -3076,7 +3146,7 @@ class _ValuesTable extends StatelessWidget {
                 ),
               ),
               Text(
-                'TIME',
+                tr('ins_col_time').toUpperCase(),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   letterSpacing: 1,
@@ -3086,7 +3156,7 @@ class _ValuesTable extends StatelessWidget {
               SizedBox(
                 width: 46,
                 child: Text(
-                  'SHARE',
+                  tr('ins_col_share').toUpperCase(),
                   textAlign: TextAlign.right,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
@@ -3178,11 +3248,12 @@ class _ConsistencyPanel extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Consistency', style: theme.textTheme.titleMedium),
+                    Text(tr('ins_consistency'),
+                        style: theme.textTheme.titleMedium),
                     Text(
                       current == 0
-                          ? 'No active streak right now'
-                          : '$current day${current == 1 ? '' : 's'} in a row',
+                          ? tr('ins_no_streak')
+                          : plural('ins_streak_row', current),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -3200,7 +3271,7 @@ class _ConsistencyPanel extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'longest streak',
+                    tr('ins_longest_streak'),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -3213,22 +3284,25 @@ class _ConsistencyPanel extends StatelessWidget {
           WellnessSparkline(
             values: recent,
             surfaceColor: surface,
-            semanticsLabel: 'Daily watch time for the last 14 days. '
-                '$recentActive of 14 days had viewing.',
+            semanticsLabel: tr('ins_daily_semantics',
+                namedArgs: {'n': '$recentActive'}),
           ),
           const SizedBox(height: 4),
           Row(
             children: [
               Expanded(
                 child: Text(
-                  'Last 14 days · $recentActive active',
+                  tr('ins_last_14_active', namedArgs: {'n': '$recentActive'}),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
               Text(
-                'Peak ${_duration(recent.fold<int>(0, math.max))}/day',
+                tr('ins_peak_day',
+                    namedArgs: {
+                      'time': _duration(recent.fold<int>(0, math.max)),
+                    }),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -3237,14 +3311,16 @@ class _ConsistencyPanel extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           WellnessMeter(
-            label: 'Days with viewing',
+            label: tr('ins_days_with_viewing'),
             valueLabel: _percent(insights.activeDayShare),
             ratio: insights.activeDayShare,
             // periodDays stops at the last recorded day, so "tracked so far"
             // is what the share actually measures.
-            caption: '${insights.activeDays} of ${insights.periodDays} days '
-                'tracked so far · typical active day '
-                '${_duration(insights.medianActiveDayMs)}',
+            caption: tr('ins_days_caption', namedArgs: {
+              'active': '${insights.activeDays}',
+              'total': '${insights.periodDays}',
+              'time': _duration(insights.medianActiveDayMs),
+            }),
             surfaceColor: surface,
           ),
         ],
@@ -3294,9 +3370,9 @@ class _RhythmPanelState extends State<_RhythmPanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Weekly rhythm', style: theme.textTheme.titleMedium),
+                    Text(tr('ins_weekly_rhythm'), style: theme.textTheme.titleMedium),
                     Text(
-                      'Every hour you watched, summed across this range',
+                      tr('ins_rhythm_desc'),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -3305,7 +3381,7 @@ class _RhythmPanelState extends State<_RhythmPanel> {
                 ),
               ),
               Text(
-                'Tap a cell',
+                tr('ins_tap_cell'),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -3323,23 +3399,31 @@ class _RhythmPanelState extends State<_RhythmPanel> {
           const SizedBox(height: 12),
           if (selected != null)
             Text(
-              '${_weekdayName(selected.$1)} at ${_hourRange(selected.$2)} — '
-              '${selectedMs == 0 ? 'nothing watched' : _duration(selectedMs)}',
+              tr('ins_cell_selected', namedArgs: {
+                'day': _weekdayName(selected.$1),
+                'hours': _hourRange(selected.$2),
+                'value': selectedMs == 0
+                    ? tr('ins_nothing_watched')
+                    : _duration(selectedMs),
+              }),
               style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             )
           else if (peak != null)
             Text(
-              'Your steadiest window is ${_weekdayName(peak.$1)} at '
-              '${_hourRange(peak.$2)} — ${_duration(peak.$3)} in total.',
+              tr('ins_steadiest', namedArgs: {
+                'day': _weekdayName(peak.$1),
+                'hours': _hourRange(peak.$2),
+                'time': _duration(peak.$3),
+              }),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             )
           else
             Text(
-              'Watch a little more and your weekly shape will appear here.',
+              tr('ins_rhythm_empty'),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -3364,8 +3448,14 @@ class _DayPartsPanel extends StatefulWidget {
 class _DayPartsPanelState extends State<_DayPartsPanel> {
   int? _selected;
 
-  static const _labels = ['Morning', 'Afternoon', 'Evening', 'Late night'];
   static const _windows = ['5a–12p', '12–5p', '5–10p', '10p–5a'];
+
+  List<String> get _labels => [
+        tr('ins_morning'),
+        tr('ins_afternoon'),
+        tr('ins_evening'),
+        tr('ins_late_night'),
+      ];
 
   @override
   void didUpdateWidget(_DayPartsPanel oldWidget) {
@@ -3387,7 +3477,7 @@ class _DayPartsPanelState extends State<_DayPartsPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('How your day splits', style: theme.textTheme.titleMedium),
+          Text(tr('ins_day_split'), style: theme.textTheme.titleMedium),
           const SizedBox(height: 16),
           WellnessOrdinalBars(
             key: const Key('wellness-day-parts'),
@@ -3406,11 +3496,13 @@ class _DayPartsPanelState extends State<_DayPartsPanel> {
           const SizedBox(height: 10),
           Text(
             selected == null
-                ? 'Ordered from morning to late night — darker means later in '
-                    'the day, longer means more time.'
-                : '${_labels[selected]} (${_windows[selected]}): '
-                    '${_duration(parts[selected])}, '
-                    '${_share(parts[selected], total)} of your viewing.',
+                ? tr('ins_dayparts_hint')
+                : tr('ins_daypart_selected', namedArgs: {
+                    'part': _labels[selected],
+                    'window': _windows[selected],
+                    'time': _duration(parts[selected]),
+                    'share': _share(parts[selected], total),
+                  }),
             style: theme.textTheme.bodySmall?.copyWith(
               color: selected == null
                   ? theme.colorScheme.onSurfaceVariant
@@ -3420,7 +3512,7 @@ class _DayPartsPanelState extends State<_DayPartsPanel> {
           ),
           const Divider(height: 30),
           Text(
-            'Weekdays vs weekend',
+            tr('ins_weekdays_weekend'),
             style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -3429,12 +3521,12 @@ class _DayPartsPanelState extends State<_DayPartsPanel> {
           WellnessSplitMeter(
             parts: [
               WellnessSplitPart(
-                label: 'Mon–Fri',
+                label: tr('ins_mon_fri'),
                 value: weekday,
                 color: palette.categorical[0],
               ),
               WellnessSplitPart(
-                label: 'Sat–Sun',
+                label: tr('ins_sat_sun'),
                 value: weekend,
                 color: palette.categorical[1],
               ),
@@ -3444,13 +3536,14 @@ class _DayPartsPanelState extends State<_DayPartsPanel> {
           ),
           const SizedBox(height: 14),
           WellnessMeter(
-            label: 'After 10pm',
+            label: tr('ins_after_10'),
             valueLabel: _percent(
               total == 0 ? 0 : widget.insights.lateNightMs / total,
             ),
             ratio: total == 0 ? 0 : widget.insights.lateNightMs / total,
-            caption: '${_duration(widget.insights.lateNightMs)} of viewing '
-                'landed between 10pm and 5am.',
+            caption: tr('ins_late_caption', namedArgs: {
+              'time': _duration(widget.insights.lateNightMs),
+            }),
             surfaceColor: surface,
           ),
         ],
@@ -3470,24 +3563,26 @@ class _CompletionPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final surface = _insightSurface(context);
     final stats = <(String, String)>[
-      ('${insights.titlesStarted}', 'started'),
-      ('${insights.completedTitles}', 'finished'),
-      ('${insights.sampledTitles}', 'sampled'),
-      ('${insights.rewatches}', 'rewatched'),
+      ('${insights.titlesStarted}', tr('ins_started')),
+      ('${insights.completedTitles}', tr('ins_finished')),
+      ('${insights.sampledTitles}', tr('ins_sampled')),
+      ('${insights.rewatches}', tr('ins_rewatched')),
     ];
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Follow-through', style: theme.textTheme.titleMedium),
+          Text(tr('ins_follow_through'), style: theme.textTheme.titleMedium),
           const SizedBox(height: 14),
           WellnessMeter(
-            label: 'Titles finished',
+            label: tr('ins_titles_finished'),
             valueLabel: _percent(insights.completionRate),
             ratio: insights.completionRate,
-            caption: '${insights.completedTitles} of '
-                '${insights.titlesStarted} titles you started · average '
-                'session ${_duration(insights.averageSessionMs)}',
+            caption: tr('ins_completion_caption', namedArgs: {
+              'done': '${insights.completedTitles}',
+              'started': '${insights.titlesStarted}',
+              'time': _duration(insights.averageSessionMs),
+            }),
             surfaceColor: surface,
           ),
           const SizedBox(height: 16),
@@ -3520,8 +3615,7 @@ class _CompletionPanel extends StatelessWidget {
           if (insights.sampledTitles > 0) ...[
             const SizedBox(height: 12),
             Text(
-              'Sampled means under two minutes and under 5% watched — dropped '
-              'early, not counted against you.',
+              tr('ins_sampled_note'),
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -3547,11 +3641,11 @@ class _GuestMergeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Add this device’s guest history?',
+            Text(tr('ins_guest_q'),
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 6),
-            const Text(
-              'Guest viewing may belong to someone else. It will stay separate unless you choose to merge it.',
+            Text(
+              tr('ins_guest_desc'),
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -3559,11 +3653,11 @@ class _GuestMergeCard extends StatelessWidget {
               children: [
                 FilledButton(
                   onPressed: provider.mergeGuestHistory,
-                  child: const Text('Merge with my account'),
+                  child: Text(tr('ins_guest_merge')),
                 ),
                 TextButton(
                   onPressed: provider.dismissGuestMerge,
-                  child: const Text('Keep separate'),
+                  child: Text(tr('ins_guest_keep')),
                 ),
               ],
             ),
@@ -3609,13 +3703,13 @@ class _PrivacyNote extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Private by design',
+                Text(tr('ins_private'),
                     style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 3),
                 Text(
                   canSync
-                      ? 'Stored in SQLite on this device and synced to your FlixQuest account. This history is not sent to product analytics.'
-                      : 'Stored only in SQLite on this device. Sign in when you want to sync it across devices.',
+                      ? tr('ins_private_synced')
+                      : tr('ins_private_local'),
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
@@ -3664,14 +3758,14 @@ class _WellnessEmptyState extends StatelessWidget {
           const SizedBox(height: 20),
           Text(
               hasHistory
-                  ? 'Nothing watched in this period'
-                  : 'Your viewing story starts here',
+                  ? tr('ins_empty_period')
+                  : tr('ins_empty_start'),
               style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 8),
           Text(
             hasHistory
-                ? 'Try another time range to revisit your earlier viewing activity.'
-                : 'Watch for at least 30 seconds and FlixQuest will begin building private insights about your time, titles, taste, and patterns.',
+                ? tr('ins_empty_period_desc')
+                : tr('ins_empty_start_desc'),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -3683,11 +3777,15 @@ class _WellnessEmptyState extends StatelessWidget {
             alignment: WrapAlignment.center,
             spacing: 8,
             runSpacing: 8,
-            children: const [
-              _EmptyFeature(icon: Icons.schedule_rounded, label: 'Time'),
-              _EmptyFeature(icon: Icons.movie_outlined, label: 'Titles'),
-              _EmptyFeature(icon: Icons.palette_outlined, label: 'Taste'),
-              _EmptyFeature(icon: Icons.grid_view_rounded, label: 'Patterns'),
+            children: [
+              _EmptyFeature(
+                  icon: Icons.schedule_rounded, label: tr('ins_time')),
+              _EmptyFeature(
+                  icon: Icons.movie_outlined, label: tr('ins_titles')),
+              _EmptyFeature(
+                  icon: Icons.palette_outlined, label: tr('ins_taste')),
+              _EmptyFeature(
+                  icon: Icons.grid_view_rounded, label: tr('ins_patterns')),
             ],
           ),
         ],
@@ -3850,7 +3948,7 @@ String _share(int value, int total) =>
 
 String _percent(double ratio) => '${(ratio.clamp(0.0, 1.0) * 100).round()}%';
 
-String _episodeCount(int value) => '$value ep${value == 1 ? '' : 's'}';
+String _episodeCount(int value) => plural('ins_episode_count', value);
 
 String _weekdayName(int mondayFirstIndex) =>
     DateFormat.EEEE().format(DateTime(2024, 1, 1 + mondayFirstIndex));
@@ -3863,29 +3961,68 @@ String _hourRange(int hour) {
 }
 
 String _trackingSince(List<WellnessViewingSession> sessions) {
-  if (sessions.isEmpty) return 'Tracking begins with your next viewing session';
+  if (sessions.isEmpty) return tr('ins_tracking_begins');
   final oldest = sessions.reduce(
     (current, session) =>
         session.startedAtUtc.isBefore(current.startedAtUtc) ? session : current,
   );
   final local =
       oldest.startedAtUtc.add(Duration(minutes: oldest.timezoneOffsetMinutes));
-  return 'Tracking since ${DateFormat.yMMMd().format(local)}';
+  return tr('ins_tracking_since',
+      namedArgs: {'date': DateFormat.yMMMd().format(local)});
 }
 
 String _relativeTime(DateTime value) {
   final difference = DateTime.now().difference(value);
-  if (difference.inMinutes < 1) return 'just now';
-  if (difference.inHours < 1) return '${difference.inMinutes}m ago';
-  if (difference.inDays < 1) return '${difference.inHours}h ago';
+  if (difference.inMinutes < 1) return tr('just_now');
+  if (difference.inHours < 1) {
+    return tr('n_minutes_ago',
+        namedArgs: {'n': '${difference.inMinutes}'});
+  }
+  if (difference.inDays < 1) {
+    return tr('n_hours_ago', namedArgs: {'n': '${difference.inHours}'});
+  }
   return DateFormat.MMMd().format(value);
 }
 
+String _unitName(String unit) => switch (unit) {
+      'day' => tr('ins_unit_day'),
+      'week' => tr('ins_unit_week'),
+      'month' => tr('ins_unit_month'),
+      'year' => tr('ins_unit_year'),
+      _ => tr('ins_unit_block'),
+    };
+
+String _unitNames(String unit) => switch (unit) {
+      'day' => tr('ins_unit_days'),
+      'week' => tr('ins_unit_weeks'),
+      'month' => tr('ins_unit_months'),
+      'year' => tr('ins_unit_years'),
+      _ => tr('ins_unit_blocks'),
+    };
+
+String _recapPeriodLabel(WellnessRecapPeriod period) => switch (period.kind) {
+      WellnessRecapPeriodKind.day => tr('today'),
+      WellnessRecapPeriodKind.week => tr('this_week'),
+      WellnessRecapPeriodKind.month ||
+      WellnessRecapPeriodKind.year =>
+        period.label,
+    };
+
+String _recapCaptionLabel(WellnessRecapPeriod period) =>
+    switch (period.kind) {
+      WellnessRecapPeriodKind.day => tr('ins_caption_today'),
+      WellnessRecapPeriodKind.week => tr('ins_caption_week'),
+      WellnessRecapPeriodKind.month ||
+      WellnessRecapPeriodKind.year =>
+        tr('ins_caption_named', namedArgs: {'period': period.label}),
+    };
+
 String _rangeName(WellnessRange range) => switch (range) {
-      WellnessRange.week => 'week',
-      WellnessRange.month => 'month',
-      WellnessRange.year => 'year',
-      WellnessRange.allTime => 'all time',
+      WellnessRange.week => tr('ins_range_week'),
+      WellnessRange.month => tr('ins_range_month'),
+      WellnessRange.year => tr('ins_range_year'),
+      WellnessRange.allTime => tr('ins_range_all'),
     };
 
 /// The recap card's bars come from the same bucketing as the live chart, so a

@@ -107,22 +107,28 @@ abstract final class MobilePlayback {
     int? elapsed,
   }) {
     final movie = item.movie;
+    debugPrint(
+      '[MovieRecommendationsDebug][MOBILE_PLAYBACK_PLAY] '
+      'movieId=${item.id} title=${item.title} '
+      'recommendationsProvided=false (fetched by MovieVideoLoader)',
+    );
+    final metadata = MovieStreamMetadata(
+      backdropPath: item.backdropPath,
+      elapsed: elapsed,
+      movieId: item.id,
+      movieName: item.title,
+      posterPath: item.posterPath,
+      releaseYear: int.tryParse(item.year ?? '') ??
+          item.recentMovie?.releaseYear ??
+          0,
+      isAdult: movie?.adult,
+      releaseDate: item.releaseDate ?? movie?.releaseDate,
+    );
     return Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => MovieVideoLoader(
           download: false,
-          metadata: MovieStreamMetadata(
-            backdropPath: item.backdropPath,
-            elapsed: elapsed,
-            movieId: item.id,
-            movieName: item.title,
-            posterPath: item.posterPath,
-            releaseYear: int.tryParse(item.year ?? '') ??
-                item.recentMovie?.releaseYear ??
-                0,
-            isAdult: movie?.adult,
-            releaseDate: item.releaseDate ?? movie?.releaseDate,
-          ),
+          metadata: metadata,
         ),
       ),
     );

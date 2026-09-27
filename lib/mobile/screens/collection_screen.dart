@@ -13,6 +13,7 @@ import '../../widgets/hosted_ads_banner.dart';
 import '../widgets/filter_chips.dart';
 import '../widgets/pill_button.dart';
 import '../widgets/poster_card.dart';
+import '../widgets/poster_grid.dart';
 import '../widgets/media_rows.dart';
 
 /// A genre's or a service's titles in a grid, a page at a time as the viewer
@@ -187,12 +188,7 @@ class _CollectionGridState extends State<_CollectionGrid> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final gutter = widget.gutter;
-    final width = MediaQuery.sizeOf(context).width;
-    final columns = width >= AppBreakpoints.wide
-        ? 6
-        : width >= AppBreakpoints.tablet
-            ? 5
-            : 3;
+    final columns = posterGridColumns(context);
     return NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
       child: CustomScrollView(
@@ -209,15 +205,11 @@ class _CollectionGridState extends State<_CollectionGrid> {
           SliverPadding(
             padding: EdgeInsets.fromLTRB(gutter, AppSpace.sm, gutter, 0),
             sliver: SliverGrid.builder(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: columns,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: PosterCard.aspectRatio,
-              ),
+              gridDelegate: posterGridDelegate(context),
               // While a page comes, posters' places pulse where it'll go:
               // the rest of the last row and the one after.
-              itemCount: _items.length + (_loading ? _placeholders(columns) : 0),
+              itemCount:
+                  _items.length + (_loading ? _placeholders(columns) : 0),
               itemBuilder: (context, index) => index >= _items.length
                   ? const SkeletonBlock()
                   : LayoutBuilder(

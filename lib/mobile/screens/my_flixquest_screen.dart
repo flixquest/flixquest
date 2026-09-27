@@ -400,12 +400,10 @@ class _ProfileHeaderContent extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppSpace.md),
-        Flexible(
-          child: PillButton(
-            label: actionLabel,
-            icon: actionIcon,
-            onPressed: onAction,
-          ),
+        PillButton(
+          label: actionLabel,
+          icon: actionIcon,
+          onPressed: onAction,
         ),
       ],
     );

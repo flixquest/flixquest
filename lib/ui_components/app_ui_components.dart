@@ -417,61 +417,6 @@ class AppRatingBadge extends StatelessWidget {
   }
 }
 
-class AppMediaGridShimmer extends StatelessWidget {
-  const AppMediaGridShimmer({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final loadingColors = AppLoadingColors.of(context);
-    final base = loadingColors.shimmerBase;
-    return SkeletonTint(
-      child: GridView.builder(
-        padding: EdgeInsets.fromLTRB(
-            AppUI.pagePadding(context), 12, AppUI.pagePadding(context), 24),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: AppUI.mediaGridColumns(context),
-          childAspectRatio: AppUI.mediaGridChildAspectRatio(context),
-          crossAxisSpacing: AppUI.mediaGridCrossAxisSpacing,
-          mainAxisSpacing: 16,
-        ),
-        itemCount: AppUI.mediaGridColumns(context) * 4,
-        itemBuilder: (_, __) => Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            AspectRatio(
-              aspectRatio: AppUI.posterAspectRatio,
-              child: _ShimmerBlock(
-                width: double.infinity,
-                height: double.infinity,
-                color: base,
-                radius: AppUI.cardRadius,
-              ),
-            ),
-            const SizedBox(height: AppUI.mediaGridTitleGap),
-            SizedBox(
-              height: AppUI.mediaGridTitleHeight,
-              child: Column(
-                children: [
-                  FractionallySizedBox(
-                    widthFactor: .84,
-                    child: _ShimmerBlock(
-                      width: double.infinity,
-                      height: 13,
-                      color: base,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  _ShimmerBlock(width: 54, height: 11, color: base),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class AppEmptyState extends StatelessWidget {
   const AppEmptyState({
     required this.title,
@@ -563,32 +508,6 @@ class AppCachedImagePlaceholder extends StatelessWidget {
     return ColoredBox(
       color: AppLoadingColors.of(context).cachedImagePlaceholder,
       child: child,
-    );
-  }
-}
-
-class _ShimmerBlock extends StatelessWidget {
-  const _ShimmerBlock({
-    required this.width,
-    required this.height,
-    required this.color,
-    this.radius = 8,
-  });
-
-  final double width;
-  final double height;
-  final double radius;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(radius),
-      ),
     );
   }
 }

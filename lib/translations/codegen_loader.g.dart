@@ -1105,7 +1105,9 @@ class CodegenLoader extends AssetLoader{
   "player_live_stalled": "The live stream stopped responding.",
   "player_switch_channel_failed": "Unable to switch to that channel.",
   "player_did_not_recover": "This channel did not recover after several attempts.",
-  "player_no_playable_stream": "This channel returned no playable stream."
+  "player_no_playable_stream": "This channel returned no playable stream.",
+  "ins_in_progress": "In progress",
+  "ins_clear_selection": "Clear selection"
 };
 static const Map<String,dynamic> _hi = {
   "popularity_descending": "लोकप्रियता घटती",
@@ -2198,7 +2200,9 @@ static const Map<String,dynamic> _hi = {
   "player_live_stalled": "लाइव स्ट्रीम ने जवाब देना बंद कर दिया।",
   "player_switch_channel_failed": "उस चैनल पर स्विच नहीं किया जा सका।",
   "player_did_not_recover": "कई प्रयासों के बाद भी यह चैनल बहाल नहीं हुआ।",
-  "player_no_playable_stream": "इस चैनल से कोई चलाने योग्य स्ट्रीम नहीं मिली।"
+  "player_no_playable_stream": "इस चैनल से कोई चलाने योग्य स्ट्रीम नहीं मिली।",
+  "ins_in_progress": "जारी",
+  "ins_clear_selection": "चयन हटाएँ"
 };
 static const Map<String,dynamic> _es = {
   "popularity_descending": "Popularidad descendiente",
@@ -3291,7 +3295,9 @@ static const Map<String,dynamic> _es = {
   "player_live_stalled": "La transmisión en vivo dejó de responder.",
   "player_switch_channel_failed": "No se pudo cambiar a ese canal.",
   "player_did_not_recover": "Este canal no se recuperó tras varios intentos.",
-  "player_no_playable_stream": "Este canal no devolvió ninguna transmisión reproducible."
+  "player_no_playable_stream": "Este canal no devolvió ninguna transmisión reproducible.",
+  "ins_in_progress": "En curso",
+  "ins_clear_selection": "Quitar selección"
 };
 static const Map<String,dynamic> _ar = {
   "popularity_descending": "ترتيب تنازلي حسب الشعبية",
@@ -4416,7 +4422,9 @@ static const Map<String,dynamic> _ar = {
   "player_live_stalled": "توقف البث المباشر عن الاستجابة.",
   "player_switch_channel_failed": "تعذّر التبديل إلى تلك القناة.",
   "player_did_not_recover": "لم تتعافَ هذه القناة بعد عدة محاولات.",
-  "player_no_playable_stream": "لم تُرجع هذه القناة أي بث قابل للتشغيل."
+  "player_no_playable_stream": "لم تُرجع هذه القناة أي بث قابل للتشغيل.",
+  "ins_in_progress": "قيد المشاهدة",
+  "ins_clear_selection": "مسح التحديد"
 };
 static const Map<String, Map<String,dynamic>> mapLocales = {"en": _en, "hi": _hi, "es": _es, "ar": _ar};
 }

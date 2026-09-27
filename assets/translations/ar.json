@@ -1121,5 +1121,7 @@
   "player_live_stalled": "توقف البث المباشر عن الاستجابة.",
   "player_switch_channel_failed": "تعذّر التبديل إلى تلك القناة.",
   "player_did_not_recover": "لم تتعافَ هذه القناة بعد عدة محاولات.",
-  "player_no_playable_stream": "لم تُرجع هذه القناة أي بث قابل للتشغيل."
+  "player_no_playable_stream": "لم تُرجع هذه القناة أي بث قابل للتشغيل.",
+  "ins_in_progress": "قيد المشاهدة",
+  "ins_clear_selection": "مسح التحديد"
 }

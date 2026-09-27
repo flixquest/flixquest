@@ -37,15 +37,6 @@ const appStreamingServices = <AppStreamingService>[
   AppStreamingService('assets/images/netflix.png', 'Netflix Kids', 175),
 ];
 
-Widget scrollingImageShimmer(String themeMode) => ShimmerBase(
-    themeMode: themeMode,
-    child: Container(
-      width: 120.0,
-      decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppUI.cardRadius),
-          color: Colors.grey.shade600),
-    ));
-
 Widget detailImageShimmer(String themeMode) => ShimmerBase(
       themeMode: themeMode,
       child: CarouselSlider(
@@ -68,7 +59,8 @@ Widget detailImageShimmer(String themeMode) => ShimmerBase(
                             height: 180,
                             child: Container(
                               decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(AppUI.cardRadius),
+                                  borderRadius:
+                                      BorderRadius.circular(AppUI.cardRadius),
                                   color: Colors.grey.shade600),
                             ),
                           ),
@@ -96,7 +88,8 @@ Widget detailImageShimmer(String themeMode) => ShimmerBase(
                               height: 180,
                               child: Container(
                                 decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(AppUI.cardRadius),
+                                    borderRadius:
+                                        BorderRadius.circular(AppUI.cardRadius),
                                     color: Colors.white),
                               ),
                             ),
@@ -179,9 +172,6 @@ Widget detailVideoImageShimmer(String themeMode) => ShimmerBase(
           borderRadius: BorderRadius.circular(AppUI.cardRadius),
           color: Colors.grey.shade600),
     ));
-
-Widget moviesAndTVShowGridShimmer(String themeMode) =>
-    const AppMediaGridShimmer();
 
 class ShimmerBase extends StatelessWidget {
   const ShimmerBase({super.key, required this.child, required this.themeMode});

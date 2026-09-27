@@ -1089,5 +1089,7 @@
   "player_live_stalled": "La transmisión en vivo dejó de responder.",
   "player_switch_channel_failed": "No se pudo cambiar a ese canal.",
   "player_did_not_recover": "Este canal no se recuperó tras varios intentos.",
-  "player_no_playable_stream": "Este canal no devolvió ninguna transmisión reproducible."
+  "player_no_playable_stream": "Este canal no devolvió ninguna transmisión reproducible.",
+  "ins_in_progress": "En curso",
+  "ins_clear_selection": "Quitar selección"
 }

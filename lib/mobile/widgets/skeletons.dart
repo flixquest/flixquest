@@ -5,6 +5,7 @@ import '../../design/skeleton.dart';
 import 'hero_card.dart';
 import 'media_art.dart';
 import 'poster_card.dart';
+import 'poster_grid.dart';
 
 /// Home's shape while it loads: the hero card and two rows, breathing slowly
 /// between two surface tones, as the TV's skeleton does.
@@ -29,6 +30,28 @@ class HomeSkeleton extends StatelessWidget {
           const PosterRowSkeleton(),
           const PosterRowSkeleton(),
         ],
+      ),
+    );
+  }
+}
+
+/// A browse grid while it loads: [rows] rows of posters in the grid's own
+/// shape and place. Inside a [SkeletonPulse].
+class PosterGridSkeleton extends StatelessWidget {
+  const PosterGridSkeleton({this.rows = 4, super.key});
+
+  final int rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final gutter = AppSpace.gutter(context);
+    return SkeletonPulse(
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(gutter, AppSpace.sm, gutter, 0),
+        gridDelegate: posterGridDelegate(context),
+        itemCount: posterGridColumns(context) * rows,
+        itemBuilder: (_, __) => const SkeletonBlock(),
       ),
     );
   }

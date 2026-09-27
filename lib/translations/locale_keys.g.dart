@@ -1070,5 +1070,7 @@ abstract class  LocaleKeys {
   static const player_switch_channel_failed = 'player_switch_channel_failed';
   static const player_did_not_recover = 'player_did_not_recover';
   static const player_no_playable_stream = 'player_no_playable_stream';
+  static const ins_in_progress = 'ins_in_progress';
+  static const ins_clear_selection = 'ins_clear_selection';
 
 }

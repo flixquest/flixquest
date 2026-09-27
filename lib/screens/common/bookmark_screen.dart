@@ -4,17 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
+import '../../catalog/home_feed_controller.dart';
+import '../../catalog/media_item.dart';
 import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
+import '../../mobile/my_list.dart';
 import '../../mobile/widgets/page_kit.dart';
 import '../../mobile/widgets/pill_button.dart';
+import '../../mobile/widgets/poster_grid.dart';
+import '../../mobile/widgets/skeletons.dart';
 import '../../provider/bookmark_provider.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../services/bookmark_sync_service.dart';
 import '../../services/globle_method.dart';
-import '../movie/bookmark_movies_tab.dart';
-import '../tv/bookmark_tv_tab.dart';
 import '/screens/common/sync_screen.dart';
 import '../../video_providers/scraper_api.dart';
 import '../../widgets/hosted_ads_banner.dart';
@@ -103,12 +106,14 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
                 ),
               ),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppSpace.gutter(context)),
+              padding:
+                  EdgeInsets.symmetric(horizontal: AppSpace.gutter(context)),
               child: SegmentSwitch<int>(
                 selected: _selectedKind,
                 onChanged: (value) => setState(() => _selectedKind = value),
                 segments: <Segment<int>>[
-                  Segment<int>(0, tr('movies'), icon: PhosphorIcons.filmStrip()),
+                  Segment<int>(0, tr('movies'),
+                      icon: PhosphorIcons.filmStrip()),
                   Segment<int>(1, tr('tv_series'),
                       icon: PhosphorIcons.television()),
                 ],
@@ -125,8 +130,16 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
               child: IndexedStack(
                 index: _selectedKind,
                 children: <Widget>[
-                  MovieBookmark(movieList: bookmarkProvider.movies),
-                  TVBookmark(tvList: bookmarkProvider.tvShows),
+                  _SavedGrid(
+                    items: MyList.items(context, filter: HomeFilter.movies),
+                    loading: bookmarkProvider.isLoading,
+                    emptyMessage: tr('no_movies_bookmarked'),
+                  ),
+                  _SavedGrid(
+                    items: MyList.items(context, filter: HomeFilter.series),
+                    loading: bookmarkProvider.isLoading,
+                    emptyMessage: tr('no_tv_bookmarked'),
+                  ),
                 ],
               ),
             )
@@ -157,5 +170,32 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
       if (!mounted) return;
       context.read<BookmarkProvider>().fetchBookmarks();
     });
+  }
+}
+
+/// One kind of saved titles: the browse grid while there are any, its
+/// skeleton while the first read is on its way, and the empty state after.
+class _SavedGrid extends StatelessWidget {
+  const _SavedGrid({
+    required this.items,
+    required this.loading,
+    required this.emptyMessage,
+  });
+
+  final List<MediaItem> items;
+  final bool loading;
+  final String emptyMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty && loading) return const PosterGridSkeleton();
+    if (items.isEmpty) {
+      return EmptyState(
+        icon: PhosphorIcons.bookmarkSimple(),
+        title: tr('bookmarks'),
+        message: emptyMessage,
+      );
+    }
+    return PosterGrid(items: items);
   }
 }

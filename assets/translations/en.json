@@ -1089,5 +1089,7 @@
   "player_live_stalled": "The live stream stopped responding.",
   "player_switch_channel_failed": "Unable to switch to that channel.",
   "player_did_not_recover": "This channel did not recover after several attempts.",
-  "player_no_playable_stream": "This channel returned no playable stream."
+  "player_no_playable_stream": "This channel returned no playable stream.",
+  "ins_in_progress": "In progress",
+  "ins_clear_selection": "Clear selection"
 }

@@ -95,6 +95,9 @@ flutter {
 dependencies {
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.14.1'
+    // Declared directly so the app can call the StartAppSDK consent APIs in
+    // FlixQuestApplication. The plugin's own dependency is runtime-only.
+    implementation 'com.startapp:inapp-sdk:5.3.1'
     constraints {
         // startapp_sdk declares a floating [5.0.0,6) range. 5.3.2 requires
         // compileSdk 37; pin the newest 5.x release compatible with this app's 36.
