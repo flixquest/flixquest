@@ -4,7 +4,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flixquest/services/globle_method.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:photo_view/photo_view.dart';
 import 'dart:isolate';
@@ -12,7 +11,7 @@ import 'dart:ui';
 import 'package:provider/provider.dart';
 import '../../functions/function.dart';
 import '../../provider/settings_provider.dart';
-import '../../ui_components/app_ui_components.dart';
+import 'image_viewer_chrome.dart';
 
 class HeroPhotoView extends StatefulWidget {
   const HeroPhotoView(
@@ -134,45 +133,22 @@ class _HeroPhotoViewState extends State<HeroPhotoView> {
   @override
   Widget build(BuildContext context) {
     final themeMode = Provider.of<SettingsProvider>(context).appTheme;
-    return SafeArea(
-      child: Scaffold(
-          appBar: AppBar(
-            title: Text(widget.name.endsWith('s')
-                ? tr('plular_person_image', namedArgs: {'name': widget.name})
-                : tr('singular_person_image',
-                    namedArgs: {'name': widget.name})),
-          ),
-          body: Stack(
-            fit: StackFit.expand,
-            children: [
-              ColoredBox(
-                color: Colors.black,
-                child: PhotoView(
-                  imageProvider: widget.imageProvider,
-                  enableRotation: true,
-                  heroAttributes: PhotoViewHeroAttributes(tag: widget.heroId),
-                ),
-              ),
-              Positioned(
-                left: AppUI.phonePadding,
-                right: AppUI.phonePadding,
-                bottom: 20,
-                child: FilledButton.icon(
-                  onPressed: () => _download(
-                    widget.heroId,
-                    '${widget.currentIndex + 1}',
-                    themeMode,
-                  ),
-                  icon: Icon(
-                    PhosphorIcons.downloadSimple(
-                      PhosphorIconsStyle.fill,
-                    ),
-                  ),
-                  label: Text(tr('download')),
-                ),
-              ),
-            ],
-          )),
+    return ImageViewerChrome(
+      title: widget.name.endsWith('s')
+          ? tr('plular_person_image', namedArgs: {'name': widget.name})
+          : tr('singular_person_image', namedArgs: {'name': widget.name}),
+      downloadLabel: tr('download'),
+      onDownload: () => _download(
+        widget.heroId,
+        '${widget.currentIndex + 1}',
+        themeMode,
+      ),
+      child: PhotoView(
+        imageProvider: widget.imageProvider,
+        enableRotation: true,
+        backgroundDecoration: const BoxDecoration(color: Colors.black),
+        heroAttributes: PhotoViewHeroAttributes(tag: widget.heroId),
+      ),
     );
   }
 }

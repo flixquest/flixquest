@@ -113,7 +113,6 @@ Future<DevicePresentation> appInitialize({
   sharedPrefsSingleton = await SharedPreferencesSingleton.getInstance();
   StartIoAdsService.instance
       .setTelevision(devicePresentation == DevicePresentation.television);
-  await StartIoAdsService.instance.restoreAdFreePass();
   await clearVideoPlaybackCache();
   FirebaseMessaging.onBackgroundMessage(_messageHandler);
   await FlutterDownloader.initialize(debug: true, ignoreSsl: true);

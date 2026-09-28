@@ -351,7 +351,7 @@ class _LivePlayerState extends State<LivePlayer> {
       showControlsOnInitialize: widget.useTvControls,
       controlsHideTime: widget.useTvControls
           ? const Duration(seconds: 4)
-          : const Duration(seconds: 3),
+          : const Duration(milliseconds: 300),
       playerTheme: widget.useTvControls ? BetterPlayerTheme.custom : null,
       customControlsBuilder: widget.useTvControls
           ? (controller, onVisibilityChanged) => BetterPlayerTvControls(
@@ -1207,9 +1207,15 @@ class _LivePlayerState extends State<LivePlayer> {
           if (didPop) return;
           _exitPlayer();
         },
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: PlayerTheme(child: _buildPortraitInlineLayout(context)),
+        // The page around the video follows the app's mode; the video
+        // itself stays black.
+        child: PlayerTheme(
+          child: Builder(
+            builder: (context) => Scaffold(
+              backgroundColor: BetterPlayerPanelColors.of(context).page,
+              body: _buildPortraitInlineLayout(context),
+            ),
+          ),
         ),
       );
     }
@@ -1345,6 +1351,7 @@ class _LivePlayerState extends State<LivePlayer> {
   }
 
   Widget _buildPortraitInlineLayout(BuildContext context) {
+    final panel = BetterPlayerPanelColors.of(context);
     return SafeArea(
       bottom: false,
       child: Column(
@@ -1444,8 +1451,8 @@ class _LivePlayerState extends State<LivePlayer> {
                         _currentChannelName,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: panel.foreground,
                           fontFamily: 'FigtreeSB',
                           fontSize: 17,
                           height: 1.2,
@@ -1466,14 +1473,14 @@ class _LivePlayerState extends State<LivePlayer> {
                       Icon(
                         PhosphorIcons.televisionSimple(),
                         size: 20,
-                        color: BetterPlayerColors.secondary,
+                        color: panel.secondary,
                       ),
                       const SizedBox(width: 9),
                       Expanded(
                         child: Text(
                           tr('channels'),
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: panel.foreground,
                             fontFamily: 'FigtreeSB',
                             fontSize: 16,
                           ),
@@ -1484,8 +1491,8 @@ class _LivePlayerState extends State<LivePlayer> {
                           'player_channel_count',
                           namedArgs: {'count': '${widget.channels.length}'},
                         ),
-                        style: const TextStyle(
-                          color: BetterPlayerColors.muted,
+                        style: TextStyle(
+                          color: panel.muted,
                           fontSize: 13,
                         ),
                       ),
@@ -1684,17 +1691,17 @@ class _ChannelThumbnail extends StatelessWidget {
               imageUrl: logo!,
               fit: BoxFit.cover,
               placeholder: (_, __) => const SizedBox.expand(),
-              errorWidget: (_, __, ___) => _initial(initial),
+              errorWidget: (_, __, ___) => _initial(context, initial),
             )
-          : _initial(initial),
+          : _initial(context, initial),
     );
   }
 
-  Widget _initial(String letter) => Center(
+  Widget _initial(BuildContext context, String letter) => Center(
         child: Text(
           letter,
-          style: const TextStyle(
-            color: BetterPlayerColors.secondary,
+          style: TextStyle(
+            color: BetterPlayerPanelColors.of(context).secondary,
             fontFamily: 'FigtreeBold',
             fontSize: 19,
           ),
@@ -1740,6 +1747,7 @@ class _LivePlayerErrorOverlay extends StatelessWidget {
       );
     }
     return PlayerTheme(
+      onVideo: true,
       child: ColoredBox(
         color: Colors.black.withValues(alpha: .86),
         child: SafeArea(

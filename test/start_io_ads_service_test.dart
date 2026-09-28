@@ -25,25 +25,6 @@ void main() {
       now = now.add(const Duration(minutes: 7));
       expect(pacing.canShow(const Duration(minutes: 10)), isTrue);
     });
-
-    test('an ad-free pass holds every ad until it expires', () {
-      final until = pacing.grantAdFree(const Duration(hours: 2));
-      expect(until, DateTime(2026, 9, 27, 22));
-      expect(pacing.adFreeActive, isTrue);
-      expect(pacing.adFreeUntil, until);
-      expect(pacing.canShow(Duration.zero), isFalse);
-
-      now = until;
-      expect(pacing.adFreeActive, isFalse);
-      expect(pacing.adFreeUntil, isNull);
-      expect(pacing.canShow(Duration.zero), isTrue);
-    });
-
-    test('a restored pass that already expired is ignored', () {
-      pacing.restoreAdFree(now.subtract(const Duration(minutes: 1)));
-      expect(pacing.adFreeActive, isFalse);
-      expect(pacing.canShow(Duration.zero), isTrue);
-    });
   });
 
   group('StartIoInterstitialMode.parse', () {

@@ -296,9 +296,10 @@ void main() {
 
     await tester.tap(find.text('Select resolution'));
     await tester.pumpAndSettle();
-    expect(find.text('Downloading from Provider Alpha'), findsOneWidget);
+    // Translated strings come back as their keys in tests.
+    expect(find.text('download_from_provider'), findsOneWidget);
     expect(find.text('~1.5 GB'), findsOneWidget);
-    expect(find.text('Size undetermined'), findsOneWidget);
+    expect(find.text('size_unknown'), findsOneWidget);
     await tester.tap(find.text('720p'));
     await tester.pumpAndSettle();
     expect(selectedResolution, '720p');

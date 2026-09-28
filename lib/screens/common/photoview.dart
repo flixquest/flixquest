@@ -7,7 +7,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flixquest/services/globle_method.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
@@ -19,7 +18,7 @@ import '../../models/images.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../design/outline_mark.dart';
-import '../../ui_components/app_ui_components.dart';
+import 'image_viewer_chrome.dart';
 
 class HeroPhotoView extends StatefulWidget {
   const HeroPhotoView(
@@ -172,67 +171,42 @@ class _HeroPhotoViewState extends State<HeroPhotoView> {
     final themeMode = Provider.of<SettingsProvider>(context).appTheme;
     final isProxyEnabled = Provider.of<SettingsProvider>(context).enableProxy;
     final proxyUrl = Provider.of<AppDependencyProvider>(context).tmdbProxy;
-    return Scaffold(
-      appBar:
-          AppBar(title: Text('${currentIndex + 1} / $_itemCount'), actions: [
-        IconButton(
-          onPressed: () async {
-            _download(
-                buildImageUrl(TMDB_BASE_IMAGE_URL, proxyUrl, isProxyEnabled,
-                        context) +
-                    imageQuality +
-                    _imagePathAt(currentIndex),
-                '${currentIndex + 1}',
-                themeMode);
-          },
-          icon: Icon(PhosphorIcons.downloadSimple()),
-        )
-      ]),
-      body: ColoredBox(
-        color: Colors.black,
-        child: Stack(alignment: Alignment.bottomCenter, children: [
-          PhotoViewGallery.builder(
-            pageController: _pages,
-            allowImplicitScrolling: true,
-            gaplessPlayback: true,
-            wantKeepAlive: true,
-            enableRotation: true,
-            scrollPhysics: const BouncingScrollPhysics(),
-            builder: (BuildContext context, int index) {
-              return PhotoViewGalleryPageOptions(
-                imageProvider: CachedNetworkImageProvider(
-                  buildImageUrl(TMDB_BASE_IMAGE_URL, proxyUrl, isProxyEnabled,
-                          context) +
-                      imageQuality +
-                      _imagePathAt(index),
-                ),
-                initialScale: PhotoViewComputedScale.contained * 0.95,
-              );
-            },
-            itemCount: _itemCount,
-            onPageChanged: onPageChanged,
-            // The mark, quietly, until the image arrives.
-            loadingBuilder: (context, event) => const Center(
-              child: OutlineMark(height: 48, color: Color(0x3DFFFFFF)),
+    return ImageViewerChrome(
+      title: widget.name ?? '',
+      downloadLabel: tr('download'),
+      onDownload: () => _download(
+          buildImageUrl(TMDB_BASE_IMAGE_URL, proxyUrl, isProxyEnabled,
+                  context) +
+              imageQuality +
+              _imagePathAt(currentIndex),
+          '${currentIndex + 1}',
+          themeMode),
+      footer: ImageViewerCounter(text: '${currentIndex + 1} / $_itemCount'),
+      child: PhotoViewGallery.builder(
+        pageController: _pages,
+        allowImplicitScrolling: true,
+        gaplessPlayback: true,
+        wantKeepAlive: true,
+        enableRotation: true,
+        backgroundDecoration: const BoxDecoration(color: Colors.black),
+        scrollPhysics: const BouncingScrollPhysics(),
+        builder: (BuildContext context, int index) {
+          return PhotoViewGalleryPageOptions(
+            imageProvider: CachedNetworkImageProvider(
+              buildImageUrl(
+                      TMDB_BASE_IMAGE_URL, proxyUrl, isProxyEnabled, context) +
+                  imageQuality +
+                  _imagePathAt(index),
             ),
-          ),
-          Container(
-            margin: const EdgeInsets.only(bottom: 20),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: .66),
-              borderRadius: BorderRadius.circular(AppUI.cardRadius),
-            ),
-            child: Text(
-              tr('image_index',
-                  namedArgs: {'index': (currentIndex + 1).toString()}),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 17.0,
-              ),
-            ),
-          )
-        ]),
+            initialScale: PhotoViewComputedScale.contained * 0.95,
+          );
+        },
+        itemCount: _itemCount,
+        onPageChanged: onPageChanged,
+        // The mark, quietly, until the image arrives.
+        loadingBuilder: (context, event) => const Center(
+          child: OutlineMark(height: 48, color: Color(0x3DFFFFFF)),
+        ),
       ),
     );
   }

@@ -129,10 +129,6 @@ UNITY_TEST_MODE=false
             .defaults[AppRemoteConfig.startIoInterstitialEnabledKey],
         true,
       );
-      expect(
-        fakeRemoteConfig.defaults[AppRemoteConfig.startIoRewardedEnabledKey],
-        true,
-      );
     });
 
     test('Defaults apply native banner network to provider', () async {
@@ -205,26 +201,20 @@ UNITY_TEST_MODE=false
         AppRemoteConfig.startIoInterstitialEnabledKey,
         false,
       );
-      fakeRemoteConfig.setMockBool(
-        AppRemoteConfig.startIoRewardedEnabledKey,
-        false,
-      );
 
       AppRemoteConfig.apply(fakeRemoteConfig, provider);
 
       expect(provider.isStartIoBannerActive, isFalse);
       expect(provider.startIoInterstitialEnabled, isFalse);
-      expect(provider.startIoRewardedEnabled, isFalse);
     });
 
-    test('pacing defaults: 10 minute interval, 2 hour pass, TV video',
+    test('pacing defaults: 10 minute interval, TV video first',
         () async {
       await AppRemoteConfig.configure(fakeRemoteConfig);
       AppRemoteConfig.apply(fakeRemoteConfig, provider);
 
       final ads = provider.startIoAds;
       expect(ads.interstitialInterval, const Duration(minutes: 10));
-      expect(ads.adFreePassDuration, const Duration(hours: 2));
       expect(ads.tvInterstitialMode, StartIoInterstitialMode.video);
       expect(StartIoAdsService.instance.config, ads);
     });
@@ -233,7 +223,6 @@ UNITY_TEST_MODE=false
       await AppRemoteConfig.configure(fakeRemoteConfig);
       fakeRemoteConfig
         ..setMockInt(AppRemoteConfig.startIoInterstitialIntervalKey, 5)
-        ..setMockInt(AppRemoteConfig.startIoAdFreePassMinutesKey, 45)
         ..setMockString(
           AppRemoteConfig.startIoTvInterstitialModeKey,
           'automatic',
@@ -244,7 +233,6 @@ UNITY_TEST_MODE=false
       final ads = provider.startIoAds;
       // A near-zero interval would show an ad on every play.
       expect(ads.interstitialInterval, const Duration(seconds: 60));
-      expect(ads.adFreePassDuration, const Duration(minutes: 45));
       expect(ads.tvInterstitialMode, StartIoInterstitialMode.automatic);
     });
   });

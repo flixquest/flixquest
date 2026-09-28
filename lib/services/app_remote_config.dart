@@ -26,10 +26,8 @@ class AppRemoteConfig {
   static const unityTestModeKey = 'unity_test_mode';
   static const startIoBannerEnabledKey = 'startio_banner_enabled';
   static const startIoInterstitialEnabledKey = 'startio_interstitial_enabled';
-  static const startIoRewardedEnabledKey = 'startio_rewarded_enabled';
   static const startIoInterstitialIntervalKey =
       'startio_interstitial_interval_seconds';
-  static const startIoAdFreePassMinutesKey = 'startio_ad_free_pass_minutes';
   static const startIoTvInterstitialModeKey = 'startio_tv_interstitial_mode';
 
   /// Live TV used to ride on the OTT flag before it got a dedicated key.
@@ -68,9 +66,7 @@ class AppRemoteConfig {
       unityTestModeKey: false,
       startIoBannerEnabledKey: true,
       startIoInterstitialEnabledKey: true,
-      startIoRewardedEnabledKey: true,
       startIoInterstitialIntervalKey: 600,
-      startIoAdFreePassMinutesKey: 120,
       startIoTvInterstitialModeKey: 'video',
     });
   }
@@ -143,18 +139,11 @@ class AppRemoteConfig {
     provider.setStartIoAdsConfig(
       bannerEnabled: remoteConfig.getBool(startIoBannerEnabledKey),
       interstitialEnabled: remoteConfig.getBool(startIoInterstitialEnabledKey),
-      rewardedEnabled: remoteConfig.getBool(startIoRewardedEnabledKey),
       // Floors keep a mistyped value from turning pacing off entirely.
       interstitialInterval: Duration(
         seconds: remoteConfig.getInt(startIoInterstitialIntervalKey).clamp(
               60,
               86400,
-            ),
-      ),
-      adFreePassDuration: Duration(
-        minutes: remoteConfig.getInt(startIoAdFreePassMinutesKey).clamp(
-              5,
-              1440,
             ),
       ),
       tvInterstitialMode: StartIoInterstitialMode.parse(

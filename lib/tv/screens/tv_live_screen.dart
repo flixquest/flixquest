@@ -18,7 +18,6 @@ import '../../services/analytics_service.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/start_io_ads_service.dart';
 import '../../widgets/hosted_ads_banner.dart';
-import '../../widgets/playback_ads.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
 import '../app/tv_design.dart';
@@ -701,17 +700,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         //   ],
         // ),
         // const SizedBox(height: 8),
-        Row(
-          children: <Widget>[
-            Expanded(child: _buildModeTracks(isSchedule)),
-            // The opt-in pass sits with the list's own controls, clear of
-            // the title row's channel count.
-            const Padding(
-              padding: EdgeInsets.only(left: 12),
-              child: AdFreePassButton(),
-            ),
-          ],
-        ),
+        _buildModeTracks(isSchedule),
         if (_showSearch) ...<Widget>[
           const SizedBox(height: 10),
           SizedBox(

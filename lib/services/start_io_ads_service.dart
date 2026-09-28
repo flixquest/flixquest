@@ -1,10 +1,9 @@
 import 'dart:async';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:startapp_sdk/startapp.dart';
-
-import '../singleton/sharedpreferences_singleton.dart';
 
 /// Which interstitial creatives Start.io may serve.
 enum StartIoInterstitialMode {
@@ -26,43 +25,32 @@ class StartIoAdsConfig {
   const StartIoAdsConfig({
     this.bannerEnabled = true,
     this.interstitialEnabled = true,
-    this.rewardedEnabled = true,
     this.testMode = false,
     this.interstitialInterval = const Duration(minutes: 10),
-    this.adFreePassDuration = const Duration(hours: 2),
     this.tvInterstitialMode = StartIoInterstitialMode.video,
   });
 
   final bool bannerEnabled;
   final bool interstitialEnabled;
-
-  /// Rewarded video only runs when a viewer opts in for an ad-free pass.
-  final bool rewardedEnabled;
   final bool testMode;
 
   /// The shortest gap between two playback interstitials.
   final Duration interstitialInterval;
 
-  /// How long a completed rewarded video keeps interstitials away.
-  final Duration adFreePassDuration;
   final StartIoInterstitialMode tvInterstitialMode;
 
   StartIoAdsConfig copyWith({
     bool? bannerEnabled,
     bool? interstitialEnabled,
-    bool? rewardedEnabled,
     bool? testMode,
     Duration? interstitialInterval,
-    Duration? adFreePassDuration,
     StartIoInterstitialMode? tvInterstitialMode,
   }) =>
       StartIoAdsConfig(
         bannerEnabled: bannerEnabled ?? this.bannerEnabled,
         interstitialEnabled: interstitialEnabled ?? this.interstitialEnabled,
-        rewardedEnabled: rewardedEnabled ?? this.rewardedEnabled,
         testMode: testMode ?? this.testMode,
         interstitialInterval: interstitialInterval ?? this.interstitialInterval,
-        adFreePassDuration: adFreePassDuration ?? this.adFreePassDuration,
         tvInterstitialMode: tvInterstitialMode ?? this.tvInterstitialMode,
       );
 
@@ -71,54 +59,35 @@ class StartIoAdsConfig {
       other is StartIoAdsConfig &&
       other.bannerEnabled == bannerEnabled &&
       other.interstitialEnabled == interstitialEnabled &&
-      other.rewardedEnabled == rewardedEnabled &&
       other.testMode == testMode &&
       other.interstitialInterval == interstitialInterval &&
-      other.adFreePassDuration == adFreePassDuration &&
       other.tvInterstitialMode == tvInterstitialMode;
 
   @override
   int get hashCode => Object.hash(
         bannerEnabled,
         interstitialEnabled,
-        rewardedEnabled,
         testMode,
         interstitialInterval,
-        adFreePassDuration,
         tvInterstitialMode,
       );
 }
 
-/// Decides when a playback interstitial may show: never during an ad-free
-/// pass, and never twice within the configured interval. Rapid replays,
-/// retries and live channel surfing therefore see one ad, not one per tap.
+/// Decides when a playback interstitial may show: never twice within the
+/// configured interval. Rapid replays, retries and live channel surfing
+/// therefore see one ad, not one per tap.
 class InterstitialPacing {
   InterstitialPacing({DateTime Function()? now}) : _now = now ?? DateTime.now;
 
   final DateTime Function() _now;
   DateTime? _lastShownAt;
-  DateTime? _adFreeUntil;
-
-  bool get adFreeActive {
-    final until = _adFreeUntil;
-    return until != null && _now().isBefore(until);
-  }
-
-  /// The pass's expiry while one is active.
-  DateTime? get adFreeUntil => adFreeActive ? _adFreeUntil : null;
 
   bool canShow(Duration interval) {
-    if (adFreeActive) return false;
     final last = _lastShownAt;
     return last == null || _now().difference(last) >= interval;
   }
 
   void recordShown() => _lastShownAt = _now();
-
-  DateTime grantAdFree(Duration duration) =>
-      _adFreeUntil = _now().add(duration);
-
-  void restoreAdFree(DateTime? until) => _adFreeUntil = until;
 }
 
 /// Completes once its full-screen ad is gone, whichever callback says so.
@@ -126,6 +95,8 @@ class _AdSession {
   final Completer<void> _closed = Completer<void>();
 
   Future<void> get closed => _closed.future;
+
+  bool get isOpen => !_closed.isCompleted;
 
   void close() {
     if (!_closed.isCompleted) _closed.complete();
@@ -141,15 +112,6 @@ class _PreparedInterstitial {
 
   /// The configuration it was loaded for; a change discards it.
   final String setup;
-}
-
-class _PreparedRewarded {
-  _PreparedRewarded(this.session);
-
-  final _AdSession session;
-  late final StartAppRewardedVideoAd ad;
-  late final DateTime loadedAt;
-  bool completed = false;
 }
 
 /// Coordinates Start.io ads without ever blocking playback on an SDK,
@@ -175,11 +137,6 @@ class StartIoAdsService {
   /// Preloaded creatives are refreshed before Start.io can expire them.
   static const Duration _preloadMaxAge = Duration(minutes: 45);
 
-  /// How long to wait before asking again after a rewarded video no-fill.
-  static const Duration _rewardedRetry = Duration(minutes: 10);
-
-  static const String _adFreeUntilKey = 'startio_ad_free_until';
-
   /// Targeting hints for a movie and series streaming audience.
   static const String catalogKeywords =
       'movies,tv shows,series,streaming,entertainment';
@@ -188,23 +145,12 @@ class StartIoAdsService {
   final StartAppSdk _sdk = StartAppSdk();
   final InterstitialPacing _pacing = InterstitialPacing();
 
-  /// The active ad-free pass's expiry, or null. Drives the pass button.
-  final ValueNotifier<DateTime?> adFreeUntil = ValueNotifier<DateTime?>(null);
-
-  /// Whether a rewarded video is loaded, so the pass button is only offered
-  /// when pressing it will actually play something.
-  final ValueNotifier<bool> adFreePassReady = ValueNotifier<bool>(false);
-
   StartIoAdsConfig _config = const StartIoAdsConfig();
   bool _television = false;
   bool? _configuredTestMode;
   _PreparedInterstitial? _preroll;
   Future<void>? _prerollLoading;
-  _PreparedRewarded? _rewarded;
-  Future<void>? _rewardedLoading;
   Completer<void>? _fullScreen;
-  Timer? _passExpiry;
-  Timer? _rewardedRetryTimer;
 
   StartIoAdsConfig get config => _config;
 
@@ -216,22 +162,10 @@ class StartIoAdsService {
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
 
-  /// Whether an ad-free pass may be sold at all: both formats are on and no
-  /// pass is running.
-  bool get _passAllowed =>
-      _isSupported &&
-      _config.rewardedEnabled &&
-      _config.interstitialEnabled &&
-      !_pacing.adFreeActive;
-
-  /// Whether the viewer can be offered a rewarded ad-free pass right now.
-  bool get canOfferAdFreePass => _passAllowed && adFreePassReady.value;
-
   void setTelevision(bool value) {
     if (_television == value) return;
     _television = value;
     _discardPreroll();
-    _discardRewarded();
   }
 
   /// Suffixes TV placements so the Start.io portal reports them separately.
@@ -270,10 +204,6 @@ class StartIoAdsService {
       _discardPreroll();
     }
     if (config.interstitialEnabled) unawaited(preloadPlaybackInterstitial());
-    if (previous.testMode != config.testMode || !_passAllowed) {
-      _discardRewarded();
-    }
-    unawaited(preloadAdFreePass());
   }
 
   Future<void> configure({required bool testMode}) async {
@@ -283,31 +213,6 @@ class StartIoAdsService {
       _configuredTestMode = testMode;
     } catch (error) {
       debugPrint('StartIoAdsService: unable to set test mode: $error');
-    }
-  }
-
-  /// Restores an ad-free pass that outlived the previous app session.
-  Future<void> restoreAdFreePass() async {
-    try {
-      final prefs = await SharedPreferencesSingleton.getInstance();
-      final millis = prefs.getInt(_adFreeUntilKey);
-      if (millis == null) return;
-      _setAdFreeUntil(DateTime.fromMillisecondsSinceEpoch(millis));
-    } catch (error) {
-      debugPrint('StartIoAdsService: unable to restore ad-free pass: $error');
-    }
-  }
-
-  void _setAdFreeUntil(DateTime? until) {
-    _passExpiry?.cancel();
-    _pacing.restoreAdFree(until);
-    final active = _pacing.adFreeUntil;
-    adFreeUntil.value = active;
-    if (active != null) {
-      _passExpiry = Timer(active.difference(DateTime.now()), () {
-        _setAdFreeUntil(null);
-        unawaited(preloadAdFreePass());
-      });
     }
   }
 
@@ -385,6 +290,11 @@ class StartIoAdsService {
             adTag: _prerollTag(mode),
             keywords: catalogKeywords,
           ),
+          // Only once the ad has rendered: a toast raised while the ad
+          // screen is still opening is dropped by the system.
+          onAdDisplayed: () {
+            if (_television) unawaited(_remindRemoteBack(session));
+          },
           onAdHidden: session.close,
           onAdNotDisplayed: session.close,
         ),
@@ -414,6 +324,28 @@ class StartIoAdsService {
     } finally {
       _fullScreen = null;
       done.complete();
+    }
+  }
+
+  static const MethodChannel _deviceChannel = MethodChannel(
+    'dev.beamlak.flixquest/device_presentation',
+  );
+
+  /// Tells a TV viewer how to leave the ad, since Start.io's close button is
+  /// made for touch. A long toast lasts a few seconds and video ads run
+  /// longer, so it is repeated once while the ad is still up.
+  Future<void> _remindRemoteBack(_AdSession session) async {
+    await _showRemoteHint();
+    await Future<void>.delayed(const Duration(seconds: 10));
+    if (session.isOpen) await _showRemoteHint();
+  }
+
+  Future<void> _showRemoteHint() async {
+    try {
+      await _deviceChannel.invokeMethod<bool>(
+          'showHint', tr('tv_ad_back_hint'));
+    } catch (error) {
+      debugPrint('StartIoAdsService: unable to show remote hint: $error');
     }
   }
 
@@ -448,93 +380,5 @@ class StartIoAdsService {
         unawaited(preloadPlaybackInterstitial());
       }
     });
-  }
-
-  /// Keeps one rewarded video ready while a pass can be sold. After a
-  /// no-fill it tries again later rather than hammering the exchange.
-  Future<void> preloadAdFreePass() {
-    if (!_passAllowed) return Future<void>.value();
-    final ready = _rewarded;
-    if (ready != null &&
-        DateTime.now().difference(ready.loadedAt) < _preloadMaxAge) {
-      return Future<void>.value();
-    }
-    _discardRewarded();
-    return _rewardedLoading ??=
-        _loadRewarded().whenComplete(() => _rewardedLoading = null);
-  }
-
-  Future<void> _loadRewarded() async {
-    _rewardedRetryTimer?.cancel();
-    await configure(testMode: _config.testMode);
-    final prepared = _PreparedRewarded(_AdSession());
-    final ad = await _load(
-      'rewarded',
-      () => _sdk.loadRewardedVideoAd(
-        prefs: StartAppAdPreferences(
-          adTag: tagFor('ad_free_pass'),
-          keywords: catalogKeywords,
-        ),
-        onAdHidden: prepared.session.close,
-        onAdNotDisplayed: prepared.session.close,
-        onVideoCompleted: () => prepared.completed = true,
-      ),
-    );
-    if (ad == null) {
-      _rewardedRetryTimer = Timer(_rewardedRetry, () {
-        unawaited(preloadAdFreePass());
-      });
-      return;
-    }
-    if (!_passAllowed) {
-      ad.dispose();
-      return;
-    }
-    prepared
-      ..ad = ad
-      ..loadedAt = DateTime.now();
-    _rewarded = prepared;
-    adFreePassReady.value = true;
-  }
-
-  void _discardRewarded() {
-    _rewarded?.ad.dispose();
-    _rewarded = null;
-    adFreePassReady.value = false;
-  }
-
-  /// Plays the preloaded opt-in rewarded video. A completed view grants an
-  /// ad-free pass for [StartIoAdsConfig.adFreePassDuration]; returns whether
-  /// it did.
-  Future<bool> watchForAdFreePass() async {
-    final prepared = _rewarded;
-    if (!canOfferAdFreePass || prepared == null || _fullScreen != null) {
-      return false;
-    }
-    _rewarded = null;
-    adFreePassReady.value = false;
-    await _runFullScreen(() async {
-      try {
-        if (!await prepared.ad.show()) prepared.session.close();
-        await prepared.session.closed.timeout(
-          const Duration(seconds: 90),
-          onTimeout: () {},
-        );
-      } finally {
-        prepared.ad.dispose();
-      }
-      if (!prepared.completed) return;
-      final until = _pacing.grantAdFree(_config.adFreePassDuration);
-      _setAdFreeUntil(until);
-      try {
-        final prefs = await SharedPreferencesSingleton.getInstance();
-        await prefs.setInt(_adFreeUntilKey, until.millisecondsSinceEpoch);
-      } catch (error) {
-        debugPrint('StartIoAdsService: unable to save ad-free pass: $error');
-      }
-    });
-    // Ready for the next offer, or for when this pass runs out.
-    unawaited(preloadAdFreePass());
-    return prepared.completed;
   }
 }

@@ -20,7 +20,6 @@ import '../../provider/settings_provider.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/media_link.dart';
 import '../../services/start_io_ads_service.dart';
-import '../../widgets/playback_ads.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
 import '../../services/analytics_service.dart';
@@ -574,9 +573,6 @@ class _ChannelListState extends State<ChannelList> {
         slivers: <Widget>[
           SliverToBoxAdapter(child: _buildHeader()),
           _bannerSliver(_headerPlacement),
-          const SliverToBoxAdapter(
-            child: Center(child: AdFreePassButton()),
-          ),
           if (_mode == _LiveTvMode.channels)
             ..._buildChannelSlivers()
           else

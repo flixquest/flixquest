@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
+import '../../functions/language_names.dart';
 import '../../functions/player_subtitle_configuration.dart';
 import '../../models/offline_download.dart';
 import '../../models/movie_stream_metadata.dart';
@@ -16,6 +17,7 @@ import '../../constants/app_constants.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../provider/wellness_provider.dart';
+import 'player/player_strings.dart';
 import 'player/player_external_subtitles.dart';
 
 /// The lightweight offline variant of FlixQuest's Better Player. It keeps the
@@ -59,7 +61,6 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
     super.didChangeDependencies();
     if (_initialized) return;
     _initialized = true;
-    final colors = Theme.of(context).colorScheme;
     final accent = Theme.of(context).primaryColor;
     final settings = context.read<SettingsProvider>();
     final controls = BetterPlayerControlsConfiguration(
@@ -73,7 +74,10 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
         seekSwipeSensitivity: 1.0,
       ),
       name: widget.download.title,
-      watchingText: tr('watching_text'),
+      subtitle: widget.download.subtitle,
+      strings: playerControlsStrings(),
+      languageLabelBuilder: languageDisplayName,
+      emphasisFontFamily: 'FigtreeSB',
       enableFullscreen: true,
       enableSubtitles: true,
       showSubtitlesButton: true,
@@ -86,39 +90,26 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
       enablePip: true,
       enableAudioTracks: true,
       backgroundColor: Colors.black,
-      progressBarBackgroundColor: Colors.white,
+      progressBarBackgroundColor: Colors.white24,
+      progressBarHandleColor: accent,
       controlBarColor: Colors.black.withValues(alpha: .48),
       muteIcon: PhosphorIcons.speakerSimpleSlash(),
       unMuteIcon: PhosphorIcons.speakerHigh(),
-      pauseIcon: PhosphorIcons.pause(),
-      pipMenuIcon: PhosphorIcons.appWindow(),
-      playIcon: PhosphorIcons.play(),
+      pauseIcon: PhosphorIcons.pause(PhosphorIconsStyle.fill),
+      pipMenuIcon: PhosphorIcons.pictureInpicture(),
+      playIcon: PhosphorIcons.play(PhosphorIconsStyle.fill),
       showControlsOnInitialize: false,
       controlsHideTime: const Duration(milliseconds: 300),
-      loadingColor: accent,
-      loadingWidget: SizedBox(
-        width: 60,
-        height: 3,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(99),
-          child: LinearProgressIndicator(
-            minHeight: 3,
-            color: accent,
-            backgroundColor: accent.withValues(alpha: .24),
-          ),
-        ),
-      ),
-      iconsColor: accent,
+      // White controls; the accent is the timeline's played part alone.
+      loadingColor: Colors.white,
+      iconsColor: Colors.white,
       progressBarPlayedColor: accent,
-      progressBarBufferedColor: Colors.black45,
-      skipForwardIcon: PhosphorIcons.fastForward(),
-      skipBackIcon: PhosphorIcons.rewind(),
+      progressBarBufferedColor: Colors.white38,
+      skipForwardIcon: PhosphorIcons.arrowClockwise(),
+      skipBackIcon: PhosphorIcons.arrowCounterClockwise(),
       fullscreenEnableIcon: PhosphorIcons.cornersOut(),
       fullscreenDisableIcon: PhosphorIcons.cornersIn(),
       overflowMenuIcon: PhosphorIcons.dotsThreeVertical(),
-      overflowMenuIconsColor: accent,
-      overflowModalTextColor: accent,
-      overflowModalColor: colors.surface,
       overflowMenuCustomItems: [
         BetterPlayerOverflowMenuItem(
           PhosphorIcons.closedCaptioning(),

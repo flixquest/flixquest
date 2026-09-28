@@ -156,7 +156,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   Timer? _phoneNextEpisodeTimer;
   bool _playerControlsVisible = false;
   String? _lastNextEpisodeDebugSignature;
-  String? _lastMovieRecommendationsRenderSignature;
   Timer? _tvNextEpisodeTimer;
   EpisodeMetadata? _tvNextEpisode;
   int? _tvNextEpisodeCountdown;
@@ -233,14 +232,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         '[MovieRecommendationsDebug][PLAYER_INIT] '
         'movieId=${metadata?.movieId} '
         'title=${metadata?.movieName} '
-        'metadataNull=${metadata == null} '
-        'recommendationsNull=${recommendations == null} '
         'metadataCount=${recommendations?.length ?? 0} '
-        'ids=${recommendations?.map((movie) => movie.movieId).join(',') ?? ''} '
-        'useTvControls=${widget.useTvControls} '
-        'proxyEnabled=${settings.enableProxy} '
-        'language=${settings.appLanguage} '
-        'country=${settings.defaultCountry}',
+        'ids=${recommendations?.map((movie) => movie.movieId).join(',') ?? ''}',
       );
     }
     _contentMenuEpisodes = List<EpisodeMetadata>.of(
@@ -2447,11 +2440,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   Future<void> _playTvMovie(MovieRecommendation movie) async {
-    debugPrint(
-      '[MovieRecommendationsDebug][MOVIE_SELECTED] '
-      'movieId=${movie.movieId} title=${movie.title} '
-      'source=player_recommendations',
-    );
     if (mounted) setState(() => _tvMenu = null);
     await _handleContentSwitch();
     if (!mounted) return;
@@ -2790,9 +2778,15 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) _exitPlayer();
         },
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: PlayerTheme(child: _buildPortraitInlineLayout(context)),
+        // The page around the video follows the app's mode; the video
+        // itself stays black.
+        child: PlayerTheme(
+          child: Builder(
+            builder: (context) => Scaffold(
+              backgroundColor: BetterPlayerPanelColors.of(context).page,
+              body: _buildPortraitInlineLayout(context),
+            ),
+          ),
         ),
       );
     }
@@ -2890,16 +2884,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final title = isTv
         ? widget.tvMetadata?.seriesName ?? ''
         : widget.movieMetadata?.movieName ?? '';
-    final renderSignature = 'isTv=$isTv recommendations=${recommendations.length} '
-        'sectionShown=${!isTv && recommendations.isNotEmpty}';
-    if (renderSignature != _lastMovieRecommendationsRenderSignature) {
-      _lastMovieRecommendationsRenderSignature = renderSignature;
-      debugPrint(
-        '[MovieRecommendationsDebug][PORTRAIT_RENDER] $renderSignature '
-        'mediaType=${widget.mediaType} '
-        'movieId=${widget.movieMetadata?.movieId}',
-      );
-    }
 
     return SafeArea(
       bottom: false,
@@ -3023,15 +3007,16 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     String? subtitle,
     Widget? action,
   }) {
+    final colors = BetterPlayerPanelColors.of(context);
     return Row(
       children: [
-        Icon(icon, size: 20, color: BetterPlayerColors.secondary),
+        Icon(icon, size: 20, color: colors.secondary),
         const SizedBox(width: 9),
         Expanded(
           child: Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: colors.foreground,
               fontFamily: 'FigtreeSB',
               fontSize: 16,
             ),
@@ -3040,8 +3025,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         if (subtitle != null)
           Text(
             subtitle,
-            style:
-                const TextStyle(color: BetterPlayerColors.muted, fontSize: 13),
+            style: TextStyle(color: colors.muted, fontSize: 13),
           ),
         if (action != null) action,
       ],
@@ -3086,9 +3070,14 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         final browsedSeason = _portraitBrowsedSeasonNumber ??
             metadata.seasonEpisodes?.firstOrNull?.seasonNumber ??
             metadata.seasonNumber;
-        return ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 560),
-          child: PlayerSheetScaffold(
+        // As tall as the seasons need, up to most of the screen.
+        final size = (.2 + seasons.length * .14).clamp(.35, .9);
+        return DraggableScrollableSheet(
+          initialChildSize: size,
+          minChildSize: .3,
+          maxChildSize: .9,
+          expand: false,
+          builder: (context, scrollController) => PlayerSheetScaffold(
             title: tr('select_season'),
             subtitle: '${seasons.length} ${tr('select_season')}',
             actions: [
@@ -3099,7 +3088,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               ),
             ],
             child: ListView.separated(
-              shrinkWrap: true,
+              controller: scrollController,
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
               itemCount: seasons.length,
               separatorBuilder: (_, __) => const SizedBox(height: 4),
@@ -3274,6 +3263,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     ));
     final resolution = await DownloadSelectionSheets.showResolution(
       context,
+      inPlayer: true,
       resolutions: sources.keys.toList(),
       providerName: providerName,
       estimatedSizesListenable: estimatedSizes,
@@ -3553,6 +3543,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final hasProviders = widget.availableProviders != null &&
         widget.availableProviders!.isNotEmpty;
     return PlayerTheme(
+      onVideo: true,
       child: ColoredBox(
         color: Colors.black,
         child: Padding(
@@ -4131,8 +4122,8 @@ class _SubtitleSwitcherSheetState extends State<_SubtitleSwitcherSheet> {
         padding: const EdgeInsetsDirectional.fromSTEB(10, 4, 10, 8),
         child: Text(
           text,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: BetterPlayerPanelColors.of(context).foreground,
             fontFamily: 'FigtreeBold',
             fontSize: 16,
           ),
@@ -4235,8 +4226,10 @@ class _SubtitleTools extends StatelessWidget {
           ),
         );
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: BetterPlayerColors.hairline)),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: BetterPlayerPanelColors.of(context).hairline),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -4307,6 +4300,7 @@ class _SubtitleTimingControlState extends State<_SubtitleTimingControl> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = BetterPlayerPanelColors.of(context);
     final offset = _offset;
     final isSynced = offset == Duration.zero;
     final status = isSynced
@@ -4318,10 +4312,10 @@ class _SubtitleTimingControlState extends State<_SubtitleTimingControl> {
           tooltip: tooltip,
           onPressed: onTap,
           style: IconButton.styleFrom(
-            backgroundColor: const Color(0x1FFFFFFF),
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: const Color(0x0DFFFFFF),
-            disabledForegroundColor: Colors.white30,
+            backgroundColor: colors.raised,
+            foregroundColor: colors.foreground,
+            disabledBackgroundColor: colors.selectedFill,
+            disabledForegroundColor: colors.muted.withValues(alpha: .5),
             fixedSize: const Size(48, 48),
           ),
           icon: Icon(icon, size: 20),
@@ -4335,12 +4329,12 @@ class _SubtitleTimingControlState extends State<_SubtitleTimingControl> {
           child: Text(
             _subtitleOffsetValue(offset),
             key: ValueKey(offset.inMilliseconds),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: colors.foreground,
               fontFamily: 'FigtreeBold',
               fontSize: 40,
               height: 1.1,
-              fontFeatures: [FontFeature.tabularFigures()],
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ),
@@ -4348,7 +4342,7 @@ class _SubtitleTimingControlState extends State<_SubtitleTimingControl> {
         Text(
           status,
           key: const Key('subtitle_timing_value'),
-          style: const TextStyle(color: BetterPlayerColors.muted, fontSize: 14),
+          style: TextStyle(color: colors.muted, fontSize: 14),
         ),
         const SizedBox(height: 16),
         Row(
@@ -4384,7 +4378,7 @@ class _SubtitleTimingControlState extends State<_SubtitleTimingControl> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 60),
           child: DefaultTextStyle(
-            style: const TextStyle(color: BetterPlayerColors.muted, fontSize: 12),
+            style: TextStyle(color: colors.muted, fontSize: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [Text('−10s'), Text('0s'), Text('+10s')],

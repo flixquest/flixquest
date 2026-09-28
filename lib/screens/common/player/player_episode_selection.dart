@@ -1,3 +1,4 @@
+import 'package:better_player_plus/better_player_plus.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -256,10 +257,14 @@ class PlayerEpisodeSelection {
                       context: playerContext,
                       barrierDismissible: false,
                       // The season's episodes, pulsing, until they come.
-                      builder: (context) => PopScope(
+                      // In the player's theme, like the sheets around it.
+                      builder: (_) => PlayerTheme(
+                        child: Builder(
+                          builder: (context) => PopScope(
                         canPop: false,
                         child: Dialog(
-                          backgroundColor: AppPalette.of(context).surface,
+                          backgroundColor:
+                              BetterPlayerPanelColors.of(context).panel,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 20),
                             child: Column(
@@ -283,7 +288,9 @@ class PlayerEpisodeSelection {
                             ),
                           ),
                         ),
-                      ),
+                        ),
+                          ),
+                        ),
                     ),
                   );
                   await fetchEpisodesForSeason(
@@ -399,7 +406,7 @@ class PlayerEpisodeSelection {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(tr('failed_load_season_episodes')),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }

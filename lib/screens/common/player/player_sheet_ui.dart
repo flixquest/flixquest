@@ -5,29 +5,40 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../ui_components/app_ui_components.dart';
 
 final Expando<ThemeData> _playerThemes = Expando<ThemeData>('playerTheme');
+final Expando<ThemeData> _videoThemes = Expando<ThemeData>('videoTheme');
 
-/// The player's look for everything it opens: black panels, white text and
-/// white pills, in every theme mode, with the app's accent kept as `primary`
-/// for progress alone. Shared with the controls' own panels.
+/// The player's look for what it opens (sheets, the portrait page): it
+/// follows the app, light in Light and dark otherwise, with ink pills and the
+/// accent kept for progress. Shared with the controls' own panels.
 ThemeData playerSheetTheme(BuildContext context) {
   final app = Theme.of(context);
   return _playerThemes[app] ??= betterPlayerPanelTheme(app);
 }
 
-/// Puts [child] in the player's dark theme, for the parts of the player
-/// drawn in its own route (the portrait layout, error screens).
-class PlayerTheme extends StatelessWidget {
-  const PlayerTheme({required this.child, super.key});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) =>
-      Theme(data: playerSheetTheme(context), child: child);
+/// The dark panel theme whatever the mode, for anything drawn over the video
+/// itself (error screens), which is dark in every theme.
+ThemeData playerVideoTheme(BuildContext context) {
+  final app = Theme.of(context);
+  return _videoThemes[app] ??= betterPlayerPanelTheme(app, dark: true);
 }
 
-/// A sheet from the player: the dark panel over the picture, rounded at the
-/// top and never wider than a tablet column.
+/// Puts [child] in the player's theme: the one that follows the app, or with
+/// [onVideo] the dark one for things drawn over the picture.
+class PlayerTheme extends StatelessWidget {
+  const PlayerTheme({required this.child, this.onVideo = false, super.key});
+
+  final Widget child;
+  final bool onVideo;
+
+  @override
+  Widget build(BuildContext context) => Theme(
+        data: onVideo ? playerVideoTheme(context) : playerSheetTheme(context),
+        child: child,
+      );
+}
+
+/// A sheet from the player: a panel in the app's mode, rounded at the top
+/// and never wider than a tablet column.
 Future<T?> showPlayerSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -35,13 +46,15 @@ Future<T?> showPlayerSheet<T>({
   bool isDismissible = true,
 }) {
   final theme = playerSheetTheme(context);
+  final colors = theme.extension<BetterPlayerPanelColors>() ??
+      BetterPlayerPanelColors.dark;
   return showModalBottomSheet<T>(
     context: context,
     useRootNavigator: useRootNavigator,
     useSafeArea: true,
     isScrollControlled: true,
     isDismissible: isDismissible,
-    backgroundColor: BetterPlayerColors.panel,
+    backgroundColor: colors.panel,
     barrierColor: Colors.black54,
     constraints: const BoxConstraints(maxWidth: 720),
     shape: const RoundedRectangleBorder(
@@ -78,6 +91,7 @@ class PlayerSheetScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = BetterPlayerPanelColors.of(context);
     return AppResponsiveContent(
       maxWidth: 760,
       padding: EdgeInsets.zero,
@@ -98,7 +112,7 @@ class PlayerSheetScaffold extends StatelessWidget {
                       width: 36,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.white24,
+                        color: colors.track,
                         borderRadius: BorderRadius.circular(99),
                       ),
                     ),
@@ -115,8 +129,8 @@ class PlayerSheetScaffold extends StatelessWidget {
                               title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: colors.foreground,
                                 fontFamily: 'FigtreeBold',
                                 fontSize: 19,
                                 height: 1.2,
@@ -128,8 +142,8 @@ class PlayerSheetScaffold extends StatelessWidget {
                                 subtitle!,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: BetterPlayerColors.muted,
+                                style: TextStyle(
+                                  color: colors.muted,
                                   fontSize: 13,
                                 ),
                               ),
@@ -154,7 +168,7 @@ class PlayerSheetScaffold extends StatelessWidget {
 
 /// One choice in a player sheet: an optional picture at the start, the name,
 /// a muted detail and two lines of description. The chosen one is lifted and
-/// checked, in white; watch progress runs along the picture in the accent.
+/// checked in ink; watch progress runs along the picture in the accent.
 class PlayerChoiceCard extends StatelessWidget {
   const PlayerChoiceCard({
     required this.title,
@@ -183,12 +197,13 @@ class PlayerChoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = BetterPlayerPanelColors.of(context);
     final accent = Theme.of(context).colorScheme.primary;
     return Semantics(
       selected: selected,
       button: onTap != null,
       child: Material(
-        color: selected ? const Color(0x14FFFFFF) : Colors.transparent,
+        color: selected ? colors.selectedFill : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -214,6 +229,7 @@ class PlayerChoiceCard extends StatelessWidget {
                               value: progress!.clamp(0, 1),
                               minHeight: 3,
                               color: accent,
+                              // On the still, which is artwork in every mode.
                               backgroundColor: Colors.white24,
                             ),
                           ),
@@ -229,8 +245,8 @@ class PlayerChoiceCard extends StatelessWidget {
                       if (kicker != null) ...[
                         Text(
                           kicker!.toUpperCase(),
-                          style: const TextStyle(
-                            color: BetterPlayerColors.muted,
+                          style: TextStyle(
+                            color: colors.muted,
                             fontFamily: 'FigtreeSB',
                             fontSize: 10.5,
                             letterSpacing: 1.3,
@@ -243,9 +259,7 @@ class PlayerChoiceCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: selected
-                              ? Colors.white
-                              : BetterPlayerColors.secondary,
+                          color: selected ? colors.foreground : colors.secondary,
                           fontFamily: selected ? 'FigtreeBold' : 'FigtreeSB',
                           fontSize: 15,
                           height: 1.25,
@@ -257,10 +271,7 @@ class PlayerChoiceCard extends StatelessWidget {
                           subtitle!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: BetterPlayerColors.muted,
-                            fontSize: 12.5,
-                          ),
+                          style: TextStyle(color: colors.muted, fontSize: 12.5),
                         ),
                       ],
                       if (description?.isNotEmpty == true) ...[
@@ -269,8 +280,8 @@ class PlayerChoiceCard extends StatelessWidget {
                           description!,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: BetterPlayerColors.muted,
+                          style: TextStyle(
+                            color: colors.muted,
                             fontSize: 12.5,
                             height: 1.35,
                           ),
@@ -284,14 +295,14 @@ class PlayerChoiceCard extends StatelessWidget {
                     (selected
                         ? Icon(
                             PhosphorIcons.check(PhosphorIconsStyle.bold),
-                            color: Colors.white,
+                            color: colors.foreground,
                             size: 20,
                           )
                         : onTap == null
                             ? const SizedBox.shrink()
                             : Icon(
                                 PhosphorIcons.caretRight(),
-                                color: BetterPlayerColors.muted,
+                                color: colors.muted,
                                 size: 18,
                               )),
               ],
@@ -303,7 +314,7 @@ class PlayerChoiceCard extends StatelessWidget {
   }
 }
 
-/// A sheet's bottom bar: what is chosen, and the white pill that applies it.
+/// A sheet's bottom bar: what is chosen, and the ink pill that applies it.
 class PlayerSheetFooter extends StatelessWidget {
   const PlayerSheetFooter({
     required this.label,
@@ -318,10 +329,11 @@ class PlayerSheetFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = BetterPlayerPanelColors.of(context);
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: BetterPlayerColors.panel,
-        border: Border(top: BorderSide(color: BetterPlayerColors.hairline)),
+      decoration: BoxDecoration(
+        color: colors.panel,
+        border: Border(top: BorderSide(color: colors.hairline)),
       ),
       child: SafeArea(
         top: false,
@@ -330,10 +342,7 @@ class PlayerSheetFooter extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(color: BetterPlayerColors.secondary),
-                ),
+                child: Text(label, style: TextStyle(color: colors.secondary)),
               ),
               FilledButton(onPressed: onPressed, child: Text(actionLabel)),
             ],
@@ -344,7 +353,7 @@ class PlayerSheetFooter extends StatelessWidget {
   }
 }
 
-/// A picture in a player sheet: a still, a poster or a flag, on a dark tile
+/// A picture in a player sheet: a still, a poster or a flag, on a raised tile
 /// while it loads.
 class PlayerThumbnail extends StatelessWidget {
   const PlayerThumbnail({
@@ -360,12 +369,13 @@ class PlayerThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = BetterPlayerPanelColors.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),
       child: ColoredBox(
-        color: BetterPlayerColors.panelRaised,
+        color: colors.raised,
         child: IconTheme(
-          data: const IconThemeData(color: BetterPlayerColors.muted),
+          data: IconThemeData(color: colors.muted),
           child: SizedBox(width: width, height: height, child: child),
         ),
       ),
@@ -373,7 +383,7 @@ class PlayerThumbnail extends StatelessWidget {
   }
 }
 
-/// A plain rounded icon button for a sheet's header.
+/// A plain icon button for a sheet's header.
 class PlayerSheetAction extends StatelessWidget {
   const PlayerSheetAction({
     required this.icon,
@@ -392,7 +402,7 @@ class PlayerSheetAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       tooltip: tooltip,
-      color: Colors.white,
+      color: BetterPlayerPanelColors.of(context).foreground,
       onPressed: onPressed,
       icon: busy
           ? const SizedBox.square(

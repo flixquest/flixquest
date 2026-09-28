@@ -1,33 +1,36 @@
-import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../mobile/widgets/page_kit.dart';
 import '../../video_providers/names.dart';
+import 'player/player_sheet_ui.dart';
 
+/// The choices before a download or a manual playback: which provider, then
+/// which resolution. Plain rows in the app's palette, so they follow the
+/// theme; opened from the player ([inPlayer]) they take the player's.
 abstract final class DownloadSelectionSheets {
   static Future<VideoProvider?> showProvider(
     BuildContext context, {
     required List<VideoProvider> providers,
-    String title = 'Choose download provider',
-    String subtitle =
-        'Select the source that should provide the offline video.',
+    String? title,
+    String? subtitle,
   }) {
-    return showModalBottomSheet<VideoProvider>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => _DownloadChoiceSheet<VideoProvider>(
-        icon: PhosphorIcons.hardDrives(),
-        title: title,
-        subtitle: subtitle,
+    return showAppSheet<VideoProvider>(
+      context,
+      builder: (context) => _ChoiceSheet<VideoProvider>(
+        title: title ?? tr('download_choose_provider'),
+        subtitle: subtitle ?? tr('download_choose_provider_description'),
         choices: [
           for (final provider in providers)
-            _DownloadChoice(
+            _Choice(
               value: provider,
               title: provider.displayName,
               subtitle: provider.contentDescription,
-              icon: PhosphorIcons.playCircle(),
+              icon: PhosphorIcons.hardDrives(),
             ),
         ],
       ),
@@ -40,51 +43,51 @@ abstract final class DownloadSelectionSheets {
     String? providerName,
     Map<String, int?> estimatedSizes = const {},
     ValueListenable<Map<String, int?>>? estimatedSizesListenable,
+    bool inPlayer = false,
   }) {
-    return showModalBottomSheet<String>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) {
-        Widget buildSheet(Map<String, int?> sizes) =>
-            _DownloadChoiceSheet<String>(
-              icon: PhosphorIcons.downloadSimple(),
-              title: 'Choose resolution',
-              subtitle: providerName == null
-                  ? 'Select the quality to keep on this device.'
-                  : 'Downloading from $providerName',
-              choices: [
-                for (final resolution in resolutions)
-                  _DownloadChoice(
-                    value: resolution,
-                    title: resolution,
-                    titleDetail: _sizeDescription(sizes, resolution),
-                    subtitle: _resolutionDescription(resolution),
-                    icon: PhosphorIcons.monitorPlay(),
+    Widget builder(BuildContext context) {
+      Widget buildSheet(Map<String, int?> sizes) => _ChoiceSheet<String>(
+            title: tr('download_choose_resolution'),
+            subtitle: providerName == null
+                ? tr('download_resolution_description')
+                : tr(
+                    'download_from_provider',
+                    namedArgs: {'name': providerName},
                   ),
-              ],
+            choices: [
+              for (final resolution in resolutions)
+                _Choice(
+                  value: resolution,
+                  title: resolution,
+                  titleDetail: _sizeDescription(sizes, resolution),
+                  subtitle: _resolutionDescription(resolution),
+                  icon: PhosphorIcons.monitorPlay(),
+                ),
+            ],
+          );
+      final listenable = estimatedSizesListenable;
+      return listenable == null
+          ? buildSheet(estimatedSizes)
+          : ValueListenableBuilder<Map<String, int?>>(
+              valueListenable: listenable,
+              builder: (_, sizes, __) => buildSheet(sizes),
             );
-        final listenable = estimatedSizesListenable;
-        return listenable == null
-            ? buildSheet(estimatedSizes)
-            : ValueListenableBuilder<Map<String, int?>>(
-                valueListenable: listenable,
-                builder: (_, sizes, __) => buildSheet(sizes),
-              );
-      },
-    );
+    }
+
+    return inPlayer
+        ? showPlayerSheet<String>(context: context, builder: builder)
+        : showAppSheet<String>(context, builder: builder);
   }
 
   static String _resolutionDescription(String resolution) {
     final height = int.tryParse(
       RegExp(r'(\d{3,4})').firstMatch(resolution)?.group(1) ?? '',
     );
-    if (height == null) return 'Adaptive quality selected by the provider';
-    if (height >= 2160) return 'Ultra HD • largest download';
-    if (height >= 1080) return 'Full HD • higher data usage';
-    if (height >= 720) return 'HD • balanced quality and size';
-    return 'Smaller download';
+    if (height == null) return tr('quality_adaptive');
+    if (height >= 2160) return tr('quality_uhd');
+    if (height >= 1080) return tr('quality_fhd');
+    if (height >= 720) return tr('quality_hd');
+    return tr('quality_small');
   }
 
   static String _sizeDescription(
@@ -92,7 +95,7 @@ abstract final class DownloadSelectionSheets {
     String resolution,
   ) {
     final bytes = estimatedSizes[resolution];
-    return bytes == null ? 'Size undetermined' : '~${_formatBytes(bytes)}';
+    return bytes == null ? tr('size_unknown') : '~${_formatBytes(bytes)}';
   }
 
   static String _formatBytes(int bytes) {
@@ -105,13 +108,13 @@ abstract final class DownloadSelectionSheets {
   }
 }
 
-class _DownloadChoice<T> {
-  const _DownloadChoice({
+class _Choice<T> {
+  const _Choice({
     required this.value,
     required this.title,
-    this.titleDetail,
     required this.subtitle,
     required this.icon,
+    this.titleDetail,
   });
 
   final T value;
@@ -121,94 +124,81 @@ class _DownloadChoice<T> {
   final IconData icon;
 }
 
-class _DownloadChoiceSheet<T> extends StatelessWidget {
-  const _DownloadChoiceSheet({
-    required this.icon,
+/// A heading and a list of plain rows: a muted icon, the choice, a detail
+/// beside it (a file size), a muted line under it and a chevron.
+class _ChoiceSheet<T> extends StatelessWidget {
+  const _ChoiceSheet({
     required this.title,
     required this.subtitle,
     required this.choices,
   });
 
-  final IconData icon;
   final String title;
   final String subtitle;
-  final List<_DownloadChoice<T>> choices;
+  final List<_Choice<T>> choices;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * .82,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 2, 20, 18),
-            child: Row(
+            padding: EdgeInsetsDirectional.fromSTEB(
+              gutter,
+              AppSpace.md,
+              gutter,
+              AppSpace.md,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(8),
+                Text(
+                  title,
+                  style: AppType.sectionHeader.copyWith(
+                    fontFamily: AppType.bold,
+                    color: palette.foreground,
                   ),
-                  child: Icon(icon, color: colors.primary),
                 ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title,
-                          style: Theme.of(context).textTheme.titleLarge),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
+                const SizedBox(height: AppSpace.xs),
+                Text(
+                  subtitle,
+                  style: AppType.metadata.copyWith(
+                    fontSize: 13,
+                    color: palette.mutedText,
                   ),
                 ),
               ],
             ),
           ),
           Flexible(
-            child: ListView.separated(
+            child: ListView.builder(
               shrinkWrap: true,
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              padding: const EdgeInsets.only(bottom: AppSpace.xxl),
               itemCount: choices.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final choice = choices[index];
-                return Material(
-                  color: colors.surfaceContainerHighest.withValues(alpha: .55),
-                  borderRadius: BorderRadius.circular(9),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(9),
-                    onTap: () => Navigator.pop(context, choice.value),
+                return InkWell(
+                  onTap: () => Navigator.pop(context, choice.value),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 60),
                     child: Padding(
-                      padding: const EdgeInsets.all(14),
+                      padding: EdgeInsetsDirectional.fromSTEB(
+                        gutter,
+                        AppSpace.md,
+                        gutter - AppSpace.xs,
+                        AppSpace.md,
+                      ),
                       child: Row(
                         children: [
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: colors.primary.withValues(alpha: .11),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              choice.icon,
-                              size: 21,
-                              color: colors.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 13),
+                          Icon(choice.icon, size: 22, color: palette.mutedText),
+                          const SizedBox(width: AppSpace.lg),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,50 +208,49 @@ class _DownloadChoiceSheet<T> extends StatelessWidget {
                                     Flexible(
                                       child: Text(
                                         choice.title,
+                                        maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleSmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                            ),
+                                        style: AppType.cardTitle.copyWith(
+                                          fontSize: 15,
+                                          color: palette.foreground,
+                                        ),
                                       ),
                                     ),
                                     if (choice.titleDetail != null) ...[
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          choice.titleDetail!,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodyMedium
-                                              ?.copyWith(
-                                                color: colors.primary,
-                                                fontWeight: FontWeight.w700,
-                                              ),
+                                      const SizedBox(width: AppSpace.sm),
+                                      Text(
+                                        choice.titleDetail!,
+                                        maxLines: 1,
+                                        style: AppType.metadata.copyWith(
+                                          fontSize: 13,
+                                          color: palette.secondaryText,
+                                          fontFeatures: const [
+                                            FontFeature.tabularFigures(),
+                                          ],
                                         ),
                                       ),
                                     ],
                                   ],
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  choice.subtitle,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        color: colors.onSurfaceVariant,
-                                      ),
-                                ),
+                                if (choice.subtitle.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    choice.subtitle,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppType.metadata.copyWith(
+                                      color: palette.mutedText,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
+                          const SizedBox(width: AppSpace.sm),
                           Icon(
                             PhosphorIcons.caretRight(),
                             size: 18,
-                            color: colors.onSurfaceVariant,
+                            color: palette.mutedText,
                           ),
                         ],
                       ),

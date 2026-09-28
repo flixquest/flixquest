@@ -147,8 +147,11 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
           );
         });
       }
-      // Fetch season episodes first
-      await _fetchSeasonEpisodes();
+      // The player's episode list is not needed until it opens, so fetch it
+      // alongside the source race instead of in front of it. Downloads never
+      // open the player.
+      final seasonEpisodesFetch =
+          widget.download ? null : _fetchSeasonEpisodes();
 
       var isBookmarked = await recentlyWatchedEpisodeController
           .contain(widget.metadata.episodeId!);
@@ -200,13 +203,11 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
             Navigator.pop(context);
             return;
           }
-          _markLoadingStatuses(only: picked);
           selection = await _fetchSelection(providers: [picked]);
           if (selection != null || !mounted) break;
         }
       } else {
-        _markLoadingStatuses(only: selectedDownloadProvider);
-        // Start all sources together and use the first playable response.
+        // Race the sources in batches and use the first playable response.
         selection = await _fetchSelection(
           providers: selectedDownloadProvider == null
               ? videoProviders
@@ -216,6 +217,7 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
 
       final firstWorkingProviderCode = selection?.provider.codeName;
       if (selection != null) {
+        _showSelectedProvider(selection.provider);
         final result = selection.result;
         videos = VideoUtils.convertVideoLinksToMap(result.videoLinks!);
         tvVideoLinks = result.videoLinks;
@@ -267,6 +269,7 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
 
         // Never start playback behind a full-screen ad.
         await StartIoAdsService.instance.whenFullScreenAdClosed();
+        await seasonEpisodesFetch;
         if (!mounted) return;
 
         // Navigate to player with provider list for lazy loading
@@ -339,24 +342,15 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
     return currentProviderIndex;
   }
 
-  /// Marks every provider pending, with [only] (when given) as the single
-  /// provider being loaded.
-  void _markLoadingStatuses({VideoProvider? only}) {
+  /// Shows [provider] as the one being played, once the race has chosen it.
+  /// Sources later in its batch may still be answering, and would otherwise
+  /// keep the focus.
+  void _showSelectedProvider(VideoProvider provider) {
     if (!mounted) return;
     setState(() {
-      if (only != null) {
-        currentProviderIndex = videoProviders.indexWhere(
-          (provider) => provider.codeName == only.codeName,
-        );
-      }
-      for (var index = 0; index < providerStates.length; index++) {
-        providerStates[index] = providerStates[index].copyWith(
-          status:
-              only == null || providerStates[index].codeName == only.codeName
-                  ? ProviderStatus.loading
-                  : ProviderStatus.pending,
-        );
-      }
+      currentProviderIndex = videoProviders.indexWhere(
+        (candidate) => candidate.codeName == provider.codeName,
+      );
     });
   }
 
@@ -368,6 +362,19 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
       providers: providers,
       load: (provider) {
         _providerStopwatches[provider.codeName] = Stopwatch()..start();
+        // Only the batch in flight shows as loading; the rest wait their turn.
+        if (mounted) {
+          setState(() {
+            final providerIndex = providerStates.indexWhere(
+              (state) => state.codeName == provider.codeName,
+            );
+            if (providerIndex != -1) {
+              providerStates[providerIndex] = providerStates[providerIndex]
+                  .copyWith(status: ProviderStatus.loading);
+            }
+            currentProviderIndex = _firstLoadingProviderIndex();
+          });
+        }
         debugPrint(
           '[TVVideoLoader] Request provider=${provider.displayName} '
           '(${provider.codeName}), tmdbId=${widget.metadata.tvId}, '

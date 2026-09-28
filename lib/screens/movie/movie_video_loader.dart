@@ -164,17 +164,11 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
           );
         });
       }
-      // Fetch movie recommendations first
-      debugPrint(
-        '[MovieRecommendationsDebug][FETCH_BEFORE_PLAYBACK] '
-        'movieId=${_metadata.movieId}',
-      );
-      await _fetchMovieRecommendations();
-      debugPrint(
-        '[MovieRecommendationsDebug][FETCH_BEFORE_PLAYBACK_DONE] '
-        'movieId=${_metadata.movieId} '
-        'recommendations=${_metadata.recommendations?.length ?? 0}',
-      );
+      // The player's recommendations are not needed until it opens, so fetch
+      // them alongside the source race instead of in front of it. Downloads
+      // never open the player.
+      final recommendationsFetch =
+          widget.download ? null : _fetchMovieRecommendations();
 
       var isBookmarked =
           await recentlyWatchedMoviesController.contain(_metadata.movieId!);
@@ -224,13 +218,11 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
             Navigator.pop(context);
             return;
           }
-          _markLoadingStatuses(only: picked);
           selection = await _fetchSelection(providers: [picked]);
           if (selection != null || !mounted) break;
         }
       } else {
-        _markLoadingStatuses(only: selectedDownloadProvider);
-        // Start all sources together and use the first playable response.
+        // Race the sources in batches and use the first playable response.
         selection = await _fetchSelection(
           providers: selectedDownloadProvider == null
               ? videoProviders
@@ -240,6 +232,7 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
 
       final firstWorkingProviderCode = selection?.provider.codeName;
       if (selection != null) {
+        _showSelectedProvider(selection.provider);
         final result = selection.result;
         videos = VideoUtils.convertVideoLinksToMap(result.videoLinks!);
         movieVideoLinks = result.videoLinks;
@@ -289,6 +282,7 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
 
         // Never start playback behind a full-screen ad.
         await StartIoAdsService.instance.whenFullScreenAdClosed();
+        await recommendationsFetch;
         if (!mounted) return;
 
         // Navigate to player with provider list for lazy loading
@@ -370,24 +364,15 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
     return currentProviderIndex;
   }
 
-  /// Marks every provider pending, with [only] (when given) as the single
-  /// provider being loaded.
-  void _markLoadingStatuses({VideoProvider? only}) {
+  /// Shows [provider] as the one being played, once the race has chosen it.
+  /// Sources later in its batch may still be answering, and would otherwise
+  /// keep the focus.
+  void _showSelectedProvider(VideoProvider provider) {
     if (!mounted) return;
     setState(() {
-      if (only != null) {
-        currentProviderIndex = videoProviders.indexWhere(
-          (provider) => provider.codeName == only.codeName,
-        );
-      }
-      for (var index = 0; index < providerStates.length; index++) {
-        providerStates[index] = providerStates[index].copyWith(
-          status:
-              only == null || providerStates[index].codeName == only.codeName
-                  ? ProviderStatus.loading
-                  : ProviderStatus.pending,
-        );
-      }
+      currentProviderIndex = videoProviders.indexWhere(
+        (candidate) => candidate.codeName == provider.codeName,
+      );
     });
   }
 
@@ -399,6 +384,19 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
       providers: providers,
       load: (provider) {
         _providerStopwatches[provider.codeName] = Stopwatch()..start();
+        // Only the batch in flight shows as loading; the rest wait their turn.
+        if (mounted) {
+          setState(() {
+            final providerIndex = providerStates.indexWhere(
+              (state) => state.codeName == provider.codeName,
+            );
+            if (providerIndex != -1) {
+              providerStates[providerIndex] = providerStates[providerIndex]
+                  .copyWith(status: ProviderStatus.loading);
+            }
+            currentProviderIndex = _firstLoadingProviderIndex();
+          });
+        }
         debugPrint(
           '[MovieVideoLoader] Request provider=${provider.displayName} '
           '(${provider.codeName}), tmdbId=${_metadata.movieId}',

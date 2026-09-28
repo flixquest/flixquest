@@ -95,4 +95,63 @@ void main() {
       findsOneWidget,
     );
   });
+
+  for (final viewport in const <Size>[Size(960, 540), Size(640, 360)]) {
+    testWidgets('playback loader fits a long source list at $viewport',
+        (tester) async {
+      // 960x540 is an Android TV at density 2; 640x360 a small landscape
+      // phone, where the ads stack under the race instead of beside it.
+      tester.view.physicalSize = viewport;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => AppDependencyProvider(),
+          child: MaterialApp(
+            home: PlaybackLoadingScreen(
+              title: 'A title long enough to need a second line on a phone',
+              subtitle: 'S1:E3  ·  The Episode',
+              currentProviderIndex: 3,
+              providers: [
+                for (var index = 0; index < 14; index++)
+                  ProviderLoadState(
+                    codeName: 'provider$index',
+                    fullName: 'Provider number $index',
+                    content: 'Hollywood: English | Anime: Japanese',
+                    status: index < 3
+                        ? ProviderStatus.failed
+                        : index < 6
+                            ? ProviderStatus.loading
+                            : ProviderStatus.pending,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Provider number 13'), findsOneWidget);
+    });
+  }
+
+  testWidgets('shows a skeleton until the source list arrives', (tester) async {
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => AppDependencyProvider(),
+        child: const MaterialApp(
+          home: Scaffold(
+            body: ProviderLoadingWidget(providers: [], currentIndex: 0),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('loading_video_sources'), findsOneWidget);
+  });
 }

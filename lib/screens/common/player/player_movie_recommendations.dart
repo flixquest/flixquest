@@ -66,7 +66,7 @@ class PlayerMovieRecommendations {
           SnackBar(
             content: Text(
                 tr('failed_load_movie', namedArgs: {'error': e.toString()})),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -193,11 +193,14 @@ class PlayerMovieRecommendations {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             final selected = recommendations[selectedIndex];
+            final panel = playerSheetTheme(context)
+                    .extension<BetterPlayerPanelColors>() ??
+                BetterPlayerPanelColors.dark;
             return PlayerTheme(
               child: Dialog(
                 insetPadding: const EdgeInsets.all(20),
                 clipBehavior: Clip.antiAlias,
-                backgroundColor: BetterPlayerColors.panel,
+                backgroundColor: panel.panel,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -214,21 +217,21 @@ class PlayerMovieRecommendations {
                             Container(
                               width: 46,
                               height: 46,
-                              decoration: const BoxDecoration(
-                                color: Color(0x14FFFFFF),
+                              decoration: BoxDecoration(
+                                color: panel.raised,
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 PhosphorIcons.sparkle(),
-                                color: BetterPlayerColors.secondary,
+                                color: panel.secondary,
                               ),
                             ),
                             const SizedBox(width: 13),
                             Expanded(
                               child: Text(
                                 tr('recommended_movies'),
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: panel.foreground,
                                   fontFamily: 'FigtreeBold',
                                   fontSize: 19,
                                   height: 1.2,
@@ -257,7 +260,7 @@ class PlayerMovieRecommendations {
                             PhosphorIcons.playCircle(
                               PhosphorIconsStyle.fill,
                             ),
-                            color: Colors.white,
+                            color: panel.foreground,
                           ),
                           onTap: null,
                         ),
@@ -275,7 +278,7 @@ class PlayerMovieRecommendations {
                                 final isSelected = index == selectedIndex;
                                 return Material(
                                   color: isSelected
-                                      ? const Color(0x1FFFFFFF)
+                                      ? panel.selectedFill
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(8),
                                   clipBehavior: Clip.antiAlias,
@@ -303,9 +306,8 @@ class PlayerMovieRecommendations {
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   color: isSelected
-                                                      ? Colors.white
-                                                      : BetterPlayerColors
-                                                          .secondary,
+                                                      ? panel.foreground
+                                                      : panel.secondary,
                                                   fontFamily: 'FigtreeSB',
                                                   fontSize: 14,
                                                   height: 1.25,

@@ -89,7 +89,6 @@ class AppDependencyProvider extends ChangeNotifier {
 
   bool get startIoBannerEnabled => _startIoAds.bannerEnabled;
   bool get startIoInterstitialEnabled => _startIoAds.interstitialEnabled;
-  bool get startIoRewardedEnabled => _startIoAds.rewardedEnabled;
 
   void setBannerAdNetwork(String network) {
     final sanitized = network.trim().toLowerCase();
@@ -132,17 +131,13 @@ class AppDependencyProvider extends ChangeNotifier {
   void setStartIoAdsConfig({
     required bool bannerEnabled,
     required bool interstitialEnabled,
-    required bool rewardedEnabled,
     Duration? interstitialInterval,
-    Duration? adFreePassDuration,
     StartIoInterstitialMode? tvInterstitialMode,
   }) {
     final next = _startIoAds.copyWith(
       bannerEnabled: bannerEnabled,
       interstitialEnabled: interstitialEnabled,
-      rewardedEnabled: rewardedEnabled,
       interstitialInterval: interstitialInterval,
-      adFreePassDuration: adFreePassDuration,
       tvInterstitialMode: tvInterstitialMode,
     );
     if (next == _startIoAds) return;

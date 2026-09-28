@@ -629,6 +629,9 @@ abstract class  LocaleKeys {
   static const switched_to = 'switched_to';
   static const switch_provider_error = 'switch_provider_error';
   static const loading_video_sources = 'loading_video_sources';
+  static const playback_loader_checking = 'playback_loader_checking';
+  static const playback_loader_found = 'playback_loader_found';
+  static const playback_loader_progress = 'playback_loader_progress';
   static const upload_subtitles = 'upload_subtitles';
   static const select_subtitle_file = 'select_subtitle_file';
   static const upload_subtitle_file = 'upload_subtitle_file';
@@ -641,7 +644,6 @@ abstract class  LocaleKeys {
   static const subtitle_already_added = 'subtitle_already_added';
   static const failed_upload_subtitle = 'failed_upload_subtitle';
   static const no_file_selected = 'no_file_selected';
-  static const finding_best_source = 'finding_best_source';
   static const playback_failed = 'playback_failed';
   static const google_signin_failed = 'google_signin_failed';
   static const link_unavailable = 'link_unavailable';
@@ -807,11 +809,6 @@ abstract class  LocaleKeys {
   static const resume_action = 'resume_action';
   static const remove = 'remove';
   static const loading_episodes = 'loading_episodes';
-  static const ad_free_pass_offer = 'ad_free_pass_offer';
-  static const ad_free_pass_loading = 'ad_free_pass_loading';
-  static const ad_free_pass_active = 'ad_free_pass_active';
-  static const ad_free_pass_hours = 'ad_free_pass_hours';
-  static const ad_free_pass_minutes = 'ad_free_pass_minutes';
   static const collection = 'collection';
   static const movie_count = 'movie_count';
   static const ins_title = 'ins_title';
@@ -1072,5 +1069,20 @@ abstract class  LocaleKeys {
   static const player_no_playable_stream = 'player_no_playable_stream';
   static const ins_in_progress = 'ins_in_progress';
   static const ins_clear_selection = 'ins_clear_selection';
+  static const download_choose_provider = 'download_choose_provider';
+  static const download_choose_provider_description = 'download_choose_provider_description';
+  static const download_choose_resolution = 'download_choose_resolution';
+  static const download_resolution_description = 'download_resolution_description';
+  static const download_from_provider = 'download_from_provider';
+  static const quality_adaptive = 'quality_adaptive';
+  static const quality_uhd = 'quality_uhd';
+  static const quality_fhd = 'quality_fhd';
+  static const quality_hd = 'quality_hd';
+  static const quality_small = 'quality_small';
+  static const size_unknown = 'size_unknown';
+  static const in_app_kicker = 'in_app_kicker';
+  static const in_app_open = 'in_app_open';
+  static const in_app_dismiss = 'in_app_dismiss';
+  static const tv_ad_back_hint = 'tv_ad_back_hint';
 
 }

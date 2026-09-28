@@ -313,10 +313,13 @@ List<String> crewWith(Credits? credits, Set<String> jobs) => _names(
           .map((person) => person.name),
     ).toList();
 
-/// An episode's guest stars, then the series' regulars, as one cast.
+/// An episode's cast: the series' regulars first, then the episode's guest
+/// stars (who are also named on their own line), each once.
 List<Cast> episodeCast(Credits? credits) {
   final seen = <int>{};
   return <Cast>[
+    for (final regular in credits?.cast ?? const <Cast>[])
+      if (regular.id == null || seen.add(regular.id!)) regular,
     for (final guest in credits?.episodeGuestStars ?? const [])
       if (guest.id == null || seen.add(guest.id!))
         Cast(
@@ -326,7 +329,5 @@ List<Cast> episodeCast(Credits? credits) {
           profilePath: guest.profilePath,
           order: guest.order,
         ),
-    for (final regular in credits?.cast ?? const <Cast>[])
-      if (regular.id == null || seen.add(regular.id!)) regular,
   ];
 }

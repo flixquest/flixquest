@@ -1,35 +1,43 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../design/app_palette.dart';
+import '../design/app_tokens.dart';
+import '../mobile/widgets/page_kit.dart';
 import '../models/in_app_message_payload.dart';
 import 'app_ui_components.dart';
 
+/// A message sent from the console: a modal, a bottom sheet or a banner, as
+/// its payload asks. All three are in the app's palette: the artwork, a
+/// small kicker (the one touch of the accent), the title and text, and ink
+/// pills.
 class InAppMessageDialog extends StatelessWidget {
+  const InAppMessageDialog({super.key, required this.payload});
+
   final InAppMessagePayload payload;
 
-  const InAppMessageDialog({
-    super.key,
-    required this.payload,
-  });
-
   static Future<void> show(
-      BuildContext context, InAppMessagePayload payload) async {
+    BuildContext context,
+    InAppMessagePayload payload,
+  ) async {
     switch (payload.displayType) {
       case 'bottom_sheet':
-        await showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
+        await showAppSheet<void>(
+          context,
           builder: (context) => _InAppBottomSheetWidget(payload: payload),
         );
         break;
       case 'banner':
-        ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-        ScaffoldMessenger.of(context).showMaterialBanner(
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.hideCurrentMaterialBanner();
+        messenger.showMaterialBanner(
           MaterialBanner(
-            elevation: 8,
+            elevation: 0,
             backgroundColor: Colors.transparent,
+            dividerColor: Colors.transparent,
             forceActionsBelow: false,
             padding: EdgeInsets.zero,
             content: _InAppBannerWidget(payload: payload),
@@ -39,261 +47,39 @@ class InAppMessageDialog extends StatelessWidget {
         break;
       case 'modal':
       default:
-        await showDialog(
+        await showDialog<void>(
           context: context,
           barrierDismissible: true,
-          barrierColor: Colors.black.withValues(alpha: 0.75),
           builder: (context) => InAppMessageDialog(payload: payload),
         );
         break;
     }
   }
 
-  Future<void> _handleAction(BuildContext context) async {
-    Navigator.of(context).pop();
-    if (payload.actionUrl != null && payload.actionUrl!.isNotEmpty) {
-      final uri = Uri.parse(payload.actionUrl!);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-    final isDark = theme.brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1E1F1E) : Colors.white;
-
+    final palette = AppPalette.of(context);
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: Container(
+      backgroundColor: palette.surface,
+      surfaceTintColor: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.hero),
+      ),
+      child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: primaryColor.withValues(alpha: 0.2),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
-              blurRadius: 25,
-              offset: const Offset(0, 10),
+        child: SingleChildScrollView(
+          child: _MessageContent(
+            payload: payload,
+            dismissLabel: tr('in_app_dismiss'),
+            imageRadius: 0,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpace.xl,
+              AppSpace.lg,
+              AppSpace.xl,
+              AppSpace.lg,
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header Image with Gradient & Close Button
-              if (payload.imageUrl != null && payload.imageUrl!.isNotEmpty)
-                Stack(
-                  children: [
-                    CachedNetworkImage(
-                      imageUrl: payload.imageUrl!,
-                      height: 190,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => const AppCachedImagePlaceholder(),
-                      errorWidget: (context, url, error) =>
-                          const SizedBox.shrink(),
-                    ),
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              cardBg.withValues(alpha: 0.7),
-                              cardBg,
-                            ],
-                            stops: const [0.3, 0.8, 1.0],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: GestureDetector(
-                        onTap: () => Navigator.of(context).pop(),
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            PhosphorIcons.x(PhosphorIconsStyle.bold),
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Align(
-                  alignment: Alignment.topRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 12, right: 12),
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: Icon(
-                        PhosphorIcons.x(PhosphorIconsStyle.bold),
-                        size: 20,
-                        color: theme.iconTheme.color?.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ),
-                ),
-
-              // Content Section
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Badge Header
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: primaryColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            PhosphorIcons.sparkle(PhosphorIconsStyle.fill),
-                            size: 14,
-                            color: primaryColor,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'NOTIFICATION',
-                            style: TextStyle(
-                              fontFamily: 'FigtreeSB',
-                              fontSize: 11,
-                              color: primaryColor,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Title
-                    Text(
-                      payload.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontFamily: 'FigtreeSB',
-                        fontSize: 19,
-                        fontWeight: FontWeight.bold,
-                        height: 1.25,
-                      ),
-                    ),
-
-                    // Body
-                    if (payload.body.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        payload.body,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontFamily: 'Figtree',
-                          fontSize: 14,
-                          color: theme.textTheme.bodyMedium?.color
-                              ?.withValues(alpha: 0.85),
-                          height: 1.45,
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 22),
-
-                    // Action Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 13),
-                              side: BorderSide(
-                                color:
-                                    theme.dividerColor.withValues(alpha: 0.3),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: Text(
-                              'Dismiss',
-                              style: TextStyle(
-                                fontFamily: 'FigtreeSB',
-                                fontSize: 14,
-                                color: theme.textTheme.bodyLarge?.color,
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (payload.actionUrl != null &&
-                            payload.actionUrl!.isNotEmpty) ...[
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () => _handleAction(context),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryColor,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 13),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    payload.buttonText ?? 'View Now',
-                                    style: const TextStyle(
-                                      fontFamily: 'FigtreeSB',
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Icon(
-                                    PhosphorIcons.arrowSquareOut(
-                                        PhosphorIconsStyle.bold),
-                                    size: 16,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
         ),
       ),
@@ -302,320 +88,252 @@ class InAppMessageDialog extends StatelessWidget {
 }
 
 class _InAppBottomSheetWidget extends StatelessWidget {
-  final InAppMessagePayload payload;
-
   const _InAppBottomSheetWidget({required this.payload});
 
-  Future<void> _handleAction(BuildContext context) async {
-    Navigator.of(context).pop();
-    if (payload.actionUrl != null && payload.actionUrl!.isNotEmpty) {
-      final uri = Uri.parse(payload.actionUrl!);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    }
-  }
+  final InAppMessagePayload payload;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-    final isDark = theme.brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1E1F1E) : Colors.white;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-        border: Border(
-          top: BorderSide(
-            color: primaryColor.withValues(alpha: 0.25),
-            width: 1.5,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.6),
-            blurRadius: 30,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 12,
-        bottom: 20 + MediaQuery.of(context).padding.bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Drag Handle
-          Center(
-            child: Container(
-              width: 38,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.dividerColor.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Optional Image
-          if (payload.imageUrl != null && payload.imageUrl!.isNotEmpty) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(5),
-              child: CachedNetworkImage(
-                imageUrl: payload.imageUrl!,
-                height: 170,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => const AppCachedImagePlaceholder(),
-                errorWidget: (context, url, error) => const SizedBox.shrink(),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          // Title
-          Text(
-            payload.title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontFamily: 'FigtreeSB',
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          // Body
-          if (payload.body.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              payload.body,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontFamily: 'Figtree',
-                fontSize: 14,
-                color:
-                    theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.85),
-                height: 1.4,
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 20),
-
-          // Buttons
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    side: BorderSide(
-                      color: theme.dividerColor.withValues(alpha: 0.3),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Text(
-                    'Close',
-                    style: TextStyle(
-                      fontFamily: 'FigtreeSB',
-                      fontSize: 14,
-                      color: theme.textTheme.bodyLarge?.color,
-                    ),
-                  ),
-                ),
-              ),
-              if (payload.actionUrl != null &&
-                  payload.actionUrl!.isNotEmpty) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => _handleAction(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          payload.buttonText ?? 'Check It Out',
-                          style: const TextStyle(
-                            fontFamily: 'FigtreeSB',
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          PhosphorIcons.caretRight(PhosphorIconsStyle.bold),
-                          size: 16,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
+    final gutter = AppSpace.gutter(context);
+    return SingleChildScrollView(
+      child: _MessageContent(
+        payload: payload,
+        dismissLabel: tr('close'),
+        imageRadius: AppRadii.card,
+        padding: EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpace.xl),
       ),
     );
   }
 }
 
-class _InAppBannerWidget extends StatelessWidget {
-  final InAppMessagePayload payload;
+/// The artwork, kicker, title, text and actions shared by the modal and the
+/// sheet.
+class _MessageContent extends StatelessWidget {
+  const _MessageContent({
+    required this.payload,
+    required this.dismissLabel,
+    required this.imageRadius,
+    required this.padding,
+  });
 
-  const _InAppBannerWidget({required this.payload});
+  final InAppMessagePayload payload;
+  final String dismissLabel;
+  final double imageRadius;
+  final EdgeInsets padding;
+
+  bool get _hasAction => payload.actionUrl?.isNotEmpty == true;
+
+  Future<void> _act(BuildContext context) async {
+    Navigator.of(context).pop();
+    if (!_hasAction) return;
+    await _openUrl(payload.actionUrl!);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-    final isDark = theme.brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF242524) : Colors.white;
-
-    return Padding(
-      padding: const EdgeInsets.all(10),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(
-            color: primaryColor.withValues(alpha: 0.25),
-            width: 1,
+    final palette = AppPalette.of(context);
+    final image = payload.imageUrl;
+    final artwork = image == null || image.isEmpty
+        ? null
+        : AspectRatio(
+            aspectRatio: 16 / 9,
+            child: CachedNetworkImage(
+              imageUrl: image,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => const AppCachedImagePlaceholder(),
+              errorWidget: (_, __, ___) => ColoredBox(
+                color: palette.raisedSurface,
+              ),
+            ),
+          );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (artwork != null)
+          Padding(
+            padding: imageRadius == 0
+                ? EdgeInsets.zero
+                : EdgeInsets.fromLTRB(padding.left, 0, padding.right, 0),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(imageRadius),
+              child: artwork,
+            ),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.4),
-              blurRadius: 15,
-              offset: const Offset(0, 4),
-            ),
-          ],
+        Padding(
+          padding: padding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tr('in_app_kicker').toUpperCase(),
+                style: AppType.kicker.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: AppSpace.sm),
+              Text(
+                payload.title,
+                style: AppType.sectionHeader.copyWith(
+                  fontFamily: AppType.bold,
+                  fontSize: 20,
+                  height: 1.25,
+                  color: palette.foreground,
+                ),
+              ),
+              if (payload.body.isNotEmpty) ...[
+                const SizedBox(height: AppSpace.sm),
+                Text(
+                  payload.body,
+                  style: AppType.body.copyWith(color: palette.secondaryText),
+                ),
+              ],
+              const SizedBox(height: AppSpace.xl),
+              if (_hasAction) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => _act(context),
+                    icon: Icon(PhosphorIcons.arrowSquareOut(), size: 18),
+                    label: Text(payload.buttonText ?? tr('in_app_open')),
+                  ),
+                ),
+                const SizedBox(height: AppSpace.xs),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(dismissLabel),
+                ),
+              ),
+            ],
+          ),
         ),
-        child: Row(
-          children: [
-            // Thumbnail or Icon
-            if (payload.imageUrl != null && payload.imageUrl!.isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(5),
-                child: CachedNetworkImage(
-                  imageUrl: payload.imageUrl!,
-                  width: 48,
-                  height: 48,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) => const AppCachedImagePlaceholder(),
-                  errorWidget: (context, url, error) =>
-                      _buildDefaultIcon(primaryColor),
-                ),
-              )
-            else
-              _buildDefaultIcon(primaryColor),
+      ],
+    );
+  }
+}
 
-            const SizedBox(width: 12),
+/// A slim card under the status bar: a thumbnail, the title and one line,
+/// and an open or close button at the end.
+class _InAppBannerWidget extends StatelessWidget {
+  const _InAppBannerWidget({required this.payload});
 
-            // Title & Body
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    payload.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontFamily: 'FigtreeSB',
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (payload.body.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      payload.body,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontFamily: 'Figtree',
-                        fontSize: 12.5,
-                        color: theme.textTheme.bodySmall?.color
-                            ?.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+  final InAppMessagePayload payload;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final hasAction = payload.actionUrl?.isNotEmpty == true;
+    final image = payload.imageUrl;
+    final messenger = ScaffoldMessenger.of(context);
+    Widget placeholderIcon() => Icon(
+          PhosphorIcons.bellSimple(),
+          color: palette.mutedText,
+          size: 22,
+        );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpace.md,
+        AppSpace.sm,
+        AppSpace.md,
+        AppSpace.sm,
+      ),
+      child: Material(
+        color: palette.raisedSurface,
+        borderRadius: BorderRadius.circular(AppRadii.hero),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: hasAction
+              ? () async {
+                  messenger.hideCurrentMaterialBanner();
+                  await _openUrl(payload.actionUrl!);
+                }
+              : null,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpace.md,
+              AppSpace.md,
+              AppSpace.xs,
+              AppSpace.md,
             ),
-
-            const SizedBox(width: 8),
-
-            // Action or Close
-            if (payload.actionUrl != null && payload.actionUrl!.isNotEmpty)
-              IconButton(
-                style: IconButton.styleFrom(
-                  backgroundColor: primaryColor.withValues(alpha: 0.15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.card),
+                  child: SizedBox.square(
+                    dimension: 44,
+                    child: ColoredBox(
+                      color: palette.surface,
+                      child: image == null || image.isEmpty
+                          ? placeholderIcon()
+                          : CachedNetworkImage(
+                              imageUrl: image,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) => placeholderIcon(),
+                            ),
+                    ),
                   ),
                 ),
-                onPressed: () async {
-                  ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-                  final uri = Uri.parse(payload.actionUrl!);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
-                icon: Icon(
-                  PhosphorIcons.arrowSquareOut(PhosphorIconsStyle.bold),
-                  color: primaryColor,
-                  size: 20,
+                const SizedBox(width: AppSpace.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        payload.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.cardTitle.copyWith(
+                          fontSize: 15,
+                          color: palette.foreground,
+                        ),
+                      ),
+                      if (payload.body.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          payload.body,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppType.metadata.copyWith(
+                            fontSize: 13,
+                            color: palette.mutedText,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              )
-            else
-              IconButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-                },
-                icon: Icon(
-                  PhosphorIcons.x(PhosphorIconsStyle.bold),
-                  size: 18,
-                  color: theme.iconTheme.color?.withValues(alpha: 0.6),
+                IconButton(
+                  tooltip: hasAction
+                      ? payload.buttonText ?? tr('in_app_open')
+                      : tr('close'),
+                  color: palette.foreground,
+                  onPressed: () async {
+                    messenger.hideCurrentMaterialBanner();
+                    if (hasAction) await _openUrl(payload.actionUrl!);
+                  },
+                  icon: Icon(
+                    hasAction
+                        ? PhosphorIcons.arrowSquareOut()
+                        : PhosphorIcons.x(),
+                    size: 20,
+                  ),
                 ),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildDefaultIcon(Color primaryColor) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: primaryColor.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Icon(
-        PhosphorIcons.megaphone(PhosphorIconsStyle.fill),
-        color: primaryColor,
-        size: 22,
-      ),
-    );
+Future<void> _openUrl(String url) async {
+  final uri = Uri.tryParse(url);
+  if (uri != null && await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }
