@@ -19,14 +19,25 @@ abstract final class ArtSize {
   static const still = 'w780/';
 }
 
-/// A poster's width on a browse row: three whole posters and the edge of a
-/// fourth across a phone, a little larger on tablets.
+/// How many whole posters a browse row shows: three across a phone, five on
+/// a tablet, six and seven as the page widens.
+int posterRowCount(double width) => width >= 1300
+    ? 7
+    : width >= AppBreakpoints.wide
+        ? 6
+        : width >= AppBreakpoints.tablet
+            ? 5
+            : 3;
+
+/// A poster's width on a browse row: [posterRowCount] whole posters and the
+/// edge of the next across the page.
 double posterWidth(BuildContext context) {
   final width = MediaQuery.sizeOf(context).width;
   final gutter = AppSpace.gutter(context);
-  final fit = (width - gutter * 2 - 20) / 3.15;
+  final count = posterRowCount(width);
+  final fit = (width - gutter * 2 - 10.0 * count) / (count + .15);
   return width >= AppBreakpoints.tablet
-      ? fit.clamp(132.0, 160.0)
+      ? fit.clamp(112.0, 190.0)
       : fit.clamp(104.0, 140.0);
 }
 

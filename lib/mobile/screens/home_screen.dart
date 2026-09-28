@@ -37,7 +37,7 @@ import '../widgets/genre_sheet.dart';
 import '../widgets/hero_card.dart';
 import '../widgets/media_art.dart';
 import '../widgets/media_rows.dart';
-import '../widgets/pill_button.dart';
+import '../widgets/page_kit.dart' show EmptyState;
 import '../widgets/skeletons.dart';
 import 'collection_screen.dart';
 
@@ -403,8 +403,12 @@ class _HomeScreenState extends State<HomeScreen>
       ];
     } else if (_failed.contains(_filter)) {
       content = <Widget>[
-        SliverToBoxAdapter(
-          child: _HomeError(onRetry: _retry),
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: EmptyState.error(
+            message: tr('home_load_failed'),
+            onRetry: _retry,
+          ),
         ),
       ];
     } else {
@@ -782,8 +786,7 @@ List<Widget> homeRows(
   };
   HomeAdSlot adSlot(String slot, {bool tall = false}) => HomeAdSlot(
         placement: '${adBase}_$slot',
-        variant:
-            tall ? HostedBannerVariant.tall : HostedBannerVariant.standard,
+        variant: tall ? HostedBannerVariant.tall : HostedBannerVariant.standard,
       );
   return <Widget>[
     // The update notice is a fixed Home slot above these feed rows.
@@ -970,33 +973,6 @@ class _RenderGapBelowIfShown extends RenderShiftedBox {
     final height = child.size.height;
     size = constraints.constrain(
       Size(child.size.width, height > 0 ? height + _gap : 0),
-    );
-  }
-}
-
-class _HomeError extends StatelessWidget {
-  const _HomeError({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 96),
-      child: Column(
-        children: <Widget>[
-          Icon(PhosphorIcons.wifiSlash(), size: 36, color: palette.mutedText),
-          const SizedBox(height: AppSpace.md),
-          Text(
-            tr('home_load_failed'),
-            textAlign: TextAlign.center,
-            style: AppType.body.copyWith(color: palette.mutedText),
-          ),
-          const SizedBox(height: AppSpace.lg),
-          PillButton(label: tr('retry'), onPressed: onRetry),
-        ],
-      ),
     );
   }
 }

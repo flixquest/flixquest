@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,8 +34,12 @@ class DetailsSliverHeader extends StatelessWidget {
   /// Round buttons at the end, as [DetailsRoundButton]s.
   final List<Widget>? actions;
 
-  static double heightFor(BuildContext context) =>
-      MediaQuery.sizeOf(context).width * 9 / 16;
+  /// 16:9, but never more than half the screen's height, so a landscape
+  /// screen still shows the page under the artwork.
+  static double heightFor(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    return math.min(size.width * 9 / 16, math.max(size.height * .5, 220));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,22 +208,31 @@ class DetailsRoundButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: onArtwork
-            ? const Color(0x61000000)
-            : palette.page.withValues(alpha: 0),
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        tooltip: tooltip,
-        padding: EdgeInsets.zero,
-        onPressed: onPressed,
-        color: onArtwork ? const Color(0xFFFFFFFF) : palette.foreground,
-        icon: Icon(icon, size: 22),
+    return SizedBox.square(
+      dimension: 48,
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: onArtwork
+                  ? const Color(0x61000000)
+                  : palette.page.withValues(alpha: 0),
+              shape: BoxShape.circle,
+            ),
+          ),
+          IconButton(
+            tooltip: tooltip,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+            onPressed: onPressed,
+            color: onArtwork ? const Color(0xFFFFFFFF) : palette.foreground,
+            icon: Icon(icon, size: 22),
+          ),
+        ],
       ),
     );
   }

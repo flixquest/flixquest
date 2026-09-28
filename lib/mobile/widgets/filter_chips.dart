@@ -32,7 +32,9 @@ class FilterChips extends StatelessWidget {
 
   final List<FilterChipSpec> chips;
 
-  static const height = 34.0;
+  /// The row's height: the pill's own 34 dp inside a 48 dp target.
+  static const height = 48.0;
+  static const pillHeight = 34.0;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +59,11 @@ class ChoicePill extends StatelessWidget {
 
   final FilterChipSpec spec;
 
+  void _tap() {
+    HapticFeedback.selectionClick();
+    spec.onTap();
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -66,46 +73,55 @@ class ChoicePill extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      child: SizedBox(
-        height: FilterChips.height,
-        child: Material(
-          color: selected ? palette.focusFill : palette.idleFill,
-          borderRadius: BorderRadius.circular(AppRadii.chip),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              spec.onTap();
-            },
-            child: Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(
-                icon == null ? 14 : 11,
-                0,
-                spec.dropdown ? 10 : 14,
-                0,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  if (icon != null) ...<Widget>[
-                    Icon(icon, size: 16, color: foreground),
-                    const SizedBox(width: 6),
-                  ],
-                  Text(
-                    spec.label,
-                    style: TextStyle(
-                      fontFamily: AppType.semiBold,
-                      fontSize: 14,
-                      height: 1.1,
-                      color: foreground,
+      label: spec.label,
+      onTap: _tap,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _tap,
+        child: SizedBox(
+          height: FilterChips.height,
+          child: Center(
+            child: SizedBox(
+              height: FilterChips.pillHeight,
+              child: Material(
+                color: selected ? palette.focusFill : palette.idleFill,
+                borderRadius: BorderRadius.circular(AppRadii.chip),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: _tap,
+                  child: Padding(
+                    padding: EdgeInsetsDirectional.fromSTEB(
+                      icon == null ? 14 : 11,
+                      0,
+                      spec.dropdown ? 10 : 14,
+                      0,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        if (icon != null) ...<Widget>[
+                          Icon(icon, size: 16, color: foreground),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          spec.label,
+                          style: TextStyle(
+                            fontFamily: AppType.semiBold,
+                            fontSize: 14,
+                            height: 1.1,
+                            color: foreground,
+                          ),
+                        ),
+                        if (spec.dropdown) ...<Widget>[
+                          const SizedBox(width: 4),
+                          Icon(PhosphorIcons.caretDown(),
+                              size: 14, color: foreground),
+                        ],
+                      ],
                     ),
                   ),
-                  if (spec.dropdown) ...<Widget>[
-                    const SizedBox(width: 4),
-                    Icon(PhosphorIcons.caretDown(),
-                        size: 14, color: foreground),
-                  ],
-                ],
+                ),
               ),
             ),
           ),

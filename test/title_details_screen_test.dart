@@ -4,6 +4,7 @@ import 'package:flixquest/catalog/title_details_source.dart';
 import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/constants/theme_data.dart';
 import 'package:flixquest/mobile/screens/title_details_screen.dart';
+import 'package:flixquest/mobile/widgets/details_header.dart';
 import 'package:flixquest/mobile/widgets/page_kit.dart';
 import 'package:flixquest/mobile/widgets/filter_chips.dart';
 import 'package:flixquest/mobile/widgets/poster_card.dart';
@@ -529,4 +530,70 @@ void main() {
       }
     });
   }
+
+  group('on a wide screen', () {
+    Future<void> pump(
+      WidgetTester tester,
+      MediaItem item, {
+      TextDirection direction = TextDirection.ltr,
+      Size size = const Size(1280, 800),
+    }) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        _app(
+          item,
+          direction: direction,
+          history: WatchHistory(episodes: <RecentEpisode>[_watching(1, 1)]),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    for (final direction in TextDirection.values) {
+      testWidgets(
+          '${direction.name}: actions at the start, episodes and '
+          'tabs at the end', (tester) async {
+        await pump(tester, _series, direction: direction);
+        final edge = direction == TextDirection.ltr ? 512.0 : 1280 - 512.0;
+        bool atStart(Finder finder) {
+          final x = tester.getCenter(finder).dx;
+          return direction == TextDirection.ltr ? x < edge : x > edge;
+        }
+
+        expect(atStart(find.byType(DetailsPlayButton)), isTrue);
+        expect(atStart(find.text('AD_SLOT')), isTrue);
+        expect(atStart(find.text('episodes')), isFalse);
+        expect(atStart(find.byType(FilterChips)), isFalse);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('the tabs scroll on their own, the actions stay',
+        (tester) async {
+      await pump(tester, _movie);
+      final playTop = tester.getTopLeft(find.text('play')).dy;
+      await tester.scrollUntilVisible(
+        _poster(103),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(tester.getTopLeft(find.text('play')).dy, playTop);
+      expect(_poster(103), findsOneWidget);
+    });
+
+    testWidgets('a landscape phone keeps one column and the page in view',
+        (tester) async {
+      await pump(tester, _movie, size: const Size(844, 390));
+      expect(find.byType(CustomScrollView), findsOneWidget);
+      expect(find.text('Heat'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

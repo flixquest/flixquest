@@ -331,6 +331,10 @@ void main() {
 
   testWidgets('the field opens on arriving at the tab, not at launch',
       (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     Future<void> pumpShell(String? startOn) async {
       if (startOn != null) {
         await _prefs.setString(
@@ -379,5 +383,61 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(fieldFocused(), isTrue);
+  });
+
+  for (final size in const <Size>[Size(768, 1024), Size(1024, 768)]) {
+    testWidgets('a $size tablet, 1.3 text, right to left: nothing overflows',
+        (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: MediaQueryData(
+            size: size,
+            textScaler: const TextScaler.linear(1.3),
+          ),
+          child: _app(
+            Directionality(
+              textDirection: TextDirection.rtl,
+              child: SearchScreen(
+                source: _FakeSource(),
+                loadSuggestions: _suggestions,
+                openTitle: (_, __) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // Suggestions, then results, then no results.
+      expect(tester.takeException(), isNull);
+      for (final query in <String>['dune', 'zzzzzz']) {
+        await _type(tester, query);
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      }
+    });
+  }
+
+  testWidgets('targets are 48 dp and labelled', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _app(
+        SearchScreen(
+          source: _FakeSource(),
+          loadSuggestions: _suggestions,
+          openTitle: (_, __) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    semantics.dispose();
   });
 }

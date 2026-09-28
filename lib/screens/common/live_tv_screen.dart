@@ -717,7 +717,7 @@ class _ChannelListState extends State<ChannelList> {
     final slivers = <Widget>[];
     var banner = 0;
     for (final section in sections) {
-      slivers.addAll(<Widget>[
+      slivers.add(SliverReadableWidth(maxWidth: 900, slivers: <Widget>[
         SliverToBoxAdapter(
           child: KickerHeading(
             section.label,
@@ -744,7 +744,7 @@ class _ChannelListState extends State<ChannelList> {
             },
           ),
         ),
-      ]);
+      ]));
       if (banner < _listPlacements.length) {
         slivers.add(_bannerSliver(_listPlacements[banner]));
       }

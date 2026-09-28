@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -38,6 +40,8 @@ class _SyncScreenState extends State<SyncScreen>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final MovieDatabaseController _movieDb = MovieDatabaseController();
   final TVDatabaseController _tvDb = TVDatabaseController();
+
+  static const _contentWidth = 760.0;
 
   late final TabController _tabController;
 
@@ -315,15 +319,23 @@ class _SyncScreenState extends State<SyncScreen>
               animation: _tabController,
               builder: (context, _) => CustomScrollView(
                 slivers: [
-                  SliverToBoxAdapter(child: _buildStatus(context, user)),
-                  SliverToBoxAdapter(child: _buildMetricsOverview(context)),
-                  SliverToBoxAdapter(child: _buildKindSwitch(context)),
-                  ..._buildTitles(context, series: _tabController.index == 1),
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height:
-                          AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,
-                    ),
+                  SliverReadableWidth(
+                    maxWidth: _contentWidth,
+                    slivers: [
+                      SliverToBoxAdapter(child: _buildStatus(context, user)),
+                      SliverToBoxAdapter(child: _buildMetricsOverview(context)),
+                      SliverToBoxAdapter(child: _buildKindSwitch(context)),
+                      ..._buildTitles(
+                        context,
+                        series: _tabController.index == 1,
+                      ),
+                      SliverToBoxAdapter(
+                        child: SizedBox(
+                          height: AppSpace.xxxl +
+                              MediaQuery.paddingOf(context).bottom,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -478,11 +490,9 @@ class _SyncScreenState extends State<SyncScreen>
   List<Widget> _buildTitles(BuildContext context, {required bool series}) {
     final gutter = AppSpace.gutter(context);
     const spacing = 10.0;
-    const columns = 3;
-    final width = (MediaQuery.sizeOf(context).width -
-            gutter * 2 -
-            spacing * (columns - 1)) /
-        columns;
+    final content = math.min(MediaQuery.sizeOf(context).width, _contentWidth);
+    final columns = content >= AppBreakpoints.tablet ? 4 : 3;
+    final width = (content - gutter * 2 - spacing * (columns - 1)) / columns;
     final actions = SliverPadding(
       padding: EdgeInsets.fromLTRB(gutter, AppSpace.lg, gutter, 0),
       sliver: SliverToBoxAdapter(
@@ -490,7 +500,6 @@ class _SyncScreenState extends State<SyncScreen>
           children: [
             Expanded(
               child: PillButton(
-                height: 46,
                 icon: PhosphorIcons.cloudArrowDown(),
                 label: tr(series ? 'offline_tv_sync' : 'offline_movie_sync'),
                 onPressed: _isActionRunning ? null : _pullCloudToLocal,
@@ -500,7 +509,6 @@ class _SyncScreenState extends State<SyncScreen>
             Expanded(
               child: PillButton(
                 primary: true,
-                height: 46,
                 busy: _isActionRunning,
                 icon: PhosphorIcons.cloudArrowUp(),
                 label: tr(series ? 'online_tv_sync' : 'online_movie_sync'),
@@ -553,7 +561,7 @@ class _SyncScreenState extends State<SyncScreen>
       SliverPadding(
         padding: EdgeInsets.symmetric(horizontal: gutter),
         sliver: SliverGrid.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
             mainAxisSpacing: spacing,
             crossAxisSpacing: spacing,

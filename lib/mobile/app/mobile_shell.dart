@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/app_session_state_store.dart';
 import '../screens/discover_screen.dart';
@@ -16,7 +17,8 @@ import '../screens/search_screen.dart';
 import 'mobile_nav_bar.dart';
 import 'mobile_tabs.dart';
 
-/// The phone app's frame: five tabs under a flush bottom bar.
+/// The phone app's frame: five tabs under a flush bottom bar, or beside a
+/// side rail from tablet width.
 ///
 /// Each tab is built the first time it is shown and kept alive after, so
 /// switching back finds it as it was left. Back from any tab but Home goes to
@@ -42,6 +44,10 @@ class _MobileShellState extends State<MobileShell>
   late final RestorableString _restoredTab;
   late final AnimationController _fade;
   final Map<MobileTab, Widget> _bodies = <MobileTab, Widget>{};
+
+  // Turning the device swaps the bar for the rail; the key carries the tabs,
+  // and what they have loaded, across the swap.
+  final GlobalKey _tabsKey = GlobalKey(debugLabel: 'MobileShell tabs');
 
   @override
   String get restorationId => 'handheld_home';
@@ -127,38 +133,75 @@ class _MobileShellState extends State<MobileShell>
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) _tabs.select(MobileTab.home);
         },
-        child: Scaffold(
-          backgroundColor: AppPalette.of(context).page,
-          // The page runs under the translucent bar; tabs pad their ends by
-          // MediaQuery's bottom padding, which includes the bar.
-          extendBody: true,
-          bottomNavigationBar: MobileNavBar(
-            current: current,
-            onSelect: _tabs.select,
-          ),
-          body: Stack(
-            fit: StackFit.expand,
-            children: <Widget>[
-              for (final tab in MobileTab.values)
-                if (tab == current || _bodies.containsKey(tab))
-                  Offstage(
-                    key: ValueKey<MobileTab>(tab),
-                    offstage: tab != current,
-                    child: TickerMode(
-                      enabled: tab == current,
-                      child: FadeTransition(
-                        opacity:
-                            tab == current ? _fade : kAlwaysCompleteAnimation,
-                        child: _body(tab),
-                      ),
-                    ),
-                  ),
-            ],
-          ),
+        child: Builder(
+          builder: (context) {
+            final media = MediaQuery.of(context);
+            final rail = media.size.width >= AppBreakpoints.tablet;
+            final bodies = _tabStack(current);
+            return Scaffold(
+              backgroundColor: AppPalette.of(context).page,
+              // The page runs under the translucent bar; tabs pad their ends
+              // by MediaQuery's bottom padding, which includes the bar.
+              extendBody: !rail,
+              bottomNavigationBar: rail
+                  ? null
+                  : MobileNavBar(current: current, onSelect: _tabs.select),
+              body: rail
+                  ? Row(
+                      children: <Widget>[
+                        MobileNavRail(current: current, onSelect: _tabs.select),
+                        Expanded(
+                          child: MediaQuery(
+                            data: _besideRail(context, media),
+                            child: bodies,
+                          ),
+                        ),
+                      ],
+                    )
+                  : bodies,
+            );
+          },
         ),
       ),
     );
   }
+
+  /// [media] as the tabs beside the rail should see it: as wide as the space
+  /// left, and without the inset on the rail's side, which the rail covers.
+  MediaQueryData _besideRail(BuildContext context, MediaQueryData media) {
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    EdgeInsets clear(EdgeInsets insets) =>
+        rtl ? insets.copyWith(right: 0) : insets.copyWith(left: 0);
+    return media.copyWith(
+      size: Size(
+        media.size.width - MobileNavRail.extentOf(context),
+        media.size.height,
+      ),
+      padding: clear(media.padding),
+      viewPadding: clear(media.viewPadding),
+      viewInsets: clear(media.viewInsets),
+    );
+  }
+
+  Widget _tabStack(MobileTab current) => Stack(
+        key: _tabsKey,
+        fit: StackFit.expand,
+        children: <Widget>[
+          for (final tab in MobileTab.values)
+            if (tab == current || _bodies.containsKey(tab))
+              Offstage(
+                key: ValueKey<MobileTab>(tab),
+                offstage: tab != current,
+                child: TickerMode(
+                  enabled: tab == current,
+                  child: FadeTransition(
+                    opacity: tab == current ? _fade : kAlwaysCompleteAnimation,
+                    child: _body(tab),
+                  ),
+                ),
+              ),
+        ],
+      );
 }
 
 /// The app's own page for [tab].

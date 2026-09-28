@@ -22,8 +22,7 @@ void main() {
   });
 
   group('the request', () {
-    test('movies: every filter, explicit titles as the app setting says',
-        () {
+    test('movies: every filter, explicit titles as the app setting says', () {
       final query = DiscoverQuery(MediaKind.movie)
         ..sort = 2
         ..year = '2014'
@@ -115,11 +114,12 @@ void main() {
       (widget) =>
           widget is Scrollable && widget.axisDirection == AxisDirection.down,
     );
-    Future<void> reach(Finder finder) => tester.scrollUntilVisible(
-          finder,
-          200,
-          scrollable: list,
-        );
+    Future<void> reach(Finder finder) async {
+      await tester.scrollUntilVisible(finder, 200, scrollable: list);
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+    }
+
     Future<void> settle() async {
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();
@@ -174,5 +174,73 @@ void main() {
     await tester.tap(find.text('clear_all'));
     await settle();
     expect(find.byIcon(PhosphorIcons.x()), findsNothing);
+  });
+
+  for (final size in const <Size>[Size(768, 1024), Size(1024, 768)]) {
+    testWidgets('a $size tablet, 1.3 text, right to left: nothing overflows',
+        (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: MediaQueryData(
+            size: size,
+            textScaler: const TextScaler.linear(1.3),
+          ),
+          child: MultiProvider(
+            providers: [
+              ChangeNotifierProvider(create: (_) => SettingsProvider()),
+              ChangeNotifierProvider(create: (_) => AppDependencyProvider()),
+            ],
+            child: MaterialApp(
+              home: Directionality(
+                textDirection: TextDirection.rtl,
+                child: DiscoverScreen(
+                  openResults: (_, __) {},
+                  countResults: (_) async => 1234,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      final list = find.byType(Scrollable).first;
+      for (var i = 0; i < 8; i++) {
+        await tester.drag(list, const Offset(0, -400));
+        await tester.pumpAndSettle();
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('targets are 48 dp and labelled', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsProvider()),
+          ChangeNotifierProvider(create: (_) => AppDependencyProvider()),
+        ],
+        child: MaterialApp(
+          home: DiscoverScreen(
+            openResults: (_, __) {},
+            countResults: (_) async => 1234,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    semantics.dispose();
   });
 }

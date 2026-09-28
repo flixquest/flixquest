@@ -98,7 +98,7 @@ class SearchPill extends StatelessWidget {
   final bool searching;
   final bool autofocus;
 
-  static const height = 46.0;
+  static const height = 48.0;
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +123,10 @@ class SearchPill extends StatelessWidget {
               controller: controller,
               focusNode: focusNode,
               autofocus: autofocus,
+              expands: true,
+              maxLines: null,
+              minLines: null,
+              textAlignVertical: TextAlignVertical.center,
               onChanged: onChanged,
               onSubmitted: onSubmitted,
               textInputAction: TextInputAction.search,
@@ -208,14 +212,14 @@ class SegmentSwitch<T> extends StatelessWidget {
   final T selected;
   final ValueChanged<T> onChanged;
 
-  static const height = 44.0;
+  static const height = 52.0;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return Container(
       height: height,
-      padding: const EdgeInsets.all(3),
+      padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         color: palette.idleFill,
         borderRadius: BorderRadius.circular(AppRadii.chip),
@@ -243,7 +247,7 @@ class SegmentSwitch<T> extends StatelessWidget {
                       color: segment.value == selected
                           ? palette.focusFill
                           : const Color(0x00000000),
-                      borderRadius: BorderRadius.circular(AppRadii.chip - 3),
+                      borderRadius: BorderRadius.circular(AppRadii.chip - 2),
                     ),
                     child: _SegmentLabel(
                       segment: segment,
@@ -313,41 +317,57 @@ class TogglePill extends StatelessWidget {
     final palette = AppPalette.of(context);
     final foreground = selected ? palette.onFocus : palette.foreground;
     final marked = selected && check;
+    void tap() {
+      HapticFeedback.selectionClick();
+      onTap();
+    }
+
     return Semantics(
       button: true,
       selected: selected,
-      child: Material(
-        color: selected ? palette.focusFill : palette.idleFill,
-        borderRadius: BorderRadius.circular(AppRadii.chip),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            onTap();
-          },
-          child: AnimatedPadding(
-            duration: const Duration(milliseconds: 160),
-            padding: EdgeInsetsDirectional.fromSTEB(
-              marked ? 11 : 15,
-              9,
-              15,
-              9,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                if (marked) ...<Widget>[
-                  Icon(PhosphorIcons.check(), size: 15, color: foreground),
-                  const SizedBox(width: 5),
-                ],
-                Text(
-                  label,
-                  style: AppType.cardTitle.copyWith(
-                    fontSize: 14,
-                    color: foreground,
+      label: label,
+      onTap: tap,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: tap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Center(
+            widthFactor: 1,
+            child: Material(
+              color: selected ? palette.focusFill : palette.idleFill,
+              borderRadius: BorderRadius.circular(AppRadii.chip),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: tap,
+                child: AnimatedPadding(
+                  duration: const Duration(milliseconds: 160),
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    marked ? 11 : 15,
+                    9,
+                    15,
+                    9,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      if (marked) ...<Widget>[
+                        Icon(PhosphorIcons.check(),
+                            size: 15, color: foreground),
+                        const SizedBox(width: 5),
+                      ],
+                      Text(
+                        label,
+                        style: AppType.cardTitle.copyWith(
+                          fontSize: 14,
+                          color: foreground,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -390,6 +410,46 @@ class KickerHeading extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Keeps a page's text to a reading column, centred, on screens wider than
+/// [maxWidth]; on a phone it changes nothing.
+class ReadableWidth extends StatelessWidget {
+  const ReadableWidth({required this.child, this.maxWidth = 760, super.key});
+
+  final Widget child;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: child,
+        ),
+      );
+}
+
+/// [ReadableWidth] for a run of slivers.
+class SliverReadableWidth extends StatelessWidget {
+  const SliverReadableWidth({
+    required this.slivers,
+    this.maxWidth = 760,
+    super.key,
+  });
+
+  final List<Widget> slivers;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final side = ((MediaQuery.sizeOf(context).width - maxWidth) / 2)
+        .clamp(0.0, double.infinity);
+    return SliverPadding(
+      padding: EdgeInsets.symmetric(horizontal: side),
+      sliver: SliverMainAxisGroup(slivers: slivers),
     );
   }
 }

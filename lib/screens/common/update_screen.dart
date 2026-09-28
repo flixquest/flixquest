@@ -268,52 +268,55 @@ class _UpdateScreenState extends State<UpdateScreen> {
     return Center(
       child: SingleChildScrollView(
         padding: EdgeInsets.symmetric(horizontal: AppSpace.gutter(context)),
-        child: Column(
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: palette.idleFill,
-                shape: BoxShape.circle,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Column(
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: palette.idleFill,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  PhosphorIcons.rocketLaunch(),
+                  size: 32,
+                  color: palette.foreground,
+                ),
               ),
-              child: Icon(
-                PhosphorIcons.rocketLaunch(),
-                size: 32,
-                color: palette.foreground,
+              const SizedBox(height: 16),
+              Text(
+                tr('update_available'),
+                style: AppType.pageTitle.copyWith(color: palette.foreground),
+                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              tr('update_available'),
-              style: AppType.pageTitle.copyWith(color: palette.foreground),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              tr('new_version', namedArgs: {'v': version}),
-              style: AppType.body.copyWith(color: palette.mutedText),
-            ),
-            if (changeLog.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              PillButton(
-                onPressed: () => _showChangelog(changeLog),
-                icon: PhosphorIcons.listBullets(),
-                label: tr('see_changelogs'),
+              const SizedBox(height: 6),
+              Text(
+                tr('new_version', namedArgs: {'v': version}),
+                style: AppType.body.copyWith(color: palette.mutedText),
               ),
+              if (changeLog.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                PillButton(
+                  onPressed: () => _showChangelog(changeLog),
+                  icon: PhosphorIcons.listBullets(),
+                  label: tr('see_changelogs'),
+                ),
+              ],
+              if (downloadUrl.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _DownloadCard(
+                  appVersion: version,
+                  url: downloadUrl,
+                  task: _downloadManager.getDownload(downloadUrl),
+                  onToggle: _toggleDownload,
+                  onOpen: _openDownload,
+                  onDelete: _deleteDownload,
+                ),
+              ],
             ],
-            if (downloadUrl.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              _DownloadCard(
-                appVersion: version,
-                url: downloadUrl,
-                task: _downloadManager.getDownload(downloadUrl),
-                onToggle: _toggleDownload,
-                onOpen: _openDownload,
-                onDelete: _deleteDownload,
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -532,7 +535,6 @@ class _DownloadCard extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 14),
                 child: PillButton(
                   primary: true,
-                  height: 46,
                   onPressed: () {
                     context
                         .read<SettingsProvider>()
@@ -554,7 +556,6 @@ class _DownloadCard extends StatelessWidget {
                         Expanded(
                           child: PillButton(
                             primary: true,
-                            height: 46,
                             onPressed: () => onOpen(url),
                             icon: PhosphorIcons.downloadSimple(),
                             label: tr('install_action'),
@@ -562,7 +563,6 @@ class _DownloadCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 10),
                         PillButton(
-                          height: 46,
                           onPressed: () => onDelete(url),
                           icon: PhosphorIcons.trash(),
                           label: tr('remove'),
@@ -571,7 +571,6 @@ class _DownloadCard extends StatelessWidget {
                     );
                   }
                   return PillButton(
-                    height: 46,
                     onPressed: () => onToggle(url),
                     icon: status == DownloadStatus.downloading
                         ? PhosphorIcons.pause()
@@ -720,7 +719,6 @@ class _UpdateBottomState extends State<UpdateBottom> {
               const SizedBox(width: 8),
               PillButton(
                 primary: true,
-                height: 36,
                 label: tr('update'),
                 onPressed: () => Navigator.push(
                   context,

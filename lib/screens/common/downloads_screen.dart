@@ -33,17 +33,27 @@ class DownloadsScreen extends StatelessWidget {
       onRefresh: provider.refresh,
       child: provider.downloads.isEmpty
           ? _EmptyDownloads(loading: provider.loading)
-          : ListView.separated(
-              padding: EdgeInsets.fromLTRB(
-                AppSpace.gutter(context),
-                embedded ? 20 : 12,
-                AppSpace.gutter(context),
-                112 + MediaQuery.paddingOf(context).bottom,
-              ),
-              itemCount: provider.downloads.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) =>
-                  _DownloadCard(download: provider.downloads[index]),
+          : CustomScrollView(
+              slivers: <Widget>[
+                SliverReadableWidth(
+                  slivers: <Widget>[
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        AppSpace.gutter(context),
+                        embedded ? 20 : 12,
+                        AppSpace.gutter(context),
+                        112 + MediaQuery.paddingOf(context).bottom,
+                      ),
+                      sliver: SliverList.separated(
+                        itemCount: provider.downloads.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) =>
+                            _DownloadCard(download: provider.downloads[index]),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
     );
 
@@ -377,22 +387,38 @@ class _StatusChip extends StatelessWidget {
     final palette = AppPalette.of(context);
     final error = Theme.of(context).colorScheme.error;
     final (label, color) = switch (download.state) {
-      OfflineDownloadState.completed =>
-        (_localized(context, 'download_status_completed', 'Downloaded'), palette.mutedText),
-      OfflineDownloadState.downloading =>
-        (_localized(context, 'download_status_downloading', 'Downloading'), palette.mutedText),
-      OfflineDownloadState.queued =>
-        (_localized(context, 'download_status_queued', 'Queued'), palette.mutedText),
-      OfflineDownloadState.stopped =>
-        (_localized(context, 'download_status_stopped', 'Paused'), palette.mutedText),
-      OfflineDownloadState.failed =>
-        (_localized(context, 'download_status_failed', 'Failed'), error),
-      OfflineDownloadState.removing =>
-        (_localized(context, 'download_status_removing', 'Removing'), palette.mutedText),
-      OfflineDownloadState.restarting =>
-        (_localized(context, 'download_status_restarting', 'Restarting'), palette.mutedText),
-      OfflineDownloadState.unknown =>
-        (_localized(context, 'download_status_unknown', 'Unknown'), palette.mutedText),
+      OfflineDownloadState.completed => (
+          _localized(context, 'download_status_completed', 'Downloaded'),
+          palette.mutedText
+        ),
+      OfflineDownloadState.downloading => (
+          _localized(context, 'download_status_downloading', 'Downloading'),
+          palette.mutedText
+        ),
+      OfflineDownloadState.queued => (
+          _localized(context, 'download_status_queued', 'Queued'),
+          palette.mutedText
+        ),
+      OfflineDownloadState.stopped => (
+          _localized(context, 'download_status_stopped', 'Paused'),
+          palette.mutedText
+        ),
+      OfflineDownloadState.failed => (
+          _localized(context, 'download_status_failed', 'Failed'),
+          error
+        ),
+      OfflineDownloadState.removing => (
+          _localized(context, 'download_status_removing', 'Removing'),
+          palette.mutedText
+        ),
+      OfflineDownloadState.restarting => (
+          _localized(context, 'download_status_restarting', 'Restarting'),
+          palette.mutedText
+        ),
+      OfflineDownloadState.unknown => (
+          _localized(context, 'download_status_unknown', 'Unknown'),
+          palette.mutedText
+        ),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -673,7 +699,8 @@ class _DownloadActionTile extends StatelessWidget {
     final palette = AppPalette.of(context);
     final accent = destructive ? colors.error : palette.foreground;
     return Material(
-      color: destructive ? colors.error.withValues(alpha: .08) : palette.idleFill,
+      color:
+          destructive ? colors.error.withValues(alpha: .08) : palette.idleFill,
       borderRadius: BorderRadius.circular(AppRadii.card),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.card),

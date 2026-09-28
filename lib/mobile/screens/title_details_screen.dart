@@ -185,7 +185,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
   }
 
   double _backdropHeight(BuildContext context) =>
-      MediaQuery.sizeOf(context).width * 9 / 16;
+      DetailsSliverHeader.heightFor(context);
 
   void _trackView() {
     final analytics = context.read<SettingsProvider>().analytics;
@@ -533,42 +533,131 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final history = _history(context);
+    final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.wide;
     final page = Scaffold(
       backgroundColor: palette.page,
-      body: CustomScrollView(
-        controller: _scroll,
-        slivers: <Widget>[
-          _header(context),
-          SliverToBoxAdapter(child: _summary(context, history)),
-          SliverToBoxAdapter(
-            child: widget.adBuilder?.call(context) ??
-                HomeAdSlot(
-                  placement: _isMovie ? 'movie_detail' : 'tv_detail',
-                  variant: HostedBannerVariant.tall,
-                ),
-          ),
-          if (!_isMovie) SliverToBoxAdapter(child: _episodes(context, history)),
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _TabsHeader(
-              tab: _tab,
-              background: palette.page,
-              hairline: palette.hairline,
-              onSelect: (tab) => setState(() => _tab = tab),
+      body: wide
+          ? _twoColumns(context, history)
+          : CustomScrollView(
+              controller: _scroll,
+              slivers: <Widget>[
+                _header(context),
+                SliverToBoxAdapter(child: _summary(context, history)),
+                SliverToBoxAdapter(child: _adSlot()),
+                if (!_isMovie)
+                  SliverToBoxAdapter(child: _episodes(context, history)),
+                _tabsHeader(palette),
+                ..._tabSlivers(context),
+                _bottomSpace(context),
+              ],
             ),
-          ),
-          ..._tabSlivers(context),
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,
-            ),
-          ),
-        ],
-      ),
     );
     return widget.showTitleLogos
         ? TitleLogoScope(logos: _logosFor(context), child: page)
         : page;
+  }
+
+  Widget _adSlot() =>
+      widget.adBuilder?.call(context) ??
+      HomeAdSlot(
+        placement: _isMovie ? 'movie_detail' : 'tv_detail',
+        variant: HostedBannerVariant.tall,
+      );
+
+  Widget _tabsHeader(AppPalette palette) => SliverPersistentHeader(
+        pinned: true,
+        delegate: _TabsHeader(
+          tab: _tab,
+          background: palette.page,
+          hairline: palette.hairline,
+          onSelect: (tab) => setState(() => _tab = tab),
+        ),
+      );
+
+  Widget _bottomSpace(BuildContext context) => SliverToBoxAdapter(
+        child: SizedBox(
+          height: AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,
+        ),
+      );
+
+  /// Above 1,000 px: the artwork and what to do with the title stay at the
+  /// start, and the episodes and tabs scroll beside them.
+  Widget _twoColumns(BuildContext context, WatchHistory history) {
+    final palette = AppPalette.of(context);
+    final media = MediaQuery.of(context);
+    final startWidth = (media.size.width * .4).clamp(400.0, 520.0);
+    MediaQueryData pane(double width) =>
+        media.copyWith(size: Size(width, media.size.height));
+    return Row(
+      children: <Widget>[
+        SizedBox(
+          width: startWidth,
+          child: MediaQuery(
+            data: pane(startWidth),
+            child: SingleChildScrollView(
+              primary: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  SizedBox(
+                    height: startWidth * 9 / 16,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: <Widget>[
+                        DetailsBackdrop(
+                          artwork: MediaArt(
+                            item: _item,
+                            path: _item.backdropPath ?? _item.posterPath,
+                            width: startWidth,
+                            size: ArtSize.backdrop,
+                            alignment: Alignment.topCenter,
+                          ),
+                        ),
+                        PositionedDirectional(
+                          top: media.padding.top + AppSpace.xs,
+                          start: AppSpace.sm,
+                          child: DetailsRoundButton(
+                            icon: PhosphorIcons.caretLeft(),
+                            tooltip: MaterialLocalizations.of(context)
+                                .backButtonTooltip,
+                            onArtwork: true,
+                            onPressed: () => Navigator.of(context).maybePop(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _summary(context, history),
+                  _adSlot(),
+                  SizedBox(height: AppSpace.xxxl + media.padding.bottom),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: MediaQuery(
+            data: pane(media.size.width - startWidth),
+            child: SafeArea(
+              bottom: false,
+              child: CustomScrollView(
+                controller: _scroll,
+                slivers: <Widget>[
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: AppSpace.lg),
+                  ),
+                  if (!_isMovie)
+                    SliverToBoxAdapter(child: _episodes(context, history)),
+                  _tabsHeader(palette),
+                  ..._tabSlivers(context),
+                  _bottomSpace(context),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _header(BuildContext context) => DetailsSliverHeader(
@@ -1002,11 +1091,10 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
   List<Widget> _moreLikeThis(BuildContext context) {
     final gutter = AppSpace.gutter(context);
     const spacing = 10.0;
-    const columns = 3;
-    final width = (MediaQuery.sizeOf(context).width -
-            gutter * 2 -
-            spacing * (columns - 1)) /
-        columns;
+    final available = MediaQuery.sizeOf(context).width - gutter * 2;
+    final columns =
+        ((available + spacing) / (140 + spacing)).floor().clamp(3, 6);
+    final width = (available - spacing * (columns - 1)) / columns;
     if (_like.isEmpty) {
       return <Widget>[
         SliverPadding(
@@ -1038,7 +1126,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
       SliverPadding(
         padding: EdgeInsets.symmetric(horizontal: gutter),
         sliver: SliverGrid.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
             mainAxisSpacing: spacing,
             crossAxisSpacing: spacing,

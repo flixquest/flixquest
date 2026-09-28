@@ -25,6 +25,7 @@ import '../widgets/details_header.dart';
 import '../widgets/details_parts.dart';
 import '../widgets/episode_row.dart';
 import '../widgets/media_art.dart';
+import '../widgets/page_kit.dart' show ReadableWidth;
 import '../widgets/section_header.dart';
 import 'credits_screen.dart';
 import 'episode_screen.dart';
@@ -237,7 +238,8 @@ class _SeasonScreenState extends State<SeasonScreen>
               alignment: Alignment.topCenter,
             ),
           ),
-          SliverToBoxAdapter(child: _summary(context, current, history)),
+          SliverToBoxAdapter(
+              child: ReadableWidth(child: _summary(context, current, history))),
           SliverToBoxAdapter(
             child: widget.adBuilder?.call(context) ??
                 HomeAdSlot(
@@ -245,10 +247,11 @@ class _SeasonScreenState extends State<SeasonScreen>
                   variant: HostedBannerVariant.tall,
                 ),
           ),
-          SliverToBoxAdapter(child: _episodeList(context, history)),
-          SliverToBoxAdapter(child: _cast(context)),
-          SliverToBoxAdapter(child: _videoList(context)),
-          SliverToBoxAdapter(child: _posters(context)),
+          SliverToBoxAdapter(
+              child: ReadableWidth(child: _episodeList(context, history))),
+          SliverToBoxAdapter(child: ReadableWidth(child: _cast(context))),
+          SliverToBoxAdapter(child: ReadableWidth(child: _videoList(context))),
+          SliverToBoxAdapter(child: ReadableWidth(child: _posters(context))),
           SliverToBoxAdapter(
             child: SizedBox(
               height: AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,
@@ -292,17 +295,20 @@ class _SeasonScreenState extends State<SeasonScreen>
               child: InkWell(
                 onTap: _pickSeason,
                 borderRadius: BorderRadius.circular(AppRadii.button),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Flexible(child: title),
-                    const SizedBox(width: AppSpace.sm),
-                    Icon(
-                      PhosphorIcons.caretDown(PhosphorIconsStyle.bold),
-                      size: 20,
-                      color: palette.foreground,
-                    ),
-                  ],
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Flexible(child: title),
+                      const SizedBox(width: AppSpace.sm),
+                      Icon(
+                        PhosphorIcons.caretDown(PhosphorIconsStyle.bold),
+                        size: 20,
+                        color: palette.foreground,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

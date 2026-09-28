@@ -244,6 +244,33 @@ void main() {
     });
   }
 
+  for (final size in const <Size>[Size(768, 1024), Size(1024, 768)]) {
+    testWidgets(
+        'a $size tablet, 1.3 text, Arabic: no overflow in every segment',
+        (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MediaQuery(
+        data: MediaQueryData(
+          size: size,
+          textScaler: const TextScaler.linear(1.3),
+        ),
+        child: _app(source: _Source(), locale: const Locale('ar')),
+      ));
+      await tester.pumpAndSettle();
+      for (final label in <String>[
+        'ما يشاهده الجميع',
+        'أفضل ١٠ أفلام',
+        'أفضل ١٠ مسلسلات',
+        'قريبًا',
+      ]) {
+        await _tapSegment(tester, label, rtl: true);
+        expect(tester.takeException(), isNull);
+      }
+    });
+  }
+
   testWidgets('320 wide, 1.3 text, Arabic: no overflow in every segment',
       (tester) async {
     tester.view.physicalSize = const Size(320, 700);
@@ -266,5 +293,17 @@ void main() {
       await _tapSegment(tester, label, rtl: true);
       expect(tester.takeException(), isNull);
     }
+  });
+
+  testWidgets('targets are 48 dp and labelled', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(_app(source: _Source()));
+    await tester.pumpAndSettle();
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    semantics.dispose();
   });
 }

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -161,10 +163,14 @@ class ContinueCard extends StatelessWidget {
   final MediaItem item;
   final double width;
 
-  /// Room for the two lines under the still, at the viewer's text size.
+  /// Room for the two lines under the still, at the viewer's text size, or
+  /// for the 48 dp menu button beside them.
   static double detailsHeight(BuildContext context) =>
-      MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.3).scale(1) *
-          34 +
+      math.max(
+        MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.3).scale(1) *
+            34,
+        48,
+      ) +
       8;
 
   @override
@@ -285,7 +291,7 @@ class ContinueCard extends StatelessWidget {
                 ),
               ),
               SizedBox.square(
-                dimension: 32,
+                dimension: 48,
                 child: IconButton(
                   padding: EdgeInsets.zero,
                   tooltip: tr('more_options'),

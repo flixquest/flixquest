@@ -93,59 +93,71 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
       color: palette.foreground,
       backgroundColor: palette.raisedSurface,
       onRefresh: _checkServer,
-      child: ListView(
+      child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(
-          top: AppSpace.xs,
-          bottom: AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,
-        ),
-        children: [
-          if (_error != null)
-            Padding(
-              padding: EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpace.md),
-              child: DetailsMessage(
-                message: tr('check_connection'),
-                onRetry: _checkServer,
+        slivers: [
+          SliverReadableWidth(
+            slivers: [
+              SliverPadding(
+                padding: EdgeInsets.only(
+                  top: AppSpace.xs,
+                  bottom: AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,
+                ),
+                sliver: SliverList.list(children: [
+                  if (_error != null)
+                    Padding(
+                      padding:
+                          EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpace.md),
+                      child: DetailsMessage(
+                        message: tr('check_connection'),
+                        onRetry: _checkServer,
+                      ),
+                    ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: gutter),
+                    child: _buildOverview(snapshot),
+                  ),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onDoubleTap: () {
+                      setState(() {
+                        if (_revealedProviderIds.length ==
+                            snapshot.providers.length) {
+                          _revealedProviderIds.clear();
+                        } else {
+                          _revealedProviderIds
+                              .addAll(snapshot.providers.map((p) => p.id));
+                        }
+                      });
+                    },
+                    child: KickerHeading(
+                      tr('provider_health_overview'),
+                      padding: EdgeInsetsDirectional.fromSTEB(
+                        gutter,
+                        AppSpace.xxl,
+                        gutter,
+                        AppSpace.xs,
+                      ),
+                      trailing: Text(
+                        '${snapshot.providers.length}',
+                        style:
+                            AppType.metadata.copyWith(color: palette.mutedText),
+                      ),
+                    ),
+                  ),
+                  if (snapshot.providers.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: gutter),
+                      child:
+                          DetailsMessage(message: tr('provider_health_empty')),
+                    )
+                  else
+                    for (final provider in snapshot.providers)
+                      _buildProviderRow(provider),
+                ]),
               ),
-            ),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: gutter),
-            child: _buildOverview(snapshot),
+            ],
           ),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onDoubleTap: () {
-              setState(() {
-                if (_revealedProviderIds.length == snapshot.providers.length) {
-                  _revealedProviderIds.clear();
-                } else {
-                  _revealedProviderIds
-                      .addAll(snapshot.providers.map((p) => p.id));
-                }
-              });
-            },
-            child: KickerHeading(
-              tr('provider_health_overview'),
-              padding: EdgeInsetsDirectional.fromSTEB(
-                gutter,
-                AppSpace.xxl,
-                gutter,
-                AppSpace.xs,
-              ),
-              trailing: Text(
-                '${snapshot.providers.length}',
-                style: AppType.metadata.copyWith(color: palette.mutedText),
-              ),
-            ),
-          ),
-          if (snapshot.providers.isEmpty)
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: gutter),
-              child: DetailsMessage(message: tr('provider_health_empty')),
-            )
-          else
-            for (final provider in snapshot.providers)
-              _buildProviderRow(provider),
         ],
       ),
     );

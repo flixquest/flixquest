@@ -43,7 +43,7 @@ class DetailsMessage extends StatelessWidget {
           ),
           if (retry != null) ...<Widget>[
             const SizedBox(width: AppSpace.md),
-            PillButton(label: tr('retry'), height: 34, onPressed: retry),
+            PillButton(label: tr('retry'), onPressed: retry),
           ],
         ],
       ),
@@ -581,7 +581,6 @@ class SocialLinks extends StatelessWidget {
             PillButton(
               label: label,
               icon: icon,
-              height: 36,
               onPressed: () => launchUrl(
                 Uri.parse(url),
                 mode: LaunchMode.externalApplication,

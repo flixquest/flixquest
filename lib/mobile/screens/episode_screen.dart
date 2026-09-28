@@ -27,6 +27,7 @@ import '../widgets/details_header.dart';
 import '../widgets/details_parts.dart';
 import '../widgets/episode_row.dart';
 import '../widgets/media_art.dart';
+import '../widgets/page_kit.dart' show ReadableWidth;
 import '../widgets/section_header.dart';
 import 'credits_screen.dart';
 import '../../widgets/hosted_ads_banner.dart' show HostedBannerVariant;
@@ -262,7 +263,8 @@ class _EpisodeScreenState extends State<EpisodeScreen>
               alignment: Alignment.topCenter,
             ),
           ),
-          SliverToBoxAdapter(child: _summary(context, title, history)),
+          SliverToBoxAdapter(
+              child: ReadableWidth(child: _summary(context, title, history))),
           SliverToBoxAdapter(
             child: widget.adBuilder?.call(context) ??
                 HomeAdSlot(
@@ -270,9 +272,12 @@ class _EpisodeScreenState extends State<EpisodeScreen>
                   variant: HostedBannerVariant.tall,
                 ),
           ),
-          SliverToBoxAdapter(child: _seasonRow(context, history)),
-          SliverToBoxAdapter(child: _cast(context, title)),
-          SliverToBoxAdapter(child: _stills(context, title)),
+          SliverToBoxAdapter(
+              child: ReadableWidth(child: _seasonRow(context, history))),
+          SliverToBoxAdapter(
+              child: ReadableWidth(child: _cast(context, title))),
+          SliverToBoxAdapter(
+              child: ReadableWidth(child: _stills(context, title))),
           SliverToBoxAdapter(
             child: SizedBox(
               height: AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,

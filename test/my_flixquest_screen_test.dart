@@ -261,4 +261,41 @@ void main() {
       expect(icon.color, isNot(accent));
     }
   });
+
+  for (final size in const <Size>[Size(768, 1024), Size(1024, 768)]) {
+    testWidgets('a $size tablet, 1.3 text: nothing overflows', (tester) async {
+      await _pump(
+        tester,
+        downloads: <OfflineDownload>[_download('local', createdAt: 1)],
+        saved: <Movie>[Movie(id: 2, title: 'Saved')],
+      );
+      tester.view
+        ..physicalSize = size
+        ..devicePixelRatio = 1;
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final list = find.byType(Scrollable).first;
+      for (var i = 0; i < 6; i++) {
+        await tester.drag(list, const Offset(0, -400));
+        await tester.pumpAndSettle();
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('targets are 48 dp and labelled', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _pump(
+      tester,
+      downloads: <OfflineDownload>[_download('local', createdAt: 1)],
+      saved: <Movie>[Movie(id: 2, title: 'Saved')],
+    );
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1;
+    await tester.pumpAndSettle();
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    semantics.dispose();
+  });
 }

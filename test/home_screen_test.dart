@@ -491,6 +491,47 @@ void main() {
     });
   }
 
+  for (final size in const <Size>[
+    Size(600, 960),
+    Size(768, 1024),
+    Size(1024, 768),
+    Size(1366, 1024),
+  ]) {
+    testWidgets('a $size tablet, large text, right to left: nothing overflows',
+        (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: MediaQueryData(
+            size: size,
+            textScaler: const TextScaler.linear(1.3),
+          ),
+          child: _app(
+            recent: _FakeRecent(movies: <RecentMovie>[_recentMovie(90)]),
+            bookmarks: _FakeBookmarks()..movies = <Movie>[Movie(id: 60)],
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: HomeScreen(
+                source: _FakeSource(),
+                findTint: null,
+                showTitleLogos: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (var i = 0; i < 12; i++) {
+        await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
+        await tester.pumpAndSettle();
+      }
+      expect(tester.takeException(), isNull);
+      expect(find.text('upcoming_movies'), findsOneWidget);
+    });
+  }
+
   testWidgets('a small phone, large text, right to left: nothing overflows',
       (tester) async {
     tester.view.physicalSize = const Size(360, 780);
@@ -769,6 +810,28 @@ void main() {
     await tester.tap(find.byTooltip('more_options'));
     await tester.pumpAndSettle();
     expect(find.text('episodes'), findsOneWidget);
+  });
+
+  testWidgets('targets are 48 dp and labelled', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _app(
+        recent: _FakeRecent(movies: <RecentMovie>[_recentMovie(90)]),
+        bookmarks: _FakeBookmarks()..movies = <Movie>[Movie(id: 60)],
+        child: HomeScreen(
+          source: _FakeSource(),
+          findTint: null,
+          showTitleLogos: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    semantics.dispose();
   });
 }
 

@@ -201,7 +201,6 @@ class _ContinueSheet extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                 child: PillButton(
                   primary: true,
-                  height: 44,
                   icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
                   label: continueAction(item),
                   onPressed: () {

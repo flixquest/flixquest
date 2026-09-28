@@ -1,6 +1,6 @@
 import 'dart:ui' show ImageFilter;
 
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -66,6 +66,76 @@ class MobileNavBar extends StatelessWidget {
   }
 }
 
+/// The tablet's side bar: the same destinations as [MobileNavBar], stacked
+/// at the start edge, the current one in ink with a filled icon and no
+/// indicator.
+class MobileNavRail extends StatelessWidget {
+  const MobileNavRail({
+    required this.current,
+    required this.onSelect,
+    super.key,
+  });
+
+  final MobileTab current;
+  final ValueChanged<MobileTab> onSelect;
+
+  static const width = 88.0;
+  static const _itemHeight = 68.0;
+
+  /// The space the rail takes at [context]'s start edge, the display cutout
+  /// on that side included.
+  static double extentOf(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    return width + (rtl ? padding.right : padding.left);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final padding = MediaQuery.paddingOf(context);
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    return SizedBox(
+      width: extentOf(context),
+      child: ColoredBox(
+        color: palette.page,
+        child: Padding(
+          padding: EdgeInsetsDirectional.only(
+            start: rtl ? padding.right : padding.left,
+            top: padding.top,
+            bottom: padding.bottom,
+          ),
+          child: MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 1.3,
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      for (final tab in MobileTab.values)
+                        SizedBox(
+                          width: width,
+                          height: _itemHeight,
+                          child: _NavItem(
+                            tab: tab,
+                            selected: tab == current,
+                            onTap: () => onSelect(tab),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.tab,
@@ -113,6 +183,8 @@ class _NavItem extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
+      label: tr(labelKey),
+      excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {

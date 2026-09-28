@@ -263,7 +263,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   title: tr('genres'),
                   child: Wrap(
                     spacing: AppSpace.sm,
-                    runSpacing: AppSpace.sm,
+                    runSpacing: 0,
                     children: <Widget>[
                       for (final genre in query.genreOptions)
                         TogglePill(
@@ -293,7 +293,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   title: tr('minimum_ratings'),
                   child: Wrap(
                     spacing: AppSpace.sm,
-                    runSpacing: AppSpace.sm,
+                    runSpacing: 0,
                     children: <Widget>[
                       for (final threshold in DiscoverQuery.ratingThresholds)
                         TogglePill(
@@ -313,7 +313,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     title: tr('tv_series_status'),
                     child: Wrap(
                       spacing: AppSpace.sm,
-                      runSpacing: AppSpace.sm,
+                      runSpacing: 0,
                       children: <Widget>[
                         for (var i = 0;
                             i < DiscoverQuery.seriesStatuses.length;
@@ -340,7 +340,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 }
 
-
 /// The choices made so far, each with an × to take it back.
 class _ActiveFilters extends StatelessWidget {
   const _ActiveFilters({required this.filters});
@@ -352,7 +351,7 @@ class _ActiveFilters extends StatelessWidget {
     final palette = AppPalette.of(context);
     final gutter = AppSpace.gutter(context);
     return SizedBox(
-      height: 34,
+      height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.symmetric(horizontal: gutter),
@@ -362,31 +361,45 @@ class _ActiveFilters extends StatelessWidget {
           final (label, remove) = filters[index];
           return Semantics(
             button: true,
-            child: Material(
-              color: palette.raisedSurface,
-              borderRadius: BorderRadius.circular(AppRadii.chip),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: remove,
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(14, 0, 10, 0),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(
-                        label,
-                        style: AppType.cardTitle.copyWith(
-                          fontSize: 13,
-                          color: palette.foreground,
-                        ),
+            label: label,
+            onTap: remove,
+            excludeSemantics: true,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: remove,
+              child: Center(
+                child: Material(
+                  color: palette.raisedSurface,
+                  borderRadius: BorderRadius.circular(AppRadii.chip),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: remove,
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        14,
+                        9,
+                        10,
+                        9,
                       ),
-                      const SizedBox(width: 6),
-                      Icon(
-                        PhosphorIcons.x(),
-                        size: 13,
-                        color: palette.mutedText,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            label,
+                            style: AppType.cardTitle.copyWith(
+                              fontSize: 13,
+                              color: palette.foreground,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(
+                            PhosphorIcons.x(),
+                            size: 13,
+                            color: palette.mutedText,
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -444,7 +457,6 @@ class _Section extends StatelessWidget {
     );
   }
 }
-
 
 /// The four orders as tiles, each with a mark for what it does.
 class _SortGrid extends StatelessWidget {
@@ -682,7 +694,7 @@ class _YearRail extends StatelessWidget {
     final gutter = AppSpace.gutter(context);
     final years = <String>['', ...DiscoverQuery.years()];
     return SizedBox(
-      height: 38,
+      height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.symmetric(horizontal: gutter),

@@ -14,11 +14,11 @@ class PillButton extends StatelessWidget {
     this.icon,
     this.primary = false,
     this.busy = false,
-    this.height = 40,
+    this.height = 48,
     this.onArtwork = false,
     this.destructive = false,
     super.key,
-  });
+  }) : assert(height >= 48, 'A button is at least 48 dp tall');
 
   final String label;
   final IconData? icon;

@@ -16,6 +16,7 @@ import '../../mobile/screens/home_screen.dart' show HomeAdSlot;
 import '../../mobile/widgets/details_header.dart';
 import '../../mobile/widgets/details_parts.dart';
 import '../../mobile/widgets/media_art.dart';
+import '../../mobile/widgets/page_kit.dart' show SliverReadableWidth;
 import '../../mobile/widgets/poster_card.dart';
 import '../../models/movie.dart';
 import '../../models/recently_watched.dart';
@@ -107,14 +108,22 @@ class CollectionDetailsWidgetState extends State<CollectionDetailsWidget>
                     errorWidget: (_, __, ___) => const ArtPlaceholder(),
                   ),
           ),
-          SliverToBoxAdapter(child: _summary(context, name)),
+          SliverReadableWidth(
+            slivers: [
+              SliverToBoxAdapter(child: _summary(context, name)),
+            ],
+          ),
           SliverToBoxAdapter(
             child: HomeAdSlot(
               placement: 'collection_detail',
               variant: HostedBannerVariant.tall,
             ),
           ),
-          SliverToBoxAdapter(child: _films(context)),
+          SliverReadableWidth(
+            slivers: [
+              SliverToBoxAdapter(child: _films(context)),
+            ],
+          ),
           SliverToBoxAdapter(
             child: SizedBox(
               height: AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,

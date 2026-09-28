@@ -65,7 +65,12 @@ Future<({SharedPreferences prefs, Map<MobileTab, int> inits})> _pumpShell(
   WidgetTester tester, {
   Map<String, Object> stored = const <String, Object>{},
   DefaultHome defaultHome = DefaultHome.home,
+  Size size = const Size(390, 844),
 }) async {
+  tester.view
+    ..physicalSize = size
+    ..devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
   SharedPreferences.setMockInitialValues(stored);
   final prefs = await SharedPreferences.getInstance();
   sharedPrefsSingleton = prefs;
@@ -89,8 +94,8 @@ Future<({SharedPreferences prefs, Map<MobileTab, int> inits})> _pumpShell(
   return (prefs: prefs, inits: inits);
 }
 
-Finder _navItem(MobileTab tab) => find.descendant(
-      of: find.byType(MobileNavBar),
+Finder _navItem(MobileTab tab, {Type bar = MobileNavBar}) => find.descendant(
+      of: find.byType(bar),
       matching: find.text(switch (tab) {
         MobileTab.home => 'home',
         MobileTab.newAndHot => 'new_and_hot',
@@ -249,5 +254,61 @@ void main() {
     for (final icon in icons) {
       expect(icon.color, isNot(theme.colorScheme.primary));
     }
+  });
+
+  group('on a tablet', () {
+    const tablet = Size(900, 700);
+
+    testWidgets('a side rail replaces the bottom bar', (tester) async {
+      await _pumpShell(tester, size: tablet);
+      expect(find.byType(MobileNavRail), findsOneWidget);
+      expect(find.byType(MobileNavBar), findsNothing);
+      expect(
+        tester.getSize(find.byType(MobileNavRail)).width,
+        MobileNavRail.width,
+      );
+      // The tabs get the width the rail leaves.
+      expect(
+        tester.getSize(find.byType(ListView)).width,
+        tablet.width - MobileNavRail.width,
+      );
+    });
+
+    testWidgets('the rail switches tabs',
+        (tester) async {
+      final shell = await _pumpShell(tester, size: tablet);
+      await tester.tap(_navItem(MobileTab.discover, bar: MobileNavRail));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<MobileNavRail>(find.byType(MobileNavRail)).current,
+        MobileTab.discover,
+      );
+      expect(shell.inits.keys, contains(MobileTab.discover));
+    });
+
+    testWidgets('turning the screen keeps every tab alive', (tester) async {
+      final shell = await _pumpShell(tester);
+      await tester.tap(_navItem(MobileTab.search));
+      await tester.pumpAndSettle();
+      expect(find.byType(MobileNavBar), findsOneWidget);
+
+      tester.view.physicalSize = tablet;
+      await tester.pumpAndSettle();
+      expect(find.byType(MobileNavRail), findsOneWidget);
+      expect(
+        tester.widget<MobileNavRail>(find.byType(MobileNavRail)).current,
+        MobileTab.search,
+      );
+      expect(shell.inits, <MobileTab, int>{
+        MobileTab.home: 1,
+        MobileTab.search: 1,
+      });
+    });
+
+    testWidgets('below 700 the bottom bar stays', (tester) async {
+      await _pumpShell(tester, size: const Size(699, 900));
+      expect(find.byType(MobileNavBar), findsOneWidget);
+      expect(find.byType(MobileNavRail), findsNothing);
+    });
   });
 }

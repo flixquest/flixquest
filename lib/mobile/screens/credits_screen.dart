@@ -97,29 +97,33 @@ class _CreditsScreenState extends State<CreditsScreen> {
     final gutter = AppSpace.gutter(context);
     return CustomScrollView(
       slivers: <Widget>[
-        if (groups.length > 1)
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(gutter, AppSpace.xs, gutter, 0),
-            sliver: SliverToBoxAdapter(
-              child: SegmentSwitch<_Group>(
-                segments: <Segment<_Group>>[
-                  for (final entry in groups.entries)
-                    Segment(entry.key, entry.value),
-                ],
-                selected: group,
-                onChanged: (value) => setState(() => _group = value),
+        SliverReadableWidth(
+          slivers: <Widget>[
+            if (groups.length > 1)
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(gutter, AppSpace.xs, gutter, 0),
+                sliver: SliverToBoxAdapter(
+                  child: SegmentSwitch<_Group>(
+                    segments: <Segment<_Group>>[
+                      for (final entry in groups.entries)
+                        Segment(entry.key, entry.value),
+                    ],
+                    selected: group,
+                    onChanged: (value) => setState(() => _group = value),
+                  ),
+                ),
+              ),
+            ...switch (group) {
+              _Group.cast => _castRows(context, cast),
+              _Group.guests => _guestRows(context, guests),
+              _Group.crew => _crewRows(context, crew),
+            },
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: AppSpace.xxl + MediaQuery.paddingOf(context).bottom,
               ),
             ),
-          ),
-        ...switch (group) {
-          _Group.cast => _castRows(context, cast),
-          _Group.guests => _guestRows(context, guests),
-          _Group.crew => _crewRows(context, crew),
-        },
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: AppSpace.xxl + MediaQuery.paddingOf(context).bottom,
-          ),
+          ],
         ),
       ],
     );
