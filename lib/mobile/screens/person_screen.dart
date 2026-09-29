@@ -17,7 +17,6 @@ import '../../models/tv.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../screens/common/hero_photoview.dart';
-import '../../video_providers/scraper_api.dart';
 import '../../widgets/hosted_ads_banner.dart';
 import '../widgets/details_parts.dart';
 import '../widgets/media_art.dart';
@@ -158,9 +157,6 @@ class _PersonScreenState extends State<PersonScreen> {
             child: RemoteHostedAdsBanner(
               placement: 'person_detail',
               variant: HostedBannerVariant.tall,
-              loadAds: () => ScraperApi(
-                context.read<AppDependencyProvider>().flixquestAPIURL,
-              ).getAds(),
             ),
           ),
           ..._filmography(context),

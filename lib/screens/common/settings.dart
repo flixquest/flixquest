@@ -279,14 +279,6 @@ class _SettingsState extends State<Settings> {
                   onChanged: (value) =>
                       setState(() => settingsValues.imageQuality = value),
                 ),
-                ChoiceRow<String>(
-                  icon: PhosphorIcons.list(),
-                  label: tr('list_view_type'),
-                  value: settingsValues.defaultView,
-                  options: {'list': tr('list'), 'grid': tr('grid')},
-                  onChanged: (value) =>
-                      setState(() => settingsValues.defaultView = value),
-                ),
                 ChoiceRow<DefaultHome>(
                   icon: PhosphorIcons.deviceMobile(),
                   label: tr('default_home_screen'),

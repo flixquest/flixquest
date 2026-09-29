@@ -59,15 +59,6 @@ class SettingsPreferences {
     return sharedPrefsSingleton.getString(THEME_MODE_STATUS) ?? 'amoled';
   }
 
-  static const VIEW_PREFERENCE_STATUS = 'list';
-  setViewType(String viewType) async {
-    sharedPrefsSingleton.setString(VIEW_PREFERENCE_STATUS, viewType);
-  }
-
-  Future<String> getViewType() async {
-    return sharedPrefsSingleton.getString(VIEW_PREFERENCE_STATUS) ?? 'grid';
-  }
-
   static const SEEK_PREFERENCE = 'seek';
   setSeekDuration(int seekDuration) async {
     sharedPrefsSingleton.setInt(SEEK_PREFERENCE, seekDuration);

@@ -162,6 +162,7 @@ class WellnessProvider extends ChangeNotifier {
     List<String> genres = const <String>[],
     List<String> languages = const <String>[],
     List<String> countries = const <String>[],
+    int? networkBytes,
     bool syncImmediately = false,
   }) async {
     final now = DateTime.now();
@@ -200,6 +201,7 @@ class WellnessProvider extends ChangeNotifier {
       genres: genres,
       languages: languages,
       countries: countries,
+      networkBytes: networkBytes,
       updatedAtUtc: now.toUtc(),
       synced: false,
     );

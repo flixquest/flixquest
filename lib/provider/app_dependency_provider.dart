@@ -70,6 +70,20 @@ class AppDependencyProvider extends ChangeNotifier {
       _startIoAds.bannerEnabled &&
       const {'native', 'unity', 'startio'}.contains(_bannerAdNetwork);
 
+  HostedBannerMode _hostedBannerMode = HostedBannerMode.stack;
+  HostedBannerMode get hostedBannerMode => _hostedBannerMode;
+
+  /// Hosted `/ads` banners run beside Start.io; `banner_ad_network=none`
+  /// still hides every banner.
+  bool get isHostedBannerActive =>
+      _hostedBannerMode != HostedBannerMode.off && _bannerAdNetwork != 'none';
+
+  void setHostedBannerMode(HostedBannerMode mode) {
+    if (_hostedBannerMode == mode) return;
+    _hostedBannerMode = mode;
+    notifyListeners();
+  }
+
   // These legacy values remain readable so existing Remote Config payloads
   // and older clients can coexist while Unity itself is no longer linked.
   String _unityGameIdAndroid = '5445375';

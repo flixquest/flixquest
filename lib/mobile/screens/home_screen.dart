@@ -22,7 +22,6 @@ import '../../screens/common/bookmark_screen.dart';
 import '../../screens/common/downloads_screen.dart';
 import '../../screens/common/live_tv_screen.dart';
 import '../../services/ambient_theme_service.dart';
-import '../../video_providers/scraper_api.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/common_widgets.dart'
     show AppStreamingService, appStreamingServices;
@@ -926,9 +925,6 @@ class _HostedAd extends StatelessWidget {
   Widget build(BuildContext context) => RemoteHostedAdsBanner(
         placement: placement,
         variant: variant,
-        loadAds: () => ScraperApi(
-          context.read<AppDependencyProvider>().flixquestAPIURL,
-        ).getAds(),
       );
 }
 

@@ -1,14 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../../catalog/catalog_controller.dart';
 import '../../catalog/media_item.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../design/skeleton.dart';
-import '../../provider/app_dependency_provider.dart';
-import '../../video_providers/scraper_api.dart';
 import '../../widgets/hosted_ads_banner.dart';
 import '../widgets/filter_chips.dart';
 import '../widgets/pill_button.dart';
@@ -197,9 +194,6 @@ class _CollectionGridState extends State<_CollectionGrid> {
             SliverToBoxAdapter(
               child: RemoteHostedAdsBanner(
                 placement: placement,
-                loadAds: () => ScraperApi(
-                  context.read<AppDependencyProvider>().flixquestAPIURL,
-                ).getAds(),
               ),
             ),
           SliverPadding(

@@ -71,6 +71,7 @@ class WellnessViewingSession {
     this.genres = const <String>[],
     this.languages = const <String>[],
     this.countries = const <String>[],
+    this.networkBytes,
     this.deletedAtUtc,
     this.synced = false,
   });
@@ -101,6 +102,11 @@ class WellnessViewingSession {
   final List<String> genres;
   final List<String> languages;
   final List<String> countries;
+
+  /// Network bytes the player downloaded for this session, cache reads
+  /// excluded. Null when it was not measured: sessions recorded before this
+  /// was tracked, and platforms whose player does not report it.
+  final int? networkBytes;
   final DateTime updatedAtUtc;
   final DateTime? deletedAtUtc;
   final bool synced;
@@ -162,6 +168,7 @@ class WellnessViewingSession {
       genres: genres,
       languages: languages,
       countries: countries,
+      networkBytes: networkBytes,
       updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
       deletedAtUtc: clearDeletedAt ? null : deletedAtUtc ?? this.deletedAtUtc,
       synced: synced ?? this.synced,
@@ -197,6 +204,7 @@ class WellnessViewingSession {
         'genres_json': jsonEncode(genres),
         'languages_json': jsonEncode(languages),
         'countries_json': jsonEncode(countries),
+        'network_bytes': networkBytes,
         'updated_at_utc': updatedAtUtc.millisecondsSinceEpoch,
         'deleted_at_utc': deletedAtUtc?.millisecondsSinceEpoch,
         'synced': synced ? 1 : 0,
@@ -228,6 +236,8 @@ class WellnessViewingSession {
         'genres': genres,
         'languages': languages,
         'countries': countries,
+        // Optional so documents stay readable by builds that predate it.
+        if (networkBytes != null) 'networkBytes': networkBytes,
         'updatedAtUtc': updatedAtUtc.millisecondsSinceEpoch,
         if (deletedAtUtc != null)
           'deletedAtUtc': deletedAtUtc!.millisecondsSinceEpoch,
@@ -314,6 +324,8 @@ class WellnessViewingSession {
       genres: decodeStrings(map['genres_json'] ?? map['genres']),
       languages: decodeStrings(map['languages_json'] ?? map['languages']),
       countries: decodeStrings(map['countries_json'] ?? map['countries']),
+      networkBytes: ((map['network_bytes'] ?? map['networkBytes']) as num?)
+          ?.toInt(),
       updatedAtUtc: DateTime.fromMillisecondsSinceEpoch(
         integer('updated_at_utc', 'updatedAtUtc'),
         isUtc: true,

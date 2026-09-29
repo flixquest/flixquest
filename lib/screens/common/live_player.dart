@@ -922,6 +922,9 @@ class _LivePlayerState extends State<LivePlayer> {
   }
 
   Future<void> _persistWellnessSession() async {
+    // Requested before the first await so it reaches the player ahead of a
+    // dispose that follows this call.
+    final networkBytes = _flushNetworkUsage();
     await WellnessProvider.instance.recordPlayback(
       sessionId: _sessionId,
       tracker: _wellnessTracker,
@@ -933,8 +936,20 @@ class _LivePlayerState extends State<LivePlayer> {
       progressEndMs: _sessionElapsedMs,
       completed: false,
       provider: 'Live TV',
+      networkBytes: await networkBytes,
       syncImmediately: true,
     );
+  }
+
+  /// The network data this player has used so far, or null where the
+  /// platform does not measure it.
+  Future<int?> _flushNetworkUsage() async {
+    try {
+      return await _betterPlayerController.flushNetworkUsage();
+    } catch (error) {
+      debugPrint('[LivePlayer] network usage unavailable: $error');
+      return _betterPlayerController.networkBytesTransferred;
+    }
   }
 
   Future<void> _showChannelSwitcher() async {

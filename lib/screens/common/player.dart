@@ -388,6 +388,18 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         controlBarHeight: 56,
         watchingText: tr('watching_text'),
         playerTimeMode: settings.playerTimeDisplay,
+        // A source that won't play is fixed from the controls, not a menu
+        // away: Switch Provider sits with the other playback actions.
+        quickActions: [
+          if (widget.availableProviders?.isNotEmpty == true)
+            BetterPlayerOverflowMenuItem(
+              PhosphorIcons.arrowsLeftRight(),
+              tr('switch_provider'),
+              widget.useTvControls
+                  ? _showTvProviderMenu
+                  : _showProviderSwitcher,
+            ),
+        ],
         // Add custom overflow menu item for external subtitles
         overflowMenuCustomItems: widget.useTvControls
             ? [
@@ -407,22 +419,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                     );
                   },
                 ),
-                if (widget.availableProviders?.isNotEmpty == true)
-                  BetterPlayerOverflowMenuItem(
-                    PhosphorIcons.arrowsLeftRight(),
-                    tr('switch_provider'),
-                    _showTvProviderMenu,
-                  ),
               ]
             // Subtitle timing, searching online and uploading live in the
             // Audio & Subtitles panel.
             : [
-                if (widget.availableProviders?.isNotEmpty == true)
-                  BetterPlayerOverflowMenuItem(
-                    PhosphorIcons.arrowsLeftRight(),
-                    tr('switch_provider'),
-                    _showProviderSwitcher,
-                  ),
                 BetterPlayerOverflowMenuItem(
                   PhosphorIcons.arrowSquareOut(),
                   tr('open_external'),
@@ -1841,6 +1841,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     bool syncImmediately = false,
   }) async {
     if (_preRollActive) return;
+    // Requested before the first await so it reaches the player ahead of a
+    // dispose that follows this call.
+    final networkBytes = _flushNetworkUsage();
     final value = _betterPlayerController.videoPlayerController?.value;
     final positionMs = value?.position.inMilliseconds ?? 0;
     final durationMs = value?.duration?.inMilliseconds ?? duration * 1000;
@@ -1883,8 +1886,20 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       countries: isMovie
           ? movie?.countries ?? const []
           : episode?.countries ?? const [],
+      networkBytes: await networkBytes,
       syncImmediately: syncImmediately,
     );
+  }
+
+  /// The network data this player has used so far, or null where the
+  /// platform does not measure it.
+  Future<int?> _flushNetworkUsage() async {
+    try {
+      return await _betterPlayerController.flushNetworkUsage();
+    } catch (error) {
+      debugPrint('[Player] network usage unavailable: $error');
+      return _betterPlayerController.networkBytesTransferred;
+    }
   }
 
   /// Handles saving progress and analytics before switching to a new episode/movie

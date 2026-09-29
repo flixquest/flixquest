@@ -27,7 +27,6 @@ import '../../mobile/widgets/filter_chips.dart';
 import '../../mobile/widgets/page_kit.dart';
 import '../../mobile/widgets/pill_button.dart';
 import 'live_player.dart';
-import '../../video_providers/scraper_api.dart';
 import '../../widgets/hosted_ads_banner.dart';
 
 enum _ChannelScope { all, favorites, recent }
@@ -648,9 +647,6 @@ class _ChannelListState extends State<ChannelList> {
           placement: placement,
           variant: HostedBannerVariant.tall,
           keywords: StartIoAdsService.liveKeywords,
-          loadAds: () => ScraperApi(
-            context.read<AppDependencyProvider>().flixquestAPIURL,
-          ).getAds(),
         ),
       );
 

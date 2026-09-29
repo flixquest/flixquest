@@ -350,5 +350,32 @@ UNITY_TEST_MODE=false
 
       expect(find.byType(StartIoBannerWidget), findsNothing);
     });
+
+    testWidgets('Renders nothing on Android TV', (WidgetTester tester) async {
+      StartIoAdsService.instance.setTelevision(true);
+      addTearDown(() => StartIoAdsService.instance.setTelevision(false));
+      provider.setStartIoAdsConfig(
+        bannerEnabled: true,
+        interstitialEnabled: false,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChangeNotifierProvider<AppDependencyProvider>.value(
+            value: provider,
+            child: Scaffold(
+              body: RemoteHostedAdsBanner(
+                placement: 'test_placement',
+                loadAds: () async => [],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      expect(find.byType(StartIoBannerWidget), findsNothing);
+    });
   });
 }

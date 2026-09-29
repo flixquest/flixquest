@@ -9,13 +9,11 @@ import '../../models/offline_download.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../mobile/widgets/page_kit.dart';
-import '../../provider/app_dependency_provider.dart';
 import '../../provider/offline_download_provider.dart';
 import '../../services/analytics_service.dart';
 import '../../services/offline_download_service.dart';
 import '../../ui_components/app_ui_components.dart';
 import 'offline_player_screen.dart';
-import '../../video_providers/scraper_api.dart';
 import '../../widgets/hosted_ads_banner.dart';
 
 class DownloadsScreen extends StatelessWidget {
@@ -73,9 +71,6 @@ class DownloadsScreen extends StatelessWidget {
             if (provider.error != null) _ErrorBanner(message: provider.error!),
             RemoteHostedAdsBanner(
               placement: 'downloads',
-              loadAds: () => ScraperApi(
-                context.read<AppDependencyProvider>().flixquestAPIURL,
-              ).getAds(),
             ),
             Expanded(child: content),
           ],
@@ -91,9 +86,6 @@ class DownloadsScreen extends StatelessWidget {
           if (provider.error != null) _ErrorBanner(message: provider.error!),
           RemoteHostedAdsBanner(
             placement: 'downloads',
-            loadAds: () => ScraperApi(
-              context.read<AppDependencyProvider>().flixquestAPIURL,
-            ).getAds(),
           ),
           Expanded(child: content),
         ],

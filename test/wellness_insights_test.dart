@@ -431,6 +431,98 @@ void main() {
       expect(insights.averageSessionMs, 0);
       expect(insights.currentStreakDays(DateTime(2026, 8, 23)), 0);
       expect(insights.longestStreakDays, 0);
+      expect(insights.hasNetworkUsage, isFalse);
+      expect(insights.networkBytesPerHour, 0);
+    });
+
+    test('adds up network data only from sessions that measured it', () {
+      final insights = WellnessInsights.fromSessions(
+        <WellnessViewingSession>[
+          _session(
+            id: 'measured',
+            contentId: 'a',
+            title: 'Measured',
+            start: DateTime.utc(2026, 8, 18, 20),
+            end: DateTime.utc(2026, 8, 18, 22),
+            networkBytes: 3000,
+          ),
+          _session(
+            id: 'before-tracking',
+            contentId: 'b',
+            title: 'Before tracking',
+            start: DateTime.utc(2026, 8, 19, 20),
+            end: DateTime.utc(2026, 8, 19, 21),
+          ),
+        ],
+        period: period,
+      );
+
+      expect(insights.hasNetworkUsage, isTrue);
+      expect(insights.networkMeasuredSessions, 1);
+      expect(insights.networkBytes, 3000);
+      expect(insights.networkBytesPerHour, 1500);
+    });
+
+    test('counts a session straddling the period by its share inside', () {
+      final insights = WellnessInsights.fromSessions(
+        <WellnessViewingSession>[
+          _session(
+            id: 'straddles',
+            contentId: 'a',
+            title: 'Late show',
+            start: DateTime.utc(2026, 8, 16, 23),
+            end: DateTime.utc(2026, 8, 17, 1),
+            networkBytes: 4000,
+          ),
+        ],
+        period: period,
+      );
+
+      expect(insights.networkBytes, 2000);
+      expect(insights.networkBytesPerHour, 2000);
+    });
+  });
+
+  group('WellnessViewingSession network data', () {
+    final session = _session(
+      id: 'measured',
+      contentId: 'a',
+      title: 'Measured',
+      start: DateTime.utc(2026, 8, 18, 20),
+      end: DateTime.utc(2026, 8, 18, 21),
+      networkBytes: 123456789,
+    );
+
+    test('survives the local and cloud round trips', () {
+      expect(
+        WellnessViewingSession.fromMap(session.toMap()).networkBytes,
+        123456789,
+      );
+      expect(
+        WellnessViewingSession.fromMap(session.toCloudMap()).networkBytes,
+        123456789,
+      );
+      expect(session.copyWith(synced: true).networkBytes, 123456789);
+    });
+
+    test('reads records written before it was tracked as unmeasured', () {
+      final legacy = session.toCloudMap()..remove('networkBytes');
+      final legacyRow = session.toMap()..remove('network_bytes');
+
+      expect(WellnessViewingSession.fromMap(legacy).networkBytes, isNull);
+      expect(WellnessViewingSession.fromMap(legacyRow).networkBytes, isNull);
+    });
+
+    test('leaves the field out of cloud documents when unmeasured', () {
+      final unmeasured = _session(
+        id: 'unmeasured',
+        contentId: 'a',
+        title: 'Unmeasured',
+        start: DateTime.utc(2026, 8, 18, 20),
+        end: DateTime.utc(2026, 8, 18, 21),
+      );
+
+      expect(unmeasured.toCloudMap().containsKey('networkBytes'), isFalse);
     });
   });
 }
@@ -445,6 +537,7 @@ WellnessViewingSession _session({
   WellnessMediaType mediaType = WellnessMediaType.movie,
   bool completed = false,
   int timezoneOffsetMinutes = 0,
+  int? networkBytes,
 }) {
   final watchedMs = end.difference(start).inMilliseconds;
   return WellnessViewingSession(
@@ -466,6 +559,7 @@ WellnessViewingSession _session({
     segments: <WellnessPlaybackSegment>[
       WellnessPlaybackSegment(startedAtUtc: start, endedAtUtc: end),
     ],
+    networkBytes: networkBytes,
     updatedAtUtc: end,
   );
 }

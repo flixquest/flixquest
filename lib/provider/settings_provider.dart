@@ -26,9 +26,6 @@ class SettingsProvider with ChangeNotifier {
   String _defaultCountry = 'US';
   String get defaultCountry => _defaultCountry;
 
-  String _defaultView = 'list';
-  String get defaultView => _defaultView;
-
   int _defaultSeekDuration = 10;
   int get defaultSeekDuration => _defaultSeekDuration;
 
@@ -191,18 +188,6 @@ class SettingsProvider with ChangeNotifier {
   // analytics (Mixpanel)
   Future<void> initMixpanel() async {
     _analytics = await AnalyticsService.init();
-    notifyListeners();
-  }
-
-  // view preference
-  Future<void> getCurrentViewType() async {
-    defaultView = await _settingsPreferences.getViewType();
-  }
-
-  set defaultView(String value) {
-    _defaultView = value;
-    _settingsPreferences.setViewType(value);
-    _trackSetting('Default View', value);
     notifyListeners();
   }
 

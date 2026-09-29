@@ -2700,6 +2700,14 @@ class _InsightStrip extends StatelessWidget {
             'day': _duration(insights.medianActiveDayMs),
           }),
         ),
+      if (insights.hasNetworkUsage && insights.networkBytes > 0)
+        (
+          PhosphorIcons.cellSignalHigh(),
+          tr('ins_obs_data', namedArgs: {
+            'size': _dataSize(insights.networkBytes),
+            'rate': _dataSize(insights.networkBytesPerHour),
+          }),
+        ),
       if (total > 0 && insights.lateNightMs > 0)
         (
           PhosphorIcons.moon(),
@@ -3949,6 +3957,18 @@ String _share(int value, int total) =>
 String _percent(double ratio) => '${(ratio.clamp(0.0, 1.0) * 100).round()}%';
 
 String _episodeCount(int value) => plural('ins_episode_count', value);
+
+String _dataSize(int bytes) {
+  const units = <String>['KB', 'MB', 'GB', 'TB'];
+  if (bytes < 1024) return '$bytes B';
+  var value = bytes / 1024;
+  var unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return '${value.toStringAsFixed(value < 10 ? 1 : 0)} ${units[unit]}';
+}
 
 String _weekdayName(int mondayFirstIndex) =>
     DateFormat.EEEE().format(DateTime(2024, 1, 1 + mondayFirstIndex));

@@ -21,6 +21,7 @@ class AppRemoteConfig {
   static const enableLiveTvKey = 'enable_live_tv';
   static const bannersKey = 'banners';
   static const bannerAdNetworkKey = 'banner_ad_network';
+  static const hostedBannerModeKey = 'hosted_banner_mode';
   static const unityGameIdAndroidKey = 'unity_game_id_android';
   static const unityBannerPlacementIdKey = 'unity_banner_placement_id';
   static const unityTestModeKey = 'unity_test_mode';
@@ -61,6 +62,7 @@ class AppRemoteConfig {
       legacyEnableLiveTvKey: true,
       bannersKey: '{"banners":[]}',
       bannerAdNetworkKey: 'native',
+      hostedBannerModeKey: 'stack',
       unityGameIdAndroidKey: '5445375',
       unityBannerPlacementIdKey: 'Banner_Android',
       unityTestModeKey: false,
@@ -125,6 +127,10 @@ class AppRemoteConfig {
     final bannerNetwork = remoteConfig.getString(bannerAdNetworkKey).trim();
     provider.setBannerAdNetwork(
       bannerNetwork.isNotEmpty ? bannerNetwork : 'native',
+    );
+
+    provider.setHostedBannerMode(
+      HostedBannerMode.parse(remoteConfig.getString(hostedBannerModeKey)),
     );
 
     final unityGameId = remoteConfig.getString(unityGameIdAndroidKey).trim();

@@ -19,7 +19,11 @@ class WellnessDatabaseController {
     final path = join(await getDatabasesPath(), 'flixquest_wellness_v1.db');
     return _database = await openDatabase(
       path,
+      // Columns added since version 1 are nullable and added in [onOpen]
+      // rather than by a version bump, so a build that predates them can
+      // still open the database after the app is downgraded.
       version: 1,
+      onOpen: _addMissingColumns,
       onCreate: (db, _) async {
         await db.execute('''
           CREATE TABLE wellness_sessions(
@@ -49,6 +53,7 @@ class WellnessDatabaseController {
             genres_json TEXT NOT NULL,
             languages_json TEXT NOT NULL,
             countries_json TEXT NOT NULL,
+            network_bytes INTEGER,
             updated_at_utc INTEGER NOT NULL,
             deleted_at_utc INTEGER,
             synced INTEGER NOT NULL DEFAULT 0
@@ -80,6 +85,16 @@ class WellnessDatabaseController {
         ''');
       },
     );
+  }
+
+  static Future<void> _addMissingColumns(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(wellness_sessions)');
+    final names = columns.map((column) => column['name']).toSet();
+    if (!names.contains('network_bytes')) {
+      await db.execute(
+        'ALTER TABLE wellness_sessions ADD COLUMN network_bytes INTEGER',
+      );
+    }
   }
 
   Future<void> upsertSession(WellnessViewingSession session) async {
@@ -374,6 +389,7 @@ class WellnessDatabaseController {
         'genres',
         'languages',
         'countries',
+        'network_bytes',
       ],
       for (final session in sessions.where((session) => !session.isDeleted))
         <Object?>[
@@ -394,6 +410,7 @@ class WellnessDatabaseController {
           session.genres.join('|'),
           session.languages.join('|'),
           session.countries.join('|'),
+          session.networkBytes,
         ],
     ];
     return rows.map((row) => row.map(cell).join(',')).join('\n');

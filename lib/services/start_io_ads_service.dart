@@ -162,6 +162,11 @@ class StartIoAdsService {
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
 
+  /// Android TV never shows the playback interstitial, wherever playback
+  /// starts.
+  bool get _interstitialAllowed =>
+      _isSupported && !_television && _config.interstitialEnabled;
+
   void setTelevision(bool value) {
     if (_television == value) return;
     _television = value;
@@ -261,9 +266,7 @@ class StartIoAdsService {
 
   /// Keeps one playback interstitial ready. Safe to call repeatedly.
   Future<void> preloadPlaybackInterstitial() {
-    if (!_isSupported || !_config.interstitialEnabled) {
-      return Future<void>.value();
-    }
+    if (!_interstitialAllowed) return Future<void>.value();
     final ready = _preroll;
     if (ready != null &&
         ready.setup == _prerollSetup &&
@@ -300,7 +303,7 @@ class StartIoAdsService {
         ),
       );
       if (ad == null) continue;
-      if (setup != _prerollSetup || !_config.interstitialEnabled) {
+      if (setup != _prerollSetup || !_interstitialAllowed) {
         ad.dispose();
         return;
       }
@@ -352,8 +355,7 @@ class StartIoAdsService {
   /// Shows the playback interstitial when pacing allows. Resolves once the
   /// ad is gone, or at once when none is due. Never throws.
   Future<void> showPlaybackInterstitial() {
-    if (!_isSupported ||
-        !_config.interstitialEnabled ||
+    if (!_interstitialAllowed ||
         _fullScreen != null ||
         !_pacing.canShow(_config.interstitialInterval)) {
       return Future<void>.value();

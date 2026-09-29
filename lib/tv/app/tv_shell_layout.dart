@@ -199,8 +199,9 @@ class TvShellLayoutState extends State<TvShellLayout>
   /// Right from any rail item lands here, so it never switches destinations
   /// behind the user's back.
   bool enterContent() {
-    final controller = _controllerFor(widget.selectedId);
-    if (controller.isAttached && controller.requestFocus()) return true;
+    // A screen still loading has not attached yet; its controller holds the
+    // request until it does.
+    if (_controllerFor(widget.selectedId).requestFocus()) return true;
     // Screens without an entry point (or with nothing to enter yet) take the
     // nearest control to the right, like any other directional move.
     final focused = FocusManager.instance.primaryFocus;
@@ -208,6 +209,24 @@ class TvShellLayoutState extends State<TvShellLayout>
     final target = _nearestContentNode(focused.rect);
     target?.requestFocus();
     return target != null;
+  }
+
+  /// OK on a rail item opens its screen and moves into it, so the rail
+  /// collapses rather than leaving the screen dimmed behind it.
+  void _activateDestination(String destinationId) {
+    if (destinationId == widget.selectedId) {
+      enterContent();
+      return;
+    }
+    final origin = FocusManager.instance.primaryFocus;
+    widget.onDestinationSelected(destinationId);
+    // The new screen mounts in the frame the selection draws. One that is
+    // still loading takes the request through its focus controller later.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.selectedId != destinationId) return;
+      if (FocusManager.instance.primaryFocus != origin) return;
+      enterContent();
+    });
   }
 
   /// The content control a move right from [origin] lands on: the leftmost
@@ -315,7 +334,7 @@ class TvShellLayoutState extends State<TvShellLayout>
               autofocusId: widget.selectedId,
               metrics: metrics,
               expanded: _railExpanded,
-              onDestinationSelected: widget.onDestinationSelected,
+              onDestinationSelected: _activateDestination,
               onMoveRight: (_) => enterContent(),
             ),
           ),

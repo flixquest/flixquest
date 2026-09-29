@@ -129,6 +129,9 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   }
 
   bool _requestContentFocus() {
+    // The grid is not built until the catalog arrives; it takes the request
+    // then, unless focus has moved on.
+    if (_loading && _channels.isEmpty) return _channelGrid.requestFocus();
     if (_mode == _TvLiveMode.channels &&
         _visible.isNotEmpty &&
         _channelGrid.requestFocus()) {

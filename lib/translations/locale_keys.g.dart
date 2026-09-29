@@ -213,9 +213,6 @@ abstract class  LocaleKeys {
   static const high = 'high';
   static const medium = 'medium';
   static const low = 'low';
-  static const list_view_type = 'list_view_type';
-  static const list = 'list';
-  static const grid = 'grid';
   static const default_home_screen = 'default_home_screen';
   static const discover = 'discover';
   static const profile = 'profile';
@@ -925,6 +922,7 @@ abstract class  LocaleKeys {
   static const ins_obs_window = 'ins_obs_window';
   static const ins_obs_heaviest = 'ins_obs_heaviest';
   static const ins_obs_typical = 'ins_obs_typical';
+  static const ins_obs_data = 'ins_obs_data';
   static const ins_obs_late = 'ins_obs_late';
   static const ins_obs_finish = 'ins_obs_finish';
   static const ins_obs_longest = 'ins_obs_longest';

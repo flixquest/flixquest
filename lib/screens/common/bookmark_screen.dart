@@ -15,11 +15,9 @@ import '../../mobile/widgets/pill_button.dart';
 import '../../mobile/widgets/poster_grid.dart';
 import '../../mobile/widgets/skeletons.dart';
 import '../../provider/bookmark_provider.dart';
-import '../../provider/app_dependency_provider.dart';
 import '../../services/bookmark_sync_service.dart';
 import '../../services/globle_method.dart';
 import '/screens/common/sync_screen.dart';
-import '../../video_providers/scraper_api.dart';
 import '../../widgets/hosted_ads_banner.dart';
 
 class BookmarkScreen extends StatefulWidget {
@@ -122,9 +120,6 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
             const SizedBox(height: AppSpace.xs),
             RemoteHostedAdsBanner(
               placement: 'bookmarks',
-              loadAds: () => ScraperApi(
-                context.read<AppDependencyProvider>().flixquestAPIURL,
-              ).getAds(),
             ),
             Expanded(
               child: IndexedStack(

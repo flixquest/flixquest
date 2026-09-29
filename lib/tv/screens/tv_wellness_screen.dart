@@ -244,6 +244,12 @@ class _TvWellnessContentState extends State<TvWellnessContent> {
                     ('Episodes', _duration(insights.episodeMs)),
                     ('Live TV', _duration(insights.liveMs)),
                     ('Longest session', _duration(insights.longestSessionMs)),
+                    if (insights.hasNetworkUsage)
+                      (
+                        'Data used',
+                        '${_dataSize(insights.networkBytes)} · '
+                            '${_dataSize(insights.networkBytesPerHour)}/h'
+                      ),
                   ]),
                 ]),
                 _heading('What held your attention', _sections['Titles']!),
@@ -449,6 +455,18 @@ Widget _statGrid(WellnessInsights insights) => LayoutBuilder(
         );
       },
     );
+
+String _dataSize(int bytes) {
+  const units = <String>['KB', 'MB', 'GB', 'TB'];
+  if (bytes < 1024) return '$bytes B';
+  var value = bytes / 1024;
+  var unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return '${value.toStringAsFixed(value < 10 ? 1 : 0)} ${units[unit]}';
+}
 
 Widget _facts(String title, List<(String, String)> rows) => _InsightPanel(
       title: title,

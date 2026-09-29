@@ -256,10 +256,9 @@ class _EpisodeScreenState extends State<EpisodeScreen>
             artwork: MediaArt(
               key: ValueKey<int?>(_number),
               item: widget.series,
-              path: _episode.stillPath ?? widget.series.backdropPath,
+              path: _episode.stillPath,
               width: MediaQuery.sizeOf(context).width,
-              size:
-                  _episode.stillPath == null ? ArtSize.backdrop : ArtSize.still,
+              size: ArtSize.still,
               alignment: Alignment.topCenter,
             ),
           ),
@@ -537,8 +536,7 @@ class _EpisodeScreenState extends State<EpisodeScreen>
                                       children: <Widget>[
                                         MediaArt(
                                           item: widget.series,
-                                          path: episode.stillPath ??
-                                              widget.series.backdropPath,
+                                          path: episode.stillPath,
                                           width: width,
                                           size: 'w300/',
                                           placeholder: MediaArt.darkPlaceholder,

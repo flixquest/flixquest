@@ -124,7 +124,6 @@ Future<DevicePresentation> appInitialize({
   await settingsProvider.getCurrentDefaultScreen();
   await settingsProvider.getCurrentImageQuality();
   await settingsProvider.getCurrentWatchCountry();
-  await settingsProvider.getCurrentViewType();
   await settingsProvider.getSeekDuration();
   await settingsProvider.getMaxBufferDuration();
   await settingsProvider.getVideoResolution();

@@ -187,7 +187,7 @@ void main() {
     expect(_focused, startsWith('wellness '));
   });
 
-  testWidgets('selecting a destination keeps focus on the rail',
+  testWidgets('selecting a destination moves focus into its screen',
       (tester) async {
     // The series grid was browsed earlier, so it has an item to restore.
     final memory = TvFocusMemory()
@@ -204,11 +204,24 @@ void main() {
     await _press(tester, LogicalKeyboardKey.select);
 
     expect(find.bySemanticsLabel('series card 3'), findsOneWidget);
-    expect(_focused, 'TV nav series');
-
-    await _press(tester, LogicalKeyboardKey.arrowRight);
-
     expect(_focused, 'series-grid:3');
+    expect(layout.currentState!.railHasFocus, isFalse);
+  });
+
+  testWidgets('selecting the destination already showing enters it',
+      (tester) async {
+    final selections = <String>[];
+    final layout = await _pumpLayout(
+      tester,
+      onDestinationSelected: selections.add,
+    );
+    layout.currentState!.focusRail();
+    await tester.pumpAndSettle();
+
+    await _press(tester, LogicalKeyboardKey.select);
+
+    expect(_focused, 'movies entry');
+    expect(selections, isEmpty);
   });
 
   group('switching destinations', () {
@@ -242,7 +255,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(entry('movies'), findsNothing);
       expect(entry('series'), findsOneWidget);
-      expect(_focused, 'TV nav series');
+      expect(_focused, 'series entry');
     });
 
     testWidgets('the screen fading out cannot take focus', (tester) async {
@@ -321,6 +334,79 @@ void main() {
       expect(_focused, 'TV nav series');
     });
   });
+  group('selecting a destination that is still loading', () {
+    late ValueNotifier<List<int>> catalog;
+
+    Future<GlobalKey<TvShellLayoutState>> selectLoadingSeries(
+      WidgetTester tester,
+    ) async {
+      catalog = ValueNotifier<List<int>>(const <int>[]);
+      addTearDown(catalog.dispose);
+      final layout = await _pumpLayout(
+        tester,
+        screen: (id, controller) => id == 'series'
+            ? ValueListenableBuilder<List<int>>(
+                valueListenable: catalog,
+                builder: (_, items, __) => _GridScreen(
+                  id: id,
+                  focusController: controller,
+                  items: items,
+                ),
+              )
+            : _StubScreen(id: id, focusController: controller),
+      );
+      layout.currentState!.focusRail('series');
+      await tester.pumpAndSettle();
+      await _press(tester, LogicalKeyboardKey.select);
+      expect(_focused, 'TV nav series');
+      return layout;
+    }
+
+    testWidgets('lands in the content once it arrives', (tester) async {
+      await selectLoadingSeries(tester);
+
+      catalog.value = const <int>[0, 1, 2];
+      await tester.pumpAndSettle();
+
+      expect(_focused, 'series-grid:0');
+    });
+
+    testWidgets('is dropped once the user has moved on', (tester) async {
+      await selectLoadingSeries(tester);
+      await _press(tester, LogicalKeyboardKey.arrowDown);
+
+      catalog.value = const <int>[0, 1, 2];
+      await tester.pumpAndSettle();
+
+      expect(_focused, 'TV nav live');
+    });
+
+    testWidgets('enters a screen that attaches only once loaded',
+        (tester) async {
+      // Browse screens build their browse view, and attach, after the fetch.
+      final loaded = ValueNotifier<bool>(false);
+      addTearDown(loaded.dispose);
+      final layout = await _pumpLayout(
+        tester,
+        screen: (id, controller) => ValueListenableBuilder<bool>(
+          valueListenable: loaded,
+          builder: (_, ready, __) => ready || id != 'series'
+              ? _StubScreen(id: id, focusController: controller)
+              : const Center(child: Text('Loading')),
+        ),
+      );
+      layout.currentState!.focusRail('series');
+      await tester.pumpAndSettle();
+      await _press(tester, LogicalKeyboardKey.select);
+      expect(_focused, 'TV nav series');
+
+      loaded.value = true;
+      await tester.pumpAndSettle();
+
+      expect(_focused, 'series entry');
+    });
+  });
+
   group('a region rebuilt while the other holds focus', () {
     testWidgets('keeps its content reachable by the D-pad', (tester) async {
       final revision = ValueNotifier<int>(0);
