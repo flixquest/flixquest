@@ -9,7 +9,9 @@ import 'daddylive_service.dart';
 
 import 'deep_link_dispatcher.dart';
 import 'deep_link_routes.dart';
+import 'live_channel_focus.dart';
 import 'media_link.dart';
+import 'start_io_ads_service.dart';
 import 'home_widget_navigation_service.dart';
 
 /// Opens the TMDB, IMDb and flix.quest addresses the platform hands over.
@@ -74,8 +76,11 @@ class MediaLinkNavigationService {
     );
   }
 
-  /// A live channel plays from the Live TV screen, so it gets that screen's ads, recents and
-  /// channel switching. It is refused while live TV is switched off remotely, as the tab is.
+  /// A live channel is shown in the Live TV channel list, scrolled to and focused, and left for the
+  /// person to play. It is refused while live TV is switched off remotely, as the tab is.
+  ///
+  /// On a television the list is the Live TV destination of the home shell, so the link only asks for
+  /// the channel and drops any screen open over the shell; the shell and that destination do the rest.
   static void _openChannel(NavigatorState navigator, LiveChannelLink target) {
     final dependencies = navigator.context.read<AppDependencyProvider?>();
     if (!(dependencies?.displayLiveTV ?? false)) {
@@ -88,6 +93,11 @@ class MediaLinkNavigationService {
           ),
         ),
       );
+      return;
+    }
+    if (StartIoAdsService.instance.isTelevision) {
+      navigator.popUntil((route) => route.isFirst);
+      LiveChannelFocus.request(target.channelId);
       return;
     }
     navigator.push(

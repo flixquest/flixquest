@@ -16,6 +16,7 @@ import '../../provider/settings_provider.dart';
 import '../../screens/common/live_player.dart';
 import '../../services/analytics_service.dart';
 import '../../services/daddylive_service.dart';
+import '../../services/live_channel_focus.dart';
 import '../../services/start_io_ads_service.dart';
 import '../../widgets/hosted_ads_banner.dart';
 // EthioTV source (commented out - disabled):
@@ -87,9 +88,43 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
       debugLabel: 'Live TV search',
       onKeyEvent: _handleSearchKeyEvent,
     );
+    LiveChannelFocus.pending.addListener(_onChannelFocusRequested);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _analytics.trackLiveTVScreenOpened(surface: _analyticsSurface);
       _load();
+    });
+  }
+
+  void _onChannelFocusRequested() {
+    if (LiveChannelFocus.pending.value != null) _focusRequestedChannel();
+  }
+
+  /// Puts focus on the channel a link asked for, once the catalog is here to look it up in. A link
+  /// that arrives while the catalog loads waits, and [_load] comes back to it.
+  ///
+  /// Every filter is cleared first, since the channel has to be in the grid to be focused. A channel
+  /// the catalog does not list (a stale cache, say) is tried by id instead, so the link still does
+  /// what it would have done before the list could show it.
+  void _focusRequestedChannel() {
+    if (!mounted || _loading) return;
+    final request = LiveChannelFocus.take();
+    if (request == null) return;
+    final id = request.channelId;
+    final channel = _channels.where((item) => item.id == id).firstOrNull;
+    if (channel == null) {
+      if (_resolvingId == null) _play(Channel(id: id, name: id));
+      return;
+    }
+    _searchController.clear();
+    setState(() {
+      _mode = _TvLiveMode.channels;
+      _scope = _TvLiveScope.all;
+      _category = null;
+      _letter = null;
+      _query = '';
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _channelGrid.requestFocus(itemId: id);
     });
   }
 
@@ -132,6 +167,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
 
   @override
   void dispose() {
+    LiveChannelFocus.pending.removeListener(_onChannelFocusRequested);
     widget.focusController?.detach(this);
     _searchAnalyticsDebounce?.cancel();
     _service?.close();
@@ -224,6 +260,8 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         epgDayCount: cachedEpg?.days.length ?? 0,
         error: error.toString(),
       );
+    } finally {
+      _focusRequestedChannel();
     }
   }
 

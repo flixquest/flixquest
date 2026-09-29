@@ -42,7 +42,8 @@ const _allCategoriesKey = '__all_categories__';
 class ChannelList extends StatefulWidget {
   const ChannelList({this.initialChannelId, super.key});
 
-  /// A channel to start playing as soon as the list has loaded, for a flix.quest/l/… link.
+  /// A channel to scroll to and highlight once the list has loaded, for a flix.quest/l/… link. It is
+  /// left for the person to play.
   final String? initialChannelId;
 
   @override
@@ -55,6 +56,11 @@ class _ChannelListState extends State<ChannelList> {
   // EthioTV source (commented out - disabled):
   // final _ethioDatabase = LiveTVDatabaseController(namespace: 'ethiosports');
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
+  // Marks the linked channel's card so it can be scrolled to once it is built.
+  final _linkedChannelKey = GlobalKey(debugLabel: 'Linked live channel');
+  Timer? _highlightTimer;
+  String? _highlightedId;
   DaddyLiveService? _service;
   // EthioTV source (commented out - disabled):
   // EthioSportsService? _ethioService;
@@ -83,24 +89,62 @@ class _ChannelListState extends State<ChannelList> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _analytics.trackLiveTVScreenOpened(surface: _analyticsSurface);
-      _load().then((_) => _playInitialChannel());
+      _load().then((_) => _showInitialChannel());
     });
   }
 
-  /// Plays the channel a link asked for. The catalog supplies its name when it is listed; a channel
-  /// that isn't (a stale cache, say) is still tried by id, and a failure says so like any other.
-  Future<void> _playInitialChannel() async {
+  /// Scrolls to the channel a link asked for and highlights it for a few seconds. A channel the
+  /// catalog does not list (a stale cache, say) has nothing to scroll to, so it is tried by id as a
+  /// link used to be, and a failure says so like any other.
+  Future<void> _showInitialChannel() async {
     final id = widget.initialChannelId;
     if (id == null || !mounted) return;
-    final channel = _channels.firstWhere(
-      (channel) => channel.id == id,
-      orElse: () => Channel(id: id, name: id),
-    );
-    await _play(channel);
+    final channels = _visibleChannels;
+    final index = channels.indexWhere((channel) => channel.id == id);
+    if (index < 0) {
+      await _play(Channel(id: id, name: id));
+      return;
+    }
+    setState(() => _highlightedId = id);
+    _highlightTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _highlightedId = null);
+    });
+    await _scrollToLinkedChannel(index / channels.length);
+  }
+
+  /// Brings the linked card into view. The grid builds only what is on screen, so a card far down
+  /// the list does not exist to be scrolled to: [fraction] is how far through the list it sits, which
+  /// puts the viewport near it, and if it is still not built (the banners between the grids have
+  /// heights of their own) the search widens a viewport at a time either side.
+  Future<void> _scrollToLinkedChannel(double fraction) async {
+    for (var attempt = 0; attempt < 10; attempt++) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      final card = _linkedChannelKey.currentContext;
+      if (card != null && card.mounted) {
+        await Scrollable.ensureVisible(
+          card,
+          alignment: 0.35,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+        return;
+      }
+      if (!_scrollController.hasClients) continue;
+      final position = _scrollController.position;
+      final widen = ((attempt + 1) ~/ 2) * position.viewportDimension * 0.75;
+      final target = fraction * position.maxScrollExtent +
+          (attempt.isOdd ? widen : -widen);
+      position.jumpTo(
+        target.clamp(position.minScrollExtent, position.maxScrollExtent),
+      );
+    }
   }
 
   @override
   void dispose() {
+    _highlightTimer?.cancel();
+    _scrollController.dispose();
     _searchAnalyticsDebounce?.cancel();
     _service?.close();
     // EthioTV source (commented out - disabled):
@@ -570,6 +614,7 @@ class _ChannelListState extends State<ChannelList> {
       backgroundColor: palette.raisedSurface,
       onRefresh: () => _load(refresh: true),
       child: CustomScrollView(
+        controller: _scrollController,
         slivers: <Widget>[
           SliverToBoxAdapter(child: _buildHeader()),
           _bannerSliver(_headerPlacement),
@@ -663,8 +708,11 @@ class _ChannelListState extends State<ChannelList> {
             ),
             itemBuilder: (_, index) {
               final channel = channels[index];
+              final linked = channel.id == _highlightedId;
               return _ChannelCard(
+                key: linked ? _linkedChannelKey : null,
                 channel: channel,
+                highlighted: linked,
                 favorite: _favoriteIds.contains(channel.id),
                 resolving: _resolvingId == channel.id,
                 onFavorite: () => _toggleFavorite(channel),
@@ -921,14 +969,19 @@ class _ChannelListState extends State<ChannelList> {
 class _ChannelCard extends StatelessWidget {
   const _ChannelCard({
     required this.channel,
+    required this.highlighted,
     required this.favorite,
     required this.resolving,
     required this.onFavorite,
     required this.onShare,
     required this.onPlay,
+    super.key,
   });
 
   final Channel channel;
+
+  /// Set for the channel a link pointed at, so it can be found in the list.
+  final bool highlighted;
   final bool favorite;
   final bool resolving;
   final VoidCallback onFavorite;
@@ -946,7 +999,12 @@ class _ChannelCard extends StatelessWidget {
             : channel.categories.take(2).join(' · '));
     return Material(
       color: palette.surface,
-      borderRadius: BorderRadius.circular(AppRadii.card),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        side: highlighted
+            ? BorderSide(color: palette.foreground, width: 1.5)
+            : BorderSide.none,
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: resolving ? null : onPlay,

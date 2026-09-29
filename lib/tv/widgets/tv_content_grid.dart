@@ -63,18 +63,21 @@ class TvContentGridController {
   _TvContentGridState<dynamic>? _state;
   bool _pendingRequest = false;
   FocusNode? _pendingOrigin;
+  String? _pendingItemId;
 
-  /// Focuses the remembered item, or the first one, and returns whether focus
-  /// moved. A grid that is not mounted yet (its screen is still loading) takes
-  /// the request once it is, unless focus has moved on in the meantime.
-  bool requestFocus() {
+  /// Focuses the item with [itemId] when it is in the grid, otherwise the
+  /// remembered item, or the first one, and returns whether focus moved. A
+  /// grid that is not mounted yet (its screen is still loading) takes the
+  /// request once it is, unless focus has moved on in the meantime.
+  bool requestFocus({String? itemId}) {
     final state = _state;
     if (state == null) {
       _pendingRequest = true;
       _pendingOrigin = FocusManager.instance.primaryFocus;
+      _pendingItemId = itemId;
       return false;
     }
-    return state._focusPreferredItem();
+    return state._focusPreferredItem(itemId: itemId);
   }
 
   void _attach(_TvContentGridState<dynamic> state) {
@@ -82,14 +85,16 @@ class TvContentGridController {
     if (!_pendingRequest) return;
     _pendingRequest = false;
     final origin = _pendingOrigin;
+    final itemId = _pendingItemId;
     _pendingOrigin = null;
+    _pendingItemId = null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!identical(_state, state) || !state.mounted) return;
       final focused = FocusManager.instance.primaryFocus;
       // A scope means nothing concrete holds focus, so there is nothing to
       // take it away from.
       if (focused != origin && focused is! FocusScopeNode) return;
-      state._focusPreferredItem();
+      state._focusPreferredItem(itemId: itemId);
     });
   }
 
@@ -210,12 +215,18 @@ class _TvContentGridState<T> extends State<TvContentGrid<T>> {
 
   /// Returns whether focus moved, or is on its way once the grid scrolls the
   /// item into view.
-  bool _focusPreferredItem() {
+  bool _focusPreferredItem({String? itemId}) {
     if (widget.items.isEmpty) return false;
     final memory = TvFocusMemoryScope.maybeOf(context);
-    final rememberedId = memory?.recall(widget.scopeId);
-    final index =
-        widget.items.indexWhere((item) => widget.itemId(item) == rememberedId);
+    final preferredId = itemId ?? memory?.recall(widget.scopeId);
+    var index =
+        widget.items.indexWhere((item) => widget.itemId(item) == preferredId);
+    if (index < 0 && itemId != null) {
+      // The item asked for is not here; fall back to the remembered one.
+      final rememberedId = memory?.recall(widget.scopeId);
+      index = widget.items
+          .indexWhere((item) => widget.itemId(item) == rememberedId);
+    }
     return _revealAndFocus(
       targetIndex: index < 0 ? 0 : index,
       columnCount: _columnCount,
