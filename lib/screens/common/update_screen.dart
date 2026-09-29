@@ -329,19 +329,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
       ));
       return;
     }
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(tr('changelogs')),
-        content: SingleChildScrollView(child: Text(changeLog)),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(tr('confirm')),
-          ),
-        ],
-      ),
-    );
+    showChangelogDialog(context, changeLog);
   }
 
   Future<void> _toggleDownload(String url) async {
@@ -588,6 +576,31 @@ class _DownloadCard extends StatelessWidget {
   }
 }
 
+/// The changelog as one entry per line, list markers stripped, so a long
+/// remote string can be previewed a few lines at a time.
+List<String> changelogItems(String changeLog) => changeLog
+    .split('\n')
+    .map((line) =>
+        line.trim().replaceFirst(RegExp(r'^(?:#+|[-*•·]|\d+[.)])\s+'), ''))
+    .where((line) => line.isNotEmpty)
+    .toList(growable: false);
+
+void showChangelogDialog(BuildContext context, String changeLog) {
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(tr('changelogs')),
+      content: SingleChildScrollView(child: Text(changeLog)),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(tr('confirm')),
+        ),
+      ],
+    ),
+  );
+}
+
 class UpdateBottom extends StatefulWidget {
   const UpdateBottom({this.television = false, super.key});
 
@@ -647,6 +660,7 @@ class _UpdateBottomState extends State<UpdateBottom> {
       remoteBuild,
     );
     final colors = Theme.of(context).colorScheme;
+    final items = changelogItems(config.changeLog);
     if (widget.television) {
       return Padding(
           padding: const EdgeInsets.all(16),
@@ -657,22 +671,41 @@ class _UpdateBottomState extends State<UpdateBottom> {
                 borderRadius: BorderRadius.circular(8),
                 border:
                     Border.all(color: colors.primary.withValues(alpha: 0.5))),
-            child: Row(children: [
-              Expanded(
-                  child: Text('Update available • FlixQuest $version',
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                    child: Text('Update available • FlixQuest $version',
+                        style: TextStyle(
+                            color: colors.onSurface,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700))),
+                const SizedBox(width: 16),
+                TvUpdateAction(
+                    label: 'Update',
+                    primary: true,
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                            builder: (_) => const UpdateScreen(
+                                isForced: false, television: true)))),
+              ]),
+              if (items.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                for (final item in items.take(2))
+                  Text('•  $item',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: colors.onSurface,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700))),
-              const SizedBox(width: 16),
-              TvUpdateAction(
-                  label: 'Update',
-                  primary: true,
-                  onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                          builder: (_) => const UpdateScreen(
-                              isForced: false, television: true)))),
+                          color: colors.onSurfaceVariant,
+                          fontSize: 17,
+                          height: 1.4)),
+                if (items.length > 2)
+                  Text('+${items.length - 2} more in the update',
+                      style: TextStyle(
+                          color: colors.onSurfaceVariant,
+                          fontSize: 15,
+                          height: 1.4)),
+              ],
             ]),
           ));
     }
@@ -688,46 +721,128 @@ class _UpdateBottomState extends State<UpdateBottom> {
           borderRadius: BorderRadius.circular(AppRadii.hero),
           border: Border.all(color: palette.hairline),
         ),
-        child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(16, 14, 14, 14),
-          child: Row(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadii.hero),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(
-                PhosphorIcons.rocketLaunch(),
-                size: 26,
-                color: palette.foreground,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Padding(
+                padding:
+                    const EdgeInsetsDirectional.fromSTEB(16, 14, 14, 14),
+                child: Row(
                   children: [
-                    Text(
-                      tr('update_available').toUpperCase(),
-                      style: AppType.kicker.copyWith(color: colors.primary),
+                    Icon(
+                      PhosphorIcons.rocketLaunch(),
+                      size: 26,
+                      color: palette.foreground,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      tr('new_version', namedArgs: {'v': version}),
-                      style: AppType.body.copyWith(
-                        color: palette.secondaryText,
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tr('update_available').toUpperCase(),
+                            style: AppType.kicker
+                                .copyWith(color: colors.primary),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            tr('new_version', namedArgs: {'v': version}),
+                            style: AppType.body.copyWith(
+                              color: palette.secondaryText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    PillButton(
+                      primary: true,
+                      label: tr('update'),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const UpdateScreen(isForced: false),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              PillButton(
-                primary: true,
-                label: tr('update'),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const UpdateScreen(isForced: false),
+              if (items.isNotEmpty)
+                _ChangelogPreview(
+                  items: items,
+                  onTap: () => showChangelogDialog(context, config.changeLog),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The first few changelog entries under the update banner: one ellipsized
+/// line each, so the banner grows by a fixed amount however long the notes
+/// are. Tapping opens all of them.
+class _ChangelogPreview extends StatelessWidget {
+  const _ChangelogPreview({required this.items, required this.onTap});
+
+  static const _maxItems = 3;
+
+  final List<String> items;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final more = items.length - _maxItems;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: palette.hairline)),
+          ),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(16, 10, 14, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final item in items.take(_maxItems))
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 1.5),
+                          child: Text(
+                            '•  $item',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppType.body
+                                .copyWith(color: palette.mutedText),
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        more > 0
+                            ? '${tr('see_changelogs')} (+$more)'
+                            : tr('see_changelogs'),
+                        style: AppType.kicker
+                            .copyWith(color: palette.foreground),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                Icon(
+                  PhosphorIcons.caretRight(),
+                  size: 16,
+                  color: palette.mutedText,
+                ),
+              ],
+            ),
           ),
         ),
       ),
