@@ -23,8 +23,8 @@ enum StartIoInterstitialMode {
 @immutable
 class StartIoAdsConfig {
   const StartIoAdsConfig({
-    this.bannerEnabled = true,
-    this.interstitialEnabled = true,
+    this.bannerEnabled = false,
+    this.interstitialEnabled = false,
     this.testMode = false,
     this.interstitialInterval = const Duration(minutes: 10),
     this.tvInterstitialMode = StartIoInterstitialMode.video,
@@ -248,7 +248,7 @@ class StartIoAdsService {
     StartAppBannerType type = StartAppBannerType.BANNER,
     String keywords = catalogKeywords,
   }) async {
-    if (!_isSupported) return null;
+    if (!_isSupported || !_config.bannerEnabled) return null;
     await configure(testMode: testMode);
     return _load(
       'banner at $placement',

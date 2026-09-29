@@ -82,6 +82,7 @@ class ChoicePill extends StatelessWidget {
         child: SizedBox(
           height: FilterChips.height,
           child: Center(
+            widthFactor: 1,
             child: SizedBox(
               height: FilterChips.pillHeight,
               child: Material(

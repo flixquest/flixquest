@@ -64,8 +64,8 @@ class AppRemoteConfig {
       unityGameIdAndroidKey: '5445375',
       unityBannerPlacementIdKey: 'Banner_Android',
       unityTestModeKey: false,
-      startIoBannerEnabledKey: true,
-      startIoInterstitialEnabledKey: true,
+      startIoBannerEnabledKey: false,
+      startIoInterstitialEnabledKey: false,
       startIoInterstitialIntervalKey: 600,
       startIoTvInterstitialModeKey: 'video',
     });
@@ -136,9 +136,15 @@ class AppRemoteConfig {
       bannerPlacementId: unityPlacement.isNotEmpty ? unityPlacement : null,
       testMode: unityTestMode,
     );
+    final bannerEnabled = remoteConfig.getValue(startIoBannerEnabledKey);
+    final interstitialEnabled =
+        remoteConfig.getValue(startIoInterstitialEnabledKey);
     provider.setStartIoAdsConfig(
-      bannerEnabled: remoteConfig.getBool(startIoBannerEnabledKey),
-      interstitialEnabled: remoteConfig.getBool(startIoInterstitialEnabledKey),
+      bannerEnabled: bannerEnabled.source == ValueSource.valueRemote &&
+          bannerEnabled.asBool(),
+      interstitialEnabled:
+          interstitialEnabled.source == ValueSource.valueRemote &&
+              interstitialEnabled.asBool(),
       // Floors keep a mistyped value from turning pacing off entirely.
       interstitialInterval: Duration(
         seconds: remoteConfig.getInt(startIoInterstitialIntervalKey).clamp(

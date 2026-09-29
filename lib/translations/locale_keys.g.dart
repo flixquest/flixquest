@@ -1032,6 +1032,8 @@ abstract class  LocaleKeys {
   static const player_subtitles = 'player_subtitles';
   static const player_off = 'player_off';
   static const player_quality = 'player_quality';
+  static const player_quality_auto_note = 'player_quality_auto_note';
+  static const player_quality_resolution = 'player_quality_resolution';
   static const player_more = 'player_more';
   static const player_fullscreen = 'player_fullscreen';
   static const player_exit_fullscreen = 'player_exit_fullscreen';

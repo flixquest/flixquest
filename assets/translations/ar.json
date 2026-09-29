@@ -1084,6 +1084,8 @@
   "player_subtitles": "الترجمة",
   "player_off": "إيقاف",
   "player_quality": "الجودة",
+  "player_quality_auto_note": "يتكيف مع اتصالك",
+  "player_quality_resolution": "الدقة",
   "player_more": "المزيد",
   "player_fullscreen": "ملء الشاشة",
   "player_exit_fullscreen": "الخروج من ملء الشاشة",

@@ -43,6 +43,8 @@ void main() {
 
   test('StartIoAdsConfig compares by value', () {
     const config = StartIoAdsConfig();
+    expect(config.bannerEnabled, isFalse);
+    expect(config.interstitialEnabled, isFalse);
     expect(config.copyWith(), config);
     expect(
       config.copyWith(interstitialInterval: const Duration(minutes: 5)),

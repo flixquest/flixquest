@@ -26,6 +26,8 @@ BetterPlayerControlsStrings playerControlsStrings() =>
       subtitles: tr('player_subtitles'),
       off: tr('player_off'),
       quality: tr('player_quality'),
+      qualityAutoNote: tr('player_quality_auto_note'),
+      qualityResolution: tr('player_quality_resolution'),
       more: tr('player_more'),
       close: tr('close'),
       download: tr('download_action'),

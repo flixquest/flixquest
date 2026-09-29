@@ -122,12 +122,12 @@ UNITY_TEST_MODE=false
           fakeRemoteConfig.defaults[AppRemoteConfig.unityTestModeKey], false);
       expect(
         fakeRemoteConfig.defaults[AppRemoteConfig.startIoBannerEnabledKey],
-        true,
+        false,
       );
       expect(
         fakeRemoteConfig
             .defaults[AppRemoteConfig.startIoInterstitialEnabledKey],
-        true,
+        false,
       );
     });
 
@@ -136,7 +136,8 @@ UNITY_TEST_MODE=false
       AppRemoteConfig.apply(fakeRemoteConfig, provider);
 
       expect(provider.bannerAdNetwork, 'native');
-      expect(provider.isStartIoBannerActive, isTrue);
+      expect(provider.isStartIoBannerActive, isFalse);
+      expect(provider.startIoInterstitialEnabled, isFalse);
       expect(provider.unityGameIdAndroid, '5445375');
       expect(provider.unityBannerPlacementId, 'Banner_Android');
       expect(provider.unityTestMode, isFalse);
@@ -151,6 +152,8 @@ UNITY_TEST_MODE=false
       fakeRemoteConfig.setMockString(
           AppRemoteConfig.unityBannerPlacementIdKey, 'Custom_Banner');
       fakeRemoteConfig.setMockBool(AppRemoteConfig.unityTestModeKey, true);
+      fakeRemoteConfig.setMockBool(
+          AppRemoteConfig.startIoBannerEnabledKey, true);
 
       AppRemoteConfig.apply(fakeRemoteConfig, provider);
 
@@ -163,6 +166,8 @@ UNITY_TEST_MODE=false
 
     test('Remote Config toggles active network to none', () async {
       await AppRemoteConfig.configure(fakeRemoteConfig);
+      fakeRemoteConfig.setMockBool(
+          AppRemoteConfig.startIoBannerEnabledKey, true);
       fakeRemoteConfig.setMockString(
           AppRemoteConfig.bannerAdNetworkKey, 'none');
 
@@ -173,6 +178,10 @@ UNITY_TEST_MODE=false
     });
 
     test('Provider notifies listeners on ad network change', () {
+      provider.setStartIoAdsConfig(
+        bannerEnabled: true,
+        interstitialEnabled: false,
+      );
       int listenerCalls = 0;
       provider.addListener(() {
         listenerCalls++;
@@ -208,8 +217,29 @@ UNITY_TEST_MODE=false
       expect(provider.startIoInterstitialEnabled, isFalse);
     });
 
-    test('pacing defaults: 10 minute interval, TV video first',
-        () async {
+    test('only remotely enabled Start.io formats become active', () async {
+      await AppRemoteConfig.configure(fakeRemoteConfig);
+      fakeRemoteConfig.setMockBool(
+          AppRemoteConfig.startIoBannerEnabledKey, true);
+
+      AppRemoteConfig.apply(fakeRemoteConfig, provider);
+
+      expect(provider.isStartIoBannerActive, isTrue);
+      expect(provider.startIoInterstitialEnabled, isFalse);
+
+      fakeRemoteConfig.setMockBool(
+        AppRemoteConfig.startIoInterstitialEnabledKey,
+        true,
+      );
+      fakeRemoteConfig.setMockBool(
+          AppRemoteConfig.startIoBannerEnabledKey, false);
+      AppRemoteConfig.apply(fakeRemoteConfig, provider);
+
+      expect(provider.isStartIoBannerActive, isFalse);
+      expect(provider.startIoInterstitialEnabled, isTrue);
+    });
+
+    test('pacing defaults: 10 minute interval, TV video first', () async {
       await AppRemoteConfig.configure(fakeRemoteConfig);
       AppRemoteConfig.apply(fakeRemoteConfig, provider);
 
@@ -246,6 +276,10 @@ UNITY_TEST_MODE=false
 
     testWidgets('legacy unity value renders a Start.io banner surface',
         (WidgetTester tester) async {
+      provider.setStartIoAdsConfig(
+        bannerEnabled: true,
+        interstitialEnabled: false,
+      );
       provider.setBannerAdNetwork('unity');
 
       await tester.pumpWidget(
@@ -269,6 +303,10 @@ UNITY_TEST_MODE=false
 
     testWidgets('legacy native value renders a Start.io banner surface',
         (WidgetTester tester) async {
+      provider.setStartIoAdsConfig(
+        bannerEnabled: true,
+        interstitialEnabled: false,
+      );
       provider.setBannerAdNetwork('native');
 
       await tester.pumpWidget(

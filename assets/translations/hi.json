@@ -1052,6 +1052,8 @@
   "player_subtitles": "सबटाइटल",
   "player_off": "बंद",
   "player_quality": "गुणवत्ता",
+  "player_quality_auto_note": "आपके कनेक्शन के अनुसार बदलता है",
+  "player_quality_resolution": "रिज़ॉल्यूशन",
   "player_more": "और",
   "player_fullscreen": "फ़ुल स्क्रीन",
   "player_exit_fullscreen": "फ़ुल स्क्रीन से बाहर निकलें",

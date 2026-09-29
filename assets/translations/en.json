@@ -1052,6 +1052,8 @@
   "player_subtitles": "Subtitles",
   "player_off": "Off",
   "player_quality": "Quality",
+  "player_quality_auto_note": "Adjusts to your connection",
+  "player_quality_resolution": "Resolution",
   "player_more": "More",
   "player_fullscreen": "Full screen",
   "player_exit_fullscreen": "Exit full screen",

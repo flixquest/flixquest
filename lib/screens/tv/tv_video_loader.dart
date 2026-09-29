@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flixquest/functions/function.dart';
 import 'package:flixquest/functions/network.dart';
 import 'package:flixquest/functions/video_utils.dart';
+import 'package:flixquest/functions/player_route_handoff.dart';
 import 'package:flixquest/models/tv_stream_metadata.dart';
 import 'package:flixquest/models/offline_download.dart';
 import 'package:flixquest/models/provider_video_source.dart';
@@ -273,45 +274,39 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
         if (!mounted) return;
 
         // Navigate to player with provider list for lazy loading
-        Navigator.pushReplacement(
+        handoffLoaderToPlayer<Function>(
           context,
-          MaterialPageRoute(
-            builder: (context) {
-              final player = PlayerOne(
-                mediaType: MediaType.tvShow,
-                sources: reversedVids,
-                subs: subs,
-                colors: [
-                  Theme.of(context).primaryColor,
-                  Theme.of(context).colorScheme.surface
-                ],
-                settings: settings,
-                tvMetadata: widget.metadata,
-                availableProviders:
-                    videoProviders, // Pass provider list for lazy loading
-                currentProviderCode:
-                    firstWorkingProviderCode, // Current provider
-                scraperApiUrl: _scraperApiUrl,
-                videoFormats: videoFormats,
-                videoHeaders: videoHeaders,
-                videoSizeTokens: videoSizeTokens,
-                initialVideoLinks: tvVideoLinks ?? const [],
-                prefetchedProviderResults: selection?.batchResults ?? const {},
-                subtitleStyle:
-                    Provider.of<SettingsProvider>(context).subtitleTextStyle,
-                onEpisodeChange:
-                    (episodeId, episodeNumber, seasonNumber) async {
-                  // This callback is now unused but kept for backwards compatibility
-                  // Episode changes are handled directly in the player
-                },
-                useTvControls: widget.useTvPlayer,
-                onTvPlayerExit: widget.onTvPlayerExit,
-              );
-              return widget.useTvPlayer
-                  ? TvPlayerScreen(child: player)
-                  : player;
-            },
-          ),
+          (context) {
+            final player = PlayerOne(
+              mediaType: MediaType.tvShow,
+              sources: reversedVids,
+              subs: subs,
+              colors: [
+                Theme.of(context).primaryColor,
+                Theme.of(context).colorScheme.surface
+              ],
+              settings: settings,
+              tvMetadata: widget.metadata,
+              availableProviders:
+                  videoProviders, // Pass provider list for lazy loading
+              currentProviderCode: firstWorkingProviderCode, // Current provider
+              scraperApiUrl: _scraperApiUrl,
+              videoFormats: videoFormats,
+              videoHeaders: videoHeaders,
+              videoSizeTokens: videoSizeTokens,
+              initialVideoLinks: tvVideoLinks ?? const [],
+              prefetchedProviderResults: selection?.batchResults ?? const {},
+              subtitleStyle:
+                  Provider.of<SettingsProvider>(context).subtitleTextStyle,
+              onEpisodeChange: (episodeId, episodeNumber, seasonNumber) async {
+                // This callback is now unused but kept for backwards compatibility
+                // Episode changes are handled directly in the player
+              },
+              useTvControls: widget.useTvPlayer,
+              onTvPlayerExit: widget.onTvPlayerExit,
+            );
+            return widget.useTvPlayer ? TvPlayerScreen(child: player) : player;
+          },
         ).then((value) async {
           if (value != null) {
             Function callback = value;

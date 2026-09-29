@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flixquest/functions/function.dart';
 import 'package:flixquest/functions/network.dart';
 import 'package:flixquest/functions/video_utils.dart';
+import 'package:flixquest/functions/player_route_handoff.dart';
 import 'package:flixquest/models/movie.dart';
 import 'package:flixquest/models/movie_stream_metadata.dart';
 import 'package:flixquest/models/offline_download.dart';
@@ -293,47 +294,42 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
           'recommendations=${_metadata.recommendations?.length ?? 0} '
           'recommendationIds=${_metadata.recommendations?.map((movie) => movie.movieId).join(',') ?? 'none'}',
         );
-        Navigator.pushReplacement(
+        handoffLoaderToPlayer<Function>(
           context,
-          MaterialPageRoute(
-            builder: (context) {
-              debugPrint(
-                '[MovieRecommendationsDebug][PLAYER_CREATED] '
-                'movieId=${_metadata.movieId} '
-                'recommendations=${_metadata.recommendations?.length ?? 0} '
-                'recommendationsNull=${_metadata.recommendations == null} '
-                'useTvPlayer=${widget.useTvPlayer}',
-              );
-              final player = PlayerOne(
-                mediaType: MediaType.movie,
-                sources: reversedVids,
-                subs: subs,
-                colors: [
-                  Theme.of(context).primaryColor,
-                  Theme.of(context).colorScheme.surface
-                ],
-                settings: settings,
-                movieMetadata: _metadata,
-                availableProviders:
-                    videoProviders, // Pass provider list for lazy loading
-                currentProviderCode:
-                    firstWorkingProviderCode, // Current provider
-                scraperApiUrl: _scraperApiUrl,
-                videoFormats: videoFormats,
-                videoHeaders: videoHeaders,
-                videoSizeTokens: videoSizeTokens,
-                initialVideoLinks: movieVideoLinks ?? const [],
-                prefetchedProviderResults: selection?.batchResults ?? const {},
-                subtitleStyle:
-                    Provider.of<SettingsProvider>(context).subtitleTextStyle,
-                useTvControls: widget.useTvPlayer,
-                onTvPlayerExit: widget.onTvPlayerExit,
-              );
-              return widget.useTvPlayer
-                  ? TvPlayerScreen(child: player)
-                  : player;
-            },
-          ),
+          (context) {
+            debugPrint(
+              '[MovieRecommendationsDebug][PLAYER_CREATED] '
+              'movieId=${_metadata.movieId} '
+              'recommendations=${_metadata.recommendations?.length ?? 0} '
+              'recommendationsNull=${_metadata.recommendations == null} '
+              'useTvPlayer=${widget.useTvPlayer}',
+            );
+            final player = PlayerOne(
+              mediaType: MediaType.movie,
+              sources: reversedVids,
+              subs: subs,
+              colors: [
+                Theme.of(context).primaryColor,
+                Theme.of(context).colorScheme.surface
+              ],
+              settings: settings,
+              movieMetadata: _metadata,
+              availableProviders:
+                  videoProviders, // Pass provider list for lazy loading
+              currentProviderCode: firstWorkingProviderCode, // Current provider
+              scraperApiUrl: _scraperApiUrl,
+              videoFormats: videoFormats,
+              videoHeaders: videoHeaders,
+              videoSizeTokens: videoSizeTokens,
+              initialVideoLinks: movieVideoLinks ?? const [],
+              prefetchedProviderResults: selection?.batchResults ?? const {},
+              subtitleStyle:
+                  Provider.of<SettingsProvider>(context).subtitleTextStyle,
+              useTvControls: widget.useTvPlayer,
+              onTvPlayerExit: widget.onTvPlayerExit,
+            );
+            return widget.useTvPlayer ? TvPlayerScreen(child: player) : player;
+          },
         ).then((value) async {
           if (value != null) {
             Function callback = value;
