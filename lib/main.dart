@@ -16,11 +16,13 @@ import 'provider/bookmark_provider.dart';
 import 'provider/recently_watched_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'provider/settings_provider.dart';
 import 'provider/wellness_provider.dart';
 import 'services/bookmark_sync_service.dart';
 import 'services/recently_watched_sync_service.dart';
 import 'services/media_link_navigation_service.dart';
+import 'services/start_io_ads_service.dart';
 import 'services/home_widget_navigation_service.dart';
 import 'singleton/sharedpreferences_singleton.dart';
 import 'tv/platform/device_presentation.dart';
@@ -105,7 +107,12 @@ Future<DevicePresentation> appInitialize({
   //     .setTrustedCertificatesBytes(data.buffer.asUint8List());
   await dotenv.load(fileName: '.env');
   await EasyLocalization.ensureInitialized();
+  // Seed the shared version with the installed build so any synchronous reader
+  // matches the binary instead of a hardcoded string that drifts.
+  currentAppVersion = (await PackageInfo.fromPlatform()).version;
   sharedPrefsSingleton = await SharedPreferencesSingleton.getInstance();
+  StartIoAdsService.instance
+      .setTelevision(devicePresentation == DevicePresentation.television);
   await clearVideoPlaybackCache();
   FirebaseMessaging.onBackgroundMessage(_messageHandler);
   await FlutterDownloader.initialize(debug: true, ignoreSsl: true);
@@ -117,7 +124,6 @@ Future<DevicePresentation> appInitialize({
   await settingsProvider.getCurrentDefaultScreen();
   await settingsProvider.getCurrentImageQuality();
   await settingsProvider.getCurrentWatchCountry();
-  await settingsProvider.getCurrentViewType();
   await settingsProvider.getSeekDuration();
   await settingsProvider.getMaxBufferDuration();
   await settingsProvider.getVideoResolution();

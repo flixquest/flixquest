@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../functions/subtitle_style.dart';
+import '../models/default_home.dart';
 import '../preferences/setting_preferences.dart';
 import '../services/analytics_service.dart';
 import '../video_providers/names.dart';
@@ -16,17 +17,14 @@ class SettingsProvider with ChangeNotifier {
   String _appTheme = 'amoled';
   String get appTheme => _appTheme;
 
-  int _defaultValue = 0;
-  int get defaultValue => _defaultValue;
+  DefaultHome _defaultHome = DefaultHome.home;
+  DefaultHome get defaultHome => _defaultHome;
 
   String _imageQuality = 'w500/';
   String get imageQuality => _imageQuality;
 
   String _defaultCountry = 'US';
   String get defaultCountry => _defaultCountry;
-
-  String _defaultView = 'list';
-  String get defaultView => _defaultView;
 
   int _defaultSeekDuration = 10;
   int get defaultSeekDuration => _defaultSeekDuration;
@@ -152,13 +150,14 @@ class SettingsProvider with ChangeNotifier {
 
   // screen preference
   Future<void> getCurrentDefaultScreen() async {
-    defaultValue = await _settingsPreferences.getDefaultHome();
+    _defaultHome = await _settingsPreferences.getDefaultHome();
+    notifyListeners();
   }
 
-  set defaultValue(int value) {
-    _defaultValue = value;
+  set defaultHome(DefaultHome value) {
+    _defaultHome = value;
     _settingsPreferences.setDefaultHome(value);
-    _trackSetting('Default Screen', value);
+    _trackSetting('Default Screen', value.id);
     notifyListeners();
   }
 
@@ -189,18 +188,6 @@ class SettingsProvider with ChangeNotifier {
   // analytics (Mixpanel)
   Future<void> initMixpanel() async {
     _analytics = await AnalyticsService.init();
-    notifyListeners();
-  }
-
-  // view preference
-  Future<void> getCurrentViewType() async {
-    defaultView = await _settingsPreferences.getViewType();
-  }
-
-  set defaultView(String value) {
-    _defaultView = value;
-    _settingsPreferences.setViewType(value);
-    _trackSetting('Default View', value);
     notifyListeners();
   }
 

@@ -3,15 +3,18 @@ import 'dart:async';
 import 'package:flixquest/functions/function.dart';
 import 'package:flixquest/functions/network.dart';
 import 'package:flixquest/functions/video_utils.dart';
+import 'package:flixquest/functions/player_route_handoff.dart';
+import 'package:flixquest/models/movie.dart';
 import 'package:flixquest/models/movie_stream_metadata.dart';
 import 'package:flixquest/models/offline_download.dart';
 import 'package:flixquest/models/provider_video_source.dart';
 import 'package:flixquest/models/provider_load_state.dart';
 import 'package:flixquest/services/globle_method.dart';
+import 'package:flixquest/services/start_io_ads_service.dart';
+import 'package:flixquest/widgets/playback_loading_screen.dart';
 import 'package:flixquest/services/stream_size_estimator.dart';
 import 'package:flixquest/video_providers/provider_loader.dart';
 import 'package:flixquest/video_providers/scraper_api.dart';
-import 'package:flixquest/widgets/provider_loading_widget.dart';
 import '../../controllers/recently_watched_database_controller.dart';
 import '../../provider/recently_watched_provider.dart';
 import '../../video_providers/common.dart';
@@ -32,7 +35,6 @@ import '../../screens/common/player.dart';
 import '../../screens/common/download_selection_sheets.dart';
 import '../../screens/common/manual_source_picker.dart';
 import '../../tv/player/tv_player_screen.dart';
-import '../../widgets/hosted_ads_banner.dart';
 
 class MovieVideoLoader extends StatefulWidget {
   const MovieVideoLoader(
@@ -75,17 +77,34 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
 
   late int foundIndex;
 
+  /// The metadata this loader was built for, captured once. Route builders run
+  /// again whenever route dependencies change, and callers construct a fresh
+  /// [MovieStreamMetadata] inside them; swapping to that empty copy mid-flight
+  /// would drop the fetched recommendations the player needs.
+  late final MovieStreamMetadata _metadata;
+
   @override
   void initState() {
     super.initState();
+    _metadata = widget.metadata;
     debugPrint(
       '[MovieRecommendationsDebug][LOADER_INIT] '
-      'movieId=${widget.metadata.movieId} '
-      'title=${widget.metadata.movieName} '
-      'existingRecommendations=${widget.metadata.recommendations?.length ?? 0} '
+      'movieId=${_metadata.movieId} '
+      'title=${_metadata.movieName} '
+      'existingRecommendations=${_metadata.recommendations?.length ?? 0} '
       'download=${widget.download} useTvPlayer=${widget.useTvPlayer}',
     );
-    loadVideo();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startPlayback());
+  }
+
+  Future<void> _startPlayback() async {
+    // The interstitial runs while the stream resolves, so its time on screen
+    // hides the wait instead of adding to it. [loadVideo] holds the player
+    // back until the ad is gone.
+    if (!widget.download) {
+      unawaited(StartIoAdsService.instance.showPlaybackInterstitial());
+    }
+    await loadVideo();
   }
 
   Future<void> _loadProviders() async {
@@ -119,7 +138,7 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
     });
   }
 
-  void loadVideo() async {
+  Future<void> loadVideo() async {
     try {
       await _loadProviders();
       VideoProvider? selectedDownloadProvider;
@@ -146,26 +165,20 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
           );
         });
       }
-      // Fetch movie recommendations first
-      debugPrint(
-        '[MovieRecommendationsDebug][FETCH_BEFORE_PLAYBACK] '
-        'movieId=${widget.metadata.movieId}',
-      );
-      await _fetchMovieRecommendations();
-      debugPrint(
-        '[MovieRecommendationsDebug][FETCH_BEFORE_PLAYBACK_DONE] '
-        'movieId=${widget.metadata.movieId} '
-        'recommendations=${widget.metadata.recommendations?.length ?? 0}',
-      );
+      // The player's recommendations are not needed until it opens, so fetch
+      // them alongside the source race instead of in front of it. Downloads
+      // never open the player.
+      final recommendationsFetch =
+          widget.download ? null : _fetchMovieRecommendations();
 
-      var isBookmarked = await recentlyWatchedMoviesController
-          .contain(widget.metadata.movieId!);
+      var isBookmarked =
+          await recentlyWatchedMoviesController.contain(_metadata.movieId!);
       int elapsed = 0;
       if (isBookmarked) {
         var rMovies =
             Provider.of<RecentProvider>(context, listen: false).movies;
-        int index = rMovies
-            .indexWhere((element) => element.id == widget.metadata.movieId);
+        int index =
+            rMovies.indexWhere((element) => element.id == _metadata.movieId);
         // A cloud merge can add the row to the database before this snapshot of
         // the provider list catches up, so resume from the start if it is not
         // here yet rather than indexing past the end.
@@ -174,13 +187,14 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
             elapsed = rMovies[index].elapsed!;
           });
         }
-        widget.metadata.elapsed = elapsed;
+        _metadata.elapsed = elapsed;
       } else {
-        widget.metadata.elapsed = 0;
+        _metadata.elapsed = 0;
       }
 
-      if (widget.metadata.releaseDate != null &&
-          !isReleased(widget.metadata.releaseDate!)) {
+      final isUnreleased =
+          _metadata.releaseDate != null && !isReleased(_metadata.releaseDate!);
+      if (isUnreleased) {
         GlobalMethods.showScaffoldMessage(
             tr('movie_may_not_be_available'), context);
       }
@@ -205,13 +219,11 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
             Navigator.pop(context);
             return;
           }
-          _markLoadingStatuses(only: picked);
           selection = await _fetchSelection(providers: [picked]);
           if (selection != null || !mounted) break;
         }
       } else {
-        _markLoadingStatuses(only: selectedDownloadProvider);
-        // Start all sources together and use the first playable response.
+        // Race the sources in batches and use the first playable response.
         selection = await _fetchSelection(
           providers: selectedDownloadProvider == null
               ? videoProviders
@@ -221,6 +233,7 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
 
       final firstWorkingProviderCode = selection?.provider.codeName;
       if (selection != null) {
+        _showSelectedProvider(selection.provider);
         final result = selection.result;
         videos = VideoUtils.convertVideoLinksToMap(result.videoLinks!);
         movieVideoLinks = result.videoLinks;
@@ -258,63 +271,65 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
           );
           return;
         }
-        Provider.of<SettingsProvider>(context, listen: false)
-            .analytics
-            .trackMovieWatched(
-              movieName: widget.metadata.movieName,
-              movieId: widget.metadata.movieId,
-              isAdult: widget.metadata.isAdult ?? 'unknown',
-            );
+        if (!isUnreleased) {
+          Provider.of<SettingsProvider>(context, listen: false)
+              .analytics
+              .trackMovieWatched(
+                movieName: _metadata.movieName,
+                movieId: _metadata.movieId,
+                isAdult: _metadata.isAdult ?? 'unknown',
+              );
+        }
 
-        final dependencies =
-            Provider.of<AppDependencyProvider>(context, listen: false);
-        await showHostedInterstitialAd(
-          context,
-          loadAds: () => ScraperApi(dependencies.flixquestAPIURL).getAds(),
-        );
+        // Never start playback behind a full-screen ad.
+        await StartIoAdsService.instance.whenFullScreenAdClosed();
+        await recommendationsFetch;
+        if (!mounted) return;
 
         // Navigate to player with provider list for lazy loading
         debugPrint(
           '[MovieRecommendationsDebug][PLAYER_HANDOFF] '
-          'movieId=${widget.metadata.movieId} '
-          'title=${widget.metadata.movieName} '
-          'recommendations=${widget.metadata.recommendations?.length ?? 0} '
-          'recommendationIds=${widget.metadata.recommendations?.map((movie) => movie.movieId).join(',') ?? 'none'}',
+          'movieId=${_metadata.movieId} '
+          'title=${_metadata.movieName} '
+          'recommendations=${_metadata.recommendations?.length ?? 0} '
+          'recommendationIds=${_metadata.recommendations?.map((movie) => movie.movieId).join(',') ?? 'none'}',
         );
-        Navigator.pushReplacement(
+        handoffLoaderToPlayer<Function>(
           context,
-          MaterialPageRoute(
-            builder: (context) {
-              final player = PlayerOne(
-                mediaType: MediaType.movie,
-                sources: reversedVids,
-                subs: subs,
-                colors: [
-                  Theme.of(context).primaryColor,
-                  Theme.of(context).colorScheme.surface
-                ],
-                settings: settings,
-                movieMetadata: widget.metadata,
-                availableProviders:
-                    videoProviders, // Pass provider list for lazy loading
-                currentProviderCode:
-                    firstWorkingProviderCode, // Current provider
-                scraperApiUrl: _scraperApiUrl,
-                videoFormats: videoFormats,
-                videoHeaders: videoHeaders,
-                videoSizeTokens: videoSizeTokens,
-                initialVideoLinks: movieVideoLinks ?? const [],
-                prefetchedProviderResults: selection?.batchResults ?? const {},
-                subtitleStyle:
-                    Provider.of<SettingsProvider>(context).subtitleTextStyle,
-                useTvControls: widget.useTvPlayer,
-                onTvPlayerExit: widget.onTvPlayerExit,
-              );
-              return widget.useTvPlayer
-                  ? TvPlayerScreen(child: player)
-                  : player;
-            },
-          ),
+          (context) {
+            debugPrint(
+              '[MovieRecommendationsDebug][PLAYER_CREATED] '
+              'movieId=${_metadata.movieId} '
+              'recommendations=${_metadata.recommendations?.length ?? 0} '
+              'recommendationsNull=${_metadata.recommendations == null} '
+              'useTvPlayer=${widget.useTvPlayer}',
+            );
+            final player = PlayerOne(
+              mediaType: MediaType.movie,
+              sources: reversedVids,
+              subs: subs,
+              colors: [
+                Theme.of(context).primaryColor,
+                Theme.of(context).colorScheme.surface
+              ],
+              settings: settings,
+              movieMetadata: _metadata,
+              availableProviders:
+                  videoProviders, // Pass provider list for lazy loading
+              currentProviderCode: firstWorkingProviderCode, // Current provider
+              scraperApiUrl: _scraperApiUrl,
+              videoFormats: videoFormats,
+              videoHeaders: videoHeaders,
+              videoSizeTokens: videoSizeTokens,
+              initialVideoLinks: movieVideoLinks ?? const [],
+              prefetchedProviderResults: selection?.batchResults ?? const {},
+              subtitleStyle:
+                  Provider.of<SettingsProvider>(context).subtitleTextStyle,
+              useTvControls: widget.useTvPlayer,
+              onTvPlayerExit: widget.onTvPlayerExit,
+            );
+            return widget.useTvPlayer ? TvPlayerScreen(child: player) : player;
+          },
         ).then((value) async {
           if (value != null) {
             Function callback = value;
@@ -345,24 +360,15 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
     return currentProviderIndex;
   }
 
-  /// Marks every provider pending, with [only] (when given) as the single
-  /// provider being loaded.
-  void _markLoadingStatuses({VideoProvider? only}) {
+  /// Shows [provider] as the one being played, once the race has chosen it.
+  /// Sources later in its batch may still be answering, and would otherwise
+  /// keep the focus.
+  void _showSelectedProvider(VideoProvider provider) {
     if (!mounted) return;
     setState(() {
-      if (only != null) {
-        currentProviderIndex = videoProviders.indexWhere(
-          (provider) => provider.codeName == only.codeName,
-        );
-      }
-      for (var index = 0; index < providerStates.length; index++) {
-        providerStates[index] = providerStates[index].copyWith(
-          status:
-              only == null || providerStates[index].codeName == only.codeName
-                  ? ProviderStatus.loading
-                  : ProviderStatus.pending,
-        );
-      }
+      currentProviderIndex = videoProviders.indexWhere(
+        (candidate) => candidate.codeName == provider.codeName,
+      );
     });
   }
 
@@ -374,13 +380,26 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
       providers: providers,
       load: (provider) {
         _providerStopwatches[provider.codeName] = Stopwatch()..start();
+        // Only the batch in flight shows as loading; the rest wait their turn.
+        if (mounted) {
+          setState(() {
+            final providerIndex = providerStates.indexWhere(
+              (state) => state.codeName == provider.codeName,
+            );
+            if (providerIndex != -1) {
+              providerStates[providerIndex] = providerStates[providerIndex]
+                  .copyWith(status: ProviderStatus.loading);
+            }
+            currentProviderIndex = _firstLoadingProviderIndex();
+          });
+        }
         debugPrint(
           '[MovieVideoLoader] Request provider=${provider.displayName} '
-          '(${provider.codeName}), tmdbId=${widget.metadata.movieId}',
+          '(${provider.codeName}), tmdbId=${_metadata.movieId}',
         );
         return ProviderLoader.loadMovieFromProvider(
           provider: provider,
-          movieId: widget.metadata.movieId!,
+          movieId: _metadata.movieId!,
           scraperApiUrl: _scraperApiUrl,
           full: widget.download,
         );
@@ -394,8 +413,8 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
             result.success && result.videoLinks?.isNotEmpty == true;
         settings.analytics.trackProviderAttempt(
           mediaType: 'movie',
-          contentId: widget.metadata.movieId,
-          contentTitle: widget.metadata.movieName,
+          contentId: _metadata.movieId,
+          contentTitle: _metadata.movieName,
           provider: provider.displayName,
           purpose: widget.download ? 'download' : 'playback',
           success: providerSucceeded,
@@ -432,7 +451,7 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
   /// can push a fresh loader when the user retries.
   void _showErrorSheet(String message) {
     final navigator = Navigator.of(context);
-    final metadata = widget.metadata;
+    final metadata = _metadata;
     final download = widget.download;
     final useTvPlayer = widget.useTvPlayer;
     final onTvPlayerExit = widget.onTvPlayerExit;
@@ -508,15 +527,15 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
             : url.toLowerCase().contains('.mpd')
                 ? 'dash'
                 : 'hls';
-    final posterPath = widget.metadata.posterPath;
+    final posterPath = _metadata.posterPath;
     final subtitleTrack = _preferredSubtitle(movieVideoSubs);
     try {
       await context.read<OfflineDownloadProvider>().enqueue(
             OfflineDownloadRequest(
-              id: 'movie_${widget.metadata.movieId}',
+              id: 'movie_${_metadata.movieId}',
               url: url,
               format: format,
-              title: widget.metadata.movieName ?? 'Movie',
+              title: _metadata.movieName ?? 'Movie',
               subtitle: providerName == null ? null : 'From $providerName',
               mediaType: 'movie',
               quality: quality,
@@ -527,7 +546,7 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
               headers: videoHeaders[quality] ??
                   VideoUtils.inferVideoHeaders(url) ??
                   const {},
-              contentId: widget.metadata.movieId,
+              contentId: _metadata.movieId,
               subtitleTrackUrl: subtitleTrack?.url,
               subtitleTrackName: subtitleTrack?.language,
               subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
@@ -610,34 +629,26 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.topCenter,
-            radius: 1.2,
-            colors: [
-              Theme.of(context).colorScheme.primary.withValues(alpha: .12),
-              Theme.of(context).scaffoldBackgroundColor,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              child: ProviderLoadingWidget(
-                providers: providerStates,
-                currentIndex: currentProviderIndex,
-              ),
-            ),
-          ),
-        ),
-      ),
+    final releaseYear = _metadata.releaseYear?.toString() ??
+        _metadata.releaseDate?.split('-').first;
+    final contextLine = <String>[
+      if (widget.download) tr('download'),
+      if (releaseYear?.isNotEmpty == true && releaseYear != '0') releaseYear!,
+    ].join('  ·  ');
+    return PlaybackLoadingScreen(
+      title: _metadata.movieName?.trim().isNotEmpty == true
+          ? _metadata.movieName!.trim()
+          : tr('movie'),
+      subtitle: contextLine,
+      backdropPath: _metadata.backdropPath,
+      posterPath: _metadata.posterPath,
+      providers: providerStates,
+      currentProviderIndex: currentProviderIndex,
     );
   }
 
   Future<void> _fetchMovieRecommendations() async {
-    final movieId = widget.metadata.movieId;
+    final movieId = _metadata.movieId;
     final isProxyEnabled =
         Provider.of<SettingsProvider>(context, listen: false).enableProxy;
     final proxyUrl =
@@ -649,61 +660,93 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
       'proxyEnabled=$isProxyEnabled proxyConfigured=${proxyUrl.isNotEmpty} '
       'mounted=$mounted',
     );
+    if (movieId == null) {
+      debugPrint(
+        '[MovieRecommendationsDebug][FETCH_SKIPPED] reason=missing_movie_id',
+      );
+      return;
+    }
+
+    final recommendations = await _loadRecommendations(
+      movieId: movieId,
+      isProxyEnabled: isProxyEnabled,
+      proxyUrl: proxyUrl,
+      language: language,
+    );
+    _metadata.recommendations = recommendations;
+    debugPrint(
+      '[MovieRecommendationsDebug][METADATA_SET] '
+      'movieId=$movieId count=${recommendations.length} '
+      'items=${recommendations.map((movie) => '${movie.movieId}:${movie.title}').join(' | ')}',
+    );
+
+    // Set the movie change callback
+    _metadata.onMovieChange = (int movieId) async {
+      // This will be called from the player when user selects a movie
+    };
+  }
+
+  /// TMDB's "recommendations" is frequently empty for newer or niche titles, so
+  /// fall back to the broader "similar" list before giving up.
+  Future<List<MovieRecommendation>> _loadRecommendations({
+    required int movieId,
+    required bool isProxyEnabled,
+    required String proxyUrl,
+    required String language,
+  }) async {
+    var movies = await _fetchRecommendationList(
+      label: 'recommendations',
+      endpoint: Endpoints.getMovieRecommendations(movieId, 1, language),
+      isProxyEnabled: isProxyEnabled,
+      proxyUrl: proxyUrl,
+    );
+    if (movies.isEmpty) {
+      debugPrint(
+        '[MovieRecommendationsDebug][FALLBACK_SIMILAR] movieId=$movieId',
+      );
+      movies = await _fetchRecommendationList(
+        label: 'similar',
+        endpoint: Endpoints.getSimilarMovies(movieId, 1, language),
+        isProxyEnabled: isProxyEnabled,
+        proxyUrl: proxyUrl,
+      );
+    }
+    return movies
+        .take(10)
+        .map(MovieRecommendation.fromMovie)
+        .toList(growable: false);
+  }
+
+  Future<List<Movie>> _fetchRecommendationList({
+    required String label,
+    required String endpoint,
+    required bool isProxyEnabled,
+    required String proxyUrl,
+  }) async {
     try {
-      if (movieId != null) {
-        final endpoint =
-            Endpoints.getMovieRecommendations(movieId, 1, language);
-
-        // Fetch movie recommendations
-        final movies = await fetchMovies(
-          endpoint,
-          isProxyEnabled,
-          proxyUrl,
-          debugLabel: 'MovieRecommendationsDebug',
-        );
-        debugPrint(
-          '[MovieRecommendationsDebug][FETCH_RESULT] '
-          'movieId=$movieId rawCount=${movies.length} '
-          'rawIds=${movies.take(10).map((movie) => movie.id).join(',')}',
-        );
-        if (movies.isNotEmpty) {
-          final recommendations = movies
-              .take(10)
-              .map(MovieRecommendation.fromMovie)
-              .toList(growable: false);
-          widget.metadata.recommendations = recommendations;
-          debugPrint(
-            '[MovieRecommendationsDebug][METADATA_SET] '
-            'movieId=$movieId count=${recommendations.length} '
-            'items=${recommendations.map((movie) => '${movie.movieId}:${movie.title}').join(' | ')}',
-          );
-        } else {
-          widget.metadata.recommendations = const <MovieRecommendation>[];
-          debugPrint(
-            '[MovieRecommendationsDebug][EMPTY_API_RESULT] '
-            'movieId=$movieId metadataCleared=true',
-          );
-        }
-
-        // Set the movie change callback
-        widget.metadata.onMovieChange = (int movieId) async {
-          // This will be called from the player when user selects a movie
-        };
-      } else {
-        debugPrint(
-          '[MovieRecommendationsDebug][FETCH_SKIPPED] reason=missing_movie_id',
-        );
-      }
+      final movies = await fetchMovies(
+        endpoint,
+        isProxyEnabled,
+        proxyUrl,
+        debugLabel: 'MovieRecommendationsDebug',
+      );
+      debugPrint(
+        '[MovieRecommendationsDebug][FETCH_RESULT] '
+        'label=$label rawCount=${movies.length} '
+        'rawIds=${movies.take(10).map((movie) => movie.id).join(',')}',
+      );
+      return movies;
     } catch (error, stackTrace) {
-      // If fetching recommendations fails, continue without them
+      // A failed list is not fatal; the other list (or an empty result) is used.
       debugPrint(
         '[MovieRecommendationsDebug][FETCH_FAILED] '
-        'movieId=$movieId type=${error.runtimeType} error=$error',
+        'label=$label type=${error.runtimeType} error=$error',
       );
       debugPrintStack(
         label: '[MovieRecommendationsDebug][FETCH_FAILED_STACK]',
         stackTrace: stackTrace,
       );
+      return const <Movie>[];
     }
   }
 }

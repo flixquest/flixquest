@@ -1,22 +1,32 @@
 import 'dart:async';
+import 'dart:math' as math;
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../controllers/live_tv_database_controller.dart';
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
 import '../../functions/function.dart';
+import '../../functions/live_channel_letters.dart';
+import '../../functions/live_schedule_sports.dart';
 import '../../models/live_tv.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/daddylive_service.dart';
+import '../../services/media_link.dart';
+import '../../services/start_io_ads_service.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
 import '../../services/analytics_service.dart';
-import '../../ui_components/app_ui_components.dart';
+import '../../mobile/widgets/filter_chips.dart';
+import '../../mobile/widgets/page_kit.dart';
+import '../../mobile/widgets/pill_button.dart';
 import 'live_player.dart';
-import '../../video_providers/scraper_api.dart';
 import '../../widgets/hosted_ads_banner.dart';
 
 enum _ChannelScope { all, favorites, recent }
@@ -28,15 +38,12 @@ enum _LiveTvMode { channels, schedule }
 
 const _allCategoriesKey = '__all_categories__';
 
-class _ScheduleSection {
-  const _ScheduleSection({required this.name, required this.events});
-
-  final String name;
-  final List<DaddyLiveEpgEvent> events;
-}
-
 class ChannelList extends StatefulWidget {
-  const ChannelList({super.key});
+  const ChannelList({this.initialChannelId, super.key});
+
+  /// A channel to scroll to and highlight once the list has loaded, for a flix.quest/l/… link. It is
+  /// left for the person to play.
+  final String? initialChannelId;
 
   @override
   State<ChannelList> createState() => _ChannelListState();
@@ -48,6 +55,11 @@ class _ChannelListState extends State<ChannelList> {
   // EthioTV source (commented out - disabled):
   // final _ethioDatabase = LiveTVDatabaseController(namespace: 'ethiosports');
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
+  // Marks the linked channel's card so it can be scrolled to once it is built.
+  final _linkedChannelKey = GlobalKey(debugLabel: 'Linked live channel');
+  Timer? _highlightTimer;
+  String? _highlightedId;
   DaddyLiveService? _service;
   // EthioTV source (commented out - disabled):
   // EthioSportsService? _ethioService;
@@ -56,6 +68,7 @@ class _ChannelListState extends State<ChannelList> {
   Set<String> _favoriteIds = <String>{};
   List<String> _recentIds = const <String>[];
   String? _selectedCategory;
+  String? _letter;
   String? _resolvingId;
   String _query = '';
   String? _error;
@@ -66,18 +79,71 @@ class _ChannelListState extends State<ChannelList> {
   // EthioTV source (commented out - disabled):
   // _LiveTvSource _source = _LiveTvSource.daddyLive;
   int _selectedDayIndex = 0;
+  String? _sport;
+  // Schedule events start collapsed; keys come from [_eventKey].
+  final Set<String> _expandedEvents = <String>{};
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _analytics.trackLiveTVScreenOpened(surface: _analyticsSurface);
-      _load();
+      _load().then((_) => _showInitialChannel());
     });
+  }
+
+  /// Scrolls to the channel a link asked for and highlights it for a few seconds. A channel the
+  /// catalog does not list (a stale cache, say) has nothing to scroll to, so it is tried by id as a
+  /// link used to be, and a failure says so like any other.
+  Future<void> _showInitialChannel() async {
+    final id = widget.initialChannelId;
+    if (id == null || !mounted) return;
+    final channels = _visibleChannels;
+    final index = channels.indexWhere((channel) => channel.id == id);
+    if (index < 0) {
+      await _play(Channel(id: id, name: id));
+      return;
+    }
+    setState(() => _highlightedId = id);
+    _highlightTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _highlightedId = null);
+    });
+    await _scrollToLinkedChannel(index / channels.length);
+  }
+
+  /// Brings the linked card into view. The grid builds only what is on screen, so a card far down
+  /// the list does not exist to be scrolled to: [fraction] is how far through the list it sits, which
+  /// puts the viewport near it, and if it is still not built (the banners between the grids have
+  /// heights of their own) the search widens a viewport at a time either side.
+  Future<void> _scrollToLinkedChannel(double fraction) async {
+    for (var attempt = 0; attempt < 10; attempt++) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      final card = _linkedChannelKey.currentContext;
+      if (card != null && card.mounted) {
+        await Scrollable.ensureVisible(
+          card,
+          alignment: 0.35,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+        return;
+      }
+      if (!_scrollController.hasClients) continue;
+      final position = _scrollController.position;
+      final widen = ((attempt + 1) ~/ 2) * position.viewportDimension * 0.75;
+      final target = fraction * position.maxScrollExtent +
+          (attempt.isOdd ? widen : -widen);
+      position.jumpTo(
+        target.clamp(position.minScrollExtent, position.maxScrollExtent),
+      );
+    }
   }
 
   @override
   void dispose() {
+    _highlightTimer?.cancel();
+    _scrollController.dispose();
     _searchAnalyticsDebounce?.cancel();
     _service?.close();
     // EthioTV source (commented out - disabled):
@@ -175,7 +241,8 @@ class _ChannelListState extends State<ChannelList> {
     return values.toList()..sort();
   }
 
-  List<Channel> get _visibleChannels {
+  /// Channels matching every filter except the letter, which indexes them.
+  List<Channel> get _unletteredChannels {
     Iterable<Channel> result = _channels;
     if (_scope == _ChannelScope.favorites) {
       result = result.where((channel) => _favoriteIds.contains(channel.id));
@@ -197,6 +264,36 @@ class _ChannelListState extends State<ChannelList> {
     return result.toList(growable: false);
   }
 
+  List<String> get _letters => channelLetters(_unletteredChannels);
+
+  /// The chosen letter, or null when no channel under it survives the other
+  /// filters.
+  String? get _activeLetter {
+    final letter = _letter;
+    if (letter == null) return null;
+    return _letters.contains(letter) ? letter : null;
+  }
+
+  List<Channel> get _visibleChannels {
+    final channels = _unletteredChannels;
+    final letter = _activeLetter;
+    if (letter == null) return channels;
+    return channels
+        .where((channel) => channelLetter(channel) == letter)
+        .toList(growable: false);
+  }
+
+  void _selectLetter(String? letter) {
+    if (letter == _activeLetter) return;
+    setState(() => _letter = letter);
+    _analytics.trackLiveTVInteraction(
+      surface: _analyticsSurface,
+      action: 'letter_changed',
+      value: letter ?? 'all',
+      resultCount: _visibleChannels.length,
+    );
+  }
+
   static bool _channelMatches(Channel channel, List<String> tokens) {
     // 24/7 channels match by their own identity only (name / id), never by
     // the event that happens to be airing. Use the Schedule search for teams.
@@ -216,23 +313,39 @@ class _ChannelListState extends State<ChannelList> {
     return tokens.every(haystack.contains);
   }
 
-  List<_ScheduleSection> get _scheduleSections {
+  List<LiveSportSection> get _sportSections {
     final epg = _epg;
-    if (epg == null || epg.days.isEmpty) return const <_ScheduleSection>[];
-    final day = epg.days[_selectedDayIndex.clamp(0, epg.days.length - 1)];
+    if (epg == null || epg.days.isEmpty) return const <LiveSportSection>[];
+    return groupScheduleBySport(
+      epg.days[_selectedDayIndex.clamp(0, epg.days.length - 1)],
+    );
+  }
+
+  /// The chosen sport, or null when it is not on the selected day.
+  String? get _activeSport {
+    final sport = _sport;
+    if (sport == null) return null;
+    return _sportSections.any((section) => section.name == sport)
+        ? sport
+        : null;
+  }
+
+  List<LiveSportSection> get _scheduleSections {
+    final sport = _activeSport;
     final tokens = searchTokens(_query);
-    return <_ScheduleSection>[
-      for (final category in day.categories)
-        _ScheduleSection(
-          name: category.name,
-          events: category.events
-              .where(
-                (event) =>
-                    tokens.isEmpty ||
-                    _eventMatches(event, category.name, tokens),
-              )
-              .toList(growable: false),
-        ),
+    return <LiveSportSection>[
+      for (final section in _sportSections)
+        if (sport == null || section.name == sport)
+          LiveSportSection(
+            name: section.name,
+            emoji: section.emoji,
+            events: tokens.isEmpty
+                ? section.events
+                : section.events
+                    .where(
+                        (event) => _eventMatches(event, section.name, tokens))
+                    .toList(growable: false),
+          ),
     ]..removeWhere((section) => section.events.isEmpty);
   }
 
@@ -257,9 +370,23 @@ class _ChannelListState extends State<ChannelList> {
     );
   }
 
+  Future<void> _shareChannel(Channel channel) async {
+    final url = MediaLink.liveChannelUrl(channel.id);
+    if (url == null) return;
+    await Share.share(
+      tr(
+        'watch_channel_live',
+        namedArgs: {'name': channel.name, 'url': '$url'},
+      ),
+    );
+  }
+
   Future<void> _play(Channel channel) async {
-    final stopwatch = Stopwatch()..start();
     setState(() => _resolvingId = channel.id);
+    // The interstitial runs while the stream resolves; the player opens only
+    // once it is gone.
+    unawaited(StartIoAdsService.instance.showPlaybackInterstitial());
+    final stopwatch = Stopwatch()..start();
     try {
       final stream = await _api().getStream(channel.id);
       await _daddyDatabase.addRecent(channel.id);
@@ -276,11 +403,8 @@ class _ChannelListState extends State<ChannelList> {
         durationMs: stopwatch.elapsedMilliseconds,
         source: _mode.name,
       );
-      final dependencies = context.read<AppDependencyProvider>();
-      await showHostedInterstitialAd(
-        context,
-        loadAds: () => ScraperApi(dependencies.flixquestAPIURL).getAds(),
-      );
+      await StartIoAdsService.instance.whenFullScreenAdClosed();
+      if (!mounted) return;
       final autoFullScreen = context.read<SettingsProvider>().defaultViewMode;
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -394,6 +518,26 @@ class _ChannelListState extends State<ChannelList> {
     );
   }
 
+  String _eventKey(String section, DaddyLiveEpgEvent event) =>
+      '$_selectedDayIndex|$section|${event.time}|${event.title}';
+
+  void _toggleEvent(String key) {
+    setState(() {
+      if (!_expandedEvents.remove(key)) _expandedEvents.add(key);
+    });
+  }
+
+  void _selectSport(String? sport) {
+    if (sport == _activeSport) return;
+    setState(() => _sport = sport);
+    _analytics.trackLiveTVInteraction(
+      surface: _analyticsSurface,
+      action: 'schedule_sport_changed',
+      value: sport ?? 'all',
+      resultCount: _visibleEventCount,
+    );
+  }
+
   void _selectDay(int index) {
     if (index == _selectedDayIndex) return;
     setState(() => _selectedDayIndex = index);
@@ -407,110 +551,184 @@ class _ChannelListState extends State<ChannelList> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Live TV'),
+      backgroundColor: palette.page,
+      appBar: PageAppBar(
+        title: tr('live_tv'),
         actions: <Widget>[
           IconButton(
-            tooltip: 'Refresh channels and schedule',
+            tooltip: tr('refresh'),
             onPressed: _loading ? null : () => _load(refresh: true),
             icon: Icon(PhosphorIcons.arrowsClockwise()),
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(SegmentSwitch.height + 12),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 12),
+            child: SegmentSwitch<_LiveTvMode>(
+              segments: <Segment<_LiveTvMode>>[
+                Segment(
+                  _LiveTvMode.channels,
+                  tr('channels'),
+                  icon: PhosphorIcons.televisionSimple(),
+                ),
+                Segment(
+                  _LiveTvMode.schedule,
+                  tr('schedule'),
+                  icon: PhosphorIcons.calendarDots(),
+                ),
+              ],
+              selected: _mode,
+              onChanged: _selectMode,
+            ),
+          ),
+        ),
       ),
-      body: AppResponsiveContent(
-        maxWidth: 1100,
+      body: SkeletonSwitcher(
+        loading: _loading && _channels.isEmpty,
+        skeleton: _LiveTvSkeleton(schedule: _mode == _LiveTvMode.schedule),
         child: _buildBody(),
       ),
     );
   }
 
   Widget _buildBody() {
-    if (_loading && _channels.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error != null) {
-      return AppEmptyState(
+    final palette = AppPalette.of(context);
+    final error = _error;
+    if (error != null) {
+      return EmptyState(
         icon: PhosphorIcons.broadcast(),
-        title: 'Live TV is unavailable',
-        message: _error!,
-        action: FilledButton.icon(
-          onPressed: _load,
-          icon: Icon(PhosphorIcons.arrowsClockwise()),
-          label: const Text('Retry'),
-        ),
+        title: tr('live_tv_unavailable'),
+        message: error,
+        actionLabel: tr('retry'),
+        actionIcon: PhosphorIcons.arrowClockwise(),
+        onAction: _load,
       );
     }
     return RefreshIndicator(
+      color: palette.foreground,
+      backgroundColor: palette.raisedSurface,
       onRefresh: () => _load(refresh: true),
       child: CustomScrollView(
+        controller: _scrollController,
         slivers: <Widget>[
           SliverToBoxAdapter(child: _buildHeader()),
-          SliverToBoxAdapter(
-            child: RemoteHostedAdsBanner(
-              placement: 'live_tv',
-              loadAds: () => ScraperApi(
-                context.read<AppDependencyProvider>().flixquestAPIURL,
-              ).getAds(),
-            ),
-          ),
+          _bannerSliver(_headerPlacement),
           if (_mode == _LiveTvMode.channels)
             ..._buildChannelSlivers()
           else
             ..._buildScheduleSlivers(),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: MediaQuery.paddingOf(context).bottom + AppSpace.xxl,
+            ),
+          ),
         ],
       ),
     );
   }
 
+  /// Start.io ad tags must be letters only, so the slots are named, not
+  /// numbered.
+  static const _headerPlacement = 'live_tv_top';
+  static const _listPlacements = <String>[
+    'live_tv_list_a',
+    'live_tv_list_b',
+    'live_tv_list_c',
+  ];
+
+  /// Live TV ads use the larger MREC unit; it is the best-paying placement
+  /// the Start.io plugin exposes.
+  Widget _bannerSliver(String placement) => SliverToBoxAdapter(
+        child: RemoteHostedAdsBanner(
+          placement: placement,
+          variant: HostedBannerVariant.tall,
+          keywords: StartIoAdsService.liveKeywords,
+        ),
+      );
+
+  /// Splits [items] into [parts] near-equal slices so banners can sit between
+  /// them. Empty slices are kept so the banner positions never shift.
+  static List<List<T>> _chunk<T>(List<T> items, int parts) {
+    final size = (items.length / parts).ceil();
+    return <List<T>>[
+      for (var i = 0; i < parts; i++)
+        items.sublist(
+          math.min(i * size, items.length),
+          math.min((i + 1) * size, items.length),
+        ),
+    ];
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() => _query = '');
+  }
+
   List<Widget> _buildChannelSlivers() {
     final visible = _visibleChannels;
     if (visible.isEmpty) {
-      final tokens = searchTokens(_query);
+      final searching = searchTokens(_query).isNotEmpty;
       return <Widget>[
         SliverFillRemaining(
           hasScrollBody: false,
-          child: AppEmptyState(
+          child: EmptyState(
             icon: PhosphorIcons.televisionSimple(),
-            title: 'No channels found',
-            message: tokens.isNotEmpty && _epg?.days.isNotEmpty == true
-                ? "No channels match '$_query'. Try the Schedule tab to browse "
-                    'matching matches, or clear the search.'
-                : 'Try another search, category, or collection.',
-            action: tokens.isNotEmpty
-                ? FilledButton.tonalIcon(
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _query = '');
-                    },
-                    icon: Icon(PhosphorIcons.x()),
-                    label: const Text('Clear search'),
-                  )
-                : null,
+            title: tr('no_channels'),
+            message: searching && _epg?.days.isNotEmpty == true
+                ? tr('no_channels_match', namedArgs: {'query': _query})
+                : tr('try_another_channel_filter'),
+            actionLabel: searching ? tr('clear_search') : null,
+            actionIcon: PhosphorIcons.x(),
+            onAction: _clearSearch,
           ),
         ),
       ];
     }
+    final gutter = AppSpace.gutter(context);
+    final scale = MediaQuery.textScalerOf(context);
+
+    Widget grid(List<Channel> channels) => SliverPadding(
+          padding: EdgeInsets.fromLTRB(gutter, AppSpace.xs, gutter, 0),
+          sliver: SliverGrid.builder(
+            itemCount: channels.length,
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 520,
+              // The row's two lines of text, grown with the text size.
+              mainAxisExtent: math.max(68, scale.scale(39) + 30),
+              crossAxisSpacing: AppSpace.md,
+              mainAxisSpacing: AppSpace.sm,
+            ),
+            itemBuilder: (_, index) {
+              final channel = channels[index];
+              final linked = channel.id == _highlightedId;
+              return _ChannelCard(
+                key: linked ? _linkedChannelKey : null,
+                channel: channel,
+                highlighted: linked,
+                favorite: _favoriteIds.contains(channel.id),
+                resolving: _resolvingId == channel.id,
+                onFavorite: () => _toggleFavorite(channel),
+                onShare: MediaLink.liveChannelUrl(channel.id) == null
+                    ? null
+                    : () => _shareChannel(channel),
+                onPlay: () => _play(channel),
+              );
+            },
+          ),
+        );
+
+    // The header banner sits above; these three break the list up.
+    final chunks = _chunk(visible, _listPlacements.length + 1);
     return <Widget>[
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(0, 8, 0, 28),
-        sliver: SliverGrid.builder(
-          itemCount: visible.length,
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 360,
-            mainAxisExtent: 148,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-          ),
-          itemBuilder: (_, index) => _ChannelCard(
-            channel: visible[index],
-            favorite: _favoriteIds.contains(visible[index].id),
-            resolving: _resolvingId == visible[index].id,
-            onFavorite: () => _toggleFavorite(visible[index]),
-            onPlay: () => _play(visible[index]),
-          ),
-        ),
-      ),
+      grid(chunks[0]),
+      for (var i = 0; i < _listPlacements.length; i++) ...<Widget>[
+        _bannerSliver(_listPlacements[i]),
+        grid(chunks[i + 1]),
+      ],
     ];
   }
 
@@ -521,155 +739,182 @@ class _ChannelListState extends State<ChannelList> {
       return <Widget>[
         SliverFillRemaining(
           hasScrollBody: false,
-          child: AppEmptyState(
+          child: EmptyState(
             icon: PhosphorIcons.calendarDots(),
-            title: epgAvailable ? 'No matches found' : 'Schedule unavailable',
+            title: epgAvailable
+                ? tr('no_matches_found')
+                : tr('schedule_unavailable'),
             message: epgAvailable
-                ? 'Try another team, league, or day.'
-                : "Pull to refresh to load today's schedule.",
-            action: epgAvailable
-                ? null
-                : FilledButton.icon(
-                    onPressed: () => _load(refresh: true),
-                    icon: Icon(PhosphorIcons.arrowsClockwise()),
-                    label: const Text('Refresh'),
-                  ),
+                ? tr('try_another_match_filter')
+                : tr('pull_to_refresh_schedule'),
+            actionLabel: epgAvailable ? null : tr('refresh'),
+            actionIcon: PhosphorIcons.arrowsClockwise(),
+            onAction: () => _load(refresh: true),
           ),
         ),
       ];
     }
-    return <Widget>[
-      for (final section in sections) ...<Widget>[
+    final gutter = AppSpace.gutter(context);
+    final palette = AppPalette.of(context);
+    // The header banner sits above; spread the rest after the first
+    // sections, then append any slots the schedule is too short to reach.
+    final slivers = <Widget>[];
+    var banner = 0;
+    for (final section in sections) {
+      slivers.add(SliverReadableWidth(maxWidth: 900, slivers: <Widget>[
         SliverToBoxAdapter(
-          child: _ScheduleCategoryHeader(
-            name: section.name,
-            count: section.events.length,
+          child: KickerHeading(
+            section.label,
+            trailing: Text(
+              _count(section.events.length),
+              style: AppType.metadata.copyWith(color: palette.mutedText),
+            ),
           ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(0, 0, 0, 18),
+          padding: EdgeInsets.symmetric(horizontal: gutter),
           sliver: SliverList.builder(
             itemCount: section.events.length,
-            itemBuilder: (_, index) => _ScheduleEventTile(
-              event: section.events[index],
-              resolvingChannelId: _resolvingId,
-              onPlay: _play,
-            ),
+            itemBuilder: (_, index) {
+              final event = section.events[index];
+              final key = _eventKey(section.name, event);
+              return _ScheduleEventTile(
+                event: event,
+                expanded: _expandedEvents.contains(key),
+                onToggle: () => _toggleEvent(key),
+                resolvingChannelId: _resolvingId,
+                onPlay: _play,
+              );
+            },
           ),
         ),
-      ],
-    ];
+      ]));
+      if (banner < _listPlacements.length) {
+        slivers.add(_bannerSliver(_listPlacements[banner]));
+      }
+      banner++;
+    }
+    while (banner < _listPlacements.length) {
+      slivers.add(_bannerSliver(_listPlacements[banner]));
+      banner++;
+    }
+    return slivers;
   }
 
+  String _count(int n) => NumberFormat.decimalPattern(
+        context.locale.toLanguageTag(),
+      ).format(n);
+
   Widget _buildHeader() {
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
     final isSchedule = _mode == _LiveTvMode.schedule;
+    final selectedCategory = _selectedCategory;
+    final epg = _epg;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 10, 0, 8),
+      padding: const EdgeInsets.only(top: AppSpace.xs, bottom: AppSpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          // EthioTV source (commented out - disabled):
-          // _SegmentedTrack(
-          //   children: <Widget>[
-          //     _ModeTab(
-          //       icon: PhosphorIcons.broadcast(),
-          //       label: 'DaddyLive',
-          //       selected: _source == _LiveTvSource.daddyLive,
-          //       onTap: () => _selectSource(_LiveTvSource.daddyLive),
-          //     ),
-          //     _ModeTab(
-          //       icon: PhosphorIcons.football(),
-          //       label: 'Ethio Sports',
-          //       selected: _source == _LiveTvSource.ethioSports,
-          //       onTap: () => _selectSource(_LiveTvSource.ethioSports),
-          //     ),
-          //   ],
-          // ),
-          // const SizedBox(height: 10),
-          _SegmentedTrack(
-            children: <Widget>[
-              _ModeTab(
-                icon: PhosphorIcons.televisionSimple(),
-                label: 'Channels',
-                selected: !isSchedule,
-                onTap: () => _selectMode(_LiveTvMode.channels),
-              ),
-              _ModeTab(
-                icon: PhosphorIcons.calendarDots(),
-                label: 'Schedule',
-                selected: isSchedule,
-                onTap: () => _selectMode(_LiveTvMode.schedule),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _searchController,
-            onChanged: _onSearchChanged,
-            decoration: InputDecoration(
-              hintText: isSchedule
-                  ? 'Search matches, teams & leagues'
-                  : 'Search channels',
-              prefixIcon: Icon(PhosphorIcons.magnifyingGlass()),
-              suffixIcon: _query.isEmpty
-                  ? null
-                  : IconButton(
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _query = '');
-                      },
-                      icon: Icon(PhosphorIcons.x()),
-                    ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: gutter),
+            child: SearchPill(
+              controller: _searchController,
+              hint: isSchedule ? tr('search_matches') : tr('search_channels'),
+              onChanged: _onSearchChanged,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpace.md),
           if (!isSchedule) ...<Widget>[
-            AppFilterRail(
-              children: <Widget>[
-                for (final entry in <(_ChannelScope, String, IconData)>[
-                  (_ChannelScope.all, 'All', PhosphorIcons.broadcast()),
-                  (_ChannelScope.favorites, 'Favorites', PhosphorIcons.heart()),
-                  (
-                    _ChannelScope.recent,
-                    'Recent',
-                    PhosphorIcons.clockCounterClockwise()
-                  ),
+            FilterChips(
+              chips: <FilterChipSpec>[
+                for (final (scope, label) in <(_ChannelScope, String)>[
+                  (_ChannelScope.all, tr('all')),
+                  (_ChannelScope.favorites, tr('favorites')),
+                  (_ChannelScope.recent, tr('recent')),
                 ])
-                  AppFilterPill(
-                    label: entry.$2,
-                    selected: _scope == entry.$1,
-                    onPressed: () => _selectScope(entry.$1),
+                  FilterChipSpec(
+                    label: label,
+                    selected: _scope == scope,
+                    onTap: () => _selectScope(scope),
+                  ),
+                if (_categories.isNotEmpty)
+                  FilterChipSpec(
+                    label: selectedCategory ?? tr('all_categories'),
+                    selected: selectedCategory != null,
+                    dropdown: true,
+                    onTap: _pickCategory,
                   ),
               ],
             ),
-            if (_categories.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 10),
-              _buildCategorySelector(),
+            if (_letters case final letters
+                when letters.length > 1) ...<Widget>[
+              const SizedBox(height: AppSpace.sm),
+              FilterChips(
+                chips: <FilterChipSpec>[
+                  FilterChipSpec(
+                    label: 'A–Z',
+                    selected: _activeLetter == null,
+                    onTap: () => _selectLetter(null),
+                  ),
+                  for (final letter in letters)
+                    FilterChipSpec(
+                      label: letter,
+                      selected: _activeLetter == letter,
+                      onTap: () => _selectLetter(letter),
+                    ),
+                ],
+              ),
             ],
-          ] else if (_epg case final epg? when epg.days.isNotEmpty) ...<Widget>[
-            AppFilterRail(
-              children: <Widget>[
+          ] else if (epg != null && epg.days.isNotEmpty) ...<Widget>[
+            FilterChips(
+              chips: <FilterChipSpec>[
                 for (var i = 0; i < epg.days.length; i++)
-                  AppFilterPill(
+                  FilterChipSpec(
                     label: _prettyDayLabel(epg.days[i].label),
                     selected: _selectedDayIndex == i,
-                    onPressed: () => _selectDay(i),
+                    onTap: () => _selectDay(i),
                   ),
               ],
             ),
+            if (_sportSections case final sports
+                when sports.isNotEmpty) ...<Widget>[
+              const SizedBox(height: AppSpace.sm),
+              FilterChips(
+                chips: <FilterChipSpec>[
+                  FilterChipSpec(
+                    label: tr('all_sports'),
+                    selected: _activeSport == null,
+                    onTap: () => _selectSport(null),
+                  ),
+                  for (final sport in sports)
+                    FilterChipSpec(
+                      label: sport.label,
+                      selected: _activeSport == sport.name,
+                      onTap: () => _selectSport(sport.name),
+                    ),
+                ],
+              ),
+            ],
           ],
           Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 2),
+            padding: EdgeInsetsDirectional.fromSTEB(
+              gutter,
+              AppSpace.md,
+              gutter,
+              0,
+            ),
             child: Text(
               isSchedule
-                  ? '$_visibleEventCount events • Times in $_localTimeZoneLabel'
-                  : '${_visibleChannels.length} channels',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                  ? '${plural('event_count', _visibleEventCount)} · '
+                      '${tr('times_in_zone', namedArgs: {
+                          'zone': _localTimeZoneLabel,
+                        })}'
+                  : plural('channel_count', _visibleChannels.length),
+              style: AppType.metadata.copyWith(
+                fontSize: 13,
+                color: palette.mutedText,
+              ),
             ),
           ),
         ],
@@ -691,53 +936,7 @@ class _ChannelListState extends State<ChannelList> {
   String _prettyDayLabel(String label) {
     final parsed = DateTime.tryParse(label);
     if (parsed == null) return label;
-    return DateFormat('EEE, MMM d').format(parsed);
-  }
-
-  Widget _buildCategorySelector() {
-    final colors = Theme.of(context).colorScheme;
-    return Material(
-      color: colors.surfaceContainerHighest.withValues(alpha: .6),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: _pickCategory,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
-          child: Row(
-            children: <Widget>[
-              Icon(PhosphorIcons.funnel(), size: 20, color: colors.primary),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  _selectedCategory ?? 'All categories',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-              ),
-              if (_selectedCategory != null)
-                IconButton(
-                  tooltip: 'Clear category filter',
-                  onPressed: () => _selectCategory(null),
-                  icon: Icon(
-                    PhosphorIcons.xCircle(),
-                    size: 20,
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-              Icon(
-                PhosphorIcons.caretDown(),
-                size: 18,
-                color: colors.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return DateFormat.MMMEd(context.locale.toLanguageTag()).format(parsed);
   }
 
   Future<void> _pickCategory() async {
@@ -747,11 +946,8 @@ class _ChannelListState extends State<ChannelList> {
         counts[category] = (counts[category] ?? 0) + 1;
       }
     }
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
+    final selected = await showAppSheet<String>(
+      context,
       builder: (context) => _CategoryPickerSheet(
         categories: _categories,
         counts: counts,
@@ -764,413 +960,311 @@ class _ChannelListState extends State<ChannelList> {
   }
 }
 
-class _ModeTab extends StatelessWidget {
-  const _ModeTab({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Expanded(
-      child: Material(
-        color: selected ? colors.primary : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 11),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Icon(
-                  icon,
-                  size: 18,
-                  color: selected ? colors.onPrimary : colors.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color:
-                        selected ? colors.onPrimary : colors.onSurfaceVariant,
-                    fontFamily: selected ? 'FigtreeSB' : 'Figtree',
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SegmentedTrack extends StatelessWidget {
-  const _SegmentedTrack({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest.withValues(alpha: .6),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: children,
-      ),
-    );
-  }
-}
-
+/// A channel: its initial, its name and what's on, tapped to watch. Share
+/// and favourite sit at the end.
 class _ChannelCard extends StatelessWidget {
   const _ChannelCard({
     required this.channel,
+    required this.highlighted,
     required this.favorite,
     required this.resolving,
     required this.onFavorite,
+    required this.onShare,
     required this.onPlay,
+    super.key,
   });
 
   final Channel channel;
+
+  /// Set for the channel a link pointed at, so it can be found in the list.
+  final bool highlighted;
   final bool favorite;
   final bool resolving;
   final VoidCallback onFavorite;
+  final VoidCallback? onShare;
   final VoidCallback onPlay;
-
-  bool get _isLive => channel.nowPlaying != null;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
+    final live = channel.nowPlaying != null;
     final subtitle = channel.nowPlaying ??
         channel.nextUp ??
         (channel.categories.isEmpty
-            ? 'Channel ${channel.id}'
-            : channel.categories.take(2).join(' • '));
-    return Card(
+            ? tr('channel_number', namedArgs: {'id': channel.id})
+            : channel.categories.take(2).join(' · '));
+    return Material(
+      color: palette.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        side: highlighted
+            ? BorderSide(color: palette.foreground, width: 1.5)
+            : BorderSide.none,
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: resolving ? null : onPlay,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 6, 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  _ChannelAvatar(name: channel.name, letter: channel.letter),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      channel.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                  ),
-                  if (_isLive) const _LiveBadge(),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: Row(
-                  children: <Widget>[
-                    Icon(
-                      _isLive
-                          ? PhosphorIcons.broadcast(PhosphorIconsStyle.fill)
-                          : channel.nextUp != null
-                              ? PhosphorIcons.clockCounterClockwise()
-                              : PhosphorIcons.radio(),
-                      size: 15,
-                      color: _isLive ? colors.primary : colors.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: _isLive
-                                  ? colors.primary
-                                  : colors.onSurfaceVariant,
-                              fontWeight:
-                                  _isLive ? FontWeight.w600 : FontWeight.w400,
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                children: <Widget>[
-                  IconButton(
-                    tooltip: favorite ? 'Remove favorite' : 'Add favorite',
-                    onPressed: onFavorite,
-                    visualDensity: VisualDensity.compact,
-                    constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
-                    ),
-                    icon: Icon(
-                      favorite
-                          ? PhosphorIcons.heart(PhosphorIconsStyle.fill)
-                          : PhosphorIcons.heart(),
-                      size: 20,
-                      color: favorite ? colors.primary : null,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (resolving)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 12),
-                      child: SizedBox.square(
-                        dimension: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
-                      ),
-                    )
-                  else
-                    Material(
-                      color: colors.primary,
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: onPlay,
-                        child: SizedBox.square(
-                          dimension: 34,
-                          child: Icon(
-                            PhosphorIcons.play(),
-                            size: 18,
-                            color: colors.onPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ChannelAvatar extends StatelessWidget {
-  const _ChannelAvatar({required this.name, this.letter});
-
-  final String name;
-  final String? letter;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final initial = (letter ?? (name.isEmpty ? '?' : name.trim()))
-        .characters
-        .first
-        .toUpperCase();
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[
-            colors.primary.withValues(alpha: .85),
-            colors.primary.withValues(alpha: .45),
-          ],
-        ),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: colors.onPrimary,
-          fontFamily: 'FigtreeSB',
-          fontSize: 17,
-          height: 1,
-        ),
-      ),
-    );
-  }
-}
-
-class _LiveBadge extends StatelessWidget {
-  const _LiveBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: colors.error.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(7),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: colors.error,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            'LIVE',
-            style: TextStyle(
-              color: colors.error,
-              fontFamily: 'FigtreeSB',
-              fontSize: 10,
-              height: 1,
-              letterSpacing: .6,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScheduleCategoryHeader extends StatelessWidget {
-  const _ScheduleCategoryHeader({required this.name, required this.count});
-
-  final String name;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 6, 4, 10),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 4,
-            height: 18,
-            decoration: BoxDecoration(
-              color: colors.primary,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-          ),
-          Text(
-            '$count',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScheduleEventTile extends StatelessWidget {
-  const _ScheduleEventTile({
-    required this.event,
-    required this.resolvingChannelId,
-    required this.onPlay,
-  });
-
-  final DaddyLiveEpgEvent event;
-  final String? resolvingChannelId;
-  final void Function(Channel channel) onPlay;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: colors.surfaceContainerHighest.withValues(alpha: .55),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsetsDirectional.fromSTEB(12, 0, 4, 0),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Container(
-                constraints: const BoxConstraints(minWidth: 64),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                decoration: BoxDecoration(
-                  color: colors.primary.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  event.displayTime,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: colors.primary,
-                    fontFamily: 'FigtreeSB',
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
+              _ChannelAvatar(channel: channel, resolving: resolving),
+              const SizedBox(width: AppSpace.md),
               Expanded(
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      event.title,
-                      maxLines: 2,
+                      channel.name,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            height: 1.25,
-                          ),
+                      style: AppType.cardTitle.copyWith(
+                        fontSize: 15,
+                        height: 1.3,
+                        color: palette.foreground,
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                    const SizedBox(height: 2),
+                    Row(
                       children: <Widget>[
-                        for (final channel in event.channels)
-                          _ChannelChip(
-                            channel: channel,
-                            resolving: resolvingChannelId == channel.id,
-                            onPlay: () => onPlay(channel),
+                        if (live) ...<Widget>[
+                          const _LiveDot(),
+                          const SizedBox(width: 6),
+                        ],
+                        Expanded(
+                          child: Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppType.metadata.copyWith(
+                              fontSize: 13,
+                              height: 1.35,
+                              color: live
+                                  ? palette.secondaryText
+                                  : palette.mutedText,
+                            ),
                           ),
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
+              if (onShare != null)
+                IconButton(
+                  tooltip: tr('share_channel'),
+                  onPressed: onShare,
+                  color: palette.mutedText,
+                  icon: Icon(PhosphorIcons.shareNetwork(), size: 20),
+                ),
+              IconButton(
+                tooltip: favorite
+                    ? tr('remove_from_favorites')
+                    : tr('add_to_favorites'),
+                onPressed: onFavorite,
+                color: favorite ? palette.foreground : palette.mutedText,
+                icon: Icon(
+                  favorite
+                      ? PhosphorIcons.heart(PhosphorIconsStyle.fill)
+                      : PhosphorIcons.heart(),
+                  size: 20,
+                ),
+              ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A channel's initial on a soft tile, or a small spinner while its stream
+/// is found.
+class _ChannelAvatar extends StatelessWidget {
+  const _ChannelAvatar({required this.channel, required this.resolving});
+
+  final Channel channel;
+  final bool resolving;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final name = channel.name.trim();
+    final initial =
+        (channel.letter ?? (name.isEmpty ? '?' : name)).characters.first;
+    return Container(
+      width: 44,
+      height: 44,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: palette.idleFill,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: resolving
+          ? SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: palette.foreground,
+              ),
+            )
+          : Text(
+              initial.toUpperCase(),
+              style: TextStyle(
+                color: palette.foreground,
+                fontFamily: AppType.semiBold,
+                fontSize: 17,
+                height: 1,
+              ),
+            ),
+    );
+  }
+}
+
+/// Live now: a small red dot, as broadcasters mark it.
+class _LiveDot extends StatelessWidget {
+  const _LiveDot();
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: tr('live_now'),
+        child: Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.error,
+            shape: BoxShape.circle,
+          ),
+        ),
+      );
+}
+
+/// A match: its kick-off, its title and how many channels carry it; opened,
+/// the channels to watch it on.
+class _ScheduleEventTile extends StatelessWidget {
+  const _ScheduleEventTile({
+    required this.event,
+    required this.expanded,
+    required this.onToggle,
+    required this.resolvingChannelId,
+    required this.onPlay,
+  });
+
+  final DaddyLiveEpgEvent event;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final String? resolvingChannelId;
+  final void Function(Channel channel) onPlay;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final channelCount = event.channels.length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpace.sm),
+      child: Material(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            InkWell(
+              onTap: channelCount == 0 ? null : onToggle,
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpace.md),
+                child: Row(
+                  children: <Widget>[
+                    Container(
+                      constraints: const BoxConstraints(minWidth: 60),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: palette.idleFill,
+                        borderRadius: BorderRadius.circular(AppRadii.card),
+                      ),
+                      child: Text(
+                        event.displayTime,
+                        textAlign: TextAlign.center,
+                        style: AppType.cardTitle.copyWith(
+                          fontSize: 13,
+                          color: palette.foreground,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpace.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            event.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppType.cardTitle.copyWith(
+                              fontSize: 15,
+                              height: 1.3,
+                              color: palette.foreground,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            plural('channel_count', channelCount),
+                            style: AppType.metadata.copyWith(
+                              fontSize: 13,
+                              color: palette.mutedText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (channelCount > 0) ...<Widget>[
+                      const SizedBox(width: AppSpace.sm),
+                      AnimatedRotation(
+                        turns: expanded ? .5 : 0,
+                        duration: const Duration(milliseconds: 180),
+                        child: Icon(
+                          PhosphorIcons.caretDown(),
+                          size: 18,
+                          color: palette.mutedText,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              alignment: AlignmentDirectional.topCenter,
+              child: expanded && channelCount > 0
+                  ? Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        AppSpace.md,
+                        0,
+                        AppSpace.md,
+                        AppSpace.md,
+                      ),
+                      child: Wrap(
+                        spacing: AppSpace.sm,
+                        runSpacing: AppSpace.sm,
+                        children: <Widget>[
+                          for (final channel in event.channels)
+                            _ChannelChip(
+                              channel: channel,
+                              resolving: resolvingChannelId == channel.id,
+                              onPlay: () => onPlay(channel),
+                            ),
+                        ],
+                      ),
+                    )
+                  : const SizedBox(width: double.infinity),
+            ),
+          ],
         ),
       ),
     );
@@ -1190,39 +1284,43 @@ class _ChannelChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
     return Material(
-      color: colors.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(10),
+      color: palette.idleFill,
+      borderRadius: BorderRadius.circular(AppRadii.chip),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
         onTap: resolving ? null : onPlay,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsetsDirectional.fromSTEB(10, 8, 14, 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               if (resolving)
-                const SizedBox.square(
-                  dimension: 12,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                SizedBox.square(
+                  dimension: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: palette.foreground,
+                  ),
                 )
               else
-                Icon(
-                  PhosphorIcons.broadcast(PhosphorIconsStyle.fill),
-                  size: 13,
-                  color: colors.primary,
+                PlaybackIcon(
+                  PhosphorIcons.play(PhosphorIconsStyle.fill),
+                  size: 14,
+                  color: palette.foreground,
                 ),
               const SizedBox(width: 6),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 130),
+                constraints: const BoxConstraints(maxWidth: 180),
                 child: Text(
                   channel.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: AppType.cardTitle.copyWith(
+                    fontSize: 13,
+                    color: palette.foreground,
+                  ),
                 ),
               ),
             ],
@@ -1262,182 +1360,166 @@ class _CategoryPickerSheetState extends State<_CategoryPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final filtered = _query.trim().isEmpty
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
+    final needle = normalizeSearchText(_query);
+    final filtered = needle.isEmpty
         ? widget.categories
         : widget.categories
-            .where(
-              (category) => normalizeSearchText(category)
-                  .contains(normalizeSearchText(_query)),
-            )
+            .where((category) => normalizeSearchText(category).contains(needle))
             .toList(growable: false);
+    final count = NumberFormat.decimalPattern(context.locale.toLanguageTag());
+    Widget tile(String label, int n, bool selected, String value) => ListRow(
+          label: label,
+          value: count.format(n),
+          trailing: selected
+              ? Icon(
+                  PhosphorIcons.check(PhosphorIconsStyle.bold),
+                  size: 18,
+                  color: palette.foreground,
+                )
+              : null,
+          showsNext: false,
+          onTap: () => Navigator.pop(context, value),
+        );
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * .82,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 2, 20, 12),
-            child: Row(
-              children: <Widget>[
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    PhosphorIcons.funnel(),
-                    color: colors.primary,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        'Categories',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${widget.categories.length} categories • tap to filter',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) => setState(() => _query = value),
-              decoration: InputDecoration(
-                hintText: 'Search categories',
-                prefixIcon: Icon(PhosphorIcons.magnifyingGlass()),
-                suffixIcon: _query.isEmpty
-                    ? null
-                    : IconButton(
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _query = '');
-                        },
-                        icon: Icon(PhosphorIcons.x()),
-                      ),
-                isDense: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpace.md),
+              child: Text(
+                tr('categories'),
+                style: AppType.sectionHeader.copyWith(
+                  fontFamily: AppType.bold,
+                  color: palette.foreground,
                 ),
               ),
             ),
-          ),
-          Flexible(
-            child: ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-              children: <Widget>[
-                _CategoryPickerTile(
-                  label: 'All categories',
-                  count: widget.totalChannels,
-                  selected: widget.selected == null,
-                  onTap: () => Navigator.pop(context, _allCategoriesKey),
-                ),
-                const SizedBox(height: 6),
-                for (final category in filtered)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: _CategoryPickerTile(
-                      label: category,
-                      count: widget.counts[category] ?? 0,
-                      selected: widget.selected == category,
-                      onTap: () => Navigator.pop(context, category),
+            Padding(
+              padding: EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpace.sm),
+              child: SearchPill(
+                controller: _searchController,
+                hint: tr('search_categories'),
+                onChanged: (value) => setState(() => _query = value),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.only(bottom: AppSpace.xxl),
+                children: <Widget>[
+                  if (needle.isEmpty)
+                    tile(
+                      tr('all_categories'),
+                      widget.totalChannels,
+                      widget.selected == null,
+                      _allCategoriesKey,
                     ),
-                  ),
-                if (filtered.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: Center(
+                  for (final category in filtered)
+                    tile(
+                      category,
+                      widget.counts[category] ?? 0,
+                      widget.selected == category,
+                      category,
+                    ),
+                  if (filtered.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32),
                       child: Text(
-                        'No categories match',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
+                        tr('no_categories_match'),
+                        textAlign: TextAlign.center,
+                        style: AppType.body.copyWith(color: palette.mutedText),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _CategoryPickerTile extends StatelessWidget {
-  const _CategoryPickerTile({
-    required this.label,
-    required this.count,
-    required this.selected,
-    required this.onTap,
-  });
+/// Live TV's shape while the catalog loads: the search pill, a row of
+/// chips and the first channels (or matches).
+class _LiveTvSkeleton extends StatelessWidget {
+  const _LiveTvSkeleton({required this.schedule});
 
-  final String label;
-  final int count;
-  final bool selected;
-  final VoidCallback onTap;
+  final bool schedule;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Material(
-      color: selected
-          ? colors.primary.withValues(alpha: .14)
-          : colors.surfaceContainerHighest.withValues(alpha: .55),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
+    final gutter = AppSpace.gutter(context);
+    return SkeletonPulse(
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(gutter, AppSpace.xs, gutter, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const SkeletonBlock(
+              height: SearchPill.height,
+              radius: AppRadii.hero,
+            ),
+            const SizedBox(height: AppSpace.md),
+            Row(
+              children: <Widget>[
+                for (final width in const <double>[48, 84, 70, 124])
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      end: AppSpace.sm,
+                    ),
+                    child: SkeletonBlock(
+                      width: width,
+                      height: FilterChips.height,
+                      radius: AppRadii.chip,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpace.lg),
+            const SkeletonBlock.line(width: 96),
+            const SizedBox(height: AppSpace.lg),
+            for (var i = 0; i < 8; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: Row(
+                  children: <Widget>[
+                    SkeletonBlock(
+                      width: schedule ? 60 : 44,
+                      height: schedule ? 30 : 44,
+                    ),
+                    const SizedBox(width: AppSpace.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          FractionallySizedBox(
+                            widthFactor: i.isEven ? .6 : .45,
+                            child: const SkeletonBlock.line(height: 14),
+                          ),
+                          const SizedBox(height: AppSpace.sm),
+                          FractionallySizedBox(
+                            widthFactor: i.isEven ? .35 : .5,
+                            child: const SkeletonBlock.line(height: 11),
+                          ),
+                        ],
                       ),
+                    ),
+                  ],
                 ),
               ),
-              Text(
-                '$count',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(width: 12),
-              Icon(
-                selected
-                    ? PhosphorIcons.checkCircle(PhosphorIconsStyle.fill)
-                    : PhosphorIcons.circle(),
-                size: 22,
-                color: selected ? colors.primary : colors.outlineVariant,
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );

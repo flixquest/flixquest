@@ -5,7 +5,7 @@ import '../../constants/app_constants.dart';
 import '../../services/globle_method.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../../ui_components/app_ui_components.dart';
+import '../../mobile/widgets/account_form.dart';
 
 class EmailChangeScreen extends StatefulWidget {
   const EmailChangeScreen({super.key});
@@ -139,152 +139,70 @@ class EmailChangeScreenState extends State<EmailChangeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(tr('change_email'))),
-      body: userDoc == null
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
-          : AppResponsiveContent(
-              maxWidth: 560,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 68,
-                      height: 68,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: .12),
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      child: Icon(PhosphorIcons.at(),
-                          size: 32,
-                          color: Theme.of(context).colorScheme.primary),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        tr('change_email'),
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        tr('process_stuck'),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(12.0),
-                              child: TextFormField(
-                                key: const ValueKey('email'),
-                                focusNode: _newEmailFocusNode,
-                                validator: (value) {
-                                  if (value!.isEmpty || !value.contains('@')) {
-                                    return tr('invalid_email');
-                                  }
-                                  return null;
-                                },
-                                textInputAction: TextInputAction.next,
-                                onEditingComplete: () => FocusScope.of(context)
-                                    .requestFocus(_emailVerifyFocusNode),
-                                keyboardType: TextInputType.emailAddress,
-                                decoration: InputDecoration(
-                                  errorMaxLines: 3,
-                                  filled: true,
-                                  prefixIcon:
-                                      Icon(PhosphorIcons.envelopeSimple()),
-                                  labelText: tr('new_email_address'),
-                                ),
-                                onSaved: (value) {
-                                  newEmail = value!;
-                                },
-                                onChanged: (value) {
-                                  newEmail = value;
-                                },
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(12.0),
-                              child: TextFormField(
-                                key: const ValueKey('verifyEmail'),
-                                validator: (value) {
-                                  if (value != newEmail) {
-                                    return tr('email_mismatch');
-                                  }
-                                  return null;
-                                },
-                                textInputAction: TextInputAction.next,
-                                keyboardType: TextInputType.emailAddress,
-                                decoration: InputDecoration(
-                                  errorMaxLines: 3,
-                                  filled: true,
-                                  prefixIcon:
-                                      Icon(PhosphorIcons.envelopeSimple()),
-                                  labelText: tr('repeat_new_email'),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(
-                      height: 20,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25),
-                      child: _isLoading
-                          ? const CircularProgressIndicator()
-                          : ElevatedButton(
-                              style: ButtonStyle(
-                                  minimumSize: const WidgetStatePropertyAll(
-                                      Size(200, 50)),
-                                  shape: WidgetStateProperty.all(
-                                    RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10.0),
-                                    ),
-                                  )),
-                              onPressed: () {
-                                _submitForm();
-                              },
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    tr('change_email'),
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: 17),
-                                  ),
-                                  const SizedBox(
-                                    width: 5,
-                                  ),
-                                  Icon(
-                                    PhosphorIcons.arrowsClockwise(),
-                                    size: 18,
-                                  )
-                                ],
-                              )),
-                    ),
-                  ],
+    return AccountFormPage(
+      title: tr('change_email'),
+      icon: PhosphorIcons.at(),
+      heading: tr('change_email'),
+      message: tr('process_stuck'),
+      children: [
+        Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                key: const ValueKey('email'),
+                focusNode: _newEmailFocusNode,
+                validator: (value) {
+                  if (value!.isEmpty || !value.contains('@')) {
+                    return tr('invalid_email');
+                  }
+                  return null;
+                },
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () =>
+                    FocusScope.of(context).requestFocus(_emailVerifyFocusNode),
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                decoration: InputDecoration(
+                  errorMaxLines: 3,
+                  prefixIcon: Icon(PhosphorIcons.envelopeSimple()),
+                  labelText: tr('new_email_address'),
+                ),
+                onSaved: (value) {
+                  newEmail = value!;
+                },
+                onChanged: (value) {
+                  newEmail = value;
+                },
+              ),
+              const AccountFieldGap(),
+              TextFormField(
+                key: const ValueKey('verifyEmail'),
+                focusNode: _emailVerifyFocusNode,
+                validator: (value) {
+                  if (value != newEmail) {
+                    return tr('email_mismatch');
+                  }
+                  return null;
+                },
+                textInputAction: TextInputAction.done,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  errorMaxLines: 3,
+                  prefixIcon: Icon(PhosphorIcons.envelopeSimple()),
+                  labelText: tr('repeat_new_email'),
                 ),
               ),
-            ),
+            ],
+          ),
+        ),
+        AccountSubmitButton(
+          label: tr('change_email'),
+          // Working until the account is known, then while it saves.
+          busy: _isLoading || userDoc == null,
+          onPressed: _submitForm,
+        ),
+      ],
     );
   }
 }

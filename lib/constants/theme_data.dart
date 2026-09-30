@@ -845,6 +845,7 @@ class Styles {
       required ColorScheme? darkDynamicColor,
       required BuildContext context,
       required AppColor appColor,
+      bool compactCorners = false,
       OccasionalTheme? occasionalTheme,
       Color? ambientColor}) {
     var baseTheme = appThemeMode == 'dark'
@@ -863,6 +864,7 @@ class Styles {
     }
     final themed = _applyFlixQuestUI(
       baseTheme,
+      compactCorners: compactCorners,
       surfaceOverride:
           activeTheme?.backgroundFor(baseTheme.colorScheme.brightness) ??
               (ambientColor == null ? null : baseTheme.colorScheme.surface),
@@ -932,7 +934,13 @@ Color _readableOn(Color color) =>
         ? Colors.white
         : const Color(0xDE000000);
 
-ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
+ThemeData _applyFlixQuestUI(
+  ThemeData base, {
+  Color? surfaceOverride,
+  bool compactCorners = false,
+}) {
+  double corner(double handheld, double television) =>
+      compactCorners ? handheld : television;
   final colors = base.colorScheme;
   final dark = colors.brightness == Brightness.dark;
   final surface = surfaceOverride ??
@@ -960,7 +968,7 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
             )
           : colors.primary;
   final roundedBorder = OutlineInputBorder(
-    borderRadius: BorderRadius.circular(15),
+    borderRadius: BorderRadius.circular(corner(8, 15)),
     borderSide: BorderSide.none,
   );
   Color accentFor(Set<WidgetState> states) {
@@ -968,6 +976,19 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
       return colors.onSurface.withValues(alpha: .32);
     }
     return actionButtonForeground;
+  }
+
+  // Controls are drawn in ink (the page's text colour) rather than the
+  // accent: white in the dark modes, near-black in Light, the way Netflix's
+  // Play button is. The accent is kept for progress, selection marks, the
+  // text cursor and the brand itself (docs/mobile_redesign_guide.md, 3.2).
+  final ink = dark ? const Color(0xFFF7F7F7) : const Color(0xFF141516);
+  final onInk = dark ? Colors.black : Colors.white;
+  Color inkFor(Set<WidgetState> states) {
+    if (states.contains(WidgetState.disabled)) {
+      return colors.onSurface.withValues(alpha: .32);
+    }
+    return ink;
   }
 
   Color selectedFillFor(Set<WidgetState> states) {
@@ -981,19 +1002,17 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
 
   return base.copyWith(
     colorScheme: colors.copyWith(onPrimary: solidButtonForeground),
-    splashColor: colors.primary.withValues(alpha: .08),
-    highlightColor: colors.primary.withValues(alpha: .04),
-    hoverColor: colors.primary.withValues(alpha: .035),
+    splashColor: ink.withValues(alpha: .08),
+    highlightColor: ink.withValues(alpha: .04),
+    hoverColor: ink.withValues(alpha: .035),
     scaffoldBackgroundColor: surface,
     canvasColor: surface,
-    iconTheme: IconThemeData(color: actionButtonForeground, size: 24),
+    iconTheme: IconThemeData(color: ink, size: 24),
     primaryIconTheme: IconThemeData(color: solidButtonForeground, size: 24),
     iconButtonTheme: IconButtonThemeData(
       style: ButtonStyle(
-        foregroundColor: WidgetStateProperty.resolveWith(accentFor),
-        overlayColor: WidgetStatePropertyAll(
-          colors.primary.withValues(alpha: .10),
-        ),
+        foregroundColor: WidgetStateProperty.resolveWith(inkFor),
+        overlayColor: WidgetStatePropertyAll(ink.withValues(alpha: .10)),
       ),
     ),
     textTheme: base.textTheme.apply(fontFamily: 'Figtree').copyWith(
@@ -1028,7 +1047,8 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
       color: softSurface,
       surfaceTintColor: Colors.transparent,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(corner(8, 16))),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -1037,52 +1057,56 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
       border: roundedBorder,
       enabledBorder: roundedBorder,
       focusedBorder: roundedBorder.copyWith(
-        borderSide: BorderSide(color: colors.primary, width: 1.5),
+        borderSide: BorderSide(color: ink.withValues(alpha: .6), width: 1.5),
       ),
       errorBorder: roundedBorder.copyWith(
         borderSide: BorderSide(color: colors.error),
       ),
       prefixIconColor: colors.onSurfaceVariant,
-      suffixIconColor: colors.primary,
+      suffixIconColor: colors.onSurfaceVariant,
       hintStyle:
           TextStyle(color: colors.onSurfaceVariant.withValues(alpha: .65)),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         elevation: 0,
-        backgroundColor: colors.primary,
-        foregroundColor: solidButtonForeground,
+        backgroundColor: ink,
+        foregroundColor: onInk,
         minimumSize: const Size(48, 48),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(corner(7, 14))),
         textStyle: const TextStyle(fontFamily: 'FigtreeSB'),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: colors.primary,
-        foregroundColor: solidButtonForeground,
+        backgroundColor: ink,
+        foregroundColor: onInk,
         minimumSize: const Size(48, 48),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(corner(7, 14))),
         textStyle: const TextStyle(fontFamily: 'FigtreeSB'),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: actionButtonForeground,
+        foregroundColor: ink,
         minimumSize: const Size(48, 48),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-        side: BorderSide(color: actionButtonForeground, width: 1.4),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        side: BorderSide(color: ink.withValues(alpha: .24), width: 1.4),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(corner(7, 14))),
         textStyle: const TextStyle(fontFamily: 'FigtreeSB'),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: actionButtonForeground,
+        foregroundColor: ink,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(corner(6, 12))),
         textStyle: const TextStyle(fontFamily: 'FigtreeSB'),
       ),
     ),
@@ -1090,11 +1114,11 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
       elevation: 2,
       focusElevation: 4,
       hoverElevation: 4,
-      backgroundColor: colors.primary,
-      foregroundColor: solidButtonForeground,
-      focusColor: colors.primary.withValues(alpha: .16),
-      hoverColor: colors.primary.withValues(alpha: .12),
-      splashColor: solidButtonForeground.withValues(alpha: .14),
+      backgroundColor: softSurface,
+      foregroundColor: ink,
+      focusColor: ink.withValues(alpha: .16),
+      hoverColor: ink.withValues(alpha: .12),
+      splashColor: ink.withValues(alpha: .14),
     ),
     checkboxTheme: CheckboxThemeData(
       fillColor: WidgetStateProperty.resolveWith(selectedFillFor),
@@ -1134,24 +1158,41 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
     ),
     toggleButtonsTheme: ToggleButtonsThemeData(
       color: colors.onSurfaceVariant,
-      selectedColor: solidButtonForeground,
-      fillColor: colors.primary,
-      focusColor: colors.primary.withValues(alpha: .10),
-      hoverColor: colors.primary.withValues(alpha: .08),
-      splashColor: colors.primary.withValues(alpha: .10),
+      selectedColor: onInk,
+      fillColor: ink,
+      focusColor: ink.withValues(alpha: .10),
+      hoverColor: ink.withValues(alpha: .08),
+      splashColor: ink.withValues(alpha: .10),
       borderColor: colors.outline,
-      selectedBorderColor: colors.primary,
-      borderRadius: BorderRadius.circular(12),
+      selectedBorderColor: ink,
+      borderRadius: BorderRadius.circular(corner(7, 12)),
     ),
+    // Selected chips fill with ink and invert their label; the rest sit on a
+    // faint ink wash with no outline.
     chipTheme: base.chipTheme.copyWith(
-      backgroundColor: Colors.transparent,
-      selectedColor: colors.primary,
-      secondarySelectedColor: colors.primary,
-      labelStyle: TextStyle(color: colors.onSurface),
-      secondaryLabelStyle: TextStyle(color: colors.onPrimary),
-      side: BorderSide(color: colors.primary, width: 1.3),
+      color: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
+          return ink.withValues(alpha: .04);
+        }
+        return states.contains(WidgetState.selected)
+            ? ink
+            : ink.withValues(alpha: .08);
+      }),
+      backgroundColor: ink.withValues(alpha: .08),
+      selectedColor: ink,
+      secondarySelectedColor: ink,
+      checkmarkColor: onInk,
+      labelStyle: WidgetStateTextStyle.resolveWith(
+        (states) => TextStyle(
+          color: states.contains(WidgetState.selected) ? onInk : ink,
+          fontFamily: 'FigtreeSB',
+        ),
+      ),
+      secondaryLabelStyle: TextStyle(color: onInk, fontFamily: 'FigtreeSB'),
+      side: BorderSide.none,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(corner(8, 22))),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -1178,8 +1219,8 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
     ),
     tabBarTheme: TabBarThemeData(
       dividerColor: Colors.transparent,
-      indicatorColor: colors.primary,
-      labelColor: colors.primary,
+      indicatorColor: ink,
+      labelColor: ink,
       unselectedLabelColor: colors.onSurfaceVariant,
       labelStyle: const TextStyle(
           fontFamily: 'FigtreeSB', fontWeight: FontWeight.w600, fontSize: 15),
@@ -1190,15 +1231,15 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
     navigationBarTheme: NavigationBarThemeData(
       elevation: 0,
       backgroundColor: surface,
-      indicatorColor: colors.primary.withValues(alpha: .12),
+      indicatorColor: Colors.transparent,
       iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
             color: states.contains(WidgetState.selected)
-                ? colors.primary
+                ? ink
                 : colors.onSurfaceVariant,
           )),
       labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
             color: states.contains(WidgetState.selected)
-                ? colors.primary
+                ? ink
                 : colors.onSurfaceVariant,
             fontFamily:
                 states.contains(WidgetState.selected) ? 'FigtreeSB' : 'Figtree',
@@ -1209,15 +1250,18 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
       backgroundColor: surface,
       surfaceTintColor: Colors.transparent,
       showDragHandle: false,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      // A neutral handle rather than Material's accent-tinted one.
+      dragHandleColor: ink.withValues(alpha: .28),
+      shape: RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(corner(12, 28))),
       ),
     ),
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: surface,
-      selectedItemColor: colors.primary,
+      selectedItemColor: ink,
       unselectedItemColor: colors.onSurfaceVariant,
-      selectedIconTheme: IconThemeData(color: colors.primary),
+      selectedIconTheme: IconThemeData(color: ink),
       unselectedIconTheme: IconThemeData(color: colors.onSurfaceVariant),
       selectedLabelStyle: const TextStyle(fontFamily: 'FigtreeSB'),
       unselectedLabelStyle: const TextStyle(fontFamily: 'Figtree'),
@@ -1225,11 +1269,11 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
     ),
     navigationRailTheme: NavigationRailThemeData(
       backgroundColor: surface,
-      indicatorColor: colors.primary.withValues(alpha: .14),
-      selectedIconTheme: IconThemeData(color: colors.primary),
+      indicatorColor: ink.withValues(alpha: .10),
+      selectedIconTheme: IconThemeData(color: ink),
       unselectedIconTheme: IconThemeData(color: colors.onSurfaceVariant),
       selectedLabelTextStyle: TextStyle(
-        color: colors.primary,
+        color: ink,
         fontFamily: 'FigtreeSB',
       ),
       unselectedLabelTextStyle: TextStyle(
@@ -1242,7 +1286,7 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
       textColor: solidButtonForeground,
     ),
     expansionTileTheme: ExpansionTileThemeData(
-      iconColor: colors.primary,
+      iconColor: ink,
       collapsedIconColor: colors.onSurfaceVariant,
       textColor: colors.onSurface,
       collapsedTextColor: colors.onSurface,
@@ -1250,7 +1294,8 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
     dialogTheme: DialogThemeData(
       backgroundColor: surface,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(corner(10, 22))),
       titleTextStyle: base.textTheme.titleLarge?.copyWith(
         color: colors.onSurface,
         fontFamily: 'FigtreeSB',
@@ -1268,18 +1313,22 @@ ThemeData _applyFlixQuestUI(ThemeData base, {Color? surfaceOverride}) {
         color: dark ? const Color(0xFF17191B) : Colors.white,
         fontFamily: 'FigtreeSB',
       ),
-      actionTextColor: colors.primary,
+      // The snack bar is inverted (light on dark pages), so its action is
+      // the page colour's ink, in bold.
+      actionTextColor: dark ? const Color(0xFF17191B) : Colors.white,
       closeIconColor: dark ? const Color(0xFF17191B) : Colors.white,
       showCloseIcon: true,
       elevation: 8,
       insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(corner(8, 16))),
     ),
     dividerTheme: DividerThemeData(color: outline, space: 1, thickness: 1),
     listTileTheme: ListTileThemeData(
       iconColor: colors.onSurface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(corner(8, 14))),
     ),
   );
 }

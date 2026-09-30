@@ -211,6 +211,36 @@ void main() {
     provider.dispose();
   });
 
+  testWidgets('status chips are neutral, except a failure in the error colour',
+      (tester) async {
+    final gateway = _FakeGateway([
+      _download(
+        'movie_11',
+        createdAt: 11,
+        state: OfflineDownloadState.completed,
+        progress: 100,
+      ),
+      _download('movie_12', createdAt: 12, state: OfflineDownloadState.failed),
+    ]);
+    final provider = OfflineDownloadProvider(service: gateway);
+    await provider.initialize();
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: const MaterialApp(home: DownloadsScreen()),
+      ),
+    );
+
+    final colors =
+        Theme.of(tester.element(find.byType(DownloadsScreen))).colorScheme;
+    final downloaded = tester.widget<Text>(find.text('Downloaded'));
+    final failed = tester.widget<Text>(find.text('Failed'));
+    expect(downloaded.style?.color, isNot(colors.primary));
+    expect(failed.style?.color, colors.error);
+    provider.dispose();
+  });
+
   testWidgets('download sheets return the selected provider and resolution',
       (tester) async {
     VideoProvider? selectedProvider;
@@ -266,9 +296,10 @@ void main() {
 
     await tester.tap(find.text('Select resolution'));
     await tester.pumpAndSettle();
-    expect(find.text('Downloading from Provider Alpha'), findsOneWidget);
+    // Translated strings come back as their keys in tests.
+    expect(find.text('download_from_provider'), findsOneWidget);
     expect(find.text('~1.5 GB'), findsOneWidget);
-    expect(find.text('Size undetermined'), findsOneWidget);
+    expect(find.text('size_unknown'), findsOneWidget);
     await tester.tap(find.text('720p'));
     await tester.pumpAndSettle();
     expect(selectedResolution, '720p');

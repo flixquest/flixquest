@@ -77,7 +77,7 @@ void main() {
     manager.maxConcurrentTasks = 2;
   });
 
-  testWidgets('TV notice dismisses only this release and opens the TV updater',
+  testWidgets('TV notice cannot be dismissed and opens the TV updater',
       (tester) async {
     tester.view.physicalSize = const Size(960, 540);
     tester.view.devicePixelRatio = 1;
@@ -90,12 +90,7 @@ void main() {
     ]))));
     await tester.pumpAndSettle();
     expect(find.text('Update available • FlixQuest 4.2.0'), findsOneWidget);
-    await select(tester, 'Not now');
-    expect(sharedPrefsSingleton.getString('ignore_version'), '2');
-    expect(find.text('Update'), findsNothing);
-    release(build: 3);
-    await tester.pumpAndSettle();
-    expect(find.text('Update available • FlixQuest 4.3.0'), findsOneWidget);
+    expect(find.text('Not now'), findsNothing);
     await select(tester, 'Update');
     expect(tester.widget<UpdateScreen>(find.byType(UpdateScreen)).television,
         isTrue);

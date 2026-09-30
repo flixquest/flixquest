@@ -131,6 +131,13 @@ class WellnessInsights {
     required this.titlesStarted,
     required this.sampledTitles,
     required this.periodDays,
+    this.networkBytes = 0,
+    this.networkMeasuredSessions = 0,
+    this.networkMeasuredMs = 0,
+    this.sourceWatchedMs = const {},
+    this.firstTimeTitles = 0,
+    this.returningTitles = 0,
+    this.deviceCount = 0,
   });
 
   final List<WellnessViewingSession> sessions;
@@ -176,7 +183,44 @@ class WellnessInsights {
   /// Calendar days the period covers, clamped to at least one.
   final int periodDays;
 
+  /// Network data used by the sessions that measured it, with a session that
+  /// straddles the period's edge counted in proportion to its watch time
+  /// inside the period.
+  final int networkBytes;
+
+  /// Sessions that measured their network data. Older sessions and some
+  /// platforms do not, so [networkBytes] can cover only part of the period.
+  final int networkMeasuredSessions;
+
+  /// Watch time of the sessions behind [networkBytes].
+  final int networkMeasuredMs;
+
+  /// Playback per source, clipped to the selected period. Like the media
+  /// breakdown, simultaneous streams count independently.
+  final Map<WellnessPlaybackSource, int> sourceWatchedMs;
+
+  /// Distinct movies and episodes first recorded in this period, or watched
+  /// before it. These describe the available history, not lifetime viewing.
+  final int firstTimeTitles;
+  final int returningTitles;
+
+  /// Devices with qualifying playback in the period; no device IDs are shown.
+  final int deviceCount;
+
+  double get networkCoverage => sumPlaybackMs <= 0
+      ? 0
+      : (networkMeasuredMs / sumPlaybackMs).clamp(0.0, 1.0);
+
   bool get isEmpty => sessions.isEmpty;
+  bool get hasNetworkUsage => networkMeasuredSessions > 0;
+
+  /// Network data per hour watched, over the sessions that measured it.
+  int get networkBytesPerHour => networkMeasuredMs <= 0
+      ? 0
+      : (networkBytes *
+              const Duration(hours: 1).inMilliseconds /
+              networkMeasuredMs)
+          .round();
   int get sessionCount => viewingSessionCount;
   int get completedTitles => completedMovies + completedEpisodes;
   int get averageActiveDayMs =>
@@ -261,7 +305,9 @@ class WellnessInsights {
     (DateTime, int)? best;
     for (final entry in dailyWatchedMs.entries) {
       if (entry.value <= 0) continue;
-      if (best == null || entry.value > best.$2) best = (entry.key, entry.value);
+      if (best == null || entry.value > best.$2) {
+        best = (entry.key, entry.value);
+      }
     }
     return best;
   }
@@ -329,7 +375,8 @@ class WellnessInsights {
   List<DateTime> _activeDaysSorted() {
     final days = dailyWatchedMs.entries
         .where((entry) => entry.value > 0)
-        .map((entry) => DateTime(entry.key.year, entry.key.month, entry.key.day))
+        .map(
+            (entry) => DateTime(entry.key.year, entry.key.month, entry.key.day))
         .toSet()
         .toList()
       ..sort();
@@ -370,10 +417,40 @@ class WellnessInsights {
     final countryMs = <String, int>{};
     final decadeMs = <String, int>{};
     final providerMs = <String, int>{};
+    var networkBytes = 0;
+    var networkMeasuredSessions = 0;
+    var networkMeasuredMs = 0;
+    final sourceMs = <WellnessPlaybackSource, int>{};
+    final devices = <String>{};
+    final earlierTitles = <String>{};
+    final earlierPeriod = WellnessPeriod(
+      startUtc: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      endUtc: period.startUtc,
+    );
+    for (final session in allSessions) {
+      if (!session.isDeleted &&
+          session.qualifies &&
+          session.mediaType != WellnessMediaType.live &&
+          earlierPeriod.overlaps(session) &&
+          _clippedSessionWatchedMs(session, earlierPeriod) > 0) {
+        earlierTitles.add(session.uniqueTitleKey);
+      }
+    }
 
     for (final session in sessions) {
       final clippedMs = _clippedSessionWatchedMs(session, period);
       if (clippedMs <= 0) continue;
+      sourceMs.update(session.source, (value) => value + clippedMs,
+          ifAbsent: () => clippedMs);
+      if (session.deviceId.trim().isNotEmpty) devices.add(session.deviceId);
+      final sessionBytes = session.networkBytes;
+      if (sessionBytes != null) {
+        networkMeasuredSessions++;
+        networkMeasuredMs += clippedMs;
+        networkBytes += session.watchedMs <= clippedMs
+            ? sessionBytes
+            : (sessionBytes * clippedMs / session.watchedMs).round();
+      }
       switch (session.mediaType) {
         case WellnessMediaType.movie:
           movieMs += clippedMs;
@@ -384,7 +461,8 @@ class WellnessInsights {
           seriesEpisodeKeys
               .putIfAbsent(session.uniqueSeriesKey, () => <String>{})
               .add(session.uniqueTitleKey);
-          seriesLabels.putIfAbsent(session.uniqueSeriesKey, () => session.title);
+          seriesLabels.putIfAbsent(
+              session.uniqueSeriesKey, () => session.title);
           if (session.completed) {
             completedEpisodeKeys.add(session.uniqueTitleKey);
           }
@@ -506,6 +584,13 @@ class WellnessInsights {
       titlesStarted: startedTitleKeys.length,
       sampledTitles: startedTitleKeys.difference(completedTitleKeys).length,
       periodDays: periodDays,
+      networkBytes: networkBytes,
+      networkMeasuredSessions: networkMeasuredSessions,
+      networkMeasuredMs: networkMeasuredMs,
+      sourceWatchedMs: Map.unmodifiable(sourceMs),
+      firstTimeTitles: startedTitleKeys.difference(earlierTitles).length,
+      returningTitles: startedTitleKeys.intersection(earlierTitles).length,
+      deviceCount: devices.length,
     );
   }
 
@@ -582,7 +667,8 @@ void _addFallbackToCalendar(
   dailyByType.update(
     day,
     (split) => split.addMs(session.mediaType, watchedMs),
-    ifAbsent: () => WellnessMediaSplit.empty.addMs(session.mediaType, watchedMs),
+    ifAbsent: () =>
+        WellnessMediaSplit.empty.addMs(session.mediaType, watchedMs),
   );
 }
 

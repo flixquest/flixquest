@@ -5,113 +5,93 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flixquest/models/custom_exceptions.dart';
 import 'package:flutter/material.dart';
 
+import '../design/app_palette.dart';
+import '../design/app_tokens.dart';
+
 class GlobalMethods {
-  Future<void> showCustomDialog(
-      String title, String subtitle, Function fct, BuildContext context) async {
-    showDialog(
-        context: context,
-        builder: (BuildContext ctx) {
-          return AlertDialog(
-            title: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 6.0),
-                  child: Image.network(
-                    'https://image.flaticon.com/icons/png/128/564/564619.png',
-                    height: 20,
-                    width: 20,
+  Future<void> authErrorHandle(String subtitle, BuildContext context) =>
+      _showMessage(
+        context,
+        title: tr('error_occured'),
+        message: subtitle,
+        onOk: () => Navigator.pop(context),
+      );
+
+  /// A notice the user acknowledges before leaving the page it came from
+  /// (a password-reset email that has been sent).
+  Future<void> checkMessage(String subtitle, BuildContext context) =>
+      _showMessage(
+        context,
+        message: subtitle,
+        dismissible: false,
+        onOk: () {
+          Navigator.pop(context);
+          Navigator.pop(context);
+        },
+      );
+
+  /// A small dialog in the app's style: an optional title, the message in
+  /// secondary text, and one ink OK pill.
+  static Future<void> _showMessage(
+    BuildContext context, {
+    required String message,
+    required VoidCallback onOk,
+    String? title,
+    bool dismissible = true,
+  }) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: dismissible,
+      builder: (dialogContext) {
+        final palette = AppPalette.of(dialogContext);
+        return Dialog(
+          backgroundColor: palette.surface,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.hero),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpace.xl,
+                AppSpace.xl,
+                AppSpace.xl,
+                AppSpace.lg,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (title != null) ...[
+                    Text(
+                      title,
+                      style: AppType.sectionHeader.copyWith(
+                        fontFamily: AppType.bold,
+                        color: palette.foreground,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpace.sm),
+                  ],
+                  Text(
+                    message,
+                    style: AppType.body.copyWith(color: palette.secondaryText),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(title),
-                ),
-              ],
+                  const SizedBox(height: AppSpace.xl),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: onOk,
+                      child: Text(tr('ok')),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            content: Text(subtitle),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(tr('cancel'))),
-              TextButton(
-                  onPressed: () {
-                    fct();
-                    Navigator.pop(context);
-                  },
-                  child: Text(tr('ok')))
-            ],
-          );
-        });
-  }
-
-  Future<void> authErrorHandle(String subtitle, BuildContext context) async {
-    showDialog(
-        context: context,
-        builder: (BuildContext ctx) {
-          return AlertDialog(
-            title: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(tr('error_occured')),
-                ),
-              ],
-            ),
-            content: Text(subtitle),
-            actions: [
-              TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: Text(tr('ok')))
-            ],
-          );
-        });
-  }
-
-  Future<void> checkMessage(String subtitle, BuildContext context) async {
-    showDialog(
-        barrierDismissible: false,
-        context: context,
-        builder: (BuildContext ctx) {
-          return AlertDialog(
-            content: Text(subtitle),
-            actions: [
-              TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                  },
-                  child: Text(tr('ok')))
-            ],
-          );
-        });
-  }
-
-  Future<void> passwordResetException(
-      String subtitle, BuildContext context) async {
-    showDialog(
-        context: context,
-        builder: (BuildContext ctx) {
-          return AlertDialog(
-            title: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(tr('error_occured')),
-                ),
-              ],
-            ),
-            content: Text(subtitle),
-            actions: [
-              TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: Text(tr('ok')))
-            ],
-          );
-        });
+          ),
+        );
+      },
+    );
   }
 
   static void showErrorScaffoldMessengerMediaLoad(

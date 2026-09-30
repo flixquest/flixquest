@@ -4,15 +4,16 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:provider/provider.dart';
 
-import '../../constants/api_constants.dart';
 import '../../constants/app_constants.dart';
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
 import '../../functions/function.dart';
+import '../../mobile/widgets/details_header.dart';
+import '../../mobile/widgets/media_art.dart';
+import '../../mobile/widgets/page_kit.dart';
 import '../../models/custom_exceptions.dart';
-import '../../provider/app_dependency_provider.dart';
-import '../../provider/settings_provider.dart';
-import '../../ui_components/app_ui_components.dart';
 
 /// The route a link lands on while the record behind it is fetched.
 ///
@@ -91,68 +92,99 @@ class _DeepLinkLoaderState extends State<DeepLinkLoader> {
   Widget build(BuildContext context) {
     final page = _page;
     if (page != null) return page;
-    // The failure state is drawn in theme colours, so the scrimmed artwork gives way to it rather
-    // than sitting behind it.
-    final artwork = _error == null ? widget.artworkPath : null;
+    final palette = AppPalette.of(context);
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: palette.page,
+        appBar: AppBar(
+          backgroundColor: palette.page,
+          surfaceTintColor: Colors.transparent,
+          foregroundColor: palette.foreground,
+        ),
+        body: _failure(context),
+      );
+    }
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (artwork != null) _Artwork(path: artwork),
-          SafeArea(
-            child: Stack(
-              children: [
-                Align(
-                  alignment: AlignmentDirectional.topStart,
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: IconButton(
-                      tooltip:
-                          MaterialLocalizations.of(context).backButtonTooltip,
-                      onPressed: () => Navigator.maybePop(context),
-                      color: artwork == null ? null : Colors.white,
-                      icon: Icon(PhosphorIcons.caretLeft()),
-                    ),
-                  ),
-                ),
-                _error == null
-                    ? _waiting(context, overArtwork: artwork != null)
-                    : _failure(context),
-              ],
-            ),
-          ),
-        ],
-      ),
+      backgroundColor: palette.page,
+      body: _waiting(context),
     );
   }
 
-  Widget _waiting(BuildContext context, {required bool overArtwork}) {
+  /// The page's shape while the record comes: the link's artwork (or a
+  /// block where it goes), its title, and the lines a details page opens
+  /// with.
+  Widget _waiting(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
     final title = widget.title;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox.square(
-            dimension: 30,
-            child: CircularProgressIndicator(strokeWidth: 2.6),
-          ),
-          if (title != null && title.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontFamily: 'FigtreeSB',
-                      color: overArtwork ? Colors.white : null,
+    final artwork = widget.artworkPath;
+    final width = MediaQuery.sizeOf(context).width;
+    return SkeletonPulse(
+      label: title,
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: width,
+              height: width * 9 / 16,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (artwork != null)
+                    _Artwork(path: artwork)
+                  else
+                    const SkeletonBlock(radius: 0),
+                  PositionedDirectional(
+                    top: MediaQuery.paddingOf(context).top + 8,
+                    start: AppSpace.sm,
+                    child: DetailsRoundButton(
+                      icon: PhosphorIcons.caretLeft(),
+                      tooltip:
+                          MaterialLocalizations.of(context).backButtonTooltip,
+                      onArtwork: true,
+                      onPressed: () => Navigator.maybePop(context),
                     ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (title != null && title.isNotEmpty)
+                    ExcludeSemantics(
+                      child: Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppType.scaled(context, AppType.heroTitle)
+                            .copyWith(color: palette.foreground),
+                      ),
+                    )
+                  else
+                    const SkeletonBlock.line(width: 220, height: 30),
+                  const SizedBox(height: AppSpace.md),
+                  const SkeletonBlock.line(width: 150),
+                  const SizedBox(height: AppSpace.lg),
+                  const SkeletonBlock(height: 48, radius: AppRadii.button),
+                  const SizedBox(height: AppSpace.lg),
+                  const SkeletonBlock.line(height: 13),
+                  const SizedBox(height: AppSpace.sm),
+                  const SkeletonBlock.line(height: 13),
+                  const SizedBox(height: AppSpace.sm),
+                  const FractionallySizedBox(
+                    widthFactor: .6,
+                    child: SkeletonBlock.line(height: 13),
+                  ),
+                ],
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -161,22 +193,19 @@ class _DeepLinkLoaderState extends State<DeepLinkLoader> {
   /// offers no retry. Everything else is the connection, which may well come back.
   Widget _failure(BuildContext context) {
     final missing = _error is NotFoundException;
-    return AppEmptyState(
+    return EmptyState(
       icon: missing ? PhosphorIcons.filmSlate() : PhosphorIcons.cloudSlash(),
       title: missing ? tr('link_unavailable') : tr('error_occured'),
       message: missing ? tr('link_unavailable_message') : tr('check_connection'),
-      action: missing
-          ? null
-          : FilledButton.icon(
-              onPressed: _retry,
-              icon: Icon(PhosphorIcons.arrowClockwise()),
-              label: Text(tr('retry')),
-            ),
+      actionLabel: missing ? null : tr('retry'),
+      actionIcon: PhosphorIcons.arrowClockwise(),
+      onAction: missing ? null : _retry,
     );
   }
 }
 
-/// The artwork the link arrived with, dimmed so the wait reads as the page arriving.
+/// The artwork the link arrived with, fading into the page as a details
+/// page's backdrop does.
 class _Artwork extends StatelessWidget {
   const _Artwork({required this.path});
 
@@ -184,34 +213,42 @@ class _Artwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = Provider.of<SettingsProvider>(context);
-    final dependencies = Provider.of<AppDependencyProvider>(context);
-    final base = buildImageUrl(
-      TMDB_BASE_IMAGE_URL,
-      dependencies.tmdbProxy,
-      settings.enableProxy,
-      context,
-    );
+    final palette = AppPalette.of(context);
+    final url = tmdbImageUrl(context, path, size: 'w780/');
     return Stack(
       fit: StackFit.expand,
       children: [
-        CachedNetworkImage(
-          cacheManager: cacheProp(),
-          imageUrl: '${base}w780$path',
-          fit: BoxFit.cover,
-          alignment: Alignment.topCenter,
-          placeholder: (_, __) => const SizedBox.shrink(),
-          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+        if (url != null)
+          CachedNetworkImage(
+            cacheManager: cacheProp(),
+            imageUrl: url,
+            fit: BoxFit.cover,
+            alignment: Alignment.topCenter,
+            placeholder: (_, __) => const SkeletonBlock(radius: 0),
+            errorWidget: (_, __, ___) => const ArtPlaceholder(),
+          ),
+        const Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 120,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0x8C000000), Color(0x00000000)],
+              ),
+            ),
+          ),
         ),
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              begin: Alignment.topCenter,
+              begin: const Alignment(0, 0.25),
               end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withValues(alpha: .45),
-                Colors.black.withValues(alpha: .75),
-              ],
+              stops: const [0, .94, 1],
+              colors: [palette.scrim(0), palette.page, palette.page],
             ),
           ),
         ),

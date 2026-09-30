@@ -21,6 +21,17 @@ class BannerAd {
   final double aspectRatio;
   final List<String> placements;
 
+  /// Whether the backend targets this ad at [placement].
+  ///
+  /// Phones and tablets match an explicit placement, or every placement when
+  /// the ad lists none. Android TV only matches its own `<placement>_tv` name
+  /// (the tag Start.io uses there), so a phone announcement never lands on a
+  /// television by accident.
+  bool appliesTo(String placement, {bool television = false}) {
+    if (television) return placements.contains('${placement}_tv');
+    return placements.isEmpty || placements.contains(placement);
+  }
+
   factory BannerAd.fromJson(Map<String, dynamic> json) {
     return BannerAd(
       key: json['key']?.toString() ?? json['id']?.toString() ?? '',
@@ -36,6 +47,27 @@ class BannerAd {
               .whereType<String>()
               .toList(growable: false)
           : const [],
+    );
+  }
+}
+
+/// How the hosted (`/ads`) banner shares a slot with the Start.io banner.
+enum HostedBannerMode {
+  /// Hosted banners never show.
+  off,
+
+  /// The hosted banner sits above the Start.io banner in the same slot.
+  stack,
+
+  /// A live hosted banner takes the slot from Start.io; slots with no hosted
+  /// ad keep their Start.io banner.
+  priority;
+
+  static HostedBannerMode parse(String raw) {
+    final value = raw.trim().toLowerCase();
+    return HostedBannerMode.values.firstWhere(
+      (mode) => mode.name == value,
+      orElse: () => HostedBannerMode.stack,
     );
   }
 }

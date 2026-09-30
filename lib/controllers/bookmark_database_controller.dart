@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
+import '../models/genre_ids.dart';
 import '../models/movie.dart';
 import '../models/tv.dart';
 
@@ -20,7 +21,8 @@ class MovieDatabaseController {
   String colVideo = 'video';
   String colVoteAverage = 'vote_average';
   String colVoteCount = 'vote_count';
-  // String colGenre = 'genre';
+  // Added in version 2; "28,12", null for rows saved before it.
+  String colGenreIds = 'genre_ids';
   String colPosterPath = 'poster_path';
   String colDateAdded = 'date_added';
   MovieDatabaseController._createInstance();
@@ -33,7 +35,12 @@ class MovieDatabaseController {
     Directory directory = await getApplicationDocumentsDirectory();
     String path = '${directory.path}movies.db';
     var bookmarkDatabase =
-        await openDatabase(path, version: 1, onCreate: _createDb);
+        await openDatabase(
+      path,
+      version: 2,
+      onCreate: _createDb,
+      onUpgrade: _upgradeDb,
+    );
     return bookmarkDatabase;
   }
 
@@ -44,7 +51,28 @@ class MovieDatabaseController {
 
   void _createDb(Database db, int newVersion) async {
     await db.execute(
-        'CREATE TABLE $tableName($colId INTEGER PRIMARY KEY, $colTitle TEXT, $colOriginalTitle TEXT, $colOriginalLanguage TEXT, $colOverview TEXT, $colReleaseDate TEXT, $colPopularity NUMERIC, $colBackdropPath TEXT, $colVoteAverage REAL, $colVoteCount INTEGER, $colPosterPath TEXT, $colDateAdded TEXT)');
+        'CREATE TABLE $tableName($colId INTEGER PRIMARY KEY, $colTitle TEXT, $colOriginalTitle TEXT, $colOriginalLanguage TEXT, $colOverview TEXT, $colReleaseDate TEXT, $colPopularity NUMERIC, $colBackdropPath TEXT, $colVoteAverage REAL, $colVoteCount INTEGER, $colPosterPath TEXT, $colDateAdded TEXT, $colGenreIds TEXT)');
+  }
+
+  // Version 2 keeps each title's genres; earlier rows simply have none.
+  Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE $tableName ADD COLUMN $colGenreIds TEXT');
+    }
+  }
+
+  /// Fills in [id]'s genres if the row has none yet, as when an older
+  /// bookmark is seen again with them.
+  Future<void> backfillGenreIds(int id, List<int>? genreIds) async {
+    final encoded = encodeGenreIds(genreIds);
+    if (encoded == null) return;
+    final db = await database;
+    await db.update(
+      tableName,
+      <String, Object?>{colGenreIds: encoded},
+      where: '$colId = ? AND ($colGenreIds IS NULL OR $colGenreIds = \'\')',
+      whereArgs: <Object?>[id],
+    );
   }
 
   //this function will return all the movies in the database.
@@ -57,7 +85,13 @@ class MovieDatabaseController {
   // this method will be used to insert movies in the database.
   Future<int> insertMovie(Movie movie) async {
     Database db = await database;
-    var result = await db.insert(tableName, movie.toMap());
+    // A bookmark may already have been saved by another screen or cloud sync.
+    // Keep its original date_added when the same movie is saved again.
+    var result = await db.insert(
+      tableName,
+      movie.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
     return result;
   }
 
@@ -127,7 +161,8 @@ class TVDatabaseController {
   String colFirstAirDate = 'first_air_date';
   String colVoteAverage = 'vote_average';
   String colVoteCount = 'vote_count';
-  // String colGenre = 'genre';
+  // Added in version 2; "28,12", null for rows saved before it.
+  String colGenreIds = 'genre_ids';
   String colPosterPath = 'poster_path';
   String colDateAdded = 'date_added';
   TVDatabaseController._createInstance();
@@ -140,7 +175,12 @@ class TVDatabaseController {
     Directory directory = await getApplicationDocumentsDirectory();
     String path = '${directory.path}tv.db';
     var notesDatabase =
-        await openDatabase(path, version: 1, onCreate: _createDb);
+        await openDatabase(
+      path,
+      version: 2,
+      onCreate: _createDb,
+      onUpgrade: _upgradeDb,
+    );
     return notesDatabase;
   }
 
@@ -151,7 +191,28 @@ class TVDatabaseController {
 
   void _createDb(Database db, int newVersion) async {
     await db.execute(
-        'CREATE TABLE $tableName($colId INTEGER PRIMARY KEY, $colTitle TEXT, $colOriginalTitle TEXT, $colOriginalLanguage TEXT, $colOverview TEXT, $colFirstAirDate TEXT, $colPopularity NUMERIC, $colBackdropPath TEXT, $colVoteAverage REAL, $colVoteCount INTEGER, $colPosterPath TEXT, $colDateAdded TEXT)');
+        'CREATE TABLE $tableName($colId INTEGER PRIMARY KEY, $colTitle TEXT, $colOriginalTitle TEXT, $colOriginalLanguage TEXT, $colOverview TEXT, $colFirstAirDate TEXT, $colPopularity NUMERIC, $colBackdropPath TEXT, $colVoteAverage REAL, $colVoteCount INTEGER, $colPosterPath TEXT, $colDateAdded TEXT, $colGenreIds TEXT)');
+  }
+
+  // Version 2 keeps each title's genres; earlier rows simply have none.
+  Future<void> _upgradeDb(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE $tableName ADD COLUMN $colGenreIds TEXT');
+    }
+  }
+
+  /// Fills in [id]'s genres if the row has none yet, as when an older
+  /// bookmark is seen again with them.
+  Future<void> backfillGenreIds(int id, List<int>? genreIds) async {
+    final encoded = encodeGenreIds(genreIds);
+    if (encoded == null) return;
+    final db = await database;
+    await db.update(
+      tableName,
+      <String, Object?>{colGenreIds: encoded},
+      where: '$colId = ? AND ($colGenreIds IS NULL OR $colGenreIds = \'\')',
+      whereArgs: <Object?>[id],
+    );
   }
 
   //this function will return all the tv in the database.
@@ -164,7 +225,13 @@ class TVDatabaseController {
   // this method will be used to insert tv in the database.
   Future<int> insertTV(TV tv) async {
     Database db = await database;
-    var result = await db.insert(tableName, tv.toMap());
+    // A bookmark may already have been saved by another screen or cloud sync.
+    // Keep its original date_added when the same show is saved again.
+    var result = await db.insert(
+      tableName,
+      tv.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
     return result;
   }
 

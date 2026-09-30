@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:math' as math;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,19 +8,21 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
-import '../../constants/api_constants.dart';
-import '../../constants/app_constants.dart';
 import '../../controllers/bookmark_database_controller.dart';
-import '../../functions/function.dart';
 import '../../models/movie.dart';
 import '../../models/tv.dart';
-import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/bookmark_sync_service.dart';
 import '../../services/globle_method.dart';
 import '../../services/recently_watched_sync_service.dart';
-import '../../ui_components/app_ui_components.dart';
-import '../../widgets/common_widgets.dart';
+import '../../catalog/media_item.dart';
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
+import '../../mobile/widgets/details_parts.dart';
+import '../../mobile/widgets/page_kit.dart';
+import '../../mobile/widgets/pill_button.dart';
+import '../../mobile/widgets/poster_card.dart';
 import '../movie/movie_detail.dart';
 import '../tv/tv_detail.dart';
 import '../user/login_screen.dart';
@@ -37,6 +40,8 @@ class _SyncScreenState extends State<SyncScreen>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final MovieDatabaseController _movieDb = MovieDatabaseController();
   final TVDatabaseController _tvDb = TVDatabaseController();
+
+  static const _contentWidth = 760.0;
 
   late final TabController _tabController;
 
@@ -280,616 +285,332 @@ class _SyncScreenState extends State<SyncScreen>
   }
 
   String _formatLastSynced(DateTime? timestamp) {
-    if (timestamp == null) return 'Never';
+    if (timestamp == null) return tr('never');
     final diff = DateTime.now().difference(timestamp);
-    if (diff.inSeconds < 45) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
+    String ago(String key, int n) =>
+        tr(key, namedArgs: <String, String>{'n': '$n'});
+    if (diff.inSeconds < 45) return tr('just_now');
+    if (diff.inMinutes < 60) return ago('n_minutes_ago', diff.inMinutes);
+    if (diff.inHours < 24) return ago('n_hours_ago', diff.inHours);
+    return ago('n_days_ago', diff.inDays);
   }
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
     final user = _auth.currentUser;
     final isSignedIn = user != null && !user.isAnonymous;
-
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(PhosphorIcons.caretLeft()),
+      backgroundColor: palette.page,
+      appBar: PageAppBar(title: tr('sync')),
+      body: !isSignedIn
+          ? EmptyState(
+              icon: PhosphorIcons.cloudSlash(),
+              title: tr('auto_sync_off'),
+              message: tr('bookmark_feature_notice'),
+              actionLabel: tr('login_signup'),
+              actionIcon: PhosphorIcons.signIn(),
+              onAction: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              ).then((_) => _fetchData()),
+            )
+          : AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, _) => CustomScrollView(
+                slivers: [
+                  SliverReadableWidth(
+                    maxWidth: _contentWidth,
+                    slivers: [
+                      SliverToBoxAdapter(child: _buildStatus(context, user)),
+                      SliverToBoxAdapter(child: _buildMetricsOverview(context)),
+                      SliverToBoxAdapter(child: _buildKindSwitch(context)),
+                      ..._buildTitles(
+                        context,
+                        series: _tabController.index == 1,
+                      ),
+                      SliverToBoxAdapter(
+                        child: SizedBox(
+                          height: AppSpace.xxxl +
+                              MediaQuery.paddingOf(context).bottom,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  /// Whether sync is on, when it last ran, and Sync now.
+  Widget _buildStatus(BuildContext context, User user) {
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(gutter, AppSpace.xs, gutter, 0),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpace.lg),
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: BorderRadius.circular(AppRadii.hero),
         ),
-        title: Text(tr('sync')),
-        actions: [
-          ValueListenableBuilder<SyncStatus>(
+        child: ValueListenableBuilder<DateTime?>(
+          valueListenable: BookmarkSyncService.instance.lastSyncedNotifier,
+          builder: (context, lastSynced, _) =>
+              ValueListenableBuilder<SyncStatus>(
             valueListenable: BookmarkSyncService.instance.statusNotifier,
             builder: (context, status, _) {
-              final isSyncing =
-                  status == SyncStatus.syncing || _isActionRunning;
-              return IconButton(
-                tooltip: tr('sync'),
-                onPressed: isSignedIn && !isSyncing ? _runFullSync : null,
-                icon: isSyncing
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(PhosphorIcons.arrowsClockwise()),
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: SafeArea(
-        bottom: false,
-        child: !isSignedIn
-            ? SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: AppResponsiveContent(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: AppUI.pagePadding(context),
-                    vertical: 16,
-                  ),
-                  child: _buildAutoSyncBanner(context, false, user),
-                ),
-              )
-            : NestedScrollView(
-                physics: const BouncingScrollPhysics(),
-                headerSliverBuilder: (context, innerBoxIsScrolled) {
-                  return [
-                    SliverToBoxAdapter(
-                      child: AppResponsiveContent(
-                        padding: EdgeInsets.fromLTRB(
-                          AppUI.pagePadding(context),
-                          16,
-                          AppUI.pagePadding(context),
-                          14,
+              final syncing = status == SyncStatus.syncing || _isActionRunning;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: palette.idleFill,
+                          shape: BoxShape.circle,
                         ),
+                        child: Icon(
+                          PhosphorIcons.cloudCheck(),
+                          color: palette.foreground,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpace.md),
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildAutoSyncBanner(context, true, user),
-                            const SizedBox(height: 14),
-                            _buildMetricsOverview(context),
+                            Text(
+                              tr('auto_sync_on'),
+                              style: AppType.cardTitle.copyWith(
+                                fontSize: 16,
+                                color: palette.foreground,
+                              ),
+                            ),
+                            Text(
+                              user.email ?? user.uid,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppType.metadata.copyWith(
+                                fontSize: 13,
+                                color: palette.mutedText,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ),
-                    SliverPersistentHeader(
-                      pinned: true,
-                      delegate: _SegmentedTabsHeaderDelegate(
-                        controller: _tabController,
-                        tabs: [
-                          AppSegmentedTab(
-                            label: tr('movies'),
-                            icon: PhosphorIcons.filmStrip(),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpace.md),
+                  Text(
+                    tr('auto_sync_description'),
+                    style: AppType.body.copyWith(color: palette.mutedText),
+                  ),
+                  const SizedBox(height: AppSpace.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          tr('last_synced_at', namedArgs: <String, String>{
+                            'time': _formatLastSynced(lastSynced),
+                          }),
+                          style: AppType.metadata.copyWith(
+                            fontSize: 13,
+                            color: palette.mutedText,
                           ),
-                          AppSegmentedTab(
-                            label: tr('tv_series'),
-                            icon: PhosphorIcons.television(),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ];
-                },
-                body: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildMoviesTab(context),
-                    _buildTvTab(context),
-                  ],
-                ),
-              ),
+                      PillButton(
+                        busy: syncing,
+                        icon: PhosphorIcons.arrowsClockwise(),
+                        label: tr('sync_now'),
+                        onPressed: _runFullSync,
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildAutoSyncBanner(
-    BuildContext context,
-    bool isSignedIn,
-    User? user,
-  ) {
-    final colors = Theme.of(context).colorScheme;
+  Widget _buildMetricsOverview(BuildContext context) {
+    final gutter = AppSpace.gutter(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(gutter, AppSpace.md, gutter, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: _MetricTile(
+              label: tr('movies'),
+              cloudCount: _cloudMovies.length,
+              localCount: _localMovieCount,
+              icon: PhosphorIcons.filmStrip(),
+            ),
+          ),
+          const SizedBox(width: AppSpace.md),
+          Expanded(
+            child: _MetricTile(
+              label: tr('tv_series'),
+              cloudCount: _cloudTvShows.length,
+              localCount: _localTvCount,
+              icon: PhosphorIcons.television(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    if (!isSignedIn) {
-      return Card(
-        margin: EdgeInsets.zero,
-        color: colors.errorContainer.withValues(alpha: .35),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: colors.error.withValues(alpha: .3)),
+  Widget _buildKindSwitch(BuildContext context) {
+    final gutter = AppSpace.gutter(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(gutter, AppSpace.xxl, gutter, AppSpace.md),
+      child: SegmentSwitch<int>(
+        segments: [
+          Segment(0, tr('movies'), icon: PhosphorIcons.filmStrip()),
+          Segment(1, tr('tv_series'), icon: PhosphorIcons.television()),
+        ],
+        selected: _tabController.index,
+        onChanged: (index) => _tabController.animateTo(index),
+      ),
+    );
+  }
+
+  /// The saved titles of one kind as a poster grid, each with a button to
+  /// take it off the cloud, then the two ways to sync them.
+  List<Widget> _buildTitles(BuildContext context, {required bool series}) {
+    final gutter = AppSpace.gutter(context);
+    const spacing = 10.0;
+    final content = math.min(MediaQuery.sizeOf(context).width, _contentWidth);
+    final columns = content >= AppBreakpoints.tablet ? 4 : 3;
+    final width = (content - gutter * 2 - spacing * (columns - 1)) / columns;
+    final actions = SliverPadding(
+      padding: EdgeInsets.fromLTRB(gutter, AppSpace.lg, gutter, 0),
+      sliver: SliverToBoxAdapter(
+        child: Row(
+          children: [
+            Expanded(
+              child: PillButton(
+                icon: PhosphorIcons.cloudArrowDown(),
+                label: tr(series ? 'offline_tv_sync' : 'offline_movie_sync'),
+                onPressed: _isActionRunning ? null : _pullCloudToLocal,
+              ),
+            ),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(
+              child: PillButton(
+                primary: true,
+                busy: _isActionRunning,
+                icon: PhosphorIcons.cloudArrowUp(),
+                label: tr(series ? 'online_tv_sync' : 'online_movie_sync'),
+                onPressed: _pushLocalToCloud,
+              ),
+            ),
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      ),
+    );
+    if (_isLoading) {
+      return [
+        SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: gutter),
+          sliver: SliverToBoxAdapter(
+            child: SkeletonPulse(
+              child: Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: colors.error.withValues(alpha: .15),
-                      shape: BoxShape.circle,
+                  for (var i = 0; i < 6; i++)
+                    SkeletonBlock(
+                      width: width,
+                      height: width / PosterCard.aspectRatio,
                     ),
-                    child: Icon(
-                      PhosphorIcons.cloudSlash(),
-                      color: colors.error,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Auto-Sync Unavailable',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontFamily: 'FigtreeSB'),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Signed-out mode',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: colors.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                tr('bookmark_feature_notice'),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
+            ),
+          ),
+        ),
+      ];
+    }
+    final items = series
+        ? _cloudTvShows.map(MediaItem.fromSeries).toList()
+        : _cloudMovies.map(MediaItem.fromMovie).toList();
+    if (items.isEmpty) {
+      return [
+        SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: gutter),
+          sliver: SliverToBoxAdapter(
+            child: DetailsMessage(
+              message: tr(series ? 'no_tv_online' : 'no_movies_online'),
+            ),
+          ),
+        ),
+        actions,
+      ];
+    }
+    return [
+      SliverPadding(
+        padding: EdgeInsets.symmetric(horizontal: gutter),
+        sliver: SliverGrid.builder(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisSpacing: spacing,
+            crossAxisSpacing: spacing,
+            childAspectRatio: PosterCard.aspectRatio,
+          ),
+          itemCount: items.length,
+          itemBuilder: (context, index) => Stack(
+            children: [
+              PosterCard(
+                item: items[index],
+                width: width,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => series
+                        ? TVDetailPage(
+                            tvSeries: _cloudTvShows[index],
+                            heroId: 'sync_tv_${items[index].id}',
+                          )
+                        : MovieDetailPage(
+                            movie: _cloudMovies[index],
+                            heroId: 'sync_movie_${items[index].id}',
+                          ),
+                  ),
+                ).then((_) => _fetchData()),
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const LoginScreen(),
-                      ),
-                    ).then((_) => _fetchData());
-                  },
-                  icon: Icon(PhosphorIcons.signIn(), size: 18),
-                  label: Text(tr('account')),
+              PositionedDirectional(
+                top: 4,
+                end: 4,
+                child: Material(
+                  color: const Color(0x8C000000),
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    tooltip: tr('remove_from_cloud'),
+                    visualDensity: VisualDensity.compact,
+                    color: const Color(0xFFFFFFFF),
+                    onPressed: () => series
+                        ? _deleteTvFromCloud(index)
+                        : _deleteMovieFromCloud(index),
+                    icon: Icon(PhosphorIcons.trash(), size: 16),
+                  ),
                 ),
               ),
             ],
           ),
         ),
-      );
-    }
-
-    return ValueListenableBuilder<DateTime?>(
-      valueListenable: BookmarkSyncService.instance.lastSyncedNotifier,
-      builder: (context, lastSynced, _) {
-        return ValueListenableBuilder<SyncStatus>(
-          valueListenable: BookmarkSyncService.instance.statusNotifier,
-          builder: (context, status, _) {
-            final isSyncing = status == SyncStatus.syncing || _isActionRunning;
-
-            return Card(
-              margin: EdgeInsets.zero,
-              color: colors.primaryContainer.withValues(alpha: .45),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: colors.primary.withValues(alpha: .35),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: colors.primary.withValues(alpha: .18),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            PhosphorIcons.cloudCheck(
-                              PhosphorIconsStyle.fill,
-                            ),
-                            color: colors.primary,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    'Auto-Sync Active',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          fontFamily: 'FigtreeSB',
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          colors.primary.withValues(alpha: .2),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      'LIVE',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontFamily: 'FigtreeSB',
-                                        fontWeight: FontWeight.bold,
-                                        color: colors.primary,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                user?.email ?? user?.uid ?? 'Account Active',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Your movie and TV show bookmarks automatically synchronize across all signed-in devices when changed.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                            height: 1.35,
-                          ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              PhosphorIcons.clock(),
-                              size: 14,
-                              color: colors.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Last synced: ${_formatLastSynced(lastSynced)}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(
-                                    color: colors.onSurfaceVariant,
-                                  ),
-                            ),
-                          ],
-                        ),
-                        FilledButton.icon(
-                          onPressed: isSyncing ? null : _runFullSync,
-                          icon: isSyncing
-                              ? const SizedBox.square(
-                                  dimension: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Icon(PhosphorIcons.arrowsClockwise(), size: 15),
-                          label: Text(
-                            isSyncing ? tr('sync') : 'Sync Now',
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildMetricsOverview(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _MetricTile(
-            label: tr('movies'),
-            cloudCount: _cloudMovies.length,
-            localCount: _localMovieCount,
-            icon: PhosphorIcons.filmStrip(),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _MetricTile(
-            label: tr('tv_series'),
-            cloudCount: _cloudTvShows.length,
-            localCount: _localTvCount,
-            icon: PhosphorIcons.television(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMoviesTab(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_cloudMovies.isEmpty) {
-      return AppEmptyState(
-        icon: PhosphorIcons.filmStrip(),
-        title: tr('no_movies_online'),
-        message: tr('online_movie_sync'),
-        action: ElevatedButton.icon(
-          onPressed: _pushLocalToCloud,
-          icon: Icon(PhosphorIcons.cloudArrowUp()),
-          label: Text(tr('online_movie_sync')),
-        ),
-      );
-    }
-
-    final proxy = Provider.of<AppDependencyProvider>(context).tmdbProxy;
-
-    return AppResponsiveContent(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppUI.pagePadding(context),
       ),
-      child: Column(
-        children: [
-          Expanded(
-            child: GridView.builder(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.only(top: 12, bottom: 12),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: AppUI.mediaGridColumns(context),
-                childAspectRatio: AppUI.mediaGridChildAspectRatio(context),
-                crossAxisSpacing: AppUI.mediaGridCrossAxisSpacing,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: _cloudMovies.length,
-              itemBuilder: (context, index) {
-                final movie = _cloudMovies[index];
-                return _CloudMediaGridCard(
-                  title: movie.title ?? tr('not_available'),
-                  posterPath: movie.posterPath,
-                  rating: movie.voteAverage?.toDouble(),
-                  proxyUrl: proxy,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => MovieDetailPage(
-                          movie: movie,
-                          heroId: 'sync_movie_${movie.id}',
-                        ),
-                      ),
-                    ).then((_) => _fetchData());
-                  },
-                  onDelete: () => _deleteMovieFromCloud(index),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _isActionRunning ? null : _pullCloudToLocal,
-                    icon: Icon(PhosphorIcons.cloudArrowDown(), size: 18),
-                    label: Text(
-                      tr('offline_movie_sync'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _isActionRunning ? null : _pushLocalToCloud,
-                    icon: Icon(PhosphorIcons.cloudArrowUp(), size: 18),
-                    label: Text(
-                      tr('online_movie_sync'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTvTab(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_cloudTvShows.isEmpty) {
-      return AppEmptyState(
-        icon: PhosphorIcons.television(),
-        title: tr('no_tv_online'),
-        message: tr('online_tv_sync'),
-        action: ElevatedButton.icon(
-          onPressed: _pushLocalToCloud,
-          icon: Icon(PhosphorIcons.cloudArrowUp()),
-          label: Text(tr('online_tv_sync')),
-        ),
-      );
-    }
-
-    final proxy = Provider.of<AppDependencyProvider>(context).tmdbProxy;
-
-    return AppResponsiveContent(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppUI.pagePadding(context),
-      ),
-      child: Column(
-        children: [
-          Expanded(
-            child: GridView.builder(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.only(top: 12, bottom: 12),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: AppUI.mediaGridColumns(context),
-                childAspectRatio: AppUI.mediaGridChildAspectRatio(context),
-                crossAxisSpacing: AppUI.mediaGridCrossAxisSpacing,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: _cloudTvShows.length,
-              itemBuilder: (context, index) {
-                final tv = _cloudTvShows[index];
-                return _CloudMediaGridCard(
-                  title: tv.name ?? tr('not_available'),
-                  posterPath: tv.posterPath,
-                  rating: tv.voteAverage?.toDouble(),
-                  proxyUrl: proxy,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => TVDetailPage(
-                          tvSeries: tv,
-                          heroId: 'sync_tv_${tv.id}',
-                        ),
-                      ),
-                    ).then((_) => _fetchData());
-                  },
-                  onDelete: () => _deleteTvFromCloud(index),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _isActionRunning ? null : _pullCloudToLocal,
-                    icon: Icon(PhosphorIcons.cloudArrowDown(), size: 18),
-                    label: Text(
-                      tr('offline_tv_sync'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _isActionRunning ? null : _pushLocalToCloud,
-                    icon: Icon(PhosphorIcons.cloudArrowUp(), size: 18),
-                    label: Text(
-                      tr('online_tv_sync'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SegmentedTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
-  _SegmentedTabsHeaderDelegate({
-    required this.controller,
-    required this.tabs,
-  });
-
-  final TabController controller;
-  final List<AppSegmentedTab> tabs;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      alignment: Alignment.center,
-      child: AppResponsiveContent(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppUI.pagePadding(context),
-        ),
-        child: AppSegmentedTabs(
-          controller: controller,
-          tabs: tabs,
-        ),
-      ),
-    );
-  }
-
-  @override
-  double get maxExtent => 54.0;
-
-  @override
-  double get minExtent => 54.0;
-
-  @override
-  bool shouldRebuild(covariant _SegmentedTabsHeaderDelegate oldDelegate) {
-    return oldDelegate.controller != controller || oldDelegate.tabs != tabs;
+      actions,
+    ];
   }
 }
 
@@ -908,181 +629,52 @@ class _MetricTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
+    final palette = AppPalette.of(context);
+    Widget count(int value, String label) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$value',
+              style: AppType.sectionHeader.copyWith(
+                fontFamily: AppType.bold,
+                color: palette.foreground,
+              ),
+            ),
+            Text(
+              label,
+              style: AppType.metadata.copyWith(color: palette.mutedText),
+            ),
+          ],
+        );
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(AppSpace.lg),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHigh.withValues(alpha: .75),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: .4),
-        ),
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 18, color: colors.primary),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontFamily: 'FigtreeSB',
-                    ),
+              Icon(icon, size: 18, color: palette.mutedText),
+              const SizedBox(width: AppSpace.sm),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppType.cardTitle.copyWith(color: palette.foreground),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpace.md),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$cloudCount',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontFamily: 'FigtreeSB',
-                          fontWeight: FontWeight.bold,
-                          color: colors.primary,
-                        ),
-                  ),
-                  Text(
-                    'Cloud',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                  ),
-                ],
-              ),
-              Container(
-                height: 24,
-                width: 1,
-                color: colors.outlineVariant.withValues(alpha: .5),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$localCount',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontFamily: 'FigtreeSB',
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  Text(
-                    'Local',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                  ),
-                ],
-              ),
+              Expanded(child: count(cloudCount, tr('cloud'))),
+              Expanded(child: count(localCount, tr('on_this_device'))),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CloudMediaGridCard extends StatelessWidget {
-  const _CloudMediaGridCard({
-    required this.title,
-    required this.posterPath,
-    required this.rating,
-    required this.proxyUrl,
-    required this.onTap,
-    required this.onDelete,
-  });
-
-  final String title;
-  final String? posterPath;
-  final double? rating;
-  final String proxyUrl;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final settings = Provider.of<SettingsProvider>(context);
-    final imageUrl = posterPath == null
-        ? ''
-        : buildImageUrl(
-                TMDB_BASE_IMAGE_URL, proxyUrl, settings.enableProxy, context) +
-            settings.imageQuality +
-            posterPath!;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppUI.cardRadius),
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AspectRatio(
-            aspectRatio: AppUI.posterAspectRatio,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppUI.cardRadius),
-                    child: posterPath == null
-                        ? Image.asset(
-                            'assets/images/na_logo.png',
-                            fit: BoxFit.cover,
-                          )
-                        : CachedNetworkImage(
-                            cacheManager: cacheProp(),
-                            imageUrl: imageUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) =>
-                                scrollingImageShimmer(settings.appTheme),
-                            errorWidget: (_, __, ___) => Image.asset(
-                              'assets/images/na_logo.png',
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                  ),
-                ),
-                Positioned(
-                  top: 6,
-                  left: 6,
-                  right: 6,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      AppRatingBadge(rating: rating, compact: true),
-                      SizedBox.square(
-                        dimension: 28,
-                        child: IconButton.filledTonal(
-                          padding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
-                          tooltip: tr('delete'),
-                          onPressed: onDelete,
-                          icon: Icon(PhosphorIcons.trash(), size: 15),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppUI.mediaGridTitleGap),
-          SizedBox(
-            width: double.infinity,
-            height: AppUI.mediaGridTitleHeight,
-            child: Text(
-              title,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontFamily: 'FigtreeSB',
-                  ),
-            ),
           ),
         ],
       ),

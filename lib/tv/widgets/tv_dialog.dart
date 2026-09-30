@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../focus/tv_focusable.dart';
+import '../app/tv_design.dart';
+import 'tv_pill_button.dart';
 import '../focus/tv_keymap.dart';
 
 class TvDialogAction {
@@ -126,14 +127,19 @@ class _TvDialogState extends State<TvDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final palette = TvPalette.of(context);
     final hasExplicitAutofocus =
         widget.actions.any((action) => action.autofocus);
 
     return Dialog(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: palette.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 28),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 24,
+      shadowColor: Colors.black.withValues(alpha: 0.54),
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: palette.hairline),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720),
         child: FocusScope(
@@ -152,16 +158,17 @@ class _TvDialogState extends State<TvDialog> {
                     Text(
                       widget.title,
                       style: TextStyle(
-                        color: colorScheme.onSurface,
-                        fontFamily: 'FigtreeSB',
+                        color: palette.foreground,
+                        fontFamily: 'FigtreeBold',
                         fontSize: 32,
                         fontWeight: FontWeight.w700,
+                        letterSpacing: -0.45,
                       ),
                     ),
                     const SizedBox(height: 18),
                     DefaultTextStyle(
                       style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
+                        color: palette.mutedText,
                         fontFamily: 'Figtree',
                         fontSize: 22,
                         height: 1.35,
@@ -181,37 +188,16 @@ class _TvDialogState extends State<TvDialog> {
                             Builder(
                               builder: (context) {
                                 final action = widget.actions[index];
-                                return TvFocusable(
-                                  semanticLabel: action.label,
+                                return TvPillButton(
+                                  label: action.label,
                                   focusNode: _actionFocusNodes[index],
                                   autofocus: action.autofocus ||
                                       (widget.autofocusFirstAction &&
                                           !hasExplicitAutofocus &&
                                           index == 0),
+                                  prominent: action.isPrimary,
+                                  height: 48,
                                   onActivate: action.onPressed,
-                                  focusScale: 1.03,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 26,
-                                      vertical: 15,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: action.isPrimary
-                                          ? colorScheme.primary
-                                          : colorScheme.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      action.label,
-                                      style: TextStyle(
-                                        color: action.isPrimary
-                                            ? colorScheme.onPrimary
-                                            : colorScheme.onSurface,
-                                        fontSize: 21,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
                                 );
                               },
                             ),

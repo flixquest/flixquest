@@ -3,16 +3,18 @@ import 'dart:async';
 import 'package:flixquest/functions/function.dart';
 import 'package:flixquest/functions/network.dart';
 import 'package:flixquest/functions/video_utils.dart';
+import 'package:flixquest/functions/player_route_handoff.dart';
 import 'package:flixquest/models/tv_stream_metadata.dart';
 import 'package:flixquest/models/offline_download.dart';
 import 'package:flixquest/models/provider_video_source.dart';
 import 'package:flixquest/constants/app_constants.dart' show MediaType;
 import 'package:flixquest/models/provider_load_state.dart';
 import 'package:flixquest/services/globle_method.dart';
+import 'package:flixquest/services/start_io_ads_service.dart';
+import 'package:flixquest/widgets/playback_loading_screen.dart';
 import 'package:flixquest/services/stream_size_estimator.dart';
 import 'package:flixquest/video_providers/provider_loader.dart';
 import 'package:flixquest/video_providers/scraper_api.dart';
-import 'package:flixquest/widgets/provider_loading_widget.dart';
 import '../../controllers/recently_watched_database_controller.dart';
 import '../../provider/recently_watched_provider.dart';
 import '../../video_providers/common.dart';
@@ -33,7 +35,6 @@ import '../../screens/common/player.dart';
 import '../../screens/common/download_selection_sheets.dart';
 import '../../screens/common/manual_source_picker.dart';
 import '../../tv/player/tv_player_screen.dart';
-import '../../widgets/hosted_ads_banner.dart';
 
 class TVVideoLoader extends StatefulWidget {
   const TVVideoLoader(
@@ -79,7 +80,17 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
   @override
   void initState() {
     super.initState();
-    loadVideo();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startPlayback());
+  }
+
+  Future<void> _startPlayback() async {
+    // The interstitial runs while the stream resolves, so its time on screen
+    // hides the wait instead of adding to it. [loadVideo] holds the player
+    // back until the ad is gone.
+    if (!widget.download) {
+      unawaited(StartIoAdsService.instance.showPlaybackInterstitial());
+    }
+    await loadVideo();
   }
 
   Future<void> _loadProviders() async {
@@ -110,7 +121,7 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
     });
   }
 
-  void loadVideo() async {
+  Future<void> loadVideo() async {
     try {
       await _loadProviders();
       VideoProvider? selectedDownloadProvider;
@@ -137,8 +148,11 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
           );
         });
       }
-      // Fetch season episodes first
-      await _fetchSeasonEpisodes();
+      // The player's episode list is not needed until it opens, so fetch it
+      // alongside the source race instead of in front of it. Downloads never
+      // open the player.
+      final seasonEpisodesFetch =
+          widget.download ? null : _fetchSeasonEpisodes();
 
       var isBookmarked = await recentlyWatchedEpisodeController
           .contain(widget.metadata.episodeId!);
@@ -163,8 +177,9 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
         widget.metadata.elapsed = 0;
       }
 
-      if (widget.metadata.airDate != null &&
-          !isReleased(widget.metadata.airDate!)) {
+      final isUnreleased = widget.metadata.airDate != null &&
+          !isReleased(widget.metadata.airDate!);
+      if (isUnreleased) {
         GlobalMethods.showScaffoldMessage(
             tr('episode_may_not_be_available'), context);
       }
@@ -189,13 +204,11 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
             Navigator.pop(context);
             return;
           }
-          _markLoadingStatuses(only: picked);
           selection = await _fetchSelection(providers: [picked]);
           if (selection != null || !mounted) break;
         }
       } else {
-        _markLoadingStatuses(only: selectedDownloadProvider);
-        // Start all sources together and use the first playable response.
+        // Race the sources in batches and use the first playable response.
         selection = await _fetchSelection(
           providers: selectedDownloadProvider == null
               ? videoProviders
@@ -205,6 +218,7 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
 
       final firstWorkingProviderCode = selection?.provider.codeName;
       if (selection != null) {
+        _showSelectedProvider(selection.provider);
         final result = selection.result;
         videos = VideoUtils.convertVideoLinksToMap(result.videoLinks!);
         tvVideoLinks = result.videoLinks;
@@ -242,63 +256,57 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
           );
           return;
         }
-        Provider.of<SettingsProvider>(context, listen: false)
-            .analytics
-            .trackTVWatched(
-              tvName: widget.metadata.seriesName,
-              tvId: widget.metadata.tvId,
-              episodeName: widget.metadata.episodeName,
-              seasonNumber: widget.metadata.seasonNumber,
-              episodeNumber: widget.metadata.episodeNumber,
-            );
+        if (!isUnreleased) {
+          Provider.of<SettingsProvider>(context, listen: false)
+              .analytics
+              .trackTVWatched(
+                tvName: widget.metadata.seriesName,
+                tvId: widget.metadata.tvId,
+                episodeName: widget.metadata.episodeName,
+                seasonNumber: widget.metadata.seasonNumber,
+                episodeNumber: widget.metadata.episodeNumber,
+              );
+        }
 
-        final dependencies =
-            Provider.of<AppDependencyProvider>(context, listen: false);
-        await showHostedInterstitialAd(
-          context,
-          loadAds: () => ScraperApi(dependencies.flixquestAPIURL).getAds(),
-        );
+        // Never start playback behind a full-screen ad.
+        await StartIoAdsService.instance.whenFullScreenAdClosed();
+        await seasonEpisodesFetch;
+        if (!mounted) return;
 
         // Navigate to player with provider list for lazy loading
-        Navigator.pushReplacement(
+        handoffLoaderToPlayer<Function>(
           context,
-          MaterialPageRoute(
-            builder: (context) {
-              final player = PlayerOne(
-                mediaType: MediaType.tvShow,
-                sources: reversedVids,
-                subs: subs,
-                colors: [
-                  Theme.of(context).primaryColor,
-                  Theme.of(context).colorScheme.surface
-                ],
-                settings: settings,
-                tvMetadata: widget.metadata,
-                availableProviders:
-                    videoProviders, // Pass provider list for lazy loading
-                currentProviderCode:
-                    firstWorkingProviderCode, // Current provider
-                scraperApiUrl: _scraperApiUrl,
-                videoFormats: videoFormats,
-                videoHeaders: videoHeaders,
-                videoSizeTokens: videoSizeTokens,
-                initialVideoLinks: tvVideoLinks ?? const [],
-                prefetchedProviderResults: selection?.batchResults ?? const {},
-                subtitleStyle:
-                    Provider.of<SettingsProvider>(context).subtitleTextStyle,
-                onEpisodeChange:
-                    (episodeId, episodeNumber, seasonNumber) async {
-                  // This callback is now unused but kept for backwards compatibility
-                  // Episode changes are handled directly in the player
-                },
-                useTvControls: widget.useTvPlayer,
-                onTvPlayerExit: widget.onTvPlayerExit,
-              );
-              return widget.useTvPlayer
-                  ? TvPlayerScreen(child: player)
-                  : player;
-            },
-          ),
+          (context) {
+            final player = PlayerOne(
+              mediaType: MediaType.tvShow,
+              sources: reversedVids,
+              subs: subs,
+              colors: [
+                Theme.of(context).primaryColor,
+                Theme.of(context).colorScheme.surface
+              ],
+              settings: settings,
+              tvMetadata: widget.metadata,
+              availableProviders:
+                  videoProviders, // Pass provider list for lazy loading
+              currentProviderCode: firstWorkingProviderCode, // Current provider
+              scraperApiUrl: _scraperApiUrl,
+              videoFormats: videoFormats,
+              videoHeaders: videoHeaders,
+              videoSizeTokens: videoSizeTokens,
+              initialVideoLinks: tvVideoLinks ?? const [],
+              prefetchedProviderResults: selection?.batchResults ?? const {},
+              subtitleStyle:
+                  Provider.of<SettingsProvider>(context).subtitleTextStyle,
+              onEpisodeChange: (episodeId, episodeNumber, seasonNumber) async {
+                // This callback is now unused but kept for backwards compatibility
+                // Episode changes are handled directly in the player
+              },
+              useTvControls: widget.useTvPlayer,
+              onTvPlayerExit: widget.onTvPlayerExit,
+            );
+            return widget.useTvPlayer ? TvPlayerScreen(child: player) : player;
+          },
         ).then((value) async {
           if (value != null) {
             Function callback = value;
@@ -329,24 +337,15 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
     return currentProviderIndex;
   }
 
-  /// Marks every provider pending, with [only] (when given) as the single
-  /// provider being loaded.
-  void _markLoadingStatuses({VideoProvider? only}) {
+  /// Shows [provider] as the one being played, once the race has chosen it.
+  /// Sources later in its batch may still be answering, and would otherwise
+  /// keep the focus.
+  void _showSelectedProvider(VideoProvider provider) {
     if (!mounted) return;
     setState(() {
-      if (only != null) {
-        currentProviderIndex = videoProviders.indexWhere(
-          (provider) => provider.codeName == only.codeName,
-        );
-      }
-      for (var index = 0; index < providerStates.length; index++) {
-        providerStates[index] = providerStates[index].copyWith(
-          status:
-              only == null || providerStates[index].codeName == only.codeName
-                  ? ProviderStatus.loading
-                  : ProviderStatus.pending,
-        );
-      }
+      currentProviderIndex = videoProviders.indexWhere(
+        (candidate) => candidate.codeName == provider.codeName,
+      );
     });
   }
 
@@ -358,6 +357,19 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
       providers: providers,
       load: (provider) {
         _providerStopwatches[provider.codeName] = Stopwatch()..start();
+        // Only the batch in flight shows as loading; the rest wait their turn.
+        if (mounted) {
+          setState(() {
+            final providerIndex = providerStates.indexWhere(
+              (state) => state.codeName == provider.codeName,
+            );
+            if (providerIndex != -1) {
+              providerStates[providerIndex] = providerStates[providerIndex]
+                  .copyWith(status: ProviderStatus.loading);
+            }
+            currentProviderIndex = _firstLoadingProviderIndex();
+          });
+        }
         debugPrint(
           '[TVVideoLoader] Request provider=${provider.displayName} '
           '(${provider.codeName}), tmdbId=${widget.metadata.tvId}, '
@@ -614,29 +626,23 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment.topCenter,
-            radius: 1.2,
-            colors: [
-              Theme.of(context).colorScheme.primary.withValues(alpha: .12),
-              Theme.of(context).scaffoldBackgroundColor,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              child: ProviderLoadingWidget(
-                providers: providerStates,
-                currentIndex: currentProviderIndex,
-              ),
-            ),
-          ),
-        ),
-      ),
+    final season = widget.metadata.seasonNumber;
+    final episode = widget.metadata.episodeNumber;
+    final contextLine = <String>[
+      if (widget.download) tr('download'),
+      if (season != null && episode != null) 'S$season:E$episode',
+      if (widget.metadata.episodeName?.trim().isNotEmpty == true)
+        widget.metadata.episodeName!.trim(),
+    ].join('  ·  ');
+    return PlaybackLoadingScreen(
+      title: widget.metadata.seriesName?.trim().isNotEmpty == true
+          ? widget.metadata.seriesName!.trim()
+          : widget.metadata.episodeName?.trim() ?? '',
+      subtitle: contextLine,
+      backdropPath: widget.metadata.backdropPath,
+      posterPath: widget.metadata.posterPath,
+      providers: providerStates,
+      currentProviderIndex: currentProviderIndex,
     );
   }
 

@@ -12,7 +12,11 @@ import '/provider/settings_provider.dart';
 import '../../constants/app_constants.dart';
 import '../../models/profile_image_list.dart';
 import '../../services/globle_method.dart';
-import '../../ui_components/app_ui_components.dart';
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
+import '../../mobile/widgets/account_form.dart';
+import '../../mobile/widgets/page_kit.dart';
 
 class ProfileEdit extends StatefulWidget {
   const ProfileEdit({super.key});
@@ -50,6 +54,14 @@ class _ProfileEditState extends State<ProfileEdit> {
   DocumentSnapshot? userDoc;
   final ScrollController _profileScrollController = ScrollController();
 
+  /// Reads a field from [userDoc] without throwing when the document omits it.
+  /// `DocumentSnapshot.get` throws a `StateError` for missing keys, which is
+  /// common for older accounts that never stored `photoUrl`.
+  dynamic _userField(String key) {
+    final data = userDoc?.data();
+    return data is Map ? data[key] : null;
+  }
+
   void getData() async {
     User? user = _auth.currentUser;
     uid = user!.uid;
@@ -64,19 +76,22 @@ class _ProfileEditState extends State<ProfileEdit> {
 
       setState(() {
         userAnonymous = false;
-        name = userDoc!.get('name');
+        name = _userField('name');
         email = user.email;
-        joinedAt = userDoc!.get('joinedAt');
-        month = DateFormat('MMMM')
-            .format(DateTime(0, DateTime.parse(joinedAt!).month));
-        year = DateTime.parse(joinedAt!).year;
-        isVerified = userDoc!.get('verified');
-        profileId = userDoc!.get('profileId');
-        username = userDoc!.get('username');
-        photoUrl = userDoc!.get('photoUrl')?.toString();
-        createdAt = userDoc!.get('createdAt');
-        userEmail = userDoc!.get('email');
-        userId = userDoc!.get('id');
+        joinedAt = _userField('joinedAt');
+        final joinedDate =
+            joinedAt == null ? null : DateTime.tryParse(joinedAt!);
+        if (joinedDate != null) {
+          month = DateFormat('MMMM').format(DateTime(0, joinedDate.month));
+          year = joinedDate.year;
+        }
+        isVerified = _userField('verified') as bool?;
+        profileId = (_userField('profileId') as num?)?.toInt();
+        username = _userField('username');
+        photoUrl = _userField('photoUrl')?.toString();
+        createdAt = _userField('createdAt') as Timestamp?;
+        userEmail = _userField('email');
+        userId = _userField('id');
       });
 
       if (profileId != null && profileId! > 0) {
@@ -156,7 +171,7 @@ class _ProfileEditState extends State<ProfileEdit> {
                   context);
             }
             setState(() {
-              username = userDoc!.get('username');
+              username = _userField('username');
             });
             return;
           }
@@ -212,289 +227,183 @@ class _ProfileEditState extends State<ProfileEdit> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(tr('edit_profile')),
-      ),
-      body: AppResponsiveContent(
-        maxWidth: 680,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: userAnonymous == null
-            ? const Center(
-                child: CircularProgressIndicator(),
-              )
-            : SingleChildScrollView(
-                child: Form(
+    final palette = AppPalette.of(context);
+    final loading = userAnonymous == null;
+    return AccountFormPage(
+      title: tr('edit_profile'),
+      children: [
+        Text(
+          tr('profile_picture'),
+          style: AppType.sectionHeader.copyWith(color: palette.foreground),
+        ),
+        const SizedBox(height: AppSpace.xs),
+        Text(
+          tr('choose_profile'),
+          style: AppType.body.copyWith(color: palette.mutedText),
+        ),
+        SizedBox(
+          height: 96,
+          child: ListView.separated(
+            controller: _profileScrollController,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            scrollDirection: Axis.horizontal,
+            itemCount: _profileList.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            itemBuilder: (context, index) {
+              final profile = _profileList[index];
+              final selected = profileId == profile.index;
+              return Semantics(
+                selected: selected,
+                button: true,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => setState(() {
+                    profileId = profile.index;
+                    selectedProfile = profile.index;
+                    _avatarChanged = true;
+                  }),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 72,
+                    height: 72,
+                    padding: EdgeInsets.all(selected ? 3 : 0),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: selected
+                          ? Border.all(color: palette.foreground, width: 3)
+                          : null,
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/profiles/${profile.index}.png',
+                        width: 66,
+                        height: 66,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: AppSpace.md),
+        // The fields take the account's details, so they wait for them.
+        SkeletonSwitcher(
+          loading: loading,
+          skeleton: const SkeletonPulse(
+            child: Column(
+              children: [
+                SkeletonBlock(height: 56),
+                AccountFieldGap(),
+                SkeletonBlock(height: 56),
+              ],
+            ),
+          ),
+          child: loading
+              ? const SizedBox.shrink()
+              : Form(
                   key: _formKey,
                   child: Column(
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(tr('profile_picture'),
-                              style: Theme.of(context).textTheme.titleLarge),
-                          const SizedBox(height: 8),
-                          Text(
-                            tr('choose_profile'),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                          ),
-                          const SizedBox(height: 16),
-                          Card(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12, horizontal: 8),
-                              child: SizedBox(
-                                height: 84,
-                                child: ListView.separated(
-                                  controller: _profileScrollController,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8),
-                                  physics: const BouncingScrollPhysics(),
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: _profileList.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(width: 14),
-                                  itemBuilder: (context, index) {
-                                    final profile = _profileList[index];
-                                    final selected =
-                                        profileId == profile.index;
-                                    return Semantics(
-                                      selected: selected,
-                                      button: true,
-                                      child: InkWell(
-                                        customBorder: const CircleBorder(),
-                                        onTap: () => setState(() {
-                                          profileId = profile.index;
-                                          selectedProfile = profile.index;
-                                          _avatarChanged = true;
-                                        }),
-                                        child: AnimatedContainer(
-                                          duration: const Duration(
-                                              milliseconds: 180),
-                                          width: 72,
-                                          height: 72,
-                                          padding: EdgeInsets.all(
-                                              selected ? 3 : 0),
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: selected
-                                                ? Border.all(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .primary,
-                                                    width: 3,
-                                                  )
-                                                : null,
-                                          ),
-                                          child: Stack(
-                                            clipBehavior: Clip.none,
-                                            children: [
-                                              ClipOval(
-                                                child: Image.asset(
-                                                  'assets/images/profiles/${profile.index}.png',
-                                                  width: 66,
-                                                  height: 66,
-                                                  fit: BoxFit.cover,
-                                                ),
-                                              ),
-                                              if (selected)
-                                                Positioned(
-                                                  right: -3,
-                                                  bottom: -3,
-                                                  child: Container(
-                                                    width: 24,
-                                                    height: 24,
-                                                    decoration: BoxDecoration(
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .primary,
-                                                      shape: BoxShape.circle,
-                                                      border: Border.all(
-                                                        color: Theme.of(
-                                                                context)
-                                                            .scaffoldBackgroundColor,
-                                                        width: 2,
-                                                      ),
-                                                    ),
-                                                    child: Icon(
-                                                      PhosphorIcons.check(),
-                                                      size: 15,
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .onPrimary,
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: TextFormField(
-                              initialValue: name,
-                              key: const ValueKey('name'),
-                              validator: (value) {
-                                if (value!.isEmpty) {
-                                  return tr('name_empty');
-                                } else if (value.length > 40 ||
-                                    value.length < 2) {
-                                  return tr('name_short_long');
-                                }
-                                return null;
-                              },
-                              textInputAction: TextInputAction.next,
-                              // onEditingComplete: () => FocusScope.of(context)
-                              //     .requestFocus(_emailFocusNode),
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: InputDecoration(
-                                errorMaxLines: 3,
-                                filled: true,
-                                prefixIcon: Icon(PhosphorIcons.user()),
-                                labelText: tr('full_name'),
-                              ),
-                              onSaved: (value) {
-                                _fullName = value!;
-                              },
-                              onChanged: (value) {
-                                _fullName = value;
-                              },
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: TextFormField(
-                              initialValue: username,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(
-                                    RegExp('^[a-zA-Z0-9_]*')),
-                              ],
-                              key: const ValueKey('username'),
-                              validator: (value) {
-                                if (value!.isEmpty) {
-                                  return tr('username_empty');
-                                } else if (value.length < 5 ||
-                                    value.length > 30) {
-                                  return tr('username_short_long');
-                                } else if (!value
-                                    .contains(RegExp('^[a-zA-Z0-9_]*'))) {
-                                  return tr('invalid_username');
-                                }
-                                return null;
-                              },
-                              textInputAction: TextInputAction.next,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: InputDecoration(
-                                errorMaxLines: 3,
-                                filled: true,
-                                prefixIcon: Icon(PhosphorIcons.at()),
-                                labelText: tr('username'),
-                              ),
-                              onSaved: (value) {
-                                _userName = value!;
-                              },
-                              onChanged: (value) {
-                                _userName = value;
-                              },
-                            ),
-                          ),
-                        ],
+                      TextFormField(
+                        initialValue: name,
+                        key: const ValueKey('name'),
+                        validator: (value) {
+                          if (value!.isEmpty) {
+                            return tr('name_empty');
+                          } else if (value.length > 40 || value.length < 2) {
+                            return tr('name_short_long');
+                          }
+                          return null;
+                        },
+                        textInputAction: TextInputAction.next,
+                        keyboardType: TextInputType.name,
+                        decoration: InputDecoration(
+                          errorMaxLines: 3,
+                          prefixIcon: Icon(PhosphorIcons.user()),
+                          labelText: tr('full_name'),
+                        ),
+                        onSaved: (value) {
+                          _fullName = value!;
+                        },
+                        onChanged: (value) {
+                          _fullName = value;
+                        },
                       ),
-                      _isLoading
-                          ? const CircularProgressIndicator()
-                          : ElevatedButton(
-                              style: const ButtonStyle(
-                                  minimumSize:
-                                      WidgetStatePropertyAll(Size(250, 45))),
-                              onPressed: () {
-                                updateProfile();
-                              },
-                              child: Text(tr('confirm'))),
-                      const SizedBox(
-                        height: 40,
-                      ),
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        alignment: WrapAlignment.center,
-                        spacing: 15,
-                        children: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.push(context,
-                                  MaterialPageRoute(builder: ((context) {
-                                return const PasswordChangeScreen();
-                              })));
-                            },
-                            style: ButtonStyle(
-                                maximumSize: WidgetStateProperty.all(
-                                    const Size(200, 60)),
-                                shape: WidgetStateProperty.all<
-                                        RoundedRectangleBorder>(
-                                    RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
-                                ))),
-                            child: Text(tr('change_password')),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.push(context,
-                                  MaterialPageRoute(builder: ((context) {
-                                return const EmailChangeScreen();
-                              })));
-                            },
-                            style: ButtonStyle(
-                                maximumSize: WidgetStateProperty.all(
-                                    const Size(200, 60)),
-                                shape: WidgetStateProperty.all<
-                                        RoundedRectangleBorder>(
-                                    RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
-                                ))),
-                            child: Text(tr('change_email')),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.push(context,
-                                  MaterialPageRoute(builder: ((context) {
-                                return const DeleteAccountScreen();
-                              })));
-                            },
-                            style: ButtonStyle(
-                                maximumSize: WidgetStateProperty.all(
-                                    const Size(200, 60)),
-                                backgroundColor:
-                                    const WidgetStatePropertyAll(Colors.red),
-                                shape: WidgetStateProperty.all<
-                                        RoundedRectangleBorder>(
-                                    RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10.0),
-                                ))),
-                            child: Text(
-                              tr('delete_account'),
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                          ),
+                      const AccountFieldGap(),
+                      TextFormField(
+                        initialValue: username,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp('^[a-zA-Z0-9_]*')),
                         ],
+                        key: const ValueKey('username'),
+                        validator: (value) {
+                          if (value!.isEmpty) {
+                            return tr('username_empty');
+                          } else if (value.length < 5 || value.length > 30) {
+                            return tr('username_short_long');
+                          } else if (!value
+                              .contains(RegExp('^[a-zA-Z0-9_]*'))) {
+                            return tr('invalid_username');
+                          }
+                          return null;
+                        },
+                        textInputAction: TextInputAction.done,
+                        keyboardType: TextInputType.text,
+                        decoration: InputDecoration(
+                          errorMaxLines: 3,
+                          prefixIcon: Icon(PhosphorIcons.at()),
+                          labelText: tr('username'),
+                        ),
+                        onSaved: (value) {
+                          _userName = value!;
+                        },
+                        onChanged: (value) {
+                          _userName = value;
+                        },
                       ),
                     ],
                   ),
                 ),
-              ),
-      ),
+        ),
+        AccountSubmitButton(
+          label: tr('confirm'),
+          busy: _isLoading || loading,
+          onPressed: updateProfile,
+        ),
+        const SizedBox(height: AppSpace.xxl),
+        Divider(color: palette.hairline, height: 1),
+        ListRow(
+          flush: true,
+          icon: PhosphorIcons.lockKey(),
+          label: tr('change_password'),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PasswordChangeScreen()),
+          ),
+        ),
+        ListRow(
+          flush: true,
+          icon: PhosphorIcons.at(),
+          label: tr('change_email'),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const EmailChangeScreen()),
+          ),
+        ),
+        ListRow(
+          flush: true,
+          icon: PhosphorIcons.trash(),
+          label: tr('delete_account'),
+          destructive: true,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DeleteAccountScreen()),
+          ),
+        ),
+      ],
     );
   }
 }

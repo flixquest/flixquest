@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app/tv_design.dart';
+
 class TvFocusable extends StatefulWidget {
   const TvFocusable({
     required this.child,
@@ -14,8 +16,10 @@ class TvFocusable extends StatefulWidget {
     this.onFocusChanged,
     this.borderRadius = const BorderRadius.all(Radius.circular(12)),
     this.focusScale = 1.04,
+    this.focusAlignment = Alignment.center,
     this.focusColor,
     this.padding = EdgeInsets.zero,
+    this.scrollAlignment = 0.45,
     this.onKeyEvent,
     super.key,
   });
@@ -35,8 +39,15 @@ class TvFocusable extends StatefulWidget {
   final ValueChanged<bool>? onFocusChanged;
   final BorderRadius borderRadius;
   final double focusScale;
+
+  /// The point the focus scale grows from.
+  final Alignment focusAlignment;
   final Color? focusColor;
   final EdgeInsetsGeometry padding;
+
+  /// Where focus scrolls this widget to in its scrollables; null leaves
+  /// scrolling to a parent that positions focused items itself.
+  final double? scrollAlignment;
   final KeyEventResult Function(FocusNode node, KeyEvent event)? onKeyEvent;
 
   @override
@@ -84,14 +95,15 @@ class _TvFocusableState extends State<TvFocusable> {
       setState(() => _hasFocus = hasFocus);
     }
     widget.onFocusChanged?.call(hasFocus);
-    if (hasFocus) {
+    final scrollAlignment = widget.scrollAlignment;
+    if (hasFocus && scrollAlignment != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _focusNode.hasFocus) {
           Scrollable.ensureVisible(
             context,
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
-            alignment: 0.45,
+            alignment: scrollAlignment,
             alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
           );
         }
@@ -101,8 +113,12 @@ class _TvFocusableState extends State<TvFocusable> {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveFocusColor =
-        widget.focusColor ?? Theme.of(context).colorScheme.primary;
+    // The theme's text colour is the clearest boundary on its own page:
+    // white on a dark one, near-black on a light one. Keep the effect neutral
+    // so the poster remains the visual focus and low-power TV GPUs only have
+    // one small shadow to rasterize.
+    final palette = TvPalette.of(context);
+    final effectiveFocusColor = widget.focusColor ?? palette.foreground;
     final focusable = Semantics(
       container: true,
       excludeSemantics: true,
@@ -140,6 +156,7 @@ class _TvFocusableState extends State<TvFocusable> {
           onLongPress: widget.enabled ? widget.onLongPress : null,
           child: AnimatedScale(
             scale: _hasFocus ? widget.focusScale : 1,
+            alignment: widget.focusAlignment,
             duration: const Duration(milliseconds: 150),
             curve: Curves.easeOut,
             child: AnimatedContainer(
@@ -150,14 +167,16 @@ class _TvFocusableState extends State<TvFocusable> {
                 borderRadius: widget.borderRadius,
                 border: Border.all(
                   color: _hasFocus ? effectiveFocusColor : Colors.transparent,
-                  width: 3,
+                  width: 2,
                 ),
                 boxShadow: _hasFocus
                     ? <BoxShadow>[
                         BoxShadow(
-                          color: effectiveFocusColor.withValues(alpha: 0.28),
-                          blurRadius: 18,
-                          spreadRadius: 2,
+                          color: Colors.black.withValues(
+                            alpha: palette.dark ? 0.5 : 0.1,
+                          ),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
                         ),
                       ]
                     : const <BoxShadow>[],

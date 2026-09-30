@@ -47,4 +47,29 @@ void main() {
       expect(catalog.value, containsAll(localSubtitleKeys));
     }
   });
+
+  test('share messages use FlixQuest links instead of TMDB links', () {
+    final localeFiles = Directory('assets/translations')
+        .listSync()
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.json'));
+
+    for (final file in localeFiles) {
+      final catalog =
+          jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      for (final key in <String>[
+        'share_movie',
+        'share_tv',
+        'share_episode',
+        'watch_channel_live',
+      ]) {
+        final message = catalog[key] as String;
+        expect(message, contains('{url}'), reason: '${file.path}: $key');
+        expect(message, isNot(contains('themoviedb.org')),
+            reason: '${file.path}: $key');
+      }
+      expect(catalog['share_text'], contains('https://flix.quest'),
+          reason: '${file.path}: share_text');
+    }
+  });
 }

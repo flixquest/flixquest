@@ -10,15 +10,19 @@ import 'package:path_provider/path_provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
-import '../../constants/app_constants.dart';
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
+import '../../mobile/widgets/page_kit.dart';
+import '../../mobile/widgets/pill_button.dart';
 import '../../tv/focus/tv_keymap.dart';
 import '../../tv/widgets/tv_dialog.dart';
+import '../../tv/widgets/tv_loading_skeletons.dart';
 import '../../tv/widgets/tv_update_widgets.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/globle_method.dart';
 import '../../services/app_update_service.dart';
-import '../../ui_components/app_ui_components.dart';
 
 class UpdateScreen extends StatefulWidget {
   const UpdateScreen(
@@ -140,9 +144,12 @@ class _UpdateScreenState extends State<UpdateScreen> {
               },
               child: _buildTvBody())
           : Scaffold(
-              appBar: AppBar(title: Text(tr('check_for_update'))),
-              body: AppResponsiveContent(
-                maxWidth: 680,
+              backgroundColor: AppPalette.of(context).page,
+              appBar: PageAppBar(title: tr('check_for_update')),
+              body: SkeletonSwitcher(
+                loading: _error == null && _packageInfo == null,
+                alignment: Alignment.center,
+                skeleton: const _UpdateSkeleton(),
                 child: _buildBody(),
               ),
             ),
@@ -180,7 +187,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
               primary: true,
               onPressed: _prepare)
         else if (_packageInfo == null)
-          const Center(child: CircularProgressIndicator())
+          const TvUpdateSkeleton()
         else if (available) ...[
           if (config.appDownloadUrl.isNotEmpty)
             _DownloadCard(
@@ -223,25 +230,16 @@ class _UpdateScreenState extends State<UpdateScreen> {
 
   Widget _buildBody() {
     if (_error != null) {
-      return AppEmptyState(
+      return EmptyState(
         icon: PhosphorIcons.wifiSlash(),
         title: tr('internet_problem'),
         message: tr('check_connection'),
-        action: FilledButton.icon(
-          onPressed: _prepare,
-          icon: Icon(PhosphorIcons.arrowsClockwise()),
-          label: Text(tr('retry')),
-        ),
+        actionLabel: tr('retry'),
+        actionIcon: PhosphorIcons.arrowsClockwise(),
+        onAction: _prepare,
       );
     }
-    if (_packageInfo == null) {
-      return AppEmptyState(
-        icon: PhosphorIcons.downloadSimple(),
-        title: tr('check_for_update'),
-        message: tr('loading_video_sources'),
-        action: const CircularProgressIndicator(),
-      );
-    }
+    if (_packageInfo == null) return const SizedBox.shrink();
     final config = context.watch<AppDependencyProvider>();
     if (!AppUpdateService.isAvailable(
       packageInfo: _packageInfo!,
@@ -249,7 +247,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
       latestBuildNumber: config.latestBuildNumber,
       minimumBuildNumber: config.minimumBuildNumber,
     )) {
-      return AppEmptyState(
+      return EmptyState(
         icon: PhosphorIcons.checkCircle(),
         title: tr('no_update'),
         message: 'FlixQuest v${_packageInfo!.version}',
@@ -266,48 +264,59 @@ class _UpdateScreenState extends State<UpdateScreen> {
     final downloadUrl = config.appDownloadUrl;
     final changeLog = config.changeLog;
 
+    final palette = AppPalette.of(context);
     return Center(
       child: SingleChildScrollView(
-        child: Column(
-          children: [
-            Icon(
-              PhosphorIcons.rocketLaunch(PhosphorIconsStyle.fill),
-              size: 56,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              tr('update_available'),
-              style: Theme.of(context).textTheme.headlineSmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              tr('new_version', namedArgs: {'v': version}),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+        padding: EdgeInsets.symmetric(horizontal: AppSpace.gutter(context)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Column(
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: palette.idleFill,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  PhosphorIcons.rocketLaunch(),
+                  size: 32,
+                  color: palette.foreground,
+                ),
               ),
-            ),
-            if (changeLog.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              OutlinedButton.icon(
-                onPressed: () => _showChangelog(changeLog),
-                icon: Icon(PhosphorIcons.listBullets()),
-                label: Text(tr('see_changelogs')),
+              const SizedBox(height: 16),
+              Text(
+                tr('update_available'),
+                style: AppType.pageTitle.copyWith(color: palette.foreground),
+                textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 6),
+              Text(
+                tr('new_version', namedArgs: {'v': version}),
+                style: AppType.body.copyWith(color: palette.mutedText),
+              ),
+              if (changeLog.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                PillButton(
+                  onPressed: () => _showChangelog(changeLog),
+                  icon: PhosphorIcons.listBullets(),
+                  label: tr('see_changelogs'),
+                ),
+              ],
+              if (downloadUrl.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                _DownloadCard(
+                  appVersion: version,
+                  url: downloadUrl,
+                  task: _downloadManager.getDownload(downloadUrl),
+                  onToggle: _toggleDownload,
+                  onOpen: _openDownload,
+                  onDelete: _deleteDownload,
+                ),
+              ],
             ],
-            if (downloadUrl.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              _DownloadCard(
-                appVersion: version,
-                url: downloadUrl,
-                task: _downloadManager.getDownload(downloadUrl),
-                onToggle: _toggleDownload,
-                onOpen: _openDownload,
-                onDelete: _deleteDownload,
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -320,19 +329,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
       ));
       return;
     }
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(tr('changelogs')),
-        content: SingleChildScrollView(child: Text(changeLog)),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(tr('confirm')),
-          ),
-        ],
-      ),
-    );
+    showChangelogDialog(context, changeLog);
   }
 
   Future<void> _toggleDownload(String url) async {
@@ -483,18 +480,20 @@ class _DownloadCard extends StatelessWidget {
           _tvActions(context, null),
       ]);
     }
-    return Card(
-      clipBehavior: Clip.antiAlias,
+    final palette = AppPalette.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.hero),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                Icon(
-                  PhosphorIcons.androidLogo(),
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+                Icon(PhosphorIcons.androidLogo(), color: palette.mutedText),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -508,54 +507,65 @@ class _DownloadCard extends StatelessWidget {
               const SizedBox(height: 14),
               ValueListenableBuilder<double>(
                 valueListenable: task!.progress,
-                builder: (context, progress, _) =>
-                    LinearProgressIndicator(value: progress),
+                builder: (context, progress, _) => ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 3,
+                    backgroundColor: palette.idleFill,
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
             ],
             if (task == null)
-              FilledButton.icon(
-                onPressed: () {
-                  context
-                      .read<SettingsProvider>()
-                      .analytics
-                      .trackAppUpdateDownload(appVersion);
-                  onToggle(url);
-                },
-                icon: Icon(PhosphorIcons.downloadSimple()),
-                label: Text(tr('download')),
+              Padding(
+                padding: const EdgeInsets.only(top: 14),
+                child: PillButton(
+                  primary: true,
+                  onPressed: () {
+                    context
+                        .read<SettingsProvider>()
+                        .analytics
+                        .trackAppUpdateDownload(appVersion);
+                    onToggle(url);
+                  },
+                  icon: PhosphorIcons.downloadSimple(),
+                  label: tr('download_action'),
+                ),
               )
             else
               ValueListenableBuilder<DownloadStatus>(
                 valueListenable: task!.status,
                 builder: (context, status, _) {
                   if (status == DownloadStatus.completed) {
-                    return Wrap(
-                      spacing: 10,
+                    return Row(
                       children: [
-                        FilledButton(
-                          onPressed: () => onOpen(url),
-                          child: Text(tr('install')),
+                        Expanded(
+                          child: PillButton(
+                            primary: true,
+                            onPressed: () => onOpen(url),
+                            icon: PhosphorIcons.downloadSimple(),
+                            label: tr('install_action'),
+                          ),
                         ),
-                        OutlinedButton(
+                        const SizedBox(width: 10),
+                        PillButton(
                           onPressed: () => onDelete(url),
-                          child: Text(tr('delete')),
+                          icon: PhosphorIcons.trash(),
+                          label: tr('remove'),
                         ),
                       ],
                     );
                   }
-                  return FilledButton.icon(
+                  return PillButton(
                     onPressed: () => onToggle(url),
-                    icon: Icon(
-                      status == DownloadStatus.downloading
-                          ? PhosphorIcons.pause()
-                          : PhosphorIcons.play(),
-                    ),
-                    label: Text(
-                      status == DownloadStatus.downloading
-                          ? tr('pause')
-                          : tr('resume'),
-                    ),
+                    icon: status == DownloadStatus.downloading
+                        ? PhosphorIcons.pause()
+                        : PhosphorIcons.play(),
+                    label: status == DownloadStatus.downloading
+                        ? tr('pause_action')
+                        : tr('resume_action'),
                   );
                 },
               ),
@@ -564,6 +574,31 @@ class _DownloadCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The changelog as one entry per line, list markers stripped, so a long
+/// remote string can be previewed a few lines at a time.
+List<String> changelogItems(String changeLog) => changeLog
+    .split('\n')
+    .map((line) =>
+        line.trim().replaceFirst(RegExp(r'^(?:#+|[-*•·]|\d+[.)])\s+'), ''))
+    .where((line) => line.isNotEmpty)
+    .toList(growable: false);
+
+void showChangelogDialog(BuildContext context, String changeLog) {
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(tr('changelogs')),
+      content: SingleChildScrollView(child: Text(changeLog)),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(tr('confirm')),
+        ),
+      ],
+    ),
+  );
 }
 
 class UpdateBottom extends StatefulWidget {
@@ -578,7 +613,6 @@ class UpdateBottom extends StatefulWidget {
 class _UpdateBottomState extends State<UpdateBottom> {
   late final Future<PackageInfo> _packageInfo;
   bool _visible = false;
-  String _notificationId = '';
 
   @override
   void initState() {
@@ -595,23 +629,14 @@ class _UpdateBottomState extends State<UpdateBottom> {
     }
     if (!mounted) return;
     final config = context.read<AppDependencyProvider>();
-    final notificationId = AppUpdateService.notificationId(
-      remoteVersion: config.latestAppVersion,
-      latestBuildNumber: config.latestBuildNumber,
-      minimumBuildNumber: config.minimumBuildNumber,
-    );
-    final ignored = sharedPrefsSingleton.getString('ignore_version') ?? '';
 
     setState(() {
-      _notificationId = notificationId;
-      _visible = notificationId.isNotEmpty &&
-          ignored != notificationId &&
-          AppUpdateService.isAvailable(
-            packageInfo: packageInfo,
-            remoteVersion: config.latestAppVersion,
-            latestBuildNumber: config.latestBuildNumber,
-            minimumBuildNumber: config.minimumBuildNumber,
-          );
+      _visible = AppUpdateService.isAvailable(
+        packageInfo: packageInfo,
+        remoteVersion: config.latestAppVersion,
+        latestBuildNumber: config.latestBuildNumber,
+        minimumBuildNumber: config.minimumBuildNumber,
+      );
     });
   }
 
@@ -620,16 +645,6 @@ class _UpdateBottomState extends State<UpdateBottom> {
     super.didChangeDependencies();
     context.watch<AppDependencyProvider>();
     _checkVisibility();
-  }
-
-  Future<void> _dismiss() async {
-    if (_notificationId.isNotEmpty) {
-      await sharedPrefsSingleton.setString('ignore_version', _notificationId);
-    }
-    if (mounted) {
-      if (widget.television) FocusScope.of(context).nextFocus();
-      setState(() => _visible = false);
-    }
   }
 
   @override
@@ -645,6 +660,7 @@ class _UpdateBottomState extends State<UpdateBottom> {
       remoteBuild,
     );
     final colors = Theme.of(context).colorScheme;
+    final items = changelogItems(config.changeLog);
     if (widget.television) {
       return Padding(
           padding: const EdgeInsets.all(16),
@@ -652,103 +668,208 @@ class _UpdateBottomState extends State<UpdateBottom> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
                 color: colors.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 border:
                     Border.all(color: colors.primary.withValues(alpha: 0.5))),
-            child: Row(children: [
-              Expanded(
-                  child: Text('Update available • FlixQuest $version',
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                    child: Text('Update available • FlixQuest $version',
+                        style: TextStyle(
+                            color: colors.onSurface,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700))),
+                const SizedBox(width: 16),
+                TvUpdateAction(
+                    label: 'Update',
+                    primary: true,
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                            builder: (_) => const UpdateScreen(
+                                isForced: false, television: true)))),
+              ]),
+              if (items.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                for (final item in items.take(2))
+                  Text('•  $item',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: colors.onSurface,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700))),
-              const SizedBox(width: 16),
-              TvUpdateAction(
-                  label: 'Update',
-                  primary: true,
-                  onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                          builder: (_) => const UpdateScreen(
-                              isForced: false, television: true)))),
-              const SizedBox(width: 12),
-              TvUpdateAction(label: 'Not now', onPressed: _dismiss),
+                          color: colors.onSurfaceVariant,
+                          fontSize: 17,
+                          height: 1.4)),
+                if (items.length > 2)
+                  Text('+${items.length - 2} more in the update',
+                      style: TextStyle(
+                          color: colors.onSurfaceVariant,
+                          fontSize: 15,
+                          height: 1.4)),
+              ],
             ]),
           ));
     }
 
+    // A quiet panel in the page's own tones: the accent only on the small
+    // kicker, the action in ink, as on the rest of Home.
+    final palette = AppPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: EdgeInsets.symmetric(horizontal: AppSpace.gutter(context)),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: LinearGradient(
-            colors: [
-              colors.primary.withValues(alpha: .20),
-              colors.secondary.withValues(alpha: .10),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          border: Border.all(color: colors.primary.withValues(alpha: .28)),
+          color: palette.surface,
+          borderRadius: BorderRadius.circular(AppRadii.hero),
+          border: Border.all(color: palette.hairline),
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadii.hero),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: colors.primary,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  PhosphorIcons.rocketLaunch(PhosphorIconsStyle.fill),
-                  color: colors.onPrimary,
-                ),
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Padding(
+                padding:
+                    const EdgeInsetsDirectional.fromSTEB(16, 14, 14, 14),
+                child: Row(
                   children: [
-                    Text(
-                      tr('update_available'),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
+                    Icon(
+                      PhosphorIcons.rocketLaunch(),
+                      size: 26,
+                      color: palette.foreground,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tr('update_available').toUpperCase(),
+                            style: AppType.kicker
+                                .copyWith(color: colors.primary),
                           ),
+                          const SizedBox(height: 3),
+                          Text(
+                            tr('new_version', namedArgs: {'v': version}),
+                            style: AppType.body.copyWith(
+                              color: palette.secondaryText,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      tr('new_version', namedArgs: {'v': version}),
-                      style: TextStyle(color: colors.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 11),
-                    FilledButton.icon(
+                    const SizedBox(width: 8),
+                    PillButton(
+                      primary: true,
+                      label: tr('update'),
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => const UpdateScreen(isForced: false),
                         ),
                       ),
-                      icon: Icon(PhosphorIcons.arrowUpRight()),
-                      label: Text(tr('update')),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: _dismiss,
-                tooltip: tr('disable_notification_version'),
-                icon: Icon(PhosphorIcons.x(), size: 19),
-                visualDensity: VisualDensity.compact,
-              ),
+              if (items.isNotEmpty)
+                _ChangelogPreview(
+                  items: items,
+                  onTap: () => showChangelogDialog(context, config.changeLog),
+                ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+/// The first few changelog entries under the update banner: one ellipsized
+/// line each, so the banner grows by a fixed amount however long the notes
+/// are. Tapping opens all of them.
+class _ChangelogPreview extends StatelessWidget {
+  const _ChangelogPreview({required this.items, required this.onTap});
+
+  static const _maxItems = 3;
+
+  final List<String> items;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final more = items.length - _maxItems;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: palette.hairline)),
+          ),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(16, 10, 14, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final item in items.take(_maxItems))
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 1.5),
+                          child: Text(
+                            '•  $item',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppType.body
+                                .copyWith(color: palette.mutedText),
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        more > 0
+                            ? '${tr('see_changelogs')} (+$more)'
+                            : tr('see_changelogs'),
+                        style: AppType.kicker
+                            .copyWith(color: palette.foreground),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  PhosphorIcons.caretRight(),
+                  size: 16,
+                  color: palette.mutedText,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The update page while it finds the installed version.
+class _UpdateSkeleton extends StatelessWidget {
+  const _UpdateSkeleton();
+
+  @override
+  Widget build(BuildContext context) => SkeletonPulse(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: AppSpace.gutter(context)),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SkeletonBlock(width: 72, height: 72, circle: true),
+              SizedBox(height: 16),
+              SkeletonBlock.line(width: 200, height: 26),
+              SizedBox(height: 10),
+              SkeletonBlock.line(width: 140),
+              SizedBox(height: 24),
+              SkeletonBlock(height: 120, radius: AppRadii.hero),
+            ],
+          ),
+        ),
+      );
 }

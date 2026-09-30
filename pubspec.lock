@@ -534,7 +534,7 @@ packages:
     source: hosted
     version: "0.2.3"
   flutter_localizations:
-    dependency: transitive
+    dependency: "direct dev"
     description: flutter
     source: sdk
     version: "0.0.0"
@@ -1177,6 +1177,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.12.1"
+  startapp_sdk:
+    dependency: "direct main"
+    description:
+      name: startapp_sdk
+      sha256: fde169623c83d2a5009cecef168173dff973395de1b0fb18ccfd401dbd9d54fd
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1"
   stream_channel:
     dependency: transitive
     description:
@@ -1233,14 +1241,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
-  unity_ads_plugin:
-    dependency: "direct main"
-    description:
-      name: unity_ads_plugin
-      sha256: "850192b0a696efdc03e7edd907770fa3bb722fa0c3649f5ed1d6e500577e10a8"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.5.0"
   universal_io:
     dependency: transitive
     description:

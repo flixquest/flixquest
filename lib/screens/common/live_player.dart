@@ -2,12 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:better_player_plus/better_player_plus.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
+import '../../constants/app_constants.dart';
 import '../../functions/function.dart';
+import '../../functions/language_names.dart';
 import '../../functions/live_playback_policy.dart';
 import '../../models/live_tv.dart';
 import '../../models/wellness.dart';
@@ -17,6 +21,8 @@ import '../../provider/wellness_provider.dart';
 import '../../services/analytics_service.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/stream_intro_service.dart';
+import 'player/player_sheet_ui.dart';
+import 'player/player_strings.dart';
 
 class LivePlayer extends StatefulWidget {
   const LivePlayer({
@@ -129,6 +135,7 @@ class _LivePlayerState extends State<LivePlayer> {
   late String _currentMediaType;
   String? _currentClearKey;
   late List<LiveStreamVariant> _streamVariants;
+  final LiveStreamFailoverQueue _variantFailover = LiveStreamFailoverQueue();
   final ValueNotifier<_LivePlaybackFailure?> _playbackFailure =
       ValueNotifier<_LivePlaybackFailure?>(null);
   late final AppDependencyProvider _appDependencies;
@@ -163,6 +170,10 @@ class _LivePlayerState extends State<LivePlayer> {
     _currentMediaType = widget.mediaType;
     _currentClearKey = widget.clearKey;
     _streamVariants = List<LiveStreamVariant>.of(widget.variants);
+    _variantFailover.replace(
+      _streamVariants,
+      currentUrl: _currentVideoUrl,
+    );
 
     betterPlayerBufferingConfiguration = liveBufferingConfiguration;
 
@@ -242,7 +253,7 @@ class _LivePlayerState extends State<LivePlayer> {
       bufferedAhead: bufferedAhead,
       shouldPlay: value.isPlaying,
     )) {
-      _beginPlaybackRecovery('The live stream stopped making progress.');
+      _beginPlaybackRecovery(tr('player_live_stalled'));
     }
   }
 
@@ -328,16 +339,18 @@ class _LivePlayerState extends State<LivePlayer> {
       enablePip: !widget.useTvControls,
       enableCast: !widget.useTvControls && widget.enableCast,
       backgroundColor: Colors.black,
-      controlBarColor: Colors.black.withValues(alpha: 0.3),
-      progressBarBackgroundColor: Colors.white,
+      controlBarColor: Colors.black.withValues(alpha: 0.48),
+      progressBarBackgroundColor: Colors.white24,
       muteIcon: PhosphorIcons.speakerSimpleSlash(),
       unMuteIcon: PhosphorIcons.speakerHigh(),
-      pauseIcon: PhosphorIcons.pause(),
-      pipMenuIcon: PhosphorIcons.appWindow(),
-      playIcon: PhosphorIcons.play(),
+      pauseIcon: PhosphorIcons.pause(PhosphorIconsStyle.fill),
+      pipMenuIcon: PhosphorIcons.pictureInpicture(),
+      playIcon: PhosphorIcons.play(PhosphorIconsStyle.fill),
+      strings: playerControlsStrings(),
+      languageLabelBuilder: languageDisplayName,
       showControlsOnInitialize: widget.useTvControls,
       controlsHideTime: widget.useTvControls
-          ? const Duration(seconds: 5)
+          ? const Duration(seconds: 4)
           : const Duration(milliseconds: 300),
       playerTheme: widget.useTvControls ? BetterPlayerTheme.custom : null,
       customControlsBuilder: widget.useTvControls
@@ -349,39 +362,58 @@ class _LivePlayerState extends State<LivePlayer> {
                 onExit: _exitPlayer,
               )
           : null,
-      loadingColor: widget.colors.first,
-      iconsColor: widget.colors.first,
+      // White controls; the accent belongs to the timeline, which a live
+      // stream does not have.
+      loadingColor: Colors.white,
+      iconsColor: Colors.white,
       backwardSkipTimeInMilliseconds:
           Duration(seconds: seekDuration).inMilliseconds,
       forwardSkipTimeInMilliseconds:
           Duration(seconds: seekDuration).inMilliseconds,
       progressBarPlayedColor: widget.colors.first,
-      progressBarBufferedColor: Colors.black45,
-      skipForwardIcon: PhosphorIcons.fastForward(),
-      skipBackIcon: PhosphorIcons.rewind(),
+      progressBarBufferedColor: Colors.white38,
+      skipForwardIcon: PhosphorIcons.arrowClockwise(),
+      skipBackIcon: PhosphorIcons.arrowCounterClockwise(),
       fullscreenEnableIcon: PhosphorIcons.cornersOut(),
       fullscreenDisableIcon: PhosphorIcons.cornersIn(),
-      overflowMenuIcon: PhosphorIcons.list(),
+      overflowMenuIcon: PhosphorIcons.dotsThreeVertical(),
       subtitlesIcon: PhosphorIcons.closedCaptioning(),
       qualitiesIcon: PhosphorIcons.highDefinition(),
-      overflowMenuIconsColor: widget.colors.first,
-      overflowModalTextColor: widget.colors.first,
-      overflowModalColor: widget.colors.last,
       enableAudioTracks: true,
-      overflowMenuCustomItems: <BetterPlayerOverflowMenuItem>[
-        if (canSwitchVariants)
-          BetterPlayerOverflowMenuItem(
-            PhosphorIcons.gauge(),
-            'Stream quality',
-            _showStreamVariantSwitcher,
-          ),
-        if (canSwitchChannels)
-          BetterPlayerOverflowMenuItem(
-            PhosphorIcons.televisionSimple(),
-            'Channels',
-            _showChannelSwitcher,
-          ),
-      ],
+      // On a phone these sit in the controls' action row, where live
+      // television puts them; the TV remote gets them in its own menu.
+      quickActions: widget.useTvControls
+          ? const <BetterPlayerOverflowMenuItem>[]
+          : <BetterPlayerOverflowMenuItem>[
+              if (canSwitchChannels)
+                BetterPlayerOverflowMenuItem(
+                  PhosphorIcons.televisionSimple(),
+                  tr('channels'),
+                  _showChannelSwitcher,
+                ),
+              if (canSwitchVariants)
+                BetterPlayerOverflowMenuItem(
+                  PhosphorIcons.gauge(),
+                  tr('player_backup_streams'),
+                  _showStreamVariantSwitcher,
+                ),
+            ],
+      overflowMenuCustomItems: widget.useTvControls
+          ? <BetterPlayerOverflowMenuItem>[
+              if (canSwitchVariants)
+                BetterPlayerOverflowMenuItem(
+                  PhosphorIcons.gauge(),
+                  tr('player_backup_streams'),
+                  _showStreamVariantSwitcher,
+                ),
+              if (canSwitchChannels)
+                BetterPlayerOverflowMenuItem(
+                  PhosphorIcons.televisionSimple(),
+                  tr('channels'),
+                  _showChannelSwitcher,
+                ),
+            ]
+          : const <BetterPlayerOverflowMenuItem>[],
     );
   }
 
@@ -424,7 +456,7 @@ class _LivePlayerState extends State<LivePlayer> {
       castConfiguration: widget.enableCast && !isDash && clearKeyJson == null
           ? BetterPlayerCastConfiguration(
               title: _currentChannelName,
-              subtitle: 'Live TV',
+              subtitle: tr('live_tv'),
               imageUrl: widget.streamIcon,
               contentType: 'application/x-mpegURL',
               isLive: true,
@@ -444,7 +476,7 @@ class _LivePlayerState extends State<LivePlayer> {
     _cancelPlaybackRecovery();
     final operation = _beginSourceOperation();
     _playbackFailure.value = _LivePlaybackFailure(
-      message: failure?.message ?? 'This channel is temporarily unavailable.',
+      message: failure?.message ?? tr('player_channel_temporarily_unavailable'),
       retrying: true,
     );
     _betterPlayerController.setControlsEnabled(true);
@@ -461,10 +493,10 @@ class _LivePlayerState extends State<LivePlayer> {
       final mediaType = stream?.mediaType ?? _currentMediaType;
       final clearKey = stream?.clearKey ?? _currentClearKey;
       if (url.trim().isEmpty) {
-        throw StateError('The channel returned no playable stream.');
+        throw StateError(tr('player_no_playable_stream'));
       }
       if (_recoveryStartedAt == null) {
-        _beginPlaybackRecovery('Waiting for live video to start.');
+        _beginPlaybackRecovery(tr('player_waiting_for_live'));
       }
 
       // Do not replay the branded intro during recovery.
@@ -482,8 +514,12 @@ class _LivePlayerState extends State<LivePlayer> {
       _currentVideoHeaders = Map<String, String>.of(headers);
       _currentMediaType = mediaType;
       _currentClearKey = clearKey;
-      if (stream != null && stream.variants.isNotEmpty) {
-        _streamVariants = stream.variants;
+      if (stream != null) {
+        _streamVariants = List<LiveStreamVariant>.of(stream.variants);
+        _variantFailover.replace(
+          _streamVariants,
+          currentUrl: url,
+        );
         _betterPlayerController.setBetterPlayerControlsConfiguration(
           _buildControlsConfiguration(_currentChannelName),
         );
@@ -516,8 +552,8 @@ class _LivePlayerState extends State<LivePlayer> {
     }
     // Recover transient failures with an unobtrusive loading indicator. Reserve
     // the error prompt for when the automatic recovery window is exhausted.
-    _playbackFailure.value = const _LivePlaybackFailure(
-      message: 'Waiting for enough live video to continue.',
+    _playbackFailure.value = _LivePlaybackFailure(
+      message: tr('player_waiting_for_live'),
       retrying: true,
     );
     // Native HLS loading still retries individual requests. This app-level
@@ -565,9 +601,36 @@ class _LivePlayerState extends State<LivePlayer> {
     final attempt = ++_automaticRecoveryAttempt;
     _trackPlayerEvent('auto_retry_$attempt');
     try {
+      final backup = _variantFailover.next();
       final service = widget.service;
       final channelId = _currentChannelId;
-      if (service != null && channelId != null) {
+      if (backup != null) {
+        final didSetup = await _setupDataSourceForOperation(
+          operation,
+          _buildDataSource(
+            backup.url,
+            backup.headers,
+            mediaType: backup.mediaType,
+            clearKey: backup.clearKey,
+          ),
+        );
+        if (!didSetup ||
+            !_isActiveRecovery(generation) ||
+            !_isActiveSourceOperation(operation)) {
+          return;
+        }
+        _currentVideoUrl = backup.url;
+        _currentVideoHeaders = Map<String, String>.of(backup.headers);
+        _currentMediaType = backup.mediaType;
+        _currentClearKey = backup.clearKey;
+        _showBanner(
+          tr(
+            'player_trying_backup',
+            namedArgs: {'name': backup.title ?? tr('player_stream')},
+          ),
+        );
+        _trackPlayerEvent('auto_failover');
+      } else if (service != null && channelId != null) {
         final stream =
             await service.getStream(channelId).timeout(_sourceResolveTimeout);
         if (!_isActiveRecovery(generation) ||
@@ -592,12 +655,14 @@ class _LivePlayerState extends State<LivePlayer> {
         _currentVideoHeaders = Map<String, String>.of(stream.headers);
         _currentMediaType = stream.mediaType;
         _currentClearKey = stream.clearKey;
-        if (stream.variants.isNotEmpty) {
-          _streamVariants = stream.variants;
-          _betterPlayerController.setBetterPlayerControlsConfiguration(
-            _buildControlsConfiguration(_currentChannelName),
-          );
-        }
+        _streamVariants = List<LiveStreamVariant>.of(stream.variants);
+        _variantFailover.replace(
+          _streamVariants,
+          currentUrl: stream.url,
+        );
+        _betterPlayerController.setBetterPlayerControlsConfiguration(
+          _buildControlsConfiguration(_currentChannelName),
+        );
       } else {
         final didSetup = await _setupDataSourceForOperation(
           operation,
@@ -703,7 +768,7 @@ class _LivePlayerState extends State<LivePlayer> {
   void _showTerminalPlaybackError(int generation) {
     if (!_isActiveRecovery(generation)) return;
     final error = _lastPlaybackError ??
-        'This channel did not recover after several attempts.';
+        tr('player_did_not_recover');
     _sourceOperationGeneration++;
     _cancelPlaybackRecovery();
     _playbackFailure.value = _LivePlaybackFailure(
@@ -798,7 +863,7 @@ class _LivePlayerState extends State<LivePlayer> {
         _beginPlaybackRecovery(error);
         break;
       case BetterPlayerEventType.finished:
-        _beginPlaybackRecovery('The live broadcast stopped.');
+        _beginPlaybackRecovery(tr('player_live_stopped'));
         break;
       case BetterPlayerEventType.openFullscreen:
         _trackPlayerEvent('fullscreen_opened');
@@ -857,6 +922,9 @@ class _LivePlayerState extends State<LivePlayer> {
   }
 
   Future<void> _persistWellnessSession() async {
+    // Requested before the first await so it reaches the player ahead of a
+    // dispose that follows this call.
+    final networkBytes = _flushNetworkUsage();
     await WellnessProvider.instance.recordPlayback(
       sessionId: _sessionId,
       tracker: _wellnessTracker,
@@ -868,8 +936,20 @@ class _LivePlayerState extends State<LivePlayer> {
       progressEndMs: _sessionElapsedMs,
       completed: false,
       provider: 'Live TV',
+      networkBytes: await networkBytes,
       syncImmediately: true,
     );
+  }
+
+  /// The network data this player has used so far, or null where the
+  /// platform does not measure it.
+  Future<int?> _flushNetworkUsage() async {
+    try {
+      return await _betterPlayerController.flushNetworkUsage();
+    } catch (error) {
+      debugPrint('[LivePlayer] network usage unavailable: $error');
+      return _betterPlayerController.networkBytesTransferred;
+    }
   }
 
   Future<void> _showChannelSwitcher() async {
@@ -878,11 +958,8 @@ class _LivePlayerState extends State<LivePlayer> {
       action: 'channel_switcher_opened',
       resultCount: widget.channels.length,
     );
-    final selected = await showModalBottomSheet<Channel>(
+    final selected = await showPlayerSheet<Channel>(
       context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
       builder: (context) => _ChannelSwitcherSheet(
         channels: widget.channels,
         currentChannelId: _currentChannelId,
@@ -899,27 +976,48 @@ class _LivePlayerState extends State<LivePlayer> {
   }
 
   Future<void> _showStreamVariantSwitcher() async {
-    final selected = await showModalBottomSheet<LiveStreamVariant>(
+    final selected = await showPlayerSheet<LiveStreamVariant>(
       context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: <Widget>[
-            const ListTile(title: Text('Stream quality')),
-            for (final variant in _streamVariants)
-              ListTile(
-                leading: Icon(PhosphorIcons.gauge()),
-                title: Text(variant.title ?? 'Stream'),
-                subtitle: Text(variant.mediaType.toUpperCase()),
-                onTap: () => Navigator.of(context).pop(variant),
-              ),
+      builder: (sheetContext) => DraggableScrollableSheet(
+        initialChildSize: .62,
+        minChildSize: .4,
+        maxChildSize: .92,
+        expand: false,
+        snap: true,
+        builder: (context, scrollController) => PlayerSheetScaffold(
+          title: tr('player_backup_streams'),
+          subtitle: tr(
+            'player_stream_count',
+            namedArgs: {'count': '${_streamVariants.length}'},
+          ),
+          actions: [
+            PlayerSheetAction(
+              icon: PhosphorIcons.x(),
+              tooltip: tr('close'),
+              onPressed: () => Navigator.pop(sheetContext),
+            ),
           ],
+          child: ListView.separated(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+            itemCount: _streamVariants.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 4),
+            itemBuilder: (context, index) {
+              final variant = _streamVariants[index];
+              final current = variant.url == _currentVideoUrl;
+              return PlayerChoiceCard(
+                title: variant.title ?? '${tr('player_stream')} ${index + 1}',
+                subtitle: variant.mediaType.toUpperCase(),
+                selected: current,
+                kicker: current ? tr('player_now_playing') : null,
+                onTap: () => Navigator.pop(sheetContext, variant),
+              );
+            },
+          ),
         ),
       ),
     );
-    if (selected == null || selected.url == _currentVideoUrl) return;
+    if (selected == null) return;
     await _switchVariant(selected);
   }
 
@@ -942,7 +1040,8 @@ class _LivePlayerState extends State<LivePlayer> {
       _currentVideoHeaders = Map<String, String>.of(variant.headers);
       _currentMediaType = variant.mediaType;
       _currentClearKey = variant.clearKey;
-      _showBanner(variant.title ?? 'Stream quality');
+      _variantFailover.select(variant);
+      _showBanner(variant.title ?? tr('player_stream'));
     } catch (error) {
       _trackPlayerEvent('quality_switch_error', error: error.toString());
       _beginPlaybackRecovery(error);
@@ -976,7 +1075,12 @@ class _LivePlayerState extends State<LivePlayer> {
         betterPlayerControlsConfiguration,
       );
     });
-    _showBanner('Switching to ${channel.name}…');
+    _showBanner(
+      tr(
+        'player_switching_to',
+        namedArgs: {'name': channel.name},
+      ),
+    );
     final stopwatch = Stopwatch()..start();
     widget.analytics.trackLiveTVInteraction(
       surface: widget.analyticsSurface,
@@ -988,7 +1092,7 @@ class _LivePlayerState extends State<LivePlayer> {
           await service.getStream(channel.id).timeout(_sourceResolveTimeout);
       if (!_isActiveSourceOperation(operation)) return;
       if (hadPlaybackFailure) {
-        _beginPlaybackRecovery('Waiting for live video to start.');
+        _beginPlaybackRecovery(tr('player_waiting_for_live'));
       }
       final didSetup = await _setupDataSourceForOperation(
         operation,
@@ -1004,12 +1108,14 @@ class _LivePlayerState extends State<LivePlayer> {
       _currentVideoHeaders = Map<String, String>.of(stream.headers);
       _currentMediaType = stream.mediaType;
       _currentClearKey = stream.clearKey;
-      if (stream.variants.isNotEmpty) {
-        _streamVariants = stream.variants;
-        _betterPlayerController.setBetterPlayerControlsConfiguration(
-          _buildControlsConfiguration(_currentChannelName),
-        );
-      }
+      _streamVariants = List<LiveStreamVariant>.of(stream.variants);
+      _variantFailover.replace(
+        _streamVariants,
+        currentUrl: stream.url,
+      );
+      _betterPlayerController.setBetterPlayerControlsConfiguration(
+        _buildControlsConfiguration(_currentChannelName),
+      );
       setState(() {
         _isSwitching = false;
       });
@@ -1041,9 +1147,7 @@ class _LivePlayerState extends State<LivePlayer> {
       );
       if (!mounted) return;
       setState(() => _isSwitching = false);
-      _beginPlaybackRecovery(
-        'Unable to switch channel: ${error.toString()}',
-      );
+      _beginPlaybackRecovery(tr('player_switch_channel_failed'));
     } finally {
       if (mounted && _currentChannelId == channel.id && _isSwitching) {
         setState(() => _isSwitching = false);
@@ -1118,9 +1222,15 @@ class _LivePlayerState extends State<LivePlayer> {
           if (didPop) return;
           _exitPlayer();
         },
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: _buildPortraitInlineLayout(context),
+        // The page around the video follows the app's mode; the video
+        // itself stays black.
+        child: PlayerTheme(
+          child: Builder(
+            builder: (context) => Scaffold(
+              backgroundColor: BetterPlayerPanelColors.of(context).page,
+              body: _buildPortraitInlineLayout(context),
+            ),
+          ),
         ),
       );
     }
@@ -1162,7 +1272,7 @@ class _LivePlayerState extends State<LivePlayer> {
                           duration: const Duration(milliseconds: 240),
                           child: Material(
                             color: Colors.black.withValues(alpha: .78),
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(10),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -1185,7 +1295,7 @@ class _LivePlayerState extends State<LivePlayer> {
                                         PhosphorIconsStyle.fill,
                                       ),
                                       size: 18,
-                                      color: widget.colors.first,
+                                      color: Colors.white,
                                     ),
                                   const SizedBox(width: 9),
                                   ConstrainedBox(
@@ -1256,8 +1366,7 @@ class _LivePlayerState extends State<LivePlayer> {
   }
 
   Widget _buildPortraitInlineLayout(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final panel = BetterPlayerPanelColors.of(context);
     return SafeArea(
       bottom: false,
       child: Column(
@@ -1290,7 +1399,7 @@ class _LivePlayerState extends State<LivePlayer> {
                           duration: const Duration(milliseconds: 240),
                           child: Material(
                             color: Colors.black.withValues(alpha: .78),
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(10),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -1313,7 +1422,7 @@ class _LivePlayerState extends State<LivePlayer> {
                                         PhosphorIconsStyle.fill,
                                       ),
                                       size: 18,
-                                      color: widget.colors.first,
+                                      color: Colors.white,
                                     ),
                                   const SizedBox(width: 9),
                                   ConstrainedBox(
@@ -1349,37 +1458,57 @@ class _LivePlayerState extends State<LivePlayer> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
               children: [
-                Text(
-                  _currentChannelName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: colors.onSurface,
-                    fontFamily: 'FigtreeSB',
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _currentChannelName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: panel.foreground,
+                          fontFamily: 'FigtreeSB',
+                          fontSize: 17,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: BetterPlayerLiveBadge(label: tr('player_live')),
+                    ),
+                  ],
                 ),
                 if (widget.channels.isNotEmpty) ...[
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 22),
                   Row(
                     children: [
                       Icon(
                         PhosphorIcons.televisionSimple(),
-                        size: 21,
-                        color: colors.primary,
+                        size: 20,
+                        color: panel.secondary,
                       ),
                       const SizedBox(width: 9),
                       Expanded(
                         child: Text(
-                          'Channels',
-                          style: theme.textTheme.titleMedium?.copyWith(
+                          tr('channels'),
+                          style: TextStyle(
+                            color: panel.foreground,
                             fontFamily: 'FigtreeSB',
+                            fontSize: 16,
                           ),
                         ),
                       ),
                       Text(
-                        '${widget.channels.length}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
+                        tr(
+                          'player_channel_count',
+                          namedArgs: {'count': '${widget.channels.length}'},
+                        ),
+                        style: TextStyle(
+                          color: panel.muted,
+                          fontSize: 13,
                         ),
                       ),
                     ],
@@ -1393,41 +1522,15 @@ class _LivePlayerState extends State<LivePlayer> {
                             : channel.categories.join(' • '));
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 4),
-                      child: Material(
-                        color: current
-                            ? colors.primary.withValues(alpha: .12)
-                            : colors.surfaceContainerHighest
-                                .withValues(alpha: .45),
-                        borderRadius: BorderRadius.circular(12),
-                        clipBehavior: Clip.antiAlias,
-                        child: ListTile(
-                          dense: true,
-                          leading: Icon(
-                            current
-                                ? PhosphorIcons.playCircle(
-                                    PhosphorIconsStyle.fill,
-                                  )
-                                : PhosphorIcons.televisionSimple(),
-                            color: current
-                                ? colors.primary
-                                : colors.onSurfaceVariant,
-                          ),
-                          title: Text(
-                            channel.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: secondary == null
-                              ? null
-                              : Text(
-                                  secondary,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                          onTap: current || !canSwitchChannels
-                              ? null
-                              : () => unawaited(_switchChannel(channel)),
-                        ),
+                      child: PlayerChoiceCard(
+                        kicker: current ? tr('player_now_playing') : null,
+                        title: channel.name,
+                        subtitle: secondary,
+                        selected: current,
+                        thumbnail: _ChannelThumbnail(channel: channel),
+                        onTap: current || !canSwitchChannels
+                            ? null
+                            : () => unawaited(_switchChannel(channel)),
                       ),
                     );
                   }),
@@ -1487,7 +1590,6 @@ class _ChannelSwitcherSheetState extends State<_ChannelSwitcherSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final tokens = searchTokens(_query);
     final filtered = tokens.isEmpty
         ? widget.channels
@@ -1498,163 +1600,128 @@ class _ChannelSwitcherSheetState extends State<_ChannelSwitcherSheet> {
               ).contains(tokens.join(' ')),
             )
             .toList(growable: false);
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * .85,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 2, 20, 12),
-            child: Row(
-              children: <Widget>[
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    PhosphorIcons.televisionSimple(),
-                    color: colors.primary,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        'Channels',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${widget.channels.length} channels • tap to switch',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+    return DraggableScrollableSheet(
+      initialChildSize: .82,
+      minChildSize: .5,
+      maxChildSize: .95,
+      expand: false,
+      snap: true,
+      builder: (context, scrollController) => PlayerSheetScaffold(
+        title: tr('channels'),
+        subtitle: tr(
+          'player_channel_count',
+          namedArgs: {'count': '${widget.channels.length}'},
+        ),
+        actions: [
+          PlayerSheetAction(
+            icon: PhosphorIcons.x(),
+            tooltip: tr('close'),
+            onPressed: () => Navigator.pop(context),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) => setState(() => _query = value),
-              decoration: InputDecoration(
-                hintText: 'Search channels',
-                prefixIcon: Icon(PhosphorIcons.magnifyingGlass()),
-                suffixIcon: _query.isEmpty
-                    ? null
-                    : IconButton(
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _query = '');
-                        },
-                        icon: Icon(PhosphorIcons.x()),
-                      ),
-                isDense: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+        ],
+        child: Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 8),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _query = value),
+                decoration: InputDecoration(
+                  hintText: tr('player_search_channels'),
+                  prefixIcon: Icon(PhosphorIcons.magnifyingGlass()),
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: tr('close'),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _query = '');
+                          },
+                          icon: Icon(PhosphorIcons.x()),
+                        ),
                 ),
               ),
             ),
-          ),
-          Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-              itemCount: filtered.length,
-              itemBuilder: (context, index) {
-                final channel = filtered[index];
-                final isCurrent = channel.id == widget.currentChannelId;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Material(
-                    color: isCurrent
-                        ? colors.primary.withValues(alpha: .14)
-                        : colors.surfaceContainerHighest.withValues(alpha: .55),
-                    borderRadius: BorderRadius.circular(16),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () => Navigator.pop(context, channel),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 13,
-                        ),
-                        child: Row(
-                          children: <Widget>[
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    channel.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleSmall
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                  ),
-                                  if (channel.nowPlaying != null ||
-                                      channel
-                                          .categories.isNotEmpty) ...<Widget>[
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      channel.nowPlaying ??
-                                          channel.categories.join(' • '),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: channel.nowPlaying != null
-                                                ? colors.primary
-                                                : colors.onSurfaceVariant,
-                                          ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Icon(
-                              isCurrent
-                                  ? PhosphorIcons.playCircle(
-                                      PhosphorIconsStyle.fill,
-                                    )
-                                  : PhosphorIcons.circle(),
-                              size: 22,
-                              color: isCurrent
-                                  ? colors.primary
-                                  : colors.outlineVariant,
-                            ),
-                          ],
-                        ),
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: BetterPlayerEmptyState(
+                        icon: PhosphorIcons.televisionSimple(),
+                        title: tr('player_no_channels'),
                       ),
+                    )
+                  : ListView.separated(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 4),
+                      itemBuilder: (context, index) {
+                        final channel = filtered[index];
+                        final isCurrent = channel.id == widget.currentChannelId;
+                        final secondary = channel.nowPlaying ??
+                            (channel.categories.isEmpty
+                                ? null
+                                : channel.categories.join(' • '));
+                        return PlayerChoiceCard(
+                          kicker:
+                              isCurrent ? tr('player_now_playing') : null,
+                          title: channel.name,
+                          subtitle: secondary,
+                          selected: isCurrent,
+                          thumbnail: _ChannelThumbnail(channel: channel),
+                          onTap: () => Navigator.pop(context, channel),
+                        );
+                      },
                     ),
-                  ),
-                );
-              },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+/// A channel's logo, or its initial, in the player's thumbnail frame.
+class _ChannelThumbnail extends StatelessWidget {
+  const _ChannelThumbnail({required this.channel});
+
+  final Channel channel;
+
+  @override
+  Widget build(BuildContext context) {
+    final logo = channel.logo?.trim();
+    final name = channel.name.trim();
+    final letter = channel.letter?.trim();
+    final initial = letter?.isNotEmpty == true
+        ? letter!
+        : name.isEmpty
+            ? '?'
+            : name.toUpperCase().substring(0, 1);
+    return PlayerThumbnail(
+      width: 48,
+      height: 48,
+      child: logo?.isNotEmpty == true
+          ? CachedNetworkImage(
+              cacheManager: cacheProp(),
+              imageUrl: logo!,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => const SizedBox.expand(),
+              errorWidget: (_, __, ___) => _initial(context, initial),
+            )
+          : _initial(context, initial),
+    );
+  }
+
+  Widget _initial(BuildContext context, String letter) => Center(
+        child: Text(
+          letter,
+          style: TextStyle(
+            color: BetterPlayerPanelColors.of(context).secondary,
+            fontFamily: 'FigtreeBold',
+            fontSize: 19,
+          ),
+        ),
+      );
 }
 
 class _LivePlaybackFailure {
@@ -1679,129 +1746,112 @@ class _LivePlayerErrorOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     if (retrying) {
       // Keep the last frame and let viewers use playback/channel controls while
       // recovery runs. A transient network failure is not an actionable error.
-      return IgnorePointer(
+      return const IgnorePointer(
         child: Center(
           child: SizedBox.square(
             dimension: 32,
             child: CircularProgressIndicator(
               strokeWidth: 3,
-              color: colors.primary,
+              color: Colors.white,
             ),
           ),
         ),
       );
     }
-    return ColoredBox(
-      color: Colors.black.withValues(alpha: .86),
-      child: SafeArea(
-        minimum: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxHeight < 300;
-            final iconSize = compact ? 42.0 : 58.0;
-            final titleSize = compact ? 18.0 : 22.0;
-            final messageLines = compact ? 2 : 3;
-            final gapAfterIcon = compact ? 8.0 : 18.0;
-            final gapAfterTitle = compact ? 4.0 : 8.0;
-            final gapBeforeActions = compact ? 8.0 : 22.0;
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: iconSize,
-                      height: iconSize,
-                      decoration: BoxDecoration(
-                        color: colors.error.withValues(alpha: .16),
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: retrying
-                          ? SizedBox.square(
-                              dimension: 26,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 3,
-                                color: colors.primary,
-                              ),
-                            )
-                          : Icon(
-                              PhosphorIcons.warningCircle(),
-                              color: colors.error,
-                              size: 30,
-                            ),
-                    ),
-                    SizedBox(height: gapAfterIcon),
-                    Text(
-                      retrying ? 'Reconnecting…' : 'Channel unavailable',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
+    return PlayerTheme(
+      onVideo: true,
+      child: ColoredBox(
+        color: Colors.black.withValues(alpha: .86),
+        child: SafeArea(
+          minimum: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxHeight < 300;
+              final titleSize = compact ? 18.0 : 22.0;
+              final messageLines = compact ? 2 : 3;
+              final gapAfterIcon = compact ? 10.0 : 18.0;
+              final gapAfterTitle = compact ? 4.0 : 8.0;
+              final gapBeforeActions = compact ? 10.0 : 22.0;
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 460),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      BetterPlayerIconSurface(
+                        icon: PhosphorIcons.warningCircle(),
                         color: Colors.white,
-                        fontFamily: 'FigtreeSB',
-                        fontSize: titleSize,
                       ),
-                    ),
-                    SizedBox(height: gapAfterTitle),
-                    Text(
-                      retrying
-                          ? 'Resolving a fresh stream for this channel.'
-                          : message,
-                      maxLines: messageLines,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                    ),
-                    SizedBox(height: gapBeforeActions),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        FilledButton.icon(
-                          onPressed: retrying ? null : onRetry,
-                          style: compact
-                              ? FilledButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                  ),
-                                )
-                              : null,
-                          icon: Icon(PhosphorIcons.arrowClockwise()),
-                          label: const Text('Retry'),
+                      SizedBox(height: gapAfterIcon),
+                      Text(
+                        tr('player_channel_unavailable'),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'FigtreeSB',
+                          fontSize: titleSize,
                         ),
-                        if (onChannels != null)
-                          OutlinedButton.icon(
-                            onPressed: onChannels,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              side: const BorderSide(color: Colors.white38),
-                              visualDensity: compact
-                                  ? VisualDensity.compact
-                                  : VisualDensity.standard,
-                              padding: compact
-                                  ? const EdgeInsets.symmetric(horizontal: 12)
-                                  : null,
-                            ),
-                            icon: Icon(PhosphorIcons.televisionSimple()),
-                            label: const Text('Choose channel'),
+                      ),
+                      SizedBox(height: gapAfterTitle),
+                      Text(
+                        message,
+                        maxLines: messageLines,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: BetterPlayerColors.muted,
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                      SizedBox(height: gapBeforeActions),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: onRetry,
+                            style: compact
+                                ? FilledButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                  )
+                                : null,
+                            icon: Icon(PhosphorIcons.arrowClockwise(),
+                                size: 18),
+                            label: Text(tr('retry')),
                           ),
-                      ],
-                    ),
-                  ],
+                          if (onChannels != null)
+                            OutlinedButton.icon(
+                              onPressed: onChannels,
+                              style: OutlinedButton.styleFrom(
+                                visualDensity: compact
+                                    ? VisualDensity.compact
+                                    : VisualDensity.standard,
+                                padding: compact
+                                    ? const EdgeInsets.symmetric(horizontal: 12)
+                                    : null,
+                              ),
+                              icon: Icon(
+                                PhosphorIcons.televisionSimple(),
+                                size: 18,
+                              ),
+                              label: Text(tr('player_choose_channel')),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );

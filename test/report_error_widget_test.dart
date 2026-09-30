@@ -2,6 +2,7 @@ import 'package:flixquest/widgets/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 void main() {
   setUpAll(() {
@@ -53,6 +54,28 @@ void main() {
 
     expect(reportButton, findsNothing);
     expect(retryButton, findsNothing);
+  });
+
+  testWidgets('shows the installed app version, not a hardcoded one',
+      (tester) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'FlixQuest',
+      packageName: 'com.test.fq',
+      version: '9.9.9',
+      buildNumber: '1',
+      buildSignature: '',
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ReportErrorWidget(error: longError, hideButton: true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('v9.9.9'), findsOneWidget);
   });
 
   testWidgets('retry closes the sheet and notifies the caller', (tester) async {

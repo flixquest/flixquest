@@ -2,9 +2,13 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
 import '../../functions/function.dart';
+import '../../mobile/widgets/pill_button.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/globle_method.dart';
 import '../../services/flixquest_auth_service.dart';
@@ -80,34 +84,48 @@ class _LandingScreenState extends State<LandingScreen> {
   }
 
   Widget _actionsCard(SettingsProvider settings) {
-    final colors = Theme.of(context).colorScheme;
-    return Card(
-      color: colors.surface.withValues(alpha: .96),
+    final palette = AppPalette.of(context);
+    final busy = _loadingGoogle || _loadingAnonymous;
+    Widget wide(Widget child) => SizedBox(width: double.infinity, child: child);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.hero),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(tr('login_signup'),
-                style: Theme.of(context).textTheme.headlineSmall),
+            Text(
+              tr('login_signup'),
+              style: AppType.sectionHeader.copyWith(
+                fontFamily: AppType.bold,
+                fontSize: 22,
+                color: palette.foreground,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               tr('unlimited_on_cinemax'),
-              style: TextStyle(color: colors.onSurfaceVariant, height: 1.4),
+              style: AppType.body.copyWith(color: palette.mutedText),
             ),
             const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _loadingGoogle || _loadingAnonymous
-                  ? null
-                  : () => _push(const LoginScreen()),
-              child: Text(tr('log_in')),
+            wide(
+              PillButton(
+                primary: true,
+                height: 50,
+                label: tr('log_in'),
+                onPressed: busy ? null : () => _push(const LoginScreen()),
+              ),
             ),
             const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: _loadingGoogle || _loadingAnonymous
-                  ? null
-                  : () => _push(const SignupScreen()),
-              child: Text(tr('sign_up')),
+            wide(
+              PillButton(
+                height: 50,
+                label: tr('sign_up'),
+                onPressed: busy ? null : () => _push(const SignupScreen()),
+              ),
             ),
             const SizedBox(height: 12),
             GoogleSignInButton(
@@ -116,15 +134,16 @@ class _LandingScreenState extends State<LandingScreen> {
               onPressed: () => _continueWithGoogle(settings),
             ),
             const SizedBox(height: 12),
-            TextButton(
-              onPressed: _loadingAnonymous || _loadingGoogle
-                  ? null
-                  : () => _continueAnonymously(settings),
-              child: _loadingAnonymous
-                  ? const SizedBox.square(
-                      dimension: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(tr('continue_anonymously')),
+            wide(
+              PillButton(
+                height: 50,
+                busy: _loadingAnonymous,
+                icon: PhosphorIcons.userCircleDashed(),
+                label: tr('continue_anonymously'),
+                onPressed: _loadingGoogle
+                    ? null
+                    : () => _continueAnonymously(settings),
+              ),
             ),
           ],
         ),
@@ -231,7 +250,7 @@ class _Intro extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Hero(
             tag: 'logo_shadow',

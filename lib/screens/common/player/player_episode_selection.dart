@@ -1,3 +1,4 @@
+import 'package:better_player_plus/better_player_plus.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -14,6 +15,9 @@ import '../../../api/endpoints.dart';
 import '../../../functions/network.dart';
 import '../../tv/tv_video_loader.dart';
 import 'player_sheet_ui.dart';
+import '../../../design/app_palette.dart';
+import '../../../design/app_tokens.dart';
+import '../../../mobile/widgets/episode_row.dart';
 
 class PlayerEpisodeSelection {
   int? _browsedSeasonNumber;
@@ -43,12 +47,9 @@ class PlayerEpisodeSelection {
     debugPrint(
       '[PlayerContentMenu] pushing episode modal season=$seasonNumber',
     );
-    return showModalBottomSheet<void>(
+    return showPlayerSheet<void>(
       context: context,
       useRootNavigator: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
       builder: (sheetContext) {
         debugPrint(
           '[PlayerContentMenu] episode modal builder '
@@ -65,7 +66,6 @@ class PlayerEpisodeSelection {
             snap: true,
             snapSizes: const [.55, .82, .95],
             builder: (context, scrollController) => PlayerSheetScaffold(
-              icon: PhosphorIcons.playlist(),
               title: tr(
                 'season_episodes',
                 namedArgs: {'season': '$seasonNumber'},
@@ -216,12 +216,9 @@ class PlayerEpisodeSelection {
     if (seasons == null || seasons.isEmpty) return;
     final playerContext = context;
 
-    showModalBottomSheet<void>(
+    showPlayerSheet<void>(
       context: context,
       useRootNavigator: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
       builder: (sheetContext) => DraggableScrollableSheet(
         initialChildSize: .72,
         minChildSize: .5,
@@ -230,7 +227,6 @@ class PlayerEpisodeSelection {
         snap: true,
         snapSizes: const [.5, .72, .92],
         builder: (context, scrollController) => PlayerSheetScaffold(
-          icon: PhosphorIcons.stack(),
           title: tr('select_season'),
           subtitle: '${seasons.length} ${tr('select_season')}',
           actions: [
@@ -260,22 +256,41 @@ class PlayerEpisodeSelection {
                     DialogRoute<void>(
                       context: playerContext,
                       barrierDismissible: false,
-                      builder: (context) => const PopScope(
+                      // The season's episodes, pulsing, until they come.
+                      // In the player's theme, like the sheets around it.
+                      builder: (_) => PlayerTheme(
+                        child: Builder(
+                          builder: (context) => PopScope(
                         canPop: false,
                         child: Dialog(
+                          backgroundColor:
+                              BetterPlayerPanelColors.of(context).panel,
                           child: Padding(
-                            padding: EdgeInsets.all(28),
-                            child: Row(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Column(
                               mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                CircularProgressIndicator(),
-                                SizedBox(width: 18),
-                                Text('Loading episodes…'),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  child: Text(
+                                    tr('loading_episodes'),
+                                    style: AppType.cardTitle.copyWith(
+                                      fontSize: 16,
+                                      color: AppPalette.of(context).foreground,
+                                    ),
+                                  ),
+                                ),
+                                const EpisodeListSkeleton(count: 2),
                               ],
                             ),
                           ),
                         ),
-                      ),
+                        ),
+                          ),
+                        ),
                     ),
                   );
                   await fetchEpisodesForSeason(
@@ -391,7 +406,7 @@ class PlayerEpisodeSelection {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(tr('failed_load_season_episodes')),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }

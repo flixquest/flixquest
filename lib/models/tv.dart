@@ -1,3 +1,5 @@
+import 'genre_ids.dart';
+
 class TVList {
   int? page;
   int? totalTV;
@@ -76,6 +78,7 @@ class TV {
     backdropPath = json['backdrop_path'];
     overview = json['overview'];
     firstAirDate = json['first_air_date'];
+    genreIds = parseGenreIds(json['genre_ids']);
     // originCountry = json['origin_country'];
   }
 
@@ -90,7 +93,7 @@ class TV {
     data['poster_path'] = posterPath;
     data['original_language'] = originalLanguage;
     data['original_title'] = originalName;
-    data['genre_ids'] = genreIds;
+    if (genreIds != null) data['genre_ids'] = genreIds;
     data['backdrop_path'] = backdropPath;
     data['overview'] = overview;
     data['first_air_date'] = firstAirDate;
@@ -101,7 +104,9 @@ class TV {
   Map<String, dynamic> toMap() {
     var map = <String, dynamic>{};
     map['id'] = id;
-    //  map['genre_ids'] = genreIds;
+    // Stored as "28,12"; left out when unknown so an update keeps what the
+    // row already has.
+    if (encodeGenreIds(genreIds) case final ids?) map['genre_ids'] = ids;
     map['poster_path'] = posterPath;
     map['vote_count'] = voteCount;
     map['name'] = name;
@@ -121,7 +126,7 @@ class TV {
 
   TV.fromMapObject(Map<String, dynamic> map) {
     id = map['id'];
-    // genreIds = map['genre_ids'];
+    genreIds = parseGenreIds(map['genre_ids']);
     posterPath = map['poster_path'];
     voteCount = map['vote_count'];
     //video = map['video'];
@@ -308,11 +313,15 @@ class EpisodeList {
   num? voteAverage;
   num? voteCount;
   String? overview;
+
+  /// Minutes, when TMDB knows it.
+  int? runtime;
   List<EpisodeCrew>? episodeCrew;
   List<EpisodeGuestStars>? episodeGuestStars;
 
   EpisodeList(
       {this.airDate,
+      this.runtime,
       this.episodeNumber,
       this.name,
       this.stillPath,
@@ -333,6 +342,7 @@ class EpisodeList {
     voteAverage = json['vote_average'];
     voteCount = json['vote_count'];
     episodeId = json['id'];
+    runtime = (json['runtime'] as num?)?.toInt();
     if (json['crew'] != null) {
       episodeCrew = [];
       json['crew'].forEach((v) {
@@ -357,6 +367,7 @@ class EpisodeList {
     data['vote_average'] = voteAverage;
     data['vote_count'] = voteCount;
     data['id'] = episodeId;
+    if (runtime != null) data['runtime'] = runtime;
     if (episodeCrew != null) {
       data['crew'] = episodeCrew?.map((v) => v.toJson()).toList();
     }

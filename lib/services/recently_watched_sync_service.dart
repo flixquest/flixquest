@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../controllers/recently_watched_database_controller.dart';
 import '../models/recently_watched.dart';
+import 'sync_checkpoint.dart';
 
 enum RecentSyncStatus { idle, syncing, success, error }
 
@@ -42,6 +43,10 @@ Set<int> resolveCloudWinners({
 /// tombstones so a title finished on one device does not come back from
 /// another. Each row is its own Firestore document, which keeps concurrent
 /// progress writes from overwriting one another.
+///
+/// Pulls read only the documents written since the previous pull (see
+/// [SyncCheckpoint]), so an app resume costs a couple of reads rather than the
+/// user's whole history.
 class RecentlyWatchedSyncService {
   RecentlyWatchedSyncService._internal();
 
@@ -52,6 +57,7 @@ class RecentlyWatchedSyncService {
   static const String _moviesCollection = 'movies';
   static const String _episodesCollection = 'episodes';
   static const String _lastSyncedKey = 'flixquest_last_recently_watched_sync';
+  static const String _prunedAtKey = 'recently_watched.pruned_at.v1';
 
   /// Firestore rejects batches larger than 500 writes.
   static const int _batchLimit = 450;
@@ -67,6 +73,14 @@ class RecentlyWatchedSyncService {
 
   static const Duration _operationTimeout = Duration(seconds: 45);
 
+  /// The least time between automatic merges. iOS reports a resume after
+  /// every passing interruption, and each merge still costs a few reads.
+  static const Duration _autoSyncInterval = Duration(minutes: 2);
+
+  /// Tombstones live for [_tombstoneRetention], so looking for expired ones
+  /// once a day is plenty and saves two queries on every other merge.
+  static const Duration _pruneInterval = Duration(days: 1);
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final RecentlyWatchedMoviesController _movieDb =
@@ -81,6 +95,8 @@ class RecentlyWatchedSyncService {
 
   Timer? _pushTimer;
   bool _isSyncing = false;
+  String? _lastAutoSyncUid;
+  DateTime? _lastAutoSyncAt;
   StreamSubscription<User?>? _authSubscription;
 
   User? get currentUser => _auth.currentUser;
@@ -103,10 +119,20 @@ class RecentlyWatchedSyncService {
   }
 
   /// Runs a full merge when a signed-in user is present. Safe to call often;
-  /// concurrent runs are dropped.
+  /// concurrent runs are dropped, as are repeats within [_autoSyncInterval].
   Future<void> autoSyncIfSignedIn() async {
     if (!canSync || _isSyncing) return;
-    await syncNow();
+    final uid = currentUser!.uid;
+    final lastAt = _lastAutoSyncAt;
+    if (_lastAutoSyncUid == uid &&
+        lastAt != null &&
+        DateTime.now().difference(lastAt) < _autoSyncInterval) {
+      return;
+    }
+    if (await syncNow()) {
+      _lastAutoSyncUid = uid;
+      _lastAutoSyncAt = DateTime.now();
+    }
   }
 
   /// Schedules a debounced push after the player or the user changes a row.
@@ -148,8 +174,9 @@ class RecentlyWatchedSyncService {
     }
   }
 
-  /// Full two-way merge: pull rows that other devices changed more recently,
-  /// push local changes, then drop tombstones both stores have finished with.
+  /// Full two-way merge: pull rows that other devices changed since the last
+  /// pull, push local changes, then drop tombstones both stores have finished
+  /// with.
   Future<bool> syncNow({bool force = false}) async {
     if (!canSync) return false;
     if (_isSyncing && !force) return false;
@@ -186,12 +213,27 @@ class RecentlyWatchedSyncService {
       .doc(uid)
       .collection(_episodesCollection);
 
+  static String _checkpointScope(String uid, String collection) =>
+      'recently_watched.$uid.$collection';
+
   Future<void> _pullMovies(String uid) async {
-    final snapshot = await _movies(uid).get();
-    if (snapshot.docs.isEmpty) return;
+    final scope = _checkpointScope(uid, _moviesCollection);
+    final checkpoint = await SyncCheckpoint.load(scope);
+    final now = DateTime.now();
+    final full = checkpoint.needsFullPull(now);
+    final snapshot = await checkpoint.pull(_movies(uid), full: full);
+    if (snapshot.docs.isNotEmpty) await _applyCloudMovies(snapshot.docs);
+    await checkpoint
+        .advance(snapshot.docs.map((doc) => doc.data()), full: full, now: now)
+        .save(scope);
+  }
+
+  Future<void> _applyCloudMovies(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
 
     final cloudById = <int, RecentMovie>{};
-    for (final doc in snapshot.docs) {
+    for (final doc in docs) {
       final movie = RecentMovie.fromCloudMap(doc.data(), id: int.tryParse(doc.id));
       if (movie.id != null) cloudById[movie.id!] = movie;
     }
@@ -217,11 +259,23 @@ class RecentlyWatchedSyncService {
   }
 
   Future<void> _pullEpisodes(String uid) async {
-    final snapshot = await _episodes(uid).get();
-    if (snapshot.docs.isEmpty) return;
+    final scope = _checkpointScope(uid, _episodesCollection);
+    final checkpoint = await SyncCheckpoint.load(scope);
+    final now = DateTime.now();
+    final full = checkpoint.needsFullPull(now);
+    final snapshot = await checkpoint.pull(_episodes(uid), full: full);
+    if (snapshot.docs.isNotEmpty) await _applyCloudEpisodes(snapshot.docs);
+    await checkpoint
+        .advance(snapshot.docs.map((doc) => doc.data()), full: full, now: now)
+        .save(scope);
+  }
+
+  Future<void> _applyCloudEpisodes(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
 
     final cloudById = <int, RecentEpisode>{};
-    for (final doc in snapshot.docs) {
+    for (final doc in docs) {
       final episode =
           RecentEpisode.fromCloudMap(doc.data(), id: int.tryParse(doc.id));
       if (episode.id != null) cloudById[episode.id!] = episode;
@@ -259,7 +313,10 @@ class RecentlyWatchedSyncService {
       for (final movie in chunk) {
         batch.set(
           collection.doc(movie.id!.toString()),
-          movie.toCloudMap(),
+          <String, dynamic>{
+            ...movie.toCloudMap(),
+            syncedAtField: FieldValue.serverTimestamp(),
+          },
           SetOptions(merge: true),
         );
       }
@@ -280,7 +337,10 @@ class RecentlyWatchedSyncService {
       for (final episode in chunk) {
         batch.set(
           collection.doc(episode.id!.toString()),
-          episode.toCloudMap(),
+          <String, dynamic>{
+            ...episode.toCloudMap(),
+            syncedAtField: FieldValue.serverTimestamp(),
+          },
           SetOptions(merge: true),
         );
       }
@@ -291,11 +351,21 @@ class RecentlyWatchedSyncService {
 
   /// Cloud first, then local: dropping the local row while the cloud tombstone
   /// is still there would only make the next pull write it back.
+  ///
+  /// Runs at most once per [_pruneInterval] for each account.
   Future<void> _pruneTombstones(String uid) async {
-    final cutoff = DateTime.now()
-        .toUtc()
-        .subtract(_tombstoneRetention)
-        .millisecondsSinceEpoch;
+    final prefs = await SharedPreferences.getInstance();
+    final prunedKey = '$_prunedAtKey.$uid';
+    final now = DateTime.now();
+    final prunedAt = prefs.getInt(prunedKey);
+    if (prunedAt != null) {
+      final since =
+          now.difference(DateTime.fromMillisecondsSinceEpoch(prunedAt));
+      if (!since.isNegative && since < _pruneInterval) return;
+    }
+
+    final cutoff =
+        now.toUtc().subtract(_tombstoneRetention).millisecondsSinceEpoch;
 
     for (final collection in <CollectionReference<Map<String, dynamic>>>[
       _movies(uid),
@@ -319,6 +389,7 @@ class RecentlyWatchedSyncService {
 
     await _movieDb.prunedTombstones(cutoff);
     await _episodeDb.prunedTombstones(cutoff);
+    await prefs.setInt(prunedKey, now.millisecondsSinceEpoch);
   }
 
   Future<void> _recordSuccess() async {
@@ -350,6 +421,8 @@ class RecentlyWatchedSyncService {
     await deleteRemoteAccountData(uid);
     await _movieDb.clear();
     await _episodeDb.clear();
+    await SyncCheckpoint.clear('recently_watched.$uid.');
+    _lastAutoSyncUid = null;
     // A ValueNotifier stays quiet when the value does not change, so step
     // through idle to guarantee listeners see the success edge and reload.
     statusNotifier.value = RecentSyncStatus.idle;

@@ -2,25 +2,17 @@ import 'dart:async';
 
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flixquest/models/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'constants/app_constants.dart';
 import 'constants/theme_data.dart';
 import 'functions/function.dart';
 import 'provider/app_dependency_provider.dart';
 import 'provider/recently_watched_provider.dart';
 import 'provider/settings_provider.dart';
-import 'screens/common/discover.dart';
-import 'screens/common/bookmark_screen.dart';
-import 'screens/common/search_view.dart';
-import 'screens/user/user_info.dart';
 import 'screens/user/user_state.dart';
-import 'widgets/movie_widgets.dart';
-import 'widgets/tv_widgets.dart';
 import 'widgets/occasional_effect_overlay.dart';
 import 'provider/bookmark_provider.dart';
 import 'provider/offline_download_provider.dart';
@@ -29,10 +21,10 @@ import 'services/in_app_messaging_service.dart';
 import 'services/deep_link_dispatcher.dart';
 import 'services/home_widget_service.dart';
 import 'services/recently_watched_sync_service.dart';
-import 'services/app_session_state_store.dart';
 import 'services/app_remote_config.dart';
-import 'screens/common/downloads_screen.dart';
+import 'mobile/app/mobile_shell.dart';
 import 'tv/platform/device_presentation.dart';
+import 'tv/navigation/tv_back_key_guard.dart';
 import 'tv/widgets/tv_update_gate.dart';
 
 class FlixQuest extends StatefulWidget {
@@ -205,13 +197,15 @@ class _FlixQuestState extends State<FlixQuest>
                 darkDynamicColor: darkDynamic,
                 context: context,
                 appColor: selectedAppColor,
+                compactCorners: widget.devicePresentation !=
+                    DevicePresentation.television,
                 occasionalTheme: appDependencyProvider.activeOccasionalTheme,
                 ambientColor: appDependencyProvider.activeAmbientColor,
               );
               unawaited(
                 HomeWidgetService.instance.syncResolvedTheme(appTheme),
               );
-              return MaterialApp(
+              final app = MaterialApp(
                 restorationScopeId: 'flixquest',
                 navigatorKey: InAppMessagingService.navigatorKey,
                 localizationsDelegates: context.localizationDelegates,
@@ -253,231 +247,25 @@ class _FlixQuestState extends State<FlixQuest>
                   devicePresentation: widget.devicePresentation,
                 ),
               );
+              // Wraps the app itself: it has to hear about system Backs
+              // before the navigator does.
+              return widget.devicePresentation == DevicePresentation.television
+                  ? TvBackKeyGuard(child: app)
+                  : app;
             },
           );
         }));
   }
 }
 
-class FlixQuestHomePage extends StatefulWidget {
+/// The phone and tablet app, under its bottom bar.
+class FlixQuestHomePage extends StatelessWidget {
   const FlixQuestHomePage({
     super.key,
   });
 
   @override
-  State<FlixQuestHomePage> createState() => _FlixQuestHomePageState();
-}
-
-class _FlixQuestHomePageState extends State<FlixQuestHomePage>
-    with SingleTickerProviderStateMixin, RestorationMixin {
-  static const _destinationIds = <String>[
-    'movies',
-    'series',
-    'discover',
-    'downloads',
-    'profile',
-  ];
-
-  late final AppSessionStateStore _sessionState;
-  late final RestorableString _selectedDestinationId;
-
-  @override
-  String get restorationId => 'handheld_home';
-
-  @override
-  void initState() {
-    super.initState();
-    _sessionState = AppSessionStateStore(sharedPrefsSingleton);
-    final defaultHome =
-        Provider.of<SettingsProvider>(context, listen: false).defaultValue;
-    final defaultDestinationId = defaultHome == 3
-        ? 'profile'
-        : defaultHome >= 0 && defaultHome < _destinationIds.length
-            ? _destinationIds[defaultHome]
-            : 'movies';
-    _selectedDestinationId = RestorableString(
-      _sessionState.handheldDestination ?? defaultDestinationId,
-    );
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) {
-        Provider.of<SettingsProvider>(context, listen: false)
-            .analytics
-            .trackNavigation(
-              destination: _selectedDestinationId.value,
-              surface: 'standard',
-              source: 'restored',
-            );
-      },
-    );
-  }
-
-  @override
-  void restoreState(RestorationBucket? oldBucket, bool initialRestore) {
-    registerForRestoration(
-      _selectedDestinationId,
-      'selected_destination',
-    );
-    if (!_destinationIds.contains(_selectedDestinationId.value)) {
-      _selectedDestinationId.value = 'movies';
-    }
-  }
-
-  @override
-  void dispose() {
-    _selectedDestinationId.dispose();
-    super.dispose();
-  }
-
-  void _selectDestination(int index) {
-    final destinationId = _destinationIds[index];
-    if (_selectedDestinationId.value == destinationId) return;
-    setState(() {
-      _selectedDestinationId.value = destinationId;
-    });
-    Provider.of<SettingsProvider>(context, listen: false)
-        .analytics
-        .trackNavigation(destination: destinationId, surface: 'standard');
-    unawaited(_sessionState.rememberHandheldDestination(destinationId));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final lang = Provider.of<SettingsProvider>(context).appLanguage;
-    final colorScheme = Theme.of(context).colorScheme;
-    final selectedIndex = _destinationIds.indexOf(
-      _selectedDestinationId.value,
-    );
-    return Scaffold(
-        // Keep the page surface behind the floating navigation bar and the
-        // transparent Android gesture-navigation area.
-        extendBody: true,
-        bottomNavigationBar: Align(
-          heightFactor: 1,
-          alignment: Alignment.bottomCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                color: Theme.of(context).scaffoldBackgroundColor,
-                border: Border.all(
-                  color: colorScheme.onSurface.withValues(alpha: 0.08),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    blurRadius: 28,
-                    offset: const Offset(0, 10),
-                    color: Colors.black.withValues(alpha: .18),
-                  )
-                ],
-              ),
-              child: SafeArea(
-                minimum: const EdgeInsets.symmetric(vertical: 4),
-                child: NavigationBar(
-                  height: 66,
-                  elevation: 0,
-                  backgroundColor: Colors.transparent,
-                  indicatorColor: colorScheme.primary.withValues(alpha: 0.14),
-                  labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                  selectedIndex: selectedIndex,
-                  onDestinationSelected: _selectDestination,
-                  destinations: [
-                    NavigationDestination(
-                      icon: Icon(PhosphorIcons.house()),
-                      selectedIcon: Icon(
-                          PhosphorIcons.house(PhosphorIconsStyle.fill),
-                          color: colorScheme.primary),
-                      label: tr('movies'),
-                    ),
-                    NavigationDestination(
-                      icon: Icon(PhosphorIcons.television()),
-                      selectedIcon: Icon(
-                          PhosphorIcons.television(PhosphorIconsStyle.fill),
-                          color: colorScheme.primary),
-                      label: tr('tv_series'),
-                    ),
-                    NavigationDestination(
-                      icon: Icon(PhosphorIcons.compass()),
-                      selectedIcon: Icon(
-                          PhosphorIcons.compass(PhosphorIconsStyle.fill),
-                          color: colorScheme.primary),
-                      label: tr('discover'),
-                    ),
-                    NavigationDestination(
-                      icon: Icon(PhosphorIcons.downloadSimple()),
-                      selectedIcon: Icon(
-                          PhosphorIcons.downloadSimple(PhosphorIconsStyle.fill),
-                          color: colorScheme.primary),
-                      label: 'Downloads',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(PhosphorIcons.user()),
-                      selectedIcon: Icon(
-                          PhosphorIcons.user(PhosphorIconsStyle.fill),
-                          color: colorScheme.primary),
-                      label: tr('profile'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        body: SafeArea(
-          top: false,
-          left: false,
-          right: false,
-          child: IndexedStack(
-            index: selectedIndex,
-            children: <Widget>[
-              MainMoviesDisplay(
-                onBookmarksPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const BookmarkScreen(),
-                    ),
-                  );
-                },
-                onSearchPressed: () {
-                  showSearch(
-                    context: context,
-                    delegate: Search(
-                      includeAdult:
-                          Provider.of<SettingsProvider>(context, listen: false)
-                              .isAdult,
-                      lang: lang,
-                    ),
-                  );
-                },
-              ),
-              MainTVDisplay(
-                onBookmarksPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const BookmarkScreen(),
-                    ),
-                  );
-                },
-                onSearchPressed: () {
-                  showSearch(
-                    context: context,
-                    delegate: Search(
-                      includeAdult:
-                          Provider.of<SettingsProvider>(context, listen: false)
-                              .isAdult,
-                      lang: lang,
-                    ),
-                  );
-                },
-              ),
-              const DiscoverPage(),
-              const DownloadsScreen(embedded: true),
-              const UserInfo()
-            ],
-          ),
-        ));
-  }
+  Widget build(BuildContext context) => const MobileShell();
 }
 
 /*

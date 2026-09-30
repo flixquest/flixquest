@@ -3,126 +3,497 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/wellness_insights.dart';
+import '../../models/wellness_time_series.dart';
 import '../../provider/wellness_provider.dart';
 import '../../widgets/wellness_charts.dart';
 import '../app/tv_design.dart';
+import '../focus/tv_screen_focus_controller.dart';
+import '../widgets/tv_page_header.dart';
+import '../widgets/tv_pill_button.dart';
+import '../widgets/tv_loading_skeletons.dart';
 
 class TvWellnessScreen extends StatelessWidget {
-  const TvWellnessScreen({required this.metrics, super.key});
+  const TvWellnessScreen(
+      {required this.metrics, this.focusController, super.key});
 
   final TvShellMetrics metrics;
+  final TvScreenFocusController? focusController;
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<WellnessProvider>();
-    final insights = WellnessInsights.fromSessions(
-      provider.sessions,
-      period: WellnessPeriod.forRange(WellnessRange.week, DateTime.now()),
+    return TvWellnessContent(
+      metrics: metrics,
+      insights: provider.insights,
+      range: provider.range,
+      loading: provider.loading,
+      onRangeSelected: provider.setRange,
+      focusController: focusController,
     );
-    final colors = Theme.of(context).colorScheme;
-    return Padding(
-      padding: EdgeInsets.all(metrics.contentPadding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(PhosphorIcons.chartDonut(), color: colors.primary, size: 32),
-              const SizedBox(width: 13),
-              Text(
-                'Viewing Insights',
-                style: TextStyle(
-                  color: colors.onSurface,
-                  fontFamily: 'FigtreeSB',
-                  fontSize: 34,
+  }
+}
+
+/// Separated from storage so TV layout and D-pad behavior can be tested with
+/// deterministic viewing sessions.
+class TvWellnessContent extends StatefulWidget {
+  const TvWellnessContent({
+    required this.metrics,
+    required this.insights,
+    required this.range,
+    required this.loading,
+    required this.onRangeSelected,
+    this.focusController,
+    super.key,
+  });
+
+  final TvShellMetrics metrics;
+  final WellnessInsights insights;
+  final WellnessRange range;
+  final bool loading;
+  final ValueChanged<WellnessRange> onRangeSelected;
+  final TvScreenFocusController? focusController;
+
+  @override
+  State<TvWellnessContent> createState() => _TvWellnessContentState();
+}
+
+class _TvWellnessContentState extends State<TvWellnessContent> {
+  late final FocusNode _entry = FocusNode(debugLabel: 'TV insights week');
+  final Map<String, GlobalKey> _sections = <String, GlobalKey>{
+    'Time': GlobalKey(),
+    'Titles': GlobalKey(),
+    'Taste': GlobalKey(),
+    'Patterns': GlobalKey(),
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusController?.attach(this, _requestEntryFocus);
+  }
+
+  @override
+  void didUpdateWidget(TvWellnessContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusController != widget.focusController) {
+      oldWidget.focusController?.detach(this);
+      widget.focusController?.attach(this, _requestEntryFocus);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusController?.detach(this);
+    _entry.dispose();
+    super.dispose();
+  }
+
+  bool _requestEntryFocus() {
+    if (_entry.context == null || !_entry.canRequestFocus) return false;
+    _entry.requestFocus();
+    return true;
+  }
+
+  void _jumpTo(String section) {
+    final target = _sections[section]?.currentContext;
+    if (target == null) return;
+    Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      alignment: 0.08,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
+    final theme = Theme.of(context);
+    final insights = widget.insights;
+    final series = WellnessTimeSeries.forRange(insights, widget.range);
+    // The charts are shared with the phone and draw in the theme's accent;
+    // on TV they read in greys, and the accent stays with the brand.
+    final chartTheme = theme.copyWith(
+      colorScheme: theme.colorScheme.copyWith(
+        primary: palette.secondaryText,
+        secondary: palette.mutedText,
+      ),
+    );
+    return Theme(
+      data: chartTheme,
+      child: FocusTraversalGroup(
+        policy: ReadingOrderTraversalPolicy(),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(widget.metrics.contentPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              // The header keeps the real accent; the charts below do not.
+              Theme(
+                data: theme,
+                child: TvPageHeader(
+                  kicker: 'YOUR VIEWING STORY',
+                  title: 'Viewing Insights',
+                  compact: widget.metrics.compact,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 8),
               Text(
-                'This week • private insights',
-                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 18),
+                'Active playback only · private to this profile',
+                style: TextStyle(color: palette.mutedText, fontSize: 15),
               ),
+              const SizedBox(height: 22),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: <Widget>[
+                  for (final range in WellnessRange.values)
+                    TvPillButton(
+                      key: Key('tv-insights-range-${range.name}'),
+                      focusNode: range == WellnessRange.week ? _entry : null,
+                      label: _rangeLabel(range),
+                      semanticLabel: '${_rangeLabel(range)} viewing range'
+                          '${widget.range == range ? ', selected' : ''}',
+                      icon: widget.range == range
+                          ? PhosphorIcons.check(PhosphorIconsStyle.bold)
+                          : null,
+                      prominent: widget.range == range,
+                      onActivate: () => widget.onRangeSelected(range),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              if (widget.loading)
+                TvInsightsSkeleton(metrics: widget.metrics)
+              else if (insights.isEmpty)
+                const _InsightPanel(
+                  title: 'Your story starts here',
+                  child: Text(
+                    'Watch something and your private viewing insights will appear here. Try a different range to see older activity.',
+                  ),
+                )
+              else ...<Widget>[
+                _InsightPanel(
+                  title: 'Active playback',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        _duration(insights.totalWatchedMs),
+                        style: TextStyle(
+                          color: palette.foreground,
+                          fontFamily: 'FigtreeBold',
+                          fontSize: widget.metrics.compact ? 40 : 50,
+                        ),
+                      ),
+                      WellnessBarChart(
+                        data: <WellnessBarDatum>[
+                          for (final bucket in series.buckets)
+                            WellnessBarDatum(
+                              label: bucket.label,
+                              fullLabel: bucket.fullLabel,
+                              value: bucket.totalMs,
+                            ),
+                        ],
+                        averageMs: series.averageMs,
+                        color: palette.secondaryText,
+                        height: widget.metrics.compact ? 156 : 190,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${series.activeBuckets} active ${series.unitLabel}${series.activeBuckets == 1 ? '' : 's'} · Average active day ${_duration(insights.averageActiveDayMs)}',
+                      ),
+                      if (series.indexOfBusiest() >= 0)
+                        Text(
+                          'Busiest ${series.unitLabel}: ${series.buckets[series.indexOfBusiest()].fullLabel} · ${_duration(series.buckets[series.indexOfBusiest()].totalMs)}',
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _statGrid(insights),
+                const SizedBox(height: 22),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: <Widget>[
+                    for (final section in _sections.keys)
+                      TvPillButton(
+                        label: section,
+                        semanticLabel: 'Jump to $section insights',
+                        onActivate: () => _jumpTo(section),
+                      ),
+                  ],
+                ),
+                _heading('Your viewing rhythm', _sections['Time']!),
+                _columns(<Widget>[
+                  _facts('Consistency', <(String, String)>[
+                    (
+                      'Active days',
+                      '${insights.activeDays} of ${insights.periodDays}'
+                    ),
+                    ('Current streak', '${insights.currentStreakDays()} days'),
+                    ('Longest streak', '${insights.longestStreakDays} days'),
+                    (
+                      'Typical active day',
+                      _duration(insights.medianActiveDayMs)
+                    ),
+                  ]),
+                  _facts('What you watched', <(String, String)>[
+                    ('Movies', _duration(insights.movieMs)),
+                    ('Episodes', _duration(insights.episodeMs)),
+                    ('Live TV', _duration(insights.liveMs)),
+                    ('Longest session', _duration(insights.longestSessionMs)),
+                    if (insights.hasNetworkUsage)
+                      (
+                        'Data used',
+                        '${_dataSize(insights.networkBytes)} · '
+                            '${_dataSize(insights.networkBytesPerHour)}/h'
+                      ),
+                  ]),
+                ]),
+                _heading('What held your attention', _sections['Titles']!),
+                _columns(<Widget>[
+                  _facts('Follow-through', <(String, String)>[
+                    ('Started', '${insights.titlesStarted} titles'),
+                    (
+                      'Finished',
+                      '${insights.completedTitles} · ${_percent(insights.completionRate)}'
+                    ),
+                    ('Sampled', '${insights.sampledTitles}'),
+                    ('Rewatched', '${insights.rewatches}'),
+                    ('Average session', _duration(insights.averageSessionMs)),
+                  ]),
+                  _ranked('Most watched', insights.topTitles),
+                  if (insights.topSeriesEpisodes.isNotEmpty)
+                    _ranked(
+                      'Series you kept going',
+                      insights.topSeriesEpisodes,
+                      format: (value) => '$value episodes',
+                    ),
+                  _facts('Recent viewing', <(String, String)>[
+                    for (final session in insights.sessions.take(5))
+                      (
+                        session.title,
+                        '${_duration(session.watchedMs)} · ${session.viewingStatus}',
+                      ),
+                  ]),
+                ]),
+                _heading('The shape of your taste', _sections['Taste']!),
+                _columns(<Widget>[
+                  _ranked('Genres', insights.topGenres),
+                  _ranked('Languages', insights.topLanguages),
+                  _ranked('Countries', insights.topCountries),
+                  _ranked('Release decades', insights.topDecades),
+                  _ranked('Stream providers', insights.topProviders),
+                ]),
+                _heading('When stories fit your day', _sections['Patterns']!),
+                _InsightPanel(
+                  title: 'Weekly rhythm',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      const Text(
+                          'Viewing by weekday and hour across this range'),
+                      const SizedBox(height: 14),
+                      WellnessHeatmap(
+                        values: insights.hourOfWeekMs,
+                        rowHeight: widget.metrics.compact ? 18 : 22,
+                        surfaceColor: TvDesign.surfaceFor(context),
+                      ),
+                      if (insights.peakHourOfWeek case final peak?)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            'Busiest window: ${_weekdays[peak.$1]} at ${_hourLabel(peak.$2)} · ${_duration(peak.$3)}',
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _columns(<Widget>[
+                  _facts('Days of the week', <(String, String)>[
+                    for (var day = 0; day < 7; day++)
+                      (
+                        _weekdays[day],
+                        _duration(insights.weekdayTotalsMs[day])
+                      ),
+                  ]),
+                  _facts('Parts of the day', <(String, String)>[
+                    for (var part = 0; part < 4; part++)
+                      (_dayParts[part], _duration(insights.partOfDayMs[part])),
+                  ]),
+                  _facts('Viewing patterns', <(String, String)>[
+                    ('Weekdays', _duration(insights.weekdayWatchedMs)),
+                    ('Weekends', _duration(insights.weekendWatchedMs)),
+                    ('Late night', _duration(insights.lateNightMs)),
+                  ]),
+                ]),
+              ],
+              const SizedBox(height: 30),
             ],
           ),
-          SizedBox(height: metrics.compact ? 16 : 24),
-          if (provider.loading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
-          else if (insights.isEmpty)
-            Expanded(
-              child: Center(
-                child: Text(
-                  'Watch something and your viewing story will appear here.',
-                  style:
-                      TextStyle(color: colors.onSurfaceVariant, fontSize: 22),
+        ),
+      ),
+    );
+  }
+}
+
+const _weekdays = <String>[
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+const _dayParts = <String>['Morning', 'Afternoon', 'Evening', 'Late night'];
+
+String _rangeLabel(WellnessRange range) => switch (range) {
+      WellnessRange.week => 'Week',
+      WellnessRange.month => 'Month',
+      WellnessRange.year => 'Year',
+      WellnessRange.allTime => 'All time',
+    };
+
+String _duration(int milliseconds) {
+  final minutes = Duration(milliseconds: milliseconds).inMinutes;
+  return '${minutes ~/ 60}h ${minutes % 60}m';
+}
+
+String _percent(double value) => '${(value * 100).round()}%';
+
+String _hourLabel(int hour) {
+  final h = hour % 12 == 0 ? 12 : hour % 12;
+  return '$h ${hour < 12 ? 'am' : 'pm'}';
+}
+
+Widget _heading(String title, Key key) => Padding(
+      key: key,
+      padding: const EdgeInsets.fromLTRB(0, 34, 0, 14),
+      child: Builder(
+        builder: (context) => Text(
+          title,
+          style: TextStyle(
+            color: TvPalette.of(context).foreground,
+            fontFamily: 'FigtreeBold',
+            fontSize: 25,
+          ),
+        ),
+      ),
+    );
+
+Widget _columns(List<Widget> children) => LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 14.0;
+        final columns = constraints.maxWidth >= 700 ? 2 : 1;
+        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: <Widget>[
+            for (final child in children) SizedBox(width: width, child: child),
+          ],
+        );
+      },
+    );
+
+Widget _statGrid(WellnessInsights insights) => LayoutBuilder(
+      builder: (context, constraints) {
+        final palette = TvPalette.of(context);
+        const gap = 12.0;
+        final columns = constraints.maxWidth >= 800 ? 3 : 2;
+        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+        final stats = <(String, String, IconData)>[
+          ('Movies', '${insights.completedMovies}', PhosphorIcons.filmSlate()),
+          (
+            'Episodes',
+            '${insights.completedEpisodes}',
+            PhosphorIcons.television()
+          ),
+          ('Series', '${insights.uniqueSeries}', PhosphorIcons.stack()),
+          ('Sessions', '${insights.sessionCount}', PhosphorIcons.playCircle()),
+          (
+            'Active days',
+            '${insights.activeDays}',
+            PhosphorIcons.calendarDots()
+          ),
+          (
+            'Rewatches',
+            '${insights.rewatches}',
+            PhosphorIcons.arrowCounterClockwise()
+          ),
+        ];
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: <Widget>[
+            for (final stat in stats)
+              SizedBox(
+                width: width,
+                child: _InsightPanel(
+                  title: stat.$1,
+                  child: Row(
+                    children: <Widget>[
+                      Icon(stat.$3, color: palette.mutedText),
+                      const SizedBox(width: 12),
+                      Text(
+                        stat.$2,
+                        style: TextStyle(
+                          color: palette.foreground,
+                          fontFamily: 'FigtreeBold',
+                          fontSize: 26,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            )
-          else
-            Expanded(
+          ],
+        );
+      },
+    );
+
+String _dataSize(int bytes) {
+  const units = <String>['KB', 'MB', 'GB', 'TB'];
+  if (bytes < 1024) return '$bytes B';
+  var value = bytes / 1024;
+  var unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return '${value.toStringAsFixed(value < 10 ? 1 : 0)} ${units[unit]}';
+}
+
+Widget _facts(String title, List<(String, String)> rows) => _InsightPanel(
+      title: title,
+      child: Column(
+        children: <Widget>[
+          for (final row in rows)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+                children: <Widget>[
                   Expanded(
-                    flex: 4,
-                    child: Container(
-                      padding: EdgeInsets.all(metrics.compact ? 22 : 30),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [colors.primary, colors.tertiary],
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _duration(insights.totalWatchedMs),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontFamily: 'FigtreeSB',
-                              fontSize: 48,
-                            ),
-                          ),
-                          Text(
-                            'active playback',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: .82),
-                              fontSize: 20,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          Expanded(
-                            child: WellnessBarChart(
-                              data: _weekData(insights),
-                              color: Colors.white,
-                              height: double.infinity,
-                            ),
-                          ),
-                        ],
-                      ),
+                    child: Text(
+                      row.$1,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  SizedBox(width: metrics.compact ? 14 : 22),
-                  Expanded(
-                    flex: 3,
-                    child: GridView.count(
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 14,
-                      crossAxisSpacing: 14,
-                      childAspectRatio: metrics.compact ? 1.35 : 1.25,
-                      children: [
-                        _Metric('Movies', '${insights.completedMovies}',
-                            PhosphorIcons.filmSlate()),
-                        _Metric('Episodes', '${insights.completedEpisodes}',
-                            PhosphorIcons.television()),
-                        _Metric('Series', '${insights.uniqueSeries}',
-                            PhosphorIcons.stack()),
-                        _Metric('Active days', '${insights.activeDays}',
-                            PhosphorIcons.calendarDots()),
-                      ],
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Builder(
+                      builder: (context) => Text(
+                        row.$2,
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          color: TvPalette.of(context).foreground,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -131,56 +502,84 @@ class TvWellnessScreen extends StatelessWidget {
         ],
       ),
     );
-  }
+
+Widget _ranked(
+  String title,
+  List<WellnessRankedValue> values, {
+  String Function(int)? format,
+}) =>
+    _facts(
+      title,
+      values.isEmpty
+          ? <(String, String)>[('More viewing will reveal this insight.', '')]
+          : <(String, String)>[
+              for (final value in values.take(5))
+                (value.label, (format ?? _duration)(value.value)),
+            ],
+    );
+
+/// Read-only panels are focusable so arrow keys reveal each part of the
+/// scrollable report, including sections below the first TV viewport.
+class _InsightPanel extends StatefulWidget {
+  const _InsightPanel({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  State<_InsightPanel> createState() => _InsightPanelState();
 }
 
-class _Metric extends StatelessWidget {
-  const _Metric(this.label, this.value, this.icon);
-
-  final String label;
-  final String value;
-  final IconData icon;
+class _InsightPanelState extends State<_InsightPanel> {
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: TvDesign.surfaceFor(context, emphasis: .02),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.outlineVariant.withValues(alpha: .4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: colors.primary, size: 26),
-          const Spacer(),
-          Text(value,
-              style: const TextStyle(fontFamily: 'FigtreeSB', fontSize: 32)),
-          Text(label,
-              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 16)),
-        ],
+    final palette = TvPalette.of(context);
+    return Focus(
+      onFocusChange: (focused) {
+        setState(() => _focused = focused);
+        if (focused) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            Scrollable.ensureVisible(
+              context,
+              duration: const Duration(milliseconds: 220),
+              alignment: 0.12,
+            );
+          });
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: TvDesign.surfaceFor(context),
+          borderRadius: BorderRadius.circular(TvDesign.cardRadius),
+          border: Border.all(
+            color: _focused ? palette.foreground : palette.hairline,
+            width: _focused ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              widget.title,
+              style: TextStyle(
+                color: palette.foreground,
+                fontFamily: 'FigtreeBold',
+                fontSize: 20,
+              ),
+            ),
+            const SizedBox(height: 14),
+            DefaultTextStyle(
+              style: TextStyle(color: palette.mutedText, fontSize: 16),
+              child: widget.child,
+            ),
+          ],
+        ),
       ),
     );
   }
-}
-
-List<WellnessBarDatum> _weekData(WellnessInsights insights) {
-  final now = DateTime.now();
-  final start = DateTime(now.year, now.month, now.day)
-      .subtract(Duration(days: now.weekday - 1));
-  const labels = <String>['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  return List<WellnessBarDatum>.generate(7, (index) {
-    final day = start.add(Duration(days: index));
-    return WellnessBarDatum(
-      label: labels[index],
-      value: insights.dailyWatchedMs[day] ?? 0,
-    );
-  });
-}
-
-String _duration(int milliseconds) {
-  final minutes = Duration(milliseconds: milliseconds).inMinutes;
-  return '${minutes ~/ 60}h ${minutes % 60}m';
 }

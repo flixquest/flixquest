@@ -1025,6 +1025,7 @@ class _RampLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final labels = WellnessChartLabels.maybeOf(context);
     final style = theme.textTheme.labelSmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
@@ -1040,7 +1041,7 @@ class _RampLegend extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Less', style: style),
+            Text(labels?.less ?? 'Less', style: style),
             const SizedBox(width: 6),
             for (final color in scale)
               Padding(
@@ -1055,12 +1056,13 @@ class _RampLegend extends StatelessWidget {
                 ),
               ),
             const SizedBox(width: 4),
-            Text('More', style: style),
+            Text(labels?.more ?? 'More', style: style),
           ],
         ),
         if (maxValue > 0)
           Text(
-            'Peak ${wellnessCompactDuration(maxValue)}/h',
+            labels?.peakPerHour(wellnessCompactDuration(maxValue)) ??
+                'Peak ${wellnessCompactDuration(maxValue)}/h',
             style: style,
           ),
       ],
@@ -1162,7 +1164,8 @@ class WellnessOrdinalBars extends StatelessWidget {
         // path to a number.
         if (data.isEmpty)
           Text(
-            'Nothing recorded yet.',
+            WellnessChartLabels.maybeOf(context)?.nothingYet ??
+                'Nothing recorded yet.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -1635,4 +1638,33 @@ class _SparklinePainter extends CustomPainter {
       oldDelegate.values != values ||
       oldDelegate.color != color ||
       oldDelegate.palette != palette;
+}
+
+/// The words the charts draw, in the reader's language. Charts built outside
+/// one fall back to English.
+class WellnessChartLabels extends InheritedWidget {
+  const WellnessChartLabels({
+    required this.less,
+    required this.more,
+    required this.peakPerHour,
+    required this.nothingYet,
+    required super.child,
+    super.key,
+  });
+
+  final String less;
+  final String more;
+
+  /// "Peak 1h/h", given the compact duration.
+  final String Function(String duration) peakPerHour;
+  final String nothingYet;
+
+  static WellnessChartLabels? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<WellnessChartLabels>();
+
+  @override
+  bool updateShouldNotify(WellnessChartLabels oldWidget) =>
+      less != oldWidget.less ||
+      more != oldWidget.more ||
+      nothingYet != oldWidget.nothingYet;
 }

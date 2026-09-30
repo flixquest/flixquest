@@ -1,339 +1,259 @@
-import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+
+import '../design/app_palette.dart';
+import '../design/app_tokens.dart';
+import '../design/skeleton.dart';
 import '../models/provider_load_state.dart';
-import 'app_logo.dart';
 
-class ProviderLoadingWidget extends StatefulWidget {
-  final List<ProviderLoadState> providers;
-  final int currentIndex;
-  final String? additionalMessage;
+const _switchDuration = Duration(milliseconds: 220);
 
+/// The source race while a stream resolves: the source being waited on, how
+/// far through the list the race is, and every source's outcome so far.
+///
+/// Rows keep a steady height as the race moves on, so nothing below them
+/// jumps while the viewer waits.
+class ProviderLoadingWidget extends StatelessWidget {
   const ProviderLoadingWidget({
     required this.providers,
     required this.currentIndex,
-    this.additionalMessage,
     super.key,
   });
 
-  @override
-  State<ProviderLoadingWidget> createState() => _ProviderLoadingWidgetState();
-}
+  final List<ProviderLoadState> providers;
 
-class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    _animationController.forward();
-  }
-
-  @override
-  void didUpdateWidget(ProviderLoadingWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentIndex != widget.currentIndex) {
-      _animationController.reset();
-      _animationController.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
+  /// The source the race is waiting on, or the one it chose.
+  final int currentIndex;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final viewport = MediaQuery.sizeOf(context);
-    final isLandscape = viewport.width > viewport.height;
-    final useSplitLayout = isLandscape && viewport.width >= 620;
-    final horizontalMargin = useSplitLayout ? 16.0 : 20.0;
-
-    return Container(
-      width: double.infinity,
-      margin: EdgeInsets.symmetric(
-        horizontal: horizontalMargin,
-        vertical: useSplitLayout ? 10 : 20,
-      ),
-      padding: EdgeInsets.symmetric(
-        horizontal: useSplitLayout ? 26 : 32,
-        vertical: useSplitLayout ? 22 : 34,
-      ),
-      constraints: BoxConstraints(
-        maxWidth: useSplitLayout ? 780 : 440,
-        minHeight: useSplitLayout ? 0 : 340,
-      ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.primaryContainer.withValues(alpha: .22),
-            colors.surfaceContainerHigh.withValues(alpha: .88),
-            colors.surface.withValues(alpha: .94),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(useSplitLayout ? 24 : 28),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: .46),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colors.shadow.withValues(alpha: .18),
-            blurRadius: 36,
-            offset: const Offset(0, 18),
-          ),
-          BoxShadow(
-            color: colors.primary.withValues(alpha: .07),
-            blurRadius: 48,
-          ),
-        ],
-      ),
-      child: useSplitLayout
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(child: _buildIdentity(compact: true)),
-                Container(
-                  width: 1,
-                  height: 150,
-                  margin: const EdgeInsets.symmetric(horizontal: 24),
-                  color: colors.outlineVariant.withValues(alpha: .42),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: _buildProviderProgress(compact: true),
-                ),
-              ],
-            )
-          : Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildIdentity(compact: false),
-                const SizedBox(height: 24),
-                _buildProviderProgress(compact: false),
-              ],
-            ),
-    );
-  }
-
-  Widget _buildIdentity({required bool compact}) {
-    final colors = Theme.of(context).colorScheme;
-    final logoSize = compact ? 52.0 : 72.0;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment:
-          compact ? CrossAxisAlignment.start : CrossAxisAlignment.center,
-      children: [
-        Container(
-          padding: EdgeInsets.all(compact ? 12 : 18),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [
-                colors.primary.withValues(alpha: .22),
-                colors.primary.withValues(alpha: .08),
-                Colors.transparent,
-              ],
-            ),
-            border: Border.all(
-              color: colors.primary.withValues(alpha: .12),
-            ),
-          ),
-          child: AppLogo(height: logoSize, width: logoSize),
-        ),
-        SizedBox(height: compact ? 14 : 22),
-        Text(
-          tr('loading_video_sources'),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: compact ? TextAlign.start : TextAlign.center,
-          style: TextStyle(
-            color: colors.onSurface,
-            fontSize: compact ? 17 : 19,
-            fontWeight: FontWeight.w600,
-            fontFamily: 'Figtree',
-            letterSpacing: .2,
-            height: 1.2,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          tr('finding_best_source'),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: compact ? TextAlign.start : TextAlign.center,
-          style: TextStyle(
-            color: colors.onSurfaceVariant.withValues(alpha: .78),
-            fontSize: 13,
-            fontFamily: 'Figtree',
-            height: 1.3,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProviderProgress({required bool compact}) {
-    final colors = Theme.of(context).colorScheme;
-    final completed = widget.providers.where((provider) {
-      return provider.status == ProviderStatus.success ||
-          provider.status == ProviderStatus.failed;
-    }).length;
-    final progress = widget.providers.isEmpty
-        ? null
-        : (completed / widget.providers.length).clamp(0.0, 1.0);
+    final current = currentIndex >= 0 && currentIndex < providers.length
+        ? providers[currentIndex]
+        : null;
+    final checked = providers
+        .where((provider) =>
+            provider.status == ProviderStatus.success ||
+            provider.status == ProviderStatus.failed)
+        .length;
 
     return Column(
+      key: const ValueKey<String>('provider-loading-panel'),
       mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 5,
-                  backgroundColor: colors.primary.withValues(alpha: .11),
-                  valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
-                ),
-              ),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        AnimatedSize(
+          duration: _switchDuration,
+          curve: Curves.easeOutCubic,
+          alignment: AlignmentDirectional.topStart,
+          child: AnimatedSwitcher(
+            duration: _switchDuration,
+            layoutBuilder: (currentChild, previousChildren) => Stack(
+              alignment: AlignmentDirectional.topStart,
+              children: <Widget>[
+                ...previousChildren,
+                if (currentChild != null) currentChild,
+              ],
             ),
-            if (widget.providers.isNotEmpty) ...[
-              const SizedBox(width: 12),
-              Text(
-                '$completed/${widget.providers.length}',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+            child: _CurrentSource(
+              key: ValueKey<String>('${current?.codeName}:${current?.status}'),
+              provider: current,
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpace.lg),
+        _RaceProgress(checked: checked, total: providers.length),
+        const SizedBox(height: AppSpace.lg),
+        if (providers.isEmpty)
+          const _SourceChipsSkeleton()
+        else
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: <Widget>[
+              for (var index = 0; index < providers.length; index++)
+                _SourceChip(
+                  provider: providers[index],
+                  current: index == currentIndex,
                 ),
-              ),
             ],
-          ],
+          ),
+      ],
+    );
+  }
+}
+
+/// The one line that says what the wait is for right now.
+class _CurrentSource extends StatelessWidget {
+  const _CurrentSource({required this.provider, super.key});
+
+  final ProviderLoadState? provider;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final provider = this.provider;
+    final status = provider?.status ?? ProviderStatus.pending;
+    final headline = switch (status) {
+      // Before any request starts, the source list itself is loading.
+      ProviderStatus.pending => tr('loading_video_sources'),
+      ProviderStatus.loading => tr(
+          'playback_loader_checking',
+          namedArgs: {'provider': provider!.fullName},
         ),
-        SizedBox(height: compact ? 15 : 22),
-        FadeTransition(
-          opacity: _fadeAnimation,
-          child: _buildProviderCarousel(compact: compact),
+      ProviderStatus.success => tr(
+          'playback_loader_found',
+          namedArgs: {'provider': provider!.fullName},
         ),
-        if (widget.additionalMessage != null) ...[
-          SizedBox(height: compact ? 10 : 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-              color: colors.primaryContainer.withValues(alpha: .3),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
-                  ),
+      ProviderStatus.failed => provider!.fullName,
+    };
+    final content =
+        status == ProviderStatus.pending ? null : provider?.content?.trim();
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: _StatusGlyph(
+            status: status == ProviderStatus.pending
+                ? ProviderStatus.loading
+                : status,
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: AppSpace.md),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                headline,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppType.scaled(context, AppType.sectionHeader).copyWith(
+                  color: palette.foreground,
                 ),
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Text(
-                    widget.additionalMessage!,
-                    maxLines: compact ? 1 : 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: colors.onSurface.withValues(alpha: .8),
-                      fontSize: 13,
-                      fontFamily: 'Figtree',
-                    ),
-                    textAlign: TextAlign.center,
+              ),
+              if (content?.isNotEmpty == true) ...<Widget>[
+                const SizedBox(height: AppSpace.xs),
+                Text(
+                  content!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppType.scaled(context, AppType.metadata).copyWith(
+                    color: palette.mutedText,
+                    fontSize: 13,
                   ),
                 ),
               ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A thin bar of the sources that have answered, easing forward as each one
+/// does, with the count beside it.
+class _RaceProgress extends StatelessWidget {
+  const _RaceProgress({required this.checked, required this.total});
+
+  final int checked;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final target = total == 0 ? 0.0 : (checked / total).clamp(0.0, 1.0);
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: SizedBox(
+              height: 3,
+              child: ColoredBox(
+                color: palette.idleFill,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: target),
+                  duration: const Duration(milliseconds: 360),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, _) => FractionallySizedBox(
+                    alignment: AlignmentDirectional.centerStart,
+                    widthFactor: value,
+                    child: ColoredBox(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (total > 0) ...<Widget>[
+          const SizedBox(width: AppSpace.md),
+          Text(
+            tr(
+              'playback_loader_progress',
+              namedArgs: {'checked': '$checked', 'total': '$total'},
+            ),
+            style: AppType.scaled(context, AppType.metadata).copyWith(
+              color: palette.mutedText,
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
             ),
           ),
         ],
       ],
     );
   }
+}
 
-  Widget _buildProviderCarousel({required bool compact}) {
-    final int prevIndex =
-        widget.currentIndex > 0 ? widget.currentIndex - 1 : -1;
-    final int nextIndex = widget.currentIndex < widget.providers.length - 1
-        ? widget.currentIndex + 1
-        : -1;
+/// One source and how it answered.
+class _SourceChip extends StatelessWidget {
+  const _SourceChip({required this.provider, required this.current});
 
-    if (widget.providers.isEmpty) {
-      return _buildEmptyProviderItem(compact: compact);
-    }
+  final ProviderLoadState provider;
+  final bool current;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (prevIndex >= 0)
-          _buildProviderItem(
-            widget.providers[prevIndex],
-            compact: compact,
-          ),
-        if (widget.currentIndex < widget.providers.length)
-          _buildProviderItem(
-            widget.providers[widget.currentIndex],
-            isCurrent: true,
-            compact: compact,
-          ),
-        if (nextIndex >= 0)
-          _buildProviderItem(
-            widget.providers[nextIndex],
-            compact: compact,
-          ),
-      ],
-    );
-  }
-
-  Widget _buildEmptyProviderItem({required bool compact}) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: compact ? 12 : 15,
-      ),
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final status = provider.status;
+    final settled =
+        status == ProviderStatus.pending || status == ProviderStatus.failed;
+    final fill = switch (status) {
+      ProviderStatus.success => palette.idleFillStrong,
+      _ when current || status == ProviderStatus.loading => palette.idleFill,
+      _ => palette.idleFillFaint,
+    };
+    return AnimatedContainer(
+      duration: _switchDuration,
+      curve: Curves.easeOut,
+      constraints: const BoxConstraints(minHeight: 30),
+      padding: const EdgeInsetsDirectional.fromSTEB(8, 6, 11, 6),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest.withValues(alpha: .4),
-        borderRadius: BorderRadius.circular(14),
+        color: fill,
+        borderRadius: BorderRadius.circular(AppRadii.chip),
       ),
       child: Row(
-        children: [
-          SizedBox.square(
-            dimension: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.2,
-              color: colors.primary,
-            ),
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Container(
-              height: 10,
-              decoration: BoxDecoration(
-                color: colors.onSurface.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(10),
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _StatusGlyph(status: status, size: 14),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 160),
+            child: Text(
+              provider.fullName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppType.scaled(context, AppType.metadata).copyWith(
+                color: settled && !current
+                    ? palette.mutedText
+                    : palette.foreground,
+                fontFamily: current ? AppType.semiBold : AppType.regular,
               ),
             ),
           ),
@@ -341,128 +261,63 @@ class _ProviderLoadingWidgetState extends State<ProviderLoadingWidget>
       ),
     );
   }
+}
 
-  Widget _buildProviderItem(
-    ProviderLoadState provider, {
-    bool isCurrent = false,
-    required bool compact,
-  }) {
-    final bool isHighlighted = isCurrent;
-    final double opacity = isHighlighted ? 1.0 : 0.52;
-    final double fontSize = isHighlighted ? (compact ? 15.5 : 16.5) : 13.5;
-    final double iconSize = isHighlighted ? (compact ? 21 : 23) : 18;
+class _SourceChipsSkeleton extends StatelessWidget {
+  const _SourceChipsSkeleton();
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeInOutCubic,
-      margin: EdgeInsets.symmetric(vertical: compact ? 3 : 5),
-      child: Opacity(
-        opacity: opacity,
-        child: Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(
-            horizontal: isHighlighted ? 20 : 16,
-            vertical: isHighlighted ? (compact ? 10 : 13) : (compact ? 7 : 10),
-          ),
-          decoration: BoxDecoration(
-            color: isHighlighted
-                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: isHighlighted
-                ? Border.all(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.25),
-                    width: 1.2,
-                  )
-                : null,
-          ),
-          child: Row(
-            children: [
-              // Status icon
-              _buildStatusIcon(provider.status, iconSize),
-              const SizedBox(width: 14),
-
-              // Provider name and advertised catalogue/languages.
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      provider.fullName,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontSize: fontSize,
-                        fontWeight:
-                            isHighlighted ? FontWeight.w600 : FontWeight.w500,
-                        fontFamily: 'Figtree',
-                        letterSpacing: 0.2,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    // Every row advertises its catalogue so the coverage of
-                    // the neighbouring sources is visible too, not just the
-                    // one currently being tried.
-                    if (provider.content?.trim().isNotEmpty == true) ...[
-                      SizedBox(height: isHighlighted ? 3 : 2),
-                      Text(
-                        provider.content!.trim(),
-                        maxLines: isHighlighted ? (compact ? 2 : 3) : 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontSize: isHighlighted
-                              ? (compact ? 11.5 : 12)
-                              : (compact ? 10.5 : 11),
-                          fontFamily: 'Figtree',
-                          height: 1.25,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonPulse(
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: <Widget>[
+          for (final width in <double>[92, 68, 108, 80, 96])
+            SkeletonBlock(width: width, height: 30, radius: AppRadii.chip),
+        ],
       ),
     );
   }
+}
 
-  Widget _buildStatusIcon(ProviderStatus status, double iconSize) {
-    switch (status) {
-      case ProviderStatus.pending:
-        return Icon(
-          PhosphorIcons.hourglass(),
-          size: iconSize,
-          color:
-              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
-        );
-      case ProviderStatus.loading:
-        return SizedBox(
-          width: iconSize,
-          height: iconSize,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.2,
-            valueColor: AlwaysStoppedAnimation<Color>(
-              Theme.of(context).colorScheme.primary,
+/// Neutral throughout: spinners and marks stay off the accent, which is kept
+/// for the progress bar (docs/mobile_redesign_guide.md, section 3.2).
+class _StatusGlyph extends StatelessWidget {
+  const _StatusGlyph({required this.status, required this.size});
+
+  final ProviderStatus status;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return SizedBox.square(
+      dimension: size,
+      child: switch (status) {
+        ProviderStatus.pending => Icon(
+            PhosphorIcons.circle(),
+            size: size,
+            color: palette.mutedText.withValues(alpha: .55),
+          ),
+        ProviderStatus.loading => Padding(
+            padding: EdgeInsets.all(size * .1),
+            child: CircularProgressIndicator(
+              strokeWidth: size < 18 ? 1.6 : 2.2,
+              color: palette.mutedText,
             ),
           ),
-        );
-      case ProviderStatus.success:
-        return Icon(
-          PhosphorIcons.checkCircle(),
-          size: iconSize,
-          color: const Color(0xFF4CAF50),
-        );
-      case ProviderStatus.failed:
-        return Icon(
-          PhosphorIcons.warningCircle(),
-          size: iconSize,
-          color: const Color(0xFFEF5350),
-        );
-    }
+        ProviderStatus.success => Icon(
+            PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
+            size: size,
+            color: palette.foreground,
+          ),
+        ProviderStatus.failed => Icon(
+            PhosphorIcons.xCircle(),
+            size: size,
+            color: palette.mutedText,
+          ),
+      },
+    );
   }
 }

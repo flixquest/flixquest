@@ -8,7 +8,9 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 import '../models/banner_ad.dart';
 import '../provider/app_dependency_provider.dart';
-import 'unity_banner_widget.dart';
+import '../services/hosted_ads_repository.dart';
+import '../services/start_io_ads_service.dart';
+import 'start_io_banner_widget.dart';
 
 final CacheManager _adImageCache = CacheManager(
   Config(
@@ -25,17 +27,161 @@ enum HostedBannerVariant {
   bool get isTall => this == HostedBannerVariant.tall;
 }
 
+/// One banner slot shared by the two ad sources.
+///
+/// The hosted `/ads` banner (announcements and calls to action from our own
+/// backend) and the Start.io banner are independent: each has its own
+/// switch and either can be live without the other. [HostedBannerMode]
+/// decides what happens when both are live in the same slot. A remotely
+/// configured `banner_ad_network=none` still hides everything.
+class RemoteHostedAdsBanner extends StatefulWidget {
+  const RemoteHostedAdsBanner({
+    required this.placement,
+    this.loadAds,
+    this.variant = HostedBannerVariant.standard,
+    this.keywords = StartIoAdsService.catalogKeywords,
+    this.padding = const EdgeInsets.fromLTRB(20, 14, 20, 6),
+    super.key,
+  });
+
+  /// Replaces the shared `/ads` loader; used by tests.
+  final Future<List<BannerAd>> Function()? loadAds;
+  final String placement;
+  final HostedBannerVariant variant;
+  final String keywords;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  State<RemoteHostedAdsBanner> createState() => _RemoteHostedAdsBannerState();
+}
+
+class _RemoteHostedAdsBannerState extends State<RemoteHostedAdsBanner> {
+  Future<List<BannerAd>>? _ads;
+
+  Future<List<BannerAd>> _load(AppDependencyProvider dependencies) =>
+      widget.loadAds?.call() ??
+      HostedAdsRepository.instance.load(dependencies.flixquestAPIURL);
+
+  @override
+  Widget build(BuildContext context) {
+    final dependencies = context.watch<AppDependencyProvider?>();
+    if (dependencies == null || dependencies.bannerAdNetwork == 'none') {
+      return const SizedBox.shrink();
+    }
+    final television = StartIoAdsService.instance.isTelevision;
+    final hostedActive = dependencies.isHostedBannerActive;
+    // Both sources can show on Android TV; their widgets stay display-only.
+    final startIoActive = dependencies.isStartIoBannerActive;
+    if (!hostedActive) return _startIo(dependencies, widget.padding);
+    final ads = _ads ??= _load(dependencies);
+    final priority = dependencies.hostedBannerMode == HostedBannerMode.priority;
+
+    return FutureBuilder<List<BannerAd>>(
+      future: ads,
+      builder: (context, snapshot) {
+        final settled = snapshot.connectionState == ConnectionState.done;
+        final shown = (snapshot.data ?? const <BannerAd>[])
+            .where(
+              (ad) =>
+                  ad.appliesTo(widget.placement, television: television) &&
+                  dependencies.isBannerEnabled(ad.key, widget.placement),
+            )
+            .toList(growable: false);
+        final hosted = shown.isEmpty
+            ? null
+            : HostedAdsBanner(
+                ads: shown,
+                variant: widget.variant,
+                interactive: !television,
+                padding: widget.padding,
+              );
+        // In priority mode Start.io waits for the answer, so a slot that a
+        // hosted ad takes never loads (and bills) a banner underneath it.
+        final showStartIo =
+            startIoActive && (!priority || (settled && hosted == null));
+        if (hosted == null && !showStartIo) return const SizedBox.shrink();
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            if (hosted != null) hosted,
+            if (showStartIo)
+              _startIo(
+                dependencies,
+                hosted == null ? widget.padding : _tucked(widget.padding),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Keeps the Start.io banner close under a hosted banner it shares a slot
+  /// with, instead of doubling the gap.
+  EdgeInsetsGeometry _tucked(EdgeInsetsGeometry padding) =>
+      padding.resolve(Directionality.of(context)).copyWith(top: 6);
+
+  Widget _startIo(
+    AppDependencyProvider dependencies,
+    EdgeInsetsGeometry padding,
+  ) {
+    if (!dependencies.isStartIoBannerActive) {
+      return const SizedBox.shrink();
+    }
+    return StartIoBannerWidget(
+      placement: widget.placement,
+      testMode: dependencies.unityTestMode,
+      keywords: widget.keywords,
+      padding: padding,
+      variant: widget.variant == HostedBannerVariant.tall
+          ? StartIoBannerVariant.tall
+          : StartIoBannerVariant.standard,
+    );
+  }
+}
+
+/// A banner for surfaces that never passed their own ad loader: the stream
+/// loader, Live TV and the TV details page.
+class StartIoAdSlot extends StatelessWidget {
+  const StartIoAdSlot({
+    required this.placement,
+    this.variant = HostedBannerVariant.tall,
+    this.keywords = StartIoAdsService.catalogKeywords,
+    this.padding = EdgeInsets.zero,
+    super.key,
+  });
+
+  final String placement;
+  final HostedBannerVariant variant;
+  final String keywords;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) => RemoteHostedAdsBanner(
+        placement: placement,
+        variant: variant,
+        keywords: keywords,
+        padding: padding,
+      );
+}
+
+/// The hosted announcement / call-to-action banner served by `/ads`.
 class HostedAdsBanner extends StatelessWidget {
   const HostedAdsBanner({
     required this.ads,
-    required this.placement,
     this.variant = HostedBannerVariant.standard,
+    this.interactive = true,
+    this.padding = const EdgeInsets.fromLTRB(20, 14, 20, 6),
     super.key,
   });
 
   final List<BannerAd> ads;
-  final String placement;
   final HostedBannerVariant variant;
+
+  /// Android TV's quality rules forbid an in-page ad that opens a web page, so
+  /// TV shows the banner without a tap target or D-pad focus.
+  final bool interactive;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
@@ -65,90 +211,39 @@ class HostedAdsBanner extends StatelessWidget {
     }
 
     final maxHeight = variant.isTall ? 420.0 : 320.0;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = (config.width ?? constraints.maxWidth)
-                .clamp(1.0, constraints.maxWidth)
-                .toDouble();
-            final height = (config.height ?? width / ratio)
-                .clamp(72.0, maxHeight)
-                .toDouble();
-            return _CachedAdCarousel(
-              ads: shownAds,
-              width: width,
-              height: height,
-            );
-          },
-        ),
+    Widget banner = ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = (config.width ?? constraints.maxWidth)
+              .clamp(1.0, constraints.maxWidth)
+              .toDouble();
+          final height = (config.height ?? width / ratio)
+              .clamp(72.0, maxHeight)
+              .toDouble();
+          return _CachedAdCarousel(
+            ads: shownAds,
+            width: width,
+            height: height,
+            interactive: interactive,
+          );
+        },
       ),
     );
+    if (!interactive) {
+      banner = ExcludeFocus(child: IgnorePointer(child: banner));
+    }
+    return Padding(padding: padding, child: banner);
   }
 }
 
-/// Presents one hosted ad as a dismissible interstitial before playback.
-/// Loading and rendering failures are intentionally silent so playback is
-/// never blocked by an unavailable ad.
-Future<void> showHostedInterstitialAd(
-  BuildContext context, {
-  required Future<List<BannerAd>> Function() loadAds,
-}) async {
+Future<void> _open(String url) async {
+  final uri = Uri.tryParse(url);
+  if (uri == null || (uri.scheme != 'https' && uri.scheme != 'http')) return;
   try {
-    final ads = (await loadAds())
-        .where((ad) =>
-            ad.imageUrl.isNotEmpty &&
-            ad.targetUrl.isNotEmpty &&
-            (ad.placements.isEmpty || ad.placements.contains('interstitial')))
-        .toList(growable: false);
-    if (ads.isEmpty || !context.mounted) return;
-    final ad = ads.first;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      barrierColor: Colors.black.withValues(alpha: .82),
-      builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
-        child: Stack(
-          children: [
-            GestureDetector(
-              onTap: () => unawaited(launchUrlString(ad.targetUrl)),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: CachedNetworkImage(
-                  imageUrl: ad.imageUrl,
-                  cacheManager: _adImageCache,
-                  fit: BoxFit.contain,
-                  placeholder: (_, __) => const SizedBox(
-                    height: 240,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                tooltip: 'Close',
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.black.withValues(alpha: .65),
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                icon: const Icon(Icons.close),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    await launchUrlString(url, mode: LaunchMode.externalApplication);
   } catch (_) {
-    // Ads are optional and must never interrupt playback.
+    // A broken link must not surface as an error on a browsing screen.
   }
 }
 
@@ -157,11 +252,13 @@ class _CachedAdCarousel extends StatefulWidget {
     required this.ads,
     required this.width,
     required this.height,
+    required this.interactive,
   });
 
   final List<BannerAd> ads;
   final double width;
   final double height;
+  final bool interactive;
 
   @override
   State<_CachedAdCarousel> createState() => _CachedAdCarouselState();
@@ -207,7 +304,9 @@ class _CachedAdCarouselState extends State<_CachedAdCarousel> {
         itemBuilder: (context, index) {
           final ad = widget.ads[index];
           return GestureDetector(
-            onTap: () => unawaited(launchUrlString(ad.targetUrl)),
+            onTap: widget.interactive
+                ? () => unawaited(_open(ad.targetUrl))
+                : null,
             child: Semantics(
               label: ad.altText.isEmpty ? ad.name : ad.altText,
               image: true,
@@ -222,64 +321,6 @@ class _CachedAdCarouselState extends State<_CachedAdCarousel> {
           );
         },
       ),
-    );
-  }
-}
-
-class RemoteHostedAdsBanner extends StatefulWidget {
-  const RemoteHostedAdsBanner({
-    required this.loadAds,
-    required this.placement,
-    this.variant = HostedBannerVariant.standard,
-    super.key,
-  });
-
-  final Future<List<BannerAd>> Function() loadAds;
-  final String placement;
-  final HostedBannerVariant variant;
-
-  @override
-  State<RemoteHostedAdsBanner> createState() => _RemoteHostedAdsBannerState();
-}
-
-class _RemoteHostedAdsBannerState extends State<RemoteHostedAdsBanner> {
-  late final Future<List<BannerAd>> _adsFuture = widget.loadAds();
-
-  @override
-  Widget build(BuildContext context) {
-    // Ads are optional on standalone screens and in lightweight test trees.
-    final dependencies = context.watch<AppDependencyProvider?>();
-    if (dependencies == null) return const SizedBox.shrink();
-
-    if (dependencies.isUnityBannerActive) {
-      return UnityBannerWidget(
-        placement: widget.placement,
-        placementId: dependencies.unityBannerPlacementId,
-      );
-    }
-
-    if (!dependencies.isNativeBannerActive) {
-      return const SizedBox.shrink();
-    }
-
-    return FutureBuilder<List<BannerAd>>(
-      future: _adsFuture,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        final ads = snapshot.data!.where((ad) {
-          final backendPlacement =
-              ad.placements.isEmpty || ad.placements.contains(widget.placement);
-          return backendPlacement &&
-              dependencies.isBannerEnabled(ad.key, widget.placement);
-        }).toList(growable: false);
-        return HostedAdsBanner(
-          ads: ads,
-          placement: widget.placement,
-          variant: widget.variant,
-        );
-      },
     );
   }
 }

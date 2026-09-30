@@ -11,6 +11,8 @@ import '../app/tv_design.dart';
 import '../focus/tv_screen_focus_controller.dart';
 import '../focus/tv_focusable.dart';
 import '../widgets/tv_dialog.dart';
+import '../widgets/tv_list_row.dart';
+import '../widgets/tv_page_header.dart';
 
 class TvSettingsScreen extends StatelessWidget {
   const TvSettingsScreen({
@@ -24,170 +26,175 @@ class TvSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final appDependencies = context.watch<AppDependencyProvider>();
     final occasionalCatalog = appDependencies.occasionalThemeCatalog;
     final occasionalThemes = appDependencies.availableOccasionalThemes;
     return _TvSettingsFocusEntry(
       focusController: focusController,
-      builder: (themeFocusNode) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          metrics.contentPadding,
-          0,
-          metrics.contentPadding,
-          metrics.contentPadding,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Icon(PhosphorIcons.gear(), color: colors.primary, size: 32),
-                const SizedBox(width: 13),
-                Text(
-                  'Settings',
-                  style: TextStyle(
-                    color: colors.onSurface,
-                    fontFamily: 'FigtreeSB',
-                    fontSize: 34,
-                  ),
-                ),
-              ],
+      builder: (themeFocusNode) {
+        final appearanceTiles = <Widget>[
+          _TvSettingTile(
+            key: const ValueKey<String>('theme-mode'),
+            focusNode: themeFocusNode,
+            label: 'Theme mode',
+            value: _themeLabel(settings.appTheme),
+            icon: PhosphorIcons.moonStars(),
+            onActivate: () => _showThemeModePicker(context, settings),
+          ),
+          _TvSettingTile(
+            key: const ValueKey<String>('ambient-mode'),
+            label: 'Ambient mode',
+            value: appDependencies.ambientModeEnabled ? 'On' : 'Off',
+            icon: PhosphorIcons.imageSquare(),
+            onActivate: () => appDependencies.ambientModeEnabled =
+                !appDependencies.ambientModeEnabled,
+          ),
+          if (occasionalCatalog.enabled)
+            _TvSettingTile(
+              key: const ValueKey<String>('seasonal-themes'),
+              label: 'Seasonal themes',
+              value: appDependencies.occasionalThemeEnabled ? 'On' : 'Off',
+              icon: PhosphorIcons.sparkle(),
+              onActivate: () => appDependencies.occasionalThemeEnabled =
+                  !appDependencies.occasionalThemeEnabled,
             ),
-            SizedBox(height: metrics.compact ? 18 : 28),
-            Expanded(
-              child: SingleChildScrollView(
-                clipBehavior: Clip.hardEdge,
-                padding: const EdgeInsets.all(TvDesign.focusOutset),
-                child: Column(
-                  children: <Widget>[
-                    _TvSettingTile(
-                      key: const ValueKey<String>('theme-mode'),
-                      focusNode: themeFocusNode,
-                      label: 'Theme mode',
-                      value: _themeLabel(settings.appTheme),
-                      icon: PhosphorIcons.moonStars(),
-                      onActivate: () => _showThemeModePicker(context, settings),
-                    ),
-                    const SizedBox(height: 14),
-                    _TvSettingTile(
-                      key: const ValueKey<String>('ambient-mode'),
-                      label: 'Ambient mode',
-                      value: appDependencies.ambientModeEnabled ? 'On' : 'Off',
-                      icon: PhosphorIcons.imageSquare(),
-                      onActivate: () => appDependencies.ambientModeEnabled =
-                          !appDependencies.ambientModeEnabled,
-                    ),
-                    if (occasionalCatalog.enabled) ...<Widget>[
-                      const SizedBox(height: 14),
-                      _TvSettingTile(
-                        key: const ValueKey<String>('seasonal-themes'),
-                        label: 'Seasonal themes',
-                        value: appDependencies.occasionalThemeEnabled
-                            ? 'On'
-                            : 'Off',
-                        icon: PhosphorIcons.sparkle(),
-                        onActivate: () =>
-                            appDependencies.occasionalThemeEnabled =
-                                !appDependencies.occasionalThemeEnabled,
-                      ),
-                    ],
-                    if (occasionalCatalog.enabled &&
-                        appDependencies.occasionalThemeEnabled &&
-                        occasionalCatalog.allowUserSelection &&
-                        occasionalThemes.isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 14),
-                      _TvSettingTile(
-                        key: const ValueKey<String>('seasonal-theme'),
-                        label: 'Seasonal theme',
-                        value: _occasionalThemeLabel(appDependencies),
-                        icon: PhosphorIcons.sparkle(),
-                        onActivate: () => _showOccasionalThemePicker(
-                          context,
-                          appDependencies,
-                        ),
-                      ),
-                    ],
-                    if (occasionalCatalog.enabled &&
-                        appDependencies.occasionalThemeEnabled &&
-                        occasionalCatalog.effectsEnabled &&
-                        occasionalCatalog.allowUserEffectsToggle) ...<Widget>[
-                      const SizedBox(height: 14),
-                      _TvSettingTile(
-                        key: const ValueKey<String>('seasonal-effects'),
-                        label: 'Seasonal effects',
-                        value: appDependencies.occasionalEffectsEnabled
-                            ? 'On'
-                            : 'Off',
-                        icon: PhosphorIcons.sparkle(),
-                        onActivate: () =>
-                            appDependencies.occasionalEffectsEnabled =
-                                !appDependencies.occasionalEffectsEnabled,
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    _TvSettingTile(
-                      key: const ValueKey<String>('color-theme'),
-                      label: 'Color theme',
-                      value: _colorThemeLabel(settings.appColorIndex),
-                      icon: PhosphorIcons.palette(),
-                      onActivate: () => _showColorThemePicker(context),
-                    ),
-                    const SizedBox(height: 14),
-                    _TvSettingTile(
-                      key: const ValueKey<String>('tmdb-proxy'),
-                      label: 'TMDB proxy',
-                      value: settings.enableProxy ? 'On' : 'Off',
-                      icon: PhosphorIcons.globeHemisphereWest(),
-                      onActivate: () =>
-                          settings.enableProxy = !settings.enableProxy,
-                    ),
-                    const SizedBox(height: 14),
-                    _TvSettingTile(
-                      key: const ValueKey<String>('image-quality'),
-                      label: 'Image quality',
-                      value: _imageQualityLabel(settings.imageQuality),
-                      icon: PhosphorIcons.image(),
-                      onActivate: () =>
-                          _showImageQualityPicker(context, settings),
-                    ),
-                    const SizedBox(height: 14),
-                    _TvSettingTile(
-                      key: const ValueKey<String>('auto-load-sources'),
-                      label: 'Auto load sources',
-                      value: settings.autoLoadSources ? 'On' : 'Off',
-                      icon: PhosphorIcons.lightning(),
-                      onActivate: () =>
-                          settings.autoLoadSources = !settings.autoLoadSources,
-                    ),
-                    const SizedBox(height: 14),
-                    _TvSettingTile(
-                      key: const ValueKey<String>('subtitle-settings'),
-                      label: 'Subtitle settings',
-                      value: _subtitleSummary(settings),
-                      icon: PhosphorIcons.closedCaptioning(),
-                      onActivate: () =>
-                          _showSubtitleSettings(context, settings),
-                    ),
-                    const SizedBox(height: 14),
-                    _TvSettingTile(
-                      key: const ValueKey<String>('app-updates'),
-                      label: 'App updates',
-                      value: 'Check for updates',
-                      icon: PhosphorIcons.downloadSimple(),
-                      onActivate: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                              builder: (_) => const UpdateScreen(
-                                  isForced: false, television: true))),
-                    ),
-                  ],
-                ),
+          if (occasionalCatalog.enabled &&
+              appDependencies.occasionalThemeEnabled &&
+              occasionalCatalog.allowUserSelection &&
+              occasionalThemes.isNotEmpty)
+            _TvSettingTile(
+              key: const ValueKey<String>('seasonal-theme'),
+              label: 'Seasonal theme',
+              value: _occasionalThemeLabel(appDependencies),
+              icon: PhosphorIcons.sparkle(),
+              onActivate: () =>
+                  _showOccasionalThemePicker(context, appDependencies),
+            ),
+          if (occasionalCatalog.enabled &&
+              appDependencies.occasionalThemeEnabled &&
+              occasionalCatalog.effectsEnabled &&
+              occasionalCatalog.allowUserEffectsToggle)
+            _TvSettingTile(
+              key: const ValueKey<String>('seasonal-effects'),
+              label: 'Seasonal effects',
+              value: appDependencies.occasionalEffectsEnabled ? 'On' : 'Off',
+              icon: PhosphorIcons.sparkle(),
+              onActivate: () => appDependencies.occasionalEffectsEnabled =
+                  !appDependencies.occasionalEffectsEnabled,
+            ),
+          _TvSettingTile(
+            key: const ValueKey<String>('color-theme'),
+            label: 'Color theme',
+            value: _colorThemeLabel(settings.appColorIndex),
+            icon: PhosphorIcons.palette(),
+            onActivate: () => _showColorThemePicker(context),
+          ),
+        ];
+        final playbackTiles = <Widget>[
+          _TvSettingTile(
+            key: const ValueKey<String>('tmdb-proxy'),
+            label: 'TMDB proxy',
+            value: settings.enableProxy ? 'On' : 'Off',
+            icon: PhosphorIcons.globeHemisphereWest(),
+            onActivate: () => settings.enableProxy = !settings.enableProxy,
+          ),
+          _TvSettingTile(
+            key: const ValueKey<String>('image-quality'),
+            label: 'Image quality',
+            value: _imageQualityLabel(settings.imageQuality),
+            icon: PhosphorIcons.image(),
+            onActivate: () => _showImageQualityPicker(context, settings),
+          ),
+          _TvSettingTile(
+            key: const ValueKey<String>('auto-load-sources'),
+            label: 'Auto load sources',
+            value: settings.autoLoadSources ? 'On' : 'Off',
+            icon: PhosphorIcons.lightning(),
+            onActivate: () =>
+                settings.autoLoadSources = !settings.autoLoadSources,
+          ),
+          _TvSettingTile(
+            key: const ValueKey<String>('subtitle-settings'),
+            label: 'Subtitle settings',
+            value: _subtitleSummary(settings),
+            icon: PhosphorIcons.closedCaptioning(),
+            onActivate: () => _showSubtitleSettings(context, settings),
+          ),
+        ];
+        final aboutTiles = <Widget>[
+          _TvSettingTile(
+            key: const ValueKey<String>('app-updates'),
+            label: 'App updates',
+            value: 'Check for updates',
+            icon: PhosphorIcons.downloadSimple(),
+            onActivate: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    const UpdateScreen(isForced: false, television: true),
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        ];
+
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            metrics.contentPadding,
+            0,
+            metrics.contentPadding,
+            metrics.contentPadding,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.only(left: TvDesign.focusOutset + 4),
+                child: TvPageHeader(
+                  kicker: 'PREFERENCES',
+                  title: 'Settings',
+                  compact: metrics.compact,
+                ),
+              ),
+              SizedBox(height: metrics.compact ? 12 : 18),
+              Expanded(
+                child: SingleChildScrollView(
+                  clipBehavior: Clip.hardEdge,
+                  padding: const EdgeInsets.all(TvDesign.focusOutset),
+                  // A readable column rather than rows the width of the TV.
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 760),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          _TvSettingsSection(
+                            title: 'APPEARANCE',
+                            subtitle: 'Theme, backdrop, and seasonal details.',
+                            children: appearanceTiles,
+                          ),
+                          const SizedBox(height: 22),
+                          _TvSettingsSection(
+                            title: 'STREAMING & PLAYBACK',
+                            subtitle: 'Quality, sources, and subtitles.',
+                            children: playbackTiles,
+                          ),
+                          const SizedBox(height: 22),
+                          _TvSettingsSection(
+                            title: 'ABOUT FLIXQUEST',
+                            subtitle: 'Keep the TV experience current.',
+                            children: aboutTiles,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -580,7 +587,7 @@ class _TvSubtitleOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final palette = TvPalette.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: TvFocusable(
@@ -592,8 +599,9 @@ class _TvSubtitleOption extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 64),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
           decoration: BoxDecoration(
-            color: colors.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(10),
+            color: TvDesign.surfaceFor(context, emphasis: 0.012),
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: palette.hairline),
           ),
           child: Row(
             children: <Widget>[
@@ -604,7 +612,9 @@ class _TvSubtitleOption extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: color,
                     shape: BoxShape.circle,
-                    border: Border.all(color: colors.outline),
+                    border: Border.all(
+                      color: palette.foreground.withValues(alpha: 0.4),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -613,7 +623,7 @@ class _TvSubtitleOption extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: colors.onSurface,
+                    color: palette.foreground,
                     fontFamily: 'FigtreeSB',
                     fontSize: 21,
                   ),
@@ -622,14 +632,14 @@ class _TvSubtitleOption extends StatelessWidget {
               Text(
                 value,
                 style: TextStyle(
-                  color: colors.onSurfaceVariant,
+                  color: palette.mutedText,
                   fontSize: 20,
                 ),
               ),
               const SizedBox(width: 12),
               Icon(
                 PhosphorIcons.caretRight(),
-                color: colors.onSurfaceVariant,
+                color: palette.mutedText,
                 size: 20,
               ),
             ],
@@ -672,15 +682,12 @@ class _TvSettingsFocusEntryState extends State<_TvSettingsFocusEntry> {
     }
   }
 
-  void _requestFocus() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted ||
-          _themeFocusNode.context == null ||
-          !_themeFocusNode.canRequestFocus) {
-        return;
-      }
-      _themeFocusNode.requestFocus();
-    });
+  bool _requestFocus() {
+    if (_themeFocusNode.context == null || !_themeFocusNode.canRequestFocus) {
+      return false;
+    }
+    _themeFocusNode.requestFocus();
+    return true;
   }
 
   @override
@@ -726,22 +733,22 @@ class _TvColorThemePickerState extends State<_TvColorThemePicker> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     final settings = context.watch<SettingsProvider>();
-    final colors = Theme.of(context).colorScheme;
     final isDark = settings.appTheme == 'dark' || settings.appTheme == 'amoled';
-    final palette = AppColorsList().appColors(isDark,
+    final swatches = AppColorsList().appColors(isDark,
         customColor:
             settings.customAppColor > 0 ? settings.customAppColor : null);
     final selectedIndex =
-        palette.any((color) => color.index == settings.appColorIndex)
+        swatches.any((color) => color.index == settings.appColorIndex)
             ? settings.appColorIndex
-            : palette.first.index;
+            : swatches.first.index;
 
     return Wrap(
       spacing: 14,
       runSpacing: 14,
       children: <Widget>[
-        for (final appColor in palette)
+        for (final appColor in swatches)
           TvFocusable(
             key: ValueKey<int>(appColor.index),
             focusNode: _nodeFor(appColor.index),
@@ -756,8 +763,9 @@ class _TvColorThemePickerState extends State<_TvColorThemePicker> {
               height: 72,
               padding: const EdgeInsets.symmetric(horizontal: 11),
               decoration: BoxDecoration(
-                color: colors.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(11),
+                color: TvDesign.surfaceFor(context, emphasis: 0.012),
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: palette.hairline),
               ),
               child: Row(
                 children: <Widget>[
@@ -783,7 +791,7 @@ class _TvColorThemePickerState extends State<_TvColorThemePicker> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: colors.onSurface,
+                        color: palette.foreground,
                         fontFamily: 'FigtreeSB',
                         fontSize: 14,
                       ),
@@ -794,6 +802,39 @@ class _TvColorThemePickerState extends State<_TvColorThemePicker> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _TvSettingsSection extends StatelessWidget {
+  const _TvSettingsSection({
+    required this.title,
+    required this.subtitle,
+    required this.children,
+  });
+
+  final String title;
+
+  /// Read out with the section; the rows say enough on screen.
+  final String subtitle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: '$title. $subtitle',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          TvSectionLabel(title),
+          for (final child in children)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: child,
+            ),
+        ],
+      ),
     );
   }
 }
@@ -816,49 +857,12 @@ class _TvSettingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return TvFocusable(
+    return TvListRow(
       focusNode: focusNode,
-      semanticLabel: '$label, $value',
+      label: label,
+      value: value,
+      icon: icon,
       onActivate: onActivate,
-      focusScale: 1.015,
-      child: Container(
-        height: 76,
-        padding: const EdgeInsets.symmetric(horizontal: 22),
-        decoration: BoxDecoration(
-          color: TvDesign.surfaceFor(context, emphasis: 0.025),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: colors.outlineVariant.withValues(alpha: 0.38),
-          ),
-        ),
-        child: Row(
-          children: <Widget>[
-            Icon(icon, color: colors.primary, size: 27),
-            const SizedBox(width: 17),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: colors.onSurface,
-                  fontFamily: 'FigtreeSB',
-                  fontSize: 20,
-                ),
-              ),
-            ),
-            Text(
-              value,
-              style: TextStyle(
-                color: colors.onSurfaceVariant,
-                fontSize: 19,
-              ),
-            ),
-            const SizedBox(width: 15),
-            Icon(PhosphorIcons.caretRight(),
-                color: colors.onSurfaceVariant, size: 21),
-          ],
-        ),
-      ),
     );
   }
 }

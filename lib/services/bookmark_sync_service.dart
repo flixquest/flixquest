@@ -27,6 +27,15 @@ class BookmarkSyncService {
   bool _isSyncing = false;
   static const String _lastSyncedKey = 'flixquest_last_bookmark_sync';
 
+  /// The least time between automatic syncs for one account, e.g. each time
+  /// the bookmarks screen opens.
+  static const Duration _autoSyncInterval = Duration(minutes: 10);
+  static const Duration _changeDebounceDelay = Duration(seconds: 3);
+
+  Timer? _changeDebounce;
+  String? _lastAutoSyncUid;
+  DateTime? _lastAutoSyncAt;
+
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final millis = prefs.getInt(_lastSyncedKey);
@@ -54,42 +63,89 @@ class BookmarkSyncService {
     }
   }
 
-  Future<void> _ensureDocumentStructure(String uid) async {
+  /// Unions this device's bookmarks into the cloud document and returns the
+  /// merged lists. The document is read once and only written when the merge
+  /// changed it, so a sync with nothing new costs a single read.
+  Future<({List<Movie> movies, List<TV> tvShows})> _mergeLocalIntoCloud(
+    String uid,
+  ) async {
     final docRef = _firestore.collection('bookmarks-v2.0').doc(uid);
-    final doc = await docRef.get();
-    if (!doc.exists) {
-      await docRef.set({
-        'movies': <Map<String, dynamic>>[],
-        'tvShows': <Map<String, dynamic>>[],
-      });
-      return;
-    }
-    final data = doc.data();
-    if (data == null) return;
+    final docSnapshot = await docRef.get();
+    final docData = docSnapshot.data() ?? {};
 
-    final updates = <String, dynamic>{};
-    if (!data.containsKey('movies')) {
-      updates['movies'] = <Map<String, dynamic>>[];
+    final cloudMovies = List<Map<String, dynamic>>.from(
+      (docData['movies'] as List?) ?? [],
+    ).map((m) => Movie.fromJson(m)).toList();
+    final cloudTvs = List<Map<String, dynamic>>.from(
+      (docData['tvShows'] as List?) ?? [],
+    ).map((m) => TV.fromJson(m)).toList();
+
+    final localMovies = await _movieDb.getMovieList();
+    final localTvs = await _tvDb.getTVList();
+
+    var changed = !docSnapshot.exists ||
+        !docData.containsKey('movies') ||
+        !docData.containsKey('tvShows');
+
+    // Union by id, cloud first.
+    final mergedMovies = <Movie>[...cloudMovies];
+    for (final local in localMovies) {
+      if (local.id != null &&
+          !mergedMovies.any((item) => item.id == local.id)) {
+        mergedMovies.add(local);
+        changed = true;
+      }
     }
-    if (!data.containsKey('tvShows')) {
-      updates['tvShows'] = <Map<String, dynamic>>[];
+    if (_keepGenres(mergedMovies, localMovies, (m) => m.id,
+        (m) => m.genreIds, (m, ids) => m.genreIds = ids)) {
+      changed = true;
     }
-    if (updates.isNotEmpty) {
-      await docRef.update(updates);
+
+    final mergedTvs = <TV>[...cloudTvs];
+    for (final local in localTvs) {
+      if (local.id != null && !mergedTvs.any((item) => item.id == local.id)) {
+        mergedTvs.add(local);
+        changed = true;
+      }
     }
+    if (_keepGenres(mergedTvs, localTvs, (t) => t.id, (t) => t.genreIds,
+        (t, ids) => t.genreIds = ids)) {
+      changed = true;
+    }
+
+    if (changed) {
+      await docRef.set({
+        'movies': mergedMovies.map((m) => m.toMap()).toList(),
+        'tvShows': mergedTvs.map((t) => t.toMap()).toList(),
+      }, SetOptions(merge: true));
+    }
+    return (movies: mergedMovies, tvShows: mergedTvs);
   }
 
-  /// Triggers a background 2-way sync if the user is signed in and not anonymous.
+  /// Triggers a background 2-way sync if the user is signed in and not
+  /// anonymous. Repeats for the same account within [_autoSyncInterval] are
+  /// skipped; a bookmark change pushes on its own.
   Future<void> autoSyncIfSignedIn() async {
     if (!canSync || _isSyncing) return;
-    await syncNow();
+    final uid = currentUser!.uid;
+    final lastAt = _lastAutoSyncAt;
+    if (_lastAutoSyncUid == uid &&
+        lastAt != null &&
+        DateTime.now().difference(lastAt) < _autoSyncInterval) {
+      return;
+    }
+    if (await syncNow()) {
+      _lastAutoSyncUid = uid;
+      _lastAutoSyncAt = DateTime.now();
+    }
   }
 
-  /// Triggers background sync when local bookmarks are added or modified.
+  /// Schedules a sync after local bookmarks change, coalescing quick toggles
+  /// into one.
   Future<void> onBookmarkChanged() async {
     if (!canSync) return;
-    // Debounce/fire-and-forget sync to update cloud state
-    unawaited(syncNow());
+    _changeDebounce?.cancel();
+    _changeDebounce = Timer(_changeDebounceDelay, () => unawaited(syncNow()));
   }
 
   /// Performs a full 2-way merge sync between local SQLite DB and Firestore.
@@ -102,70 +158,27 @@ class BookmarkSyncService {
 
     try {
       final uid = currentUser!.uid;
-      await _ensureDocumentStructure(uid);
+      final merged = await _mergeLocalIntoCloud(uid);
 
-      final docRef = _firestore.collection('bookmarks-v2.0').doc(uid);
-      final docSnapshot = await docRef.get();
-      final docData = docSnapshot.data() ?? {};
-
-      // 1. Fetch Cloud Movies & TV
-      final cloudMovieMaps = List<Map<String, dynamic>>.from(
-        (docData['movies'] as List?) ?? [],
-      );
-      final cloudTvMaps = List<Map<String, dynamic>>.from(
-        (docData['tvShows'] as List?) ?? [],
-      );
-
-      final cloudMovies =
-          cloudMovieMaps.map((m) => Movie.fromJson(m)).toList();
-      final cloudTvs = cloudTvMaps.map((m) => TV.fromJson(m)).toList();
-
-      // 2. Fetch Local Movies & TV
-      final localMovies = await _movieDb.getMovieList();
-      final localTvs = await _tvDb.getTVList();
-
-      // 3. Merge Movies (Union by id)
-      final mergedMovies = <Movie>[...cloudMovies];
-      for (final local in localMovies) {
-        if (local.id != null &&
-            !mergedMovies.any((item) => item.id == local.id)) {
-          mergedMovies.add(local);
-        }
-      }
-
-      // 4. Merge TV Shows (Union by id)
-      final mergedTvs = <TV>[...cloudTvs];
-      for (final local in localTvs) {
-        if (local.id != null &&
-            !mergedTvs.any((item) => item.id == local.id)) {
-          mergedTvs.add(local);
-        }
-      }
-
-      // 5. Update Firestore with Merged Lists
-      final moviesPayload = mergedMovies.map((m) => m.toMap()).toList();
-      final tvPayload = mergedTvs.map((t) => t.toMap()).toList();
-
-      await docRef.update({
-        'movies': moviesPayload,
-        'tvShows': tvPayload,
-      });
-
-      // 6. Insert missing cloud items into Local SQLite
-      for (final movie in mergedMovies) {
+      // Insert missing cloud items into Local SQLite
+      for (final movie in merged.movies) {
         if (movie.id != null) {
           final exists = await _movieDb.contain(movie.id!);
           if (!exists) {
             await _movieDb.insertMovie(movie);
+          } else {
+            await _movieDb.backfillGenreIds(movie.id!, movie.genreIds);
           }
         }
       }
 
-      for (final tv in mergedTvs) {
+      for (final tv in merged.tvShows) {
         if (tv.id != null) {
           final exists = await _tvDb.contain(tv.id!);
           if (!exists) {
             await _tvDb.insertTV(tv);
+          } else {
+            await _tvDb.backfillGenreIds(tv.id!, tv.genreIds);
           }
         }
       }
@@ -196,48 +209,7 @@ class BookmarkSyncService {
   Future<bool> pushLocalToCloud() async {
     if (!canSync) return false;
     try {
-      final uid = currentUser!.uid;
-      await _ensureDocumentStructure(uid);
-
-      final localMovies = await _movieDb.getMovieList();
-      final localTvs = await _tvDb.getTVList();
-
-      final docRef = _firestore.collection('bookmarks-v2.0').doc(uid);
-      final docSnapshot = await docRef.get();
-      final docData = docSnapshot.data() ?? {};
-
-      final cloudMovieMaps = List<Map<String, dynamic>>.from(
-        (docData['movies'] as List?) ?? [],
-      );
-      final cloudTvMaps = List<Map<String, dynamic>>.from(
-        (docData['tvShows'] as List?) ?? [],
-      );
-
-      final cloudMovies =
-          cloudMovieMaps.map((m) => Movie.fromJson(m)).toList();
-      final cloudTvs = cloudTvMaps.map((m) => TV.fromJson(m)).toList();
-
-      final mergedMovies = <Movie>[...cloudMovies];
-      for (final local in localMovies) {
-        if (local.id != null &&
-            !mergedMovies.any((item) => item.id == local.id)) {
-          mergedMovies.add(local);
-        }
-      }
-
-      final mergedTvs = <TV>[...cloudTvs];
-      for (final local in localTvs) {
-        if (local.id != null &&
-            !mergedTvs.any((item) => item.id == local.id)) {
-          mergedTvs.add(local);
-        }
-      }
-
-      await docRef.update({
-        'movies': mergedMovies.map((m) => m.toMap()).toList(),
-        'tvShows': mergedTvs.map((t) => t.toMap()).toList(),
-      });
-
+      await _mergeLocalIntoCloud(currentUser!.uid);
       return true;
     } catch (_) {
       return false;
@@ -249,8 +221,6 @@ class BookmarkSyncService {
     if (!canSync) return false;
     try {
       final uid = currentUser!.uid;
-      await _ensureDocumentStructure(uid);
-
       final docRef = _firestore.collection('bookmarks-v2.0').doc(uid);
       final docSnapshot = await docRef.get();
       final docData = docSnapshot.data() ?? {};
@@ -268,6 +238,8 @@ class BookmarkSyncService {
           final exists = await _movieDb.contain(movie.id!);
           if (!exists) {
             await _movieDb.insertMovie(movie);
+          } else {
+            await _movieDb.backfillGenreIds(movie.id!, movie.genreIds);
           }
         }
       }
@@ -278,6 +250,8 @@ class BookmarkSyncService {
           final exists = await _tvDb.contain(tv.id!);
           if (!exists) {
             await _tvDb.insertTV(tv);
+          } else {
+            await _tvDb.backfillGenreIds(tv.id!, tv.genreIds);
           }
         }
       }
@@ -328,5 +302,31 @@ class BookmarkSyncService {
     } catch (_) {
       return false;
     }
+  }
+
+  /// A cloud copy written before genres were kept has none; take them from
+  /// the same title's local row, so the merge doesn't drop them. Returns
+  /// whether any item gained genres.
+  bool _keepGenres<T>(
+    List<T> merged,
+    List<T> local,
+    int? Function(T item) idOf,
+    List<int>? Function(T item) genresOf,
+    void Function(T item, List<int> ids) setGenres,
+  ) {
+    final known = <int, List<int>>{
+      for (final item in local)
+        if (idOf(item) case final id?)
+          if (genresOf(item) case final ids? when ids.isNotEmpty) id: ids,
+    };
+    var changed = false;
+    for (final item in merged) {
+      final ids = known[idOf(item)];
+      if (ids != null && (genresOf(item)?.isEmpty ?? true)) {
+        setGenres(item, ids);
+        changed = true;
+      }
+    }
+    return changed;
   }
 }

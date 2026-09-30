@@ -8,7 +8,7 @@ import '../constants/api_constants.dart';
 import '../models/occasional_theme.dart';
 import '../models/banner_ad.dart';
 import '../preferences/app_dependency_preferences.dart';
-import '../services/unity_ads_service.dart';
+import '../services/start_io_ads_service.dart';
 
 class AppDependencyProvider extends ChangeNotifier {
   final AppDependencies _preferences = AppDependencies();
@@ -66,32 +66,55 @@ class AppDependencyProvider extends ChangeNotifier {
 
   String _bannerAdNetwork = 'native';
   String get bannerAdNetwork => _bannerAdNetwork;
-  bool get isUnityBannerActive => _bannerAdNetwork.trim().toLowerCase() == 'unity';
-  bool get isNativeBannerActive => _bannerAdNetwork.trim().toLowerCase() == 'native';
+  bool get isStartIoBannerActive =>
+      _startIoAds.bannerEnabled &&
+      const {'native', 'unity', 'startio'}.contains(_bannerAdNetwork);
 
-  String _unityGameIdAndroid = UnityAdsService.fallbackAndroidGameId;
+  HostedBannerMode _hostedBannerMode = HostedBannerMode.stack;
+  HostedBannerMode get hostedBannerMode => _hostedBannerMode;
+
+  /// Hosted `/ads` banners run beside Start.io; `banner_ad_network=none`
+  /// still hides every banner.
+  bool get isHostedBannerActive =>
+      _hostedBannerMode != HostedBannerMode.off && _bannerAdNetwork != 'none';
+
+  void setHostedBannerMode(HostedBannerMode mode) {
+    if (_hostedBannerMode == mode) return;
+    _hostedBannerMode = mode;
+    notifyListeners();
+  }
+
+  // These legacy values remain readable so existing Remote Config payloads
+  // and older clients can coexist while Unity itself is no longer linked.
+  String _unityGameIdAndroid = '5445375';
   String get unityGameIdAndroid => _unityGameIdAndroid;
 
-  String _unityBannerPlacementId = UnityAdsService.fallbackBannerPlacementId;
+  String _unityBannerPlacementId = 'Banner_Android';
   String get unityBannerPlacementId => _unityBannerPlacementId;
 
   bool _unityTestMode = false;
   bool get unityTestMode => _unityTestMode;
 
+  StartIoAdsConfig _startIoAds = const StartIoAdsConfig();
+
+  /// Start.io behaviour, with the shared test-mode flag folded in.
+  StartIoAdsConfig get startIoAds =>
+      _startIoAds.copyWith(testMode: _unityTestMode);
+
+  bool get startIoBannerEnabled => _startIoAds.bannerEnabled;
+  bool get startIoInterstitialEnabled => _startIoAds.interstitialEnabled;
+
   void setBannerAdNetwork(String network) {
     final sanitized = network.trim().toLowerCase();
     if (_bannerAdNetwork != sanitized) {
       _bannerAdNetwork = sanitized;
-      if (isUnityBannerActive) {
-        UnityAdsService.instance.initialize(
-          gameId: _unityGameIdAndroid,
-          testMode: _unityTestMode,
-        );
-      }
       notifyListeners();
     }
   }
 
+  /// Retains the old Unity-named values as compatibility inputs. Start.io uses
+  /// the existing test-mode flag; its application ID is supplied at build time
+  /// through the Android manifest.
   void setUnityAdsConfig({
     String? gameIdAndroid,
     String? bannerPlacementId,
@@ -116,15 +139,24 @@ class AppDependencyProvider extends ChangeNotifier {
       _unityTestMode = testMode;
       changed = true;
     }
-    if (changed) {
-      if (isUnityBannerActive) {
-        UnityAdsService.instance.initialize(
-          gameId: _unityGameIdAndroid,
-          testMode: _unityTestMode,
-        );
-      }
-      notifyListeners();
-    }
+    if (changed) notifyListeners();
+  }
+
+  void setStartIoAdsConfig({
+    required bool bannerEnabled,
+    required bool interstitialEnabled,
+    Duration? interstitialInterval,
+    StartIoInterstitialMode? tvInterstitialMode,
+  }) {
+    final next = _startIoAds.copyWith(
+      bannerEnabled: bannerEnabled,
+      interstitialEnabled: interstitialEnabled,
+      interstitialInterval: interstitialInterval,
+      tvInterstitialMode: tvInterstitialMode,
+    );
+    if (next == _startIoAds) return;
+    _startIoAds = next;
+    notifyListeners();
   }
 
   bool _isForcedUpdate = false;

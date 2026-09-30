@@ -20,12 +20,18 @@ class TvNavigationDestination {
   final IconData? selectedIcon;
 }
 
+/// The shell's destinations as a floating column of icons that widens to show
+/// labels while it has focus.
+///
+/// It paints no background of its own: collapsed, it sits over the screen's
+/// artwork; [expanded], the shell supplies the scrim behind it.
 class TvNavigationRail extends StatefulWidget {
   const TvNavigationRail({
     required this.destinations,
     required this.selectedId,
     required this.onDestinationSelected,
     required this.metrics,
+    this.expanded = false,
     this.autofocusId,
     this.onMoveRight,
     super.key,
@@ -35,6 +41,7 @@ class TvNavigationRail extends StatefulWidget {
   final String selectedId;
   final ValueChanged<String> onDestinationSelected;
   final TvShellMetrics metrics;
+  final bool expanded;
   final String? autofocusId;
   final bool Function(String destinationId)? onMoveRight;
 
@@ -43,7 +50,10 @@ class TvNavigationRail extends StatefulWidget {
 }
 
 class TvNavigationRailState extends State<TvNavigationRail> {
+  static const _motion = Duration(milliseconds: 220);
+
   final Map<String, FocusNode> _focusNodes = <String, FocusNode>{};
+  String? _focusedId;
 
   @override
   void initState() {
@@ -111,178 +121,203 @@ class TvNavigationRailState extends State<TvNavigationRail> {
     final initialFocusId =
         memory?.recall('tv-navigation') ?? widget.autofocusId;
     final colors = Theme.of(context).colorScheme;
+    final metrics = widget.metrics;
+    final expanded = widget.expanded;
 
     return FocusTraversalGroup(
       policy: ReadingOrderTraversalPolicy(),
-      child: Container(
-        width: widget.metrics.railWidth,
-        decoration: BoxDecoration(
-          color: TvDesign.surfaceFor(context, emphasis: 0.015),
-          borderRadius: const BorderRadius.all(Radius.circular(20)),
-          border: Border.all(
-            color: colors.onSurface.withValues(alpha: 0.08),
-          ),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 28,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        padding: EdgeInsets.symmetric(
-          horizontal: (widget.metrics.railWidth < 140) ? 9 : 13,
-          vertical: (widget.metrics.railWidth < 140) ? 12 : 18,
-        ),
+      child: AnimatedContainer(
+        duration: _motion,
+        curve: Curves.easeOutCubic,
+        width: expanded ? metrics.expandedRailWidth : metrics.railWidth,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                (widget.metrics.railWidth < 140) ? 13 : 10,
-                0,
-                (widget.metrics.railWidth < 140) ? 13 : 10,
-                (widget.metrics.railWidth < 140) ? 10 : 18,
-              ),
-              child: (widget.metrics.railWidth < 140)
-                  ? AppLogo(
-                      fallbackAsset: 'assets/images/fq_svg.svg',
-                      height: 28,
-                      fallbackColor: colors.primary,
-                    )
-                  : Text(
-                      'FLIXQUEST',
-                      style: TextStyle(
-                        color: colors.primary,
-                        fontFamily: 'FigtreeSB',
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.2,
+            SizedBox(
+              height: metrics.navItemHeight,
+              child: Row(
+                children: <Widget>[
+                  SizedBox(
+                    width: metrics.railWidth,
+                    child: Center(
+                      child: AppLogo(
+                        fallbackAsset: 'assets/images/fq_mark.svg',
+                        height: 24,
+                        fallbackColor: colors.primary,
                       ),
                     ),
+                  ),
+                  Expanded(
+                    child: _Label(
+                      visible: expanded,
+                      child: Text(
+                        'FLIXQUEST',
+                        style: TextStyle(
+                          color: colors.primary,
+                          fontFamily: 'FigtreeBold',
+                          fontSize: 18,
+                          letterSpacing: 1.6,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             Expanded(
               child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final itemExtent =
-                      widget.metrics.navItemHeight + widget.metrics.navItemGap;
-                  final contentHeight = widget.destinations.isEmpty
-                      ? 0.0
-                      : widget.destinations.length * itemExtent -
-                          widget.metrics.navItemGap;
-                  final centeredInset =
-                      ((constraints.maxHeight - contentHeight) / 2)
-                          .clamp(0.0, double.infinity);
-                  return ListView.separated(
-                    padding: EdgeInsets.symmetric(vertical: centeredInset),
-                    itemCount: widget.destinations.length,
-                    separatorBuilder: (context, index) =>
-                        SizedBox(height: widget.metrics.navItemGap),
-                    itemBuilder: (context, index) {
-                      final destination = widget.destinations[index];
-                      return TvFocusable(
-                        focusNode: _focusNodes[destination.id],
-                        autofocus: destination.id == initialFocusId,
-                        selected: destination.id == widget.selectedId,
-                        semanticLabel: destination.label,
-                        onKeyEvent: (_, event) =>
-                            _handleDestinationKey(destination.id, event),
-                        onFocusChanged: (hasFocus) {
-                          if (hasFocus) {
-                            memory?.remember(
-                              scopeId: 'tv-navigation',
-                              itemId: destination.id,
-                            );
-                          }
-                        },
-                        onActivate: () =>
-                            widget.onDestinationSelected(destination.id),
-                        focusScale: 1.015,
-                        borderRadius:
-                            const BorderRadius.all(Radius.circular(12)),
-                        child: Container(
-                          height: widget.metrics.navItemHeight,
-                          padding: EdgeInsets.symmetric(
-                            horizontal:
-                                (widget.metrics.railWidth < 140) ? 0 : 12,
+                // Centered while every destination fits, scrolling otherwise.
+                builder: (context, constraints) => SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints:
+                        BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        for (final destination in widget.destinations)
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: metrics.navItemGap / 2,
+                            ),
+                            child: _buildDestination(
+                              destination,
+                              memory: memory,
+                              autofocus: destination.id == initialFocusId,
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            gradient: destination.id == widget.selectedId
-                                ? LinearGradient(
-                                    colors: <Color>[
-                                      colors.primary.withValues(alpha: 0.2),
-                                      colors.primary.withValues(alpha: 0.08),
-                                    ],
-                                  )
-                                : null,
-                            borderRadius: BorderRadius.circular(9),
-                          ),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: <Widget>[
-                              if (destination.id == widget.selectedId)
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Container(
-                                    width: 4,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      color: colors.primary,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                  ),
-                                ),
-                              Row(
-                                mainAxisAlignment:
-                                    (widget.metrics.railWidth < 140)
-                                        ? MainAxisAlignment.center
-                                        : MainAxisAlignment.start,
-                                children: <Widget>[
-                                  Icon(
-                                    destination.id == widget.selectedId
-                                        ? destination.selectedIcon ??
-                                            destination.icon
-                                        : destination.icon,
-                                    color: destination.id == widget.selectedId
-                                        ? colors.primary
-                                        : colors.onSurfaceVariant,
-                                    size: (widget.metrics.railWidth < 140)
-                                        ? 25
-                                        : 26,
-                                  ),
-                                  if (!(widget.metrics.railWidth <
-                                      140)) ...<Widget>[
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Text(
-                                        destination.label,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: destination.id ==
-                                                  widget.selectedId
-                                              ? colors.onSurface
-                                              : colors.onSurfaceVariant,
-                                          fontFamily: destination.id ==
-                                                  widget.selectedId
-                                              ? 'FigtreeSB'
-                                              : 'Figtree',
-                                          fontSize: 18,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDestination(
+    TvNavigationDestination destination, {
+    required TvFocusMemory? memory,
+    required bool autofocus,
+  }) {
+    final palette = TvPalette.of(context);
+    final colors = Theme.of(context).colorScheme;
+    final metrics = widget.metrics;
+    final selected = destination.id == widget.selectedId;
+    final focused = destination.id == _focusedId;
+    // Focus reads as a filled pill, the strongest signal at ten feet; the
+    // selected destination keeps its accent bar either way.
+    final foreground = focused
+        ? palette.onFocus
+        : selected
+            ? palette.foreground
+            : widget.expanded
+                ? palette.mutedText
+                : palette.mutedText.withValues(alpha: 0.75);
+
+    return TvFocusable(
+      focusNode: _focusNodes[destination.id],
+      autofocus: autofocus,
+      selected: selected,
+      semanticLabel: destination.label,
+      onKeyEvent: (_, event) => _handleDestinationKey(destination.id, event),
+      onFocusChanged: (hasFocus) {
+        if (hasFocus) {
+          memory?.remember(scopeId: 'tv-navigation', itemId: destination.id);
+        }
+        final focusedId = hasFocus
+            ? destination.id
+            : (_focusedId == destination.id ? null : _focusedId);
+        if (focusedId != _focusedId) setState(() => _focusedId = focusedId);
+      },
+      onActivate: () => widget.onDestinationSelected(destination.id),
+      focusScale: 1,
+      focusColor: Colors.transparent,
+      borderRadius: BorderRadius.circular(metrics.navItemHeight / 2),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        height: metrics.navItemHeight,
+        decoration: BoxDecoration(
+          color: focused ? palette.focusFill : Colors.transparent,
+          borderRadius: BorderRadius.circular(metrics.navItemHeight / 2),
+        ),
+        child: Stack(
+          children: <Widget>[
+            if (selected && !focused)
+              Positioned(
+                left: 2,
+                top: metrics.navItemHeight * 0.3,
+                bottom: metrics.navItemHeight * 0.3,
+                child: Container(
+                  width: 3,
+                  decoration: BoxDecoration(
+                    color: colors.primary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            Row(
+              children: <Widget>[
+                SizedBox(
+                  // Two less than the rail, clearing the pill's 2px border.
+                  width: metrics.railWidth - 4,
+                  child: Icon(
+                    selected
+                        ? destination.selectedIcon ?? destination.icon
+                        : destination.icon,
+                    color: foreground,
+                    size: metrics.compact ? 22 : 24,
+                  ),
+                ),
+                Expanded(
+                  child: _Label(
+                    visible: widget.expanded,
+                    child: Text(
+                      destination.label,
+                      style: TextStyle(
+                        color: foreground,
+                        fontFamily:
+                            focused || selected ? 'FigtreeSB' : 'Figtree',
+                        fontSize: metrics.compact ? 17 : 19,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A rail label, faded in as the rail widens and never wrapped or ellipsized
+/// while the width animates.
+class _Label extends StatelessWidget {
+  const _Label({required this.visible, required this.child});
+
+  final bool visible;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: const Duration(milliseconds: 180),
+        curve: visible ? const Interval(0.3, 1) : Curves.easeOut,
+        child: OverflowBox(
+          alignment: Alignment.centerLeft,
+          maxWidth: double.infinity,
+          child: DefaultTextStyle.merge(
+            maxLines: 1,
+            softWrap: false,
+            child: child,
+          ),
         ),
       ),
     );

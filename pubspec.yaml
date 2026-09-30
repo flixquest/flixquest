@@ -3,7 +3,7 @@ description: A Flutter movie app.
 
 publish_to: "none"
 
-version: 4.1.1+5
+version: 4.2.0+5
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -63,13 +63,15 @@ dependencies:
   shared_preferences: ^2.3.2
   shimmer: ^3.0.0
   sqflite: ^2.4.0
-  unity_ads_plugin: ^0.5.0
+  startapp_sdk: ^1.0.1
   url_launcher: ^6.3.2
   wakelock_plus: ^1.4.0
   xml: ^6.6.1
 
 dev_dependencies:
   flutter_lints: ^5.0.0
+  flutter_localizations:
+    sdk: flutter
   flutter_native_splash: ^2.4.2
   flutter_test:
     sdk: flutter

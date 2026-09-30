@@ -4,20 +4,27 @@ import 'package:provider/provider.dart';
 
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
+import '../../widgets/common_widgets.dart'
+    show AppStreamingService, appStreamingServices;
 import '../app/tv_design.dart';
+import '../app/tv_shell_layout.dart';
 import '../controllers/tv_catalog_controller.dart';
 import '../focus/tv_screen_focus_controller.dart';
-import '../focus/tv_focusable.dart';
 import '../models/tv_media_item.dart';
-import '../widgets/tv_content_grid.dart';
-import '../widgets/tv_media_card.dart';
+import '../widgets/tv_browse_skeleton.dart';
+import '../widgets/tv_browse_view.dart';
+import '../widgets/tv_media_card.dart' show TvMediaBadge;
+import '../widgets/tv_shortcut_tile.dart';
 import '../widgets/tv_state_panel.dart';
 
+/// The Movies or Series destination: a browse page of rows, with the phone
+/// app's streaming services and the genres as rows of shortcuts.
 class TvCatalogScreen extends StatefulWidget {
   const TvCatalogScreen({
     required this.kind,
     required this.metrics,
     required this.onOpenMedia,
+    required this.onOpenCollection,
     this.focusController,
     super.key,
   });
@@ -25,6 +32,7 @@ class TvCatalogScreen extends StatefulWidget {
   final TvMediaKind kind;
   final TvShellMetrics metrics;
   final ValueChanged<TvMediaItem> onOpenMedia;
+  final ValueChanged<TvCollection> onOpenCollection;
   final TvScreenFocusController? focusController;
 
   @override
@@ -33,32 +41,10 @@ class TvCatalogScreen extends StatefulWidget {
 
 class _TvCatalogScreenState extends State<TvCatalogScreen> {
   static const _controller = TvCatalogController();
-  final TvContentGridController _gridFocusController =
-      TvContentGridController();
-  Future<List<TvMediaItem>>? _items;
+  Future<TvCatalogData>? _data;
   String? _configurationKey;
-  String _sort = 'Discover';
 
-  @override
-  void initState() {
-    super.initState();
-    widget.focusController?.attach(this, _gridFocusController.requestFocus);
-  }
-
-  @override
-  void didUpdateWidget(TvCatalogScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.focusController, widget.focusController)) {
-      oldWidget.focusController?.detach(this);
-      widget.focusController?.attach(this, _gridFocusController.requestFocus);
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.focusController?.detach(this);
-    super.dispose();
-  }
+  bool get _isMovie => widget.kind == TvMediaKind.movie;
 
   @override
   void didChangeDependencies() {
@@ -69,145 +55,176 @@ class _TvCatalogScreenState extends State<TvCatalogScreen> {
         '${settings.enableProxy}|${dependencies.tmdbProxy}';
     if (_configurationKey != key) {
       _configurationKey = key;
-      _items = _load(settings, dependencies);
+      _data = _load(settings, dependencies);
     }
   }
 
-  Future<List<TvMediaItem>> _load(
+  Future<TvCatalogData> _load(
     SettingsProvider settings,
     AppDependencyProvider dependencies,
   ) {
-    return widget.kind == TvMediaKind.movie
-        ? _controller.loadMovies(settings: settings, dependencies: dependencies)
-        : _controller.loadSeries(
-            settings: settings, dependencies: dependencies);
+    return _controller.loadCatalog(
+      kind: widget.kind,
+      settings: settings,
+      dependencies: dependencies,
+    );
   }
 
   void _retry() {
     setState(() {
-      _items = _load(
+      _data = _load(
         context.read<SettingsProvider>(),
         context.read<AppDependencyProvider>(),
       );
     });
   }
 
+  void _openService(AppStreamingService service) {
+    widget.onOpenCollection(_controller.serviceCollection(
+      kind: widget.kind,
+      service: service,
+      settings: context.read<SettingsProvider>(),
+      dependencies: context.read<AppDependencyProvider>(),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
-    final title = widget.kind == TvMediaKind.movie ? 'Movies' : 'Series';
-    final icon = widget.kind == TvMediaKind.movie
-        ? PhosphorIcons.filmSlate()
-        : PhosphorIcons.television();
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        widget.metrics.contentPadding,
-        0,
-        widget.metrics.contentPadding,
-        0,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          _CatalogHeader(title: title, icon: icon),
-          const SizedBox(height: 8),
-          Row(children: [
-            for (final sort in ['Discover', 'Top rated', 'Newest'])
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: TvFocusable(
-                  semanticLabel: '$sort $title',
-                  selected: _sort == sort,
-                  focusScale: 1,
-                  onActivate: () => setState(() => _sort = sort),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                    decoration: BoxDecoration(
-                        color: _sort == sort
-                            ? Theme.of(context).colorScheme.primary
-                            : TvDesign.raisedSurface,
-                        borderRadius: BorderRadius.circular(8)),
-                    child: Text(sort,
-                        style: TextStyle(
-                            fontSize: 17,
-                            color: _sort == sort
-                                ? Theme.of(context).colorScheme.onPrimary
-                                : Colors.white)),
-                  ),
-                ),
-              ),
-          ]),
-          SizedBox(height: widget.metrics.compact ? 10 : 18),
-          Expanded(
-            child: FutureBuilder<List<TvMediaItem>>(
-              future: _items,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState != ConnectionState.done) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return TvStatePanel.error(onRetry: _retry);
-                }
-                final items = List<TvMediaItem>.of(
-                    snapshot.data ?? const <TvMediaItem>[]);
-                if (_sort == 'Top rated') {
-                  items
-                      .sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
-                } else if (_sort == 'Newest') {
-                  items.sort((a, b) =>
-                      (b.releaseDate ?? '').compareTo(a.releaseDate ?? ''));
-                }
-                if (items.isEmpty) {
-                  return TvStatePanel(
-                    title: 'No $title available',
-                    message: 'Try again in a moment.',
-                    icon: icon,
-                    actionLabel: 'Retry',
-                    onAction: _retry,
-                  );
-                }
-                return TvContentGrid<TvMediaItem>(
-                  controller: _gridFocusController,
-                  scopeId: 'catalog-${widget.kind.name}-$_sort',
-                  items: items,
-                  itemId: (item) => item.stableId,
-                  semanticLabel: (item) => item.title,
-                  targetItemWidth: widget.metrics.mediaCardWidth,
-                  itemBuilder: (_, item, width) =>
-                      TvMediaCard(item: item, width: width),
-                  onItemActivated: widget.onOpenMedia,
-                );
-              },
+    // A full-bleed screen: only the browse view's artwork reaches the edges.
+    final insets = TvShellInsets.of(context);
+    return FutureBuilder<TvCatalogData>(
+      future: _data,
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        final loading = snapshot.connectionState != ConnectionState.done;
+        return AnimatedSwitcher(
+          // The page fades in over its skeleton rather than cutting to it.
+          duration: const Duration(milliseconds: 280),
+          switchInCurve: Curves.easeOut,
+          child: KeyedSubtree(
+            key: ValueKey<Object>(
+              loading ? 'loading' : data?.featured?.stableId ?? 'error',
             ),
+            child: loading
+                ? TvBrowseSkeleton(metrics: widget.metrics)
+                : _buildLoaded(snapshot, insets),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
-}
 
-class _CatalogHeader extends StatelessWidget {
-  const _CatalogHeader({required this.title, required this.icon});
-
-  final String title;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Row(
-      children: <Widget>[
-        Icon(icon, color: colors.primary, size: 32),
-        const SizedBox(width: 13),
-        Text(
-          title,
-          style: TextStyle(
-            color: colors.onSurface,
-            fontFamily: 'FigtreeSB',
-            fontSize: 28,
-          ),
+  Widget _buildLoaded(
+      AsyncSnapshot<TvCatalogData> snapshot, EdgeInsets insets) {
+    final data = snapshot.data;
+    final featured = data?.featured;
+    if (snapshot.hasError || data == null || featured == null) {
+      return Padding(
+        padding: insets,
+        child: TvStatePanel(
+          title: _isMovie ? 'No movies to show' : 'No series to show',
+          message: 'FlixQuest could not load this page. Try again.',
+          icon:
+              _isMovie ? PhosphorIcons.filmSlate() : PhosphorIcons.television(),
+          actionLabel: 'Retry',
+          onAction: _retry,
         ),
-      ],
+      );
+    }
+    String key(TvMediaItem item) => '${item.kind.name}:${item.id}';
+    final topTen = data.topTen.map(key).toSet();
+    // Series on the air right now; upcoming movies have nothing new yet.
+    final airing = _isMovie ? const <String>{} : data.fresh.map(key).toSet();
+    return TvBrowseView(
+      featured: featured,
+      rows: _rows(data),
+      metrics: widget.metrics,
+      onOpenMedia: widget.onOpenMedia,
+      focusController: widget.focusController,
+      focusMemoryScope: 'tv-${widget.kind.name}-row',
+      badgeFor: (item) => topTen.contains(key(item))
+          ? TvMediaBadge.top10
+          : airing.contains(key(item))
+              ? TvMediaBadge.newEpisodes
+              : null,
     );
+  }
+
+  List<TvBrowseRow> _rows(TvCatalogData data) {
+    final kind = widget.kind.name;
+    final noun = _isMovie ? 'movies' : 'series';
+    return <TvBrowseRow>[
+      TvTopTenRow(
+        title: 'Top 10 $noun today',
+        scopeId: '$kind-top-ten',
+        items: data.topTen,
+      ),
+      TvMediaRow(
+        title: 'Trending now',
+        scopeId: '$kind-trending',
+        items: data.trending,
+      ),
+      TvMediaRow(
+        title: 'Popular $noun',
+        scopeId: '$kind-popular',
+        items: data.popular,
+      ),
+      TvShortcutRow(
+        title: 'Streaming services',
+        scopeId: '$kind-services',
+        shortcuts: <TvBrowseShortcut>[
+          for (final service in appStreamingServices)
+            TvBrowseShortcut(
+              id: 'service-${service.providerId}',
+              title: service.name,
+              facts: const <String>['Streaming service'],
+              description:
+                  'The most popular $noun streaming on ${service.name}.',
+              logoAsset: service.imagePath,
+              onActivate: () => _openService(service),
+            ),
+        ],
+      ),
+      TvMediaRow(
+        title: 'Top rated',
+        scopeId: '$kind-top-rated',
+        items: data.topRated,
+      ),
+      TvMediaRow(
+        title: _isMovie ? 'Coming soon' : 'New episodes',
+        scopeId: '$kind-fresh',
+        items: data.fresh,
+        // Every card here would say New episodes.
+        showBadges: _isMovie,
+      ),
+      TvShortcutRow(
+        title: 'Genres',
+        scopeId: '$kind-genres',
+        shortcuts: <TvBrowseShortcut>[
+          for (final genre in data.genres)
+            TvBrowseShortcut(
+              id: 'genre-${genre.genreID}',
+              title: genre.genreName!,
+              facts: const <String>['Genre'],
+              description: 'Popular ${genre.genreName!.toLowerCase()} $noun, '
+                  'the most watched first.',
+              onActivate: () => widget.onOpenCollection(
+                _controller.genreCollection(
+                  kind: widget.kind,
+                  genre: genre,
+                  settings: context.read<SettingsProvider>(),
+                  dependencies: context.read<AppDependencyProvider>(),
+                ),
+              ),
+            ),
+        ],
+      ),
+      for (final shelf in data.serviceShelves)
+        TvMediaRow(
+          title: 'Popular on ${shelf.service.name}',
+          scopeId: '$kind-on-${shelf.service.providerId}',
+          items: shelf.items,
+        ),
+    ];
   }
 }

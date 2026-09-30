@@ -2,15 +2,21 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../design/app_palette.dart';
+import '../../design/app_tokens.dart';
+import '../../design/skeleton.dart';
+import '../../mobile/widgets/filter_chips.dart';
+import '../../mobile/widgets/page_kit.dart';
+import '../../mobile/widgets/pill_button.dart';
 import '../../models/wellness.dart';
 import '../../models/wellness_insights.dart';
 import '../../models/wellness_recap.dart';
@@ -19,6 +25,7 @@ import '../../provider/wellness_provider.dart';
 import '../../services/wellness_sync_service.dart';
 import '../../ui_components/app_ui_components.dart';
 import '../../widgets/wellness_charts.dart';
+import 'widgets/insights_dashboard.dart';
 
 class WellnessScreen extends StatefulWidget {
   const WellnessScreen({super.key});
@@ -32,6 +39,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
   final GlobalKey _titlesSectionKey = GlobalKey();
   final GlobalKey _tasteSectionKey = GlobalKey();
   final GlobalKey _patternsSectionKey = GlobalKey();
+  final GlobalKey _playbackSectionKey = GlobalKey();
   bool _sharing = false;
 
   @override
@@ -39,35 +47,47 @@ class _WellnessScreenState extends State<WellnessScreen> {
     final wellness = context.watch<WellnessProvider>();
     final insights = wellness.insights;
     final hasRecapHistory = hasRecapWorthyHistory(wellness.sessions);
+    final palette = AppPalette.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Viewing Insights'),
-        centerTitle: false,
-        scrolledUnderElevation: 0,
+      backgroundColor: palette.page,
+      appBar: PageAppBar(
+        title: tr('ins_title'),
         actions: [
           IconButton(
-            tooltip: 'Viewing Insights options',
+            tooltip: tr('ins_options'),
             onPressed: () => _showInsightsActions(wellness),
             icon: Icon(PhosphorIcons.dotsThreeVertical()),
           ),
-          const SizedBox(width: 4),
         ],
       ),
-      body: wellness.loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: wellness.canSync ? wellness.syncNow : wellness.reload,
-              child: AppResponsiveContent(
-                maxWidth: 920,
-                padding: EdgeInsets.zero,
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(
-                    AppUI.pagePadding(context),
-                    12,
-                    AppUI.pagePadding(context),
-                    40,
-                  ),
+      body: WellnessChartLabels(
+        less: tr('ins_less'),
+        more: tr('ins_more'),
+        peakPerHour: (duration) =>
+            tr('ins_peak_hour', namedArgs: {'time': duration}),
+        nothingYet: tr('ins_nothing_yet'),
+        child: SkeletonSwitcher(
+          loading: wellness.loading,
+          skeleton: const _InsightsSkeleton(),
+          child: RefreshIndicator(
+            color: palette.foreground,
+            backgroundColor: palette.raisedSurface,
+            onRefresh: wellness.canSync ? wellness.syncNow : wellness.reload,
+            child: AppResponsiveContent(
+              maxWidth: 920,
+              padding: EdgeInsets.zero,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  AppUI.pagePadding(context),
+                  12,
+                  AppUI.pagePadding(context),
+                  40,
+                ),
+                // Keep report anchors mounted so a snapshot or section chip
+                // can jump directly to a section outside the viewport.
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (wellness.shouldOfferGuestMerge)
                       _GuestMergeCard(provider: wellness),
@@ -99,37 +119,47 @@ class _WellnessScreenState extends State<WellnessScreen> {
                         range: wellness.range,
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _trackingSince(wellness.sessions),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
+                      LayoutBuilder(builder: (context, constraints) {
+                        final tracking = Text(
+                          _trackingSince(wellness.sessions),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: Theme.of(context)
                                         .colorScheme
                                         .onSurfaceVariant,
                                   ),
-                            ),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: _sharing
-                                ? null
-                                : () => _openShareRecap(wellness),
-                            icon: _sharing
-                                ? const SizedBox.square(
-                                    dimension: 15,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Icon(PhosphorIcons.shareNetwork(), size: 18),
-                            label: const Text('Share recap'),
-                          ),
-                        ],
+                        );
+                        final share = PillButton(
+                          busy: _sharing,
+                          onPressed: () => _openShareRecap(wellness),
+                          icon: PhosphorIcons.shareNetwork(),
+                          label: tr('ins_share_recap'),
+                        );
+                        if (constraints.maxWidth < 520) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              tracking,
+                              const SizedBox(height: 10),
+                              share
+                            ],
+                          );
+                        }
+                        return Row(children: [
+                          Expanded(child: tracking),
+                          const SizedBox(width: 12),
+                          share,
+                        ]);
+                      }),
+                      const SizedBox(height: 18),
+                      InsightsSnapshot(
+                        insights: insights,
+                        onTitles: () => _jumpToSection(_titlesSectionKey),
+                        onTaste: () => _jumpToSection(_tasteSectionKey),
+                        onPatterns: () => _jumpToSection(_patternsSectionKey),
                       ),
+                      const SizedBox(height: 18),
+                      _StatGrid(insights: insights),
                       const SizedBox(height: 18),
                       _RecapShelf(
                         sessions: wellness.sessions,
@@ -138,8 +168,6 @@ class _WellnessScreenState extends State<WellnessScreen> {
                           initialPeriod: period,
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      _StatGrid(insights: insights),
                       const SizedBox(height: 20),
                       _SectionNavigator(
                         onSelected: (section) =>
@@ -148,16 +176,16 @@ class _WellnessScreenState extends State<WellnessScreen> {
                           _InsightsSection.titles => _titlesSectionKey,
                           _InsightsSection.taste => _tasteSectionKey,
                           _InsightsSection.patterns => _patternsSectionKey,
+                          _InsightsSection.playback => _playbackSectionKey,
                         }),
                       ),
                       const SizedBox(height: 34),
                       _SectionHeader(
                         key: _timeSectionKey,
                         icon: PhosphorIcons.clockCounterClockwise(),
-                        eyebrow: 'TIME',
-                        title: 'Your viewing rhythm',
-                        description:
-                            'Active playback only—pauses and buffering are excluded.',
+                        eyebrow: tr('ins_time').toUpperCase(),
+                        title: tr('ins_time_title'),
+                        description: tr('ins_time_desc'),
                       ),
                       const SizedBox(height: 14),
                       _TimelinePanel(
@@ -173,27 +201,26 @@ class _WellnessScreenState extends State<WellnessScreen> {
                       _SectionHeader(
                         key: _titlesSectionKey,
                         icon: PhosphorIcons.filmSlate(),
-                        eyebrow: 'TITLES',
-                        title: 'What held your attention',
-                        description:
-                            'Completed titles, returning favorites, and recent sessions.',
+                        eyebrow: tr('ins_titles').toUpperCase(),
+                        title: tr('ins_titles_title'),
+                        description: tr('ins_titles_desc'),
                       ),
+                      const SizedBox(height: 14),
+                      InsightsDiscoveryPanel(insights: insights),
                       const SizedBox(height: 14),
                       _CompletionPanel(insights: insights),
                       const SizedBox(height: 14),
-                      _RankedPanel(
-                        title: 'Most watched',
-                        values: insights.topTitles.take(5).toList(),
-                        emptyMessage:
-                            'More viewing will reveal your top titles.',
+                      InsightsRankedPanel(
+                        title: tr('ins_most_watched'),
+                        values: insights.topTitles,
+                        emptyMessage: tr('ins_most_watched_empty'),
                       ),
                       const SizedBox(height: 14),
                       if (insights.topSeriesEpisodes.isNotEmpty) ...[
-                        _RankedPanel(
-                          title: 'Series you kept going',
-                          values: insights.topSeriesEpisodes.take(5).toList(),
-                          emptyMessage:
-                              'Episode counts appear once you watch a series.',
+                        InsightsRankedPanel(
+                          title: tr('ins_series_kept'),
+                          values: insights.topSeriesEpisodes,
+                          emptyMessage: tr('ins_series_kept_empty'),
                           valueLabel: _episodeCount,
                         ),
                         const SizedBox(height: 14),
@@ -204,11 +231,12 @@ class _WellnessScreenState extends State<WellnessScreen> {
                       _SectionHeader(
                         key: _tasteSectionKey,
                         icon: PhosphorIcons.palette(),
-                        eyebrow: 'TASTE',
-                        title: 'The shape of your taste',
-                        description:
-                            'Built from the metadata available when you watched.',
+                        eyebrow: tr('ins_taste').toUpperCase(),
+                        title: tr('ins_taste_title'),
+                        description: tr('ins_taste_desc'),
                       ),
+                      const SizedBox(height: 14),
+                      InsightsTasteBreadth(insights: insights),
                       const SizedBox(height: 14),
                       LayoutBuilder(
                         builder: (context, constraints) {
@@ -217,35 +245,30 @@ class _WellnessScreenState extends State<WellnessScreen> {
                               ? (constraints.maxWidth - 14) / 2
                               : constraints.maxWidth;
                           final panels = <Widget>[
-                            _RankedPanel(
-                              title: 'Genres',
-                              values: insights.topGenres.take(5).toList(),
-                              emptyMessage:
-                                  'Genre insights will appear as title metadata is collected.',
+                            InsightsRankedPanel(
+                              title: tr('genres'),
+                              values: insights.topGenres,
+                              emptyMessage: tr('ins_genres_empty'),
                             ),
-                            _RankedPanel(
-                              title: 'Languages',
-                              values: insights.topLanguages.take(5).toList(),
-                              emptyMessage:
-                                  'Language insights will appear with enriched titles.',
+                            InsightsRankedPanel(
+                              title: tr('ins_languages'),
+                              values: insights.topLanguages,
+                              emptyMessage: tr('ins_languages_empty'),
                             ),
-                            _RankedPanel(
-                              title: 'Countries',
-                              values: insights.topCountries.take(5).toList(),
-                              emptyMessage:
-                                  'Country insights will appear with enriched titles.',
+                            InsightsRankedPanel(
+                              title: tr('ins_countries'),
+                              values: insights.topCountries,
+                              emptyMessage: tr('ins_countries_empty'),
                             ),
-                            _RankedPanel(
-                              title: 'Release decades',
-                              values: insights.topDecades.take(5).toList(),
-                              emptyMessage:
-                                  'Release-era insights will appear after more viewing.',
+                            InsightsRankedPanel(
+                              title: tr('ins_decades'),
+                              values: insights.topDecades,
+                              emptyMessage: tr('ins_decades_empty'),
                             ),
-                            _RankedPanel(
-                              title: 'Stream providers',
-                              values: insights.topProviders.take(5).toList(),
-                              emptyMessage:
-                                  'Provider insights will appear after streaming sessions.',
+                            InsightsRankedPanel(
+                              title: tr('ins_providers'),
+                              values: insights.topProviders,
+                              emptyMessage: tr('ins_providers_empty'),
                             ),
                           ];
                           return Wrap(
@@ -262,10 +285,9 @@ class _WellnessScreenState extends State<WellnessScreen> {
                       _SectionHeader(
                         key: _patternsSectionKey,
                         icon: PhosphorIcons.calendarDots(),
-                        eyebrow: 'PATTERNS',
-                        title: 'When stories fit your day',
-                        description:
-                            'A private view of your own routine—not a score or a warning.',
+                        eyebrow: tr('ins_patterns').toUpperCase(),
+                        title: tr('ins_patterns_title'),
+                        description: tr('ins_patterns_desc'),
                       ),
                       const SizedBox(height: 14),
                       _RhythmPanel(
@@ -276,6 +298,16 @@ class _WellnessScreenState extends State<WellnessScreen> {
                       _DayPartsPanel(insights: insights),
                       const SizedBox(height: 14),
                       _InsightStrip(insights: insights),
+                      const SizedBox(height: 34),
+                      _SectionHeader(
+                        key: _playbackSectionKey,
+                        icon: PhosphorIcons.devices(),
+                        eyebrow: tr('ins_playback').toUpperCase(),
+                        title: tr('ins_playback_title'),
+                        description: tr('ins_playback_desc'),
+                      ),
+                      const SizedBox(height: 14),
+                      InsightsPlaybackPanel(insights: insights),
                       const SizedBox(height: 26),
                       _PrivacyNote(canSync: wellness.canSync),
                     ],
@@ -283,6 +315,9 @@ class _WellnessScreenState extends State<WellnessScreen> {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -323,27 +358,25 @@ class _WellnessScreenState extends State<WellnessScreen> {
             XFile(jsonFile.path, mimeType: 'application/json'),
             XFile(csvFile.path, mimeType: 'text/csv'),
           ],
-          text: 'My private FlixQuest Viewing Insights archive',
+          text: tr('ins_export_text'),
         );
       case _WellnessAction.clear:
         if (!mounted) return;
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Clear viewing history?'),
+            title: Text(tr('ins_clear_q')),
             content: Text(
-              wellness.canSync
-                  ? 'This removes your viewing sessions from this device and every synced device. This cannot be undone.'
-                  : 'This removes the viewing sessions stored on this device. This cannot be undone.',
+              wellness.canSync ? tr('ins_clear_synced') : tr('ins_clear_local'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+                child: Text(tr('cancel')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Clear history'),
+                child: Text(tr('ins_clear_history')),
               ),
             ],
           ),
@@ -420,12 +453,12 @@ class _InsightsActionsSheet extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(14),
+                  color: AppPalette.of(context).idleFill,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   PhosphorIcons.slidersHorizontal(),
-                  color: colors.onPrimaryContainer,
+                  color: AppPalette.of(context).foreground,
                   size: 21,
                 ),
               ),
@@ -435,11 +468,11 @@ class _InsightsActionsSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Your insights data',
+                      tr('ins_data_title'),
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     Text(
-                      'Export a copy or manage your history.',
+                      tr('ins_data_desc'),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: colors.onSurfaceVariant,
                           ),
@@ -448,7 +481,7 @@ class _InsightsActionsSheet extends StatelessWidget {
                 ),
               ),
               IconButton(
-                tooltip: 'Close',
+                tooltip: tr('close'),
                 onPressed: () => Navigator.pop(context),
                 icon: Icon(PhosphorIcons.x()),
               ),
@@ -457,15 +490,15 @@ class _InsightsActionsSheet extends StatelessWidget {
           const SizedBox(height: 20),
           _InsightsActionTile(
             icon: PhosphorIcons.export(),
-            title: 'Export my data',
-            description: 'Download your sessions as JSON and CSV.',
+            title: tr('ins_export'),
+            description: tr('ins_export_desc'),
             onTap: () => Navigator.pop(context, _WellnessAction.export),
           ),
           const SizedBox(height: 10),
           _InsightsActionTile(
             icon: PhosphorIcons.trash(),
-            title: 'Clear viewing history',
-            description: 'Remove all locally stored and synced sessions.',
+            title: tr('ins_clear_title'),
+            description: tr('ins_clear_desc'),
             destructive: true,
             onTap: () => Navigator.pop(context, _WellnessAction.clear),
           ),
@@ -493,12 +526,13 @@ class _InsightsActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final accent = destructive ? colors.error : colors.primary;
+    final accent =
+        destructive ? colors.error : AppPalette.of(context).foreground;
     return Material(
       color: destructive
           ? colors.errorContainer.withValues(alpha: .32)
           : _insightSurface(context),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(10),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -511,7 +545,7 @@ class _InsightsActionTile extends StatelessWidget {
                 height: 44,
                 decoration: BoxDecoration(
                   color: accent.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: accent, size: 21),
               ),
@@ -596,18 +630,21 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
   String get _caption {
     final insights = _insights;
     final title = _includeTopTitle && insights.topTitles.isNotEmpty
-        ? ' My most-watched title was ${insights.topTitles.first.label}.'
+        ? tr('ins_caption_top',
+            namedArgs: {'title': insights.topTitles.first.label})
         : '';
-    return '${_period.captionLabel} on FlixQuest: '
-        '${_duration(insights.totalWatchedMs)} of stories across '
-        '${insights.activeDays} active ${insights.activeDays == 1 ? 'day' : 'days'}.$title';
+    return '${tr('ins_caption', namedArgs: {
+          'period': _recapCaptionLabel(_period),
+          'time': _duration(insights.totalWatchedMs),
+          'days': plural('ins_active_days', insights.activeDays),
+        })}$title';
   }
 
   Future<void> _copyCaption() async {
     await Clipboard.setData(ClipboardData(text: _caption));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Caption copied')),
+      SnackBar(content: Text(tr('ins_caption_copied'))),
     );
   }
 
@@ -634,7 +671,8 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
       final box = context.findRenderObject() as RenderBox?;
       await Share.shareXFiles(
         <XFile>[XFile(file.path, mimeType: 'image/png')],
-        subject: '${_period.label} FlixQuest recap',
+        subject: tr('ins_recap_subject',
+            namedArgs: {'period': _recapPeriodLabel(_period)}),
         text: _caption,
         sharePositionOrigin:
             box == null ? null : box.localToGlobal(Offset.zero) & box.size,
@@ -642,8 +680,8 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not create the recap. Please try again.'),
+        SnackBar(
+          content: Text(tr('ins_recap_failed')),
         ),
       );
     } finally {
@@ -664,7 +702,7 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
     }
     return Material(
       color: colors.surface,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
       clipBehavior: Clip.antiAlias,
       child: DraggableScrollableSheet(
         expand: false,
@@ -694,19 +732,19 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Share your viewing story',
+                        tr('ins_share_story'),
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Pick a moment, choose a look, then make it yours.',
+                        tr('ins_share_story_desc'),
                         style: TextStyle(color: colors.onSurfaceVariant),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Close',
+                  tooltip: tr('close'),
                   onPressed: () => Navigator.pop(context),
                   icon: Icon(PhosphorIcons.x()),
                 ),
@@ -714,7 +752,7 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
             ),
             const SizedBox(height: 18),
             Text(
-              'RECAP PERIOD',
+              tr('ins_recap_period').toUpperCase(),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: colors.onSurfaceVariant,
                     fontFamily: 'FigtreeSB',
@@ -732,29 +770,19 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
                 itemBuilder: (context, index) {
                   final period = periods[index];
                   final selected = period.id == _period.id;
-                  return ChoiceChip(
-                    label: Text(
-                      period.label,
-                      style: TextStyle(
-                        color: selected ? colors.onPrimary : colors.onSurface,
-                        fontFamily: selected ? 'FigtreeSB' : 'Figtree',
-                        fontWeight:
-                            selected ? FontWeight.w600 : FontWeight.w500,
-                      ),
+                  return ChoicePill(
+                    spec: FilterChipSpec(
+                      label: _recapPeriodLabel(period),
+                      selected: selected,
+                      onTap: () => setState(() => _period = period),
                     ),
-                    selected: selected,
-                    showCheckmark: false,
-                    side: BorderSide.none,
-                    backgroundColor: _insightSurface(context, raised: true),
-                    selectedColor: colors.primary,
-                    onSelected: (_) => setState(() => _period = period),
                   );
                 },
               ),
             ),
             const SizedBox(height: 18),
             Text(
-              'FLIXQUEST THEMES',
+              tr('ins_themes').toUpperCase(),
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: colors.onSurfaceVariant,
                     fontFamily: 'FigtreeSB',
@@ -768,21 +796,21 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
               child: Row(
                 children: [
                   _RecapStyleChip(
-                    label: 'Light',
+                    label: tr('ins_theme_light'),
                     colors: const [Color(0xFFFAF9FC), Color(0xFFF57C00)],
                     selected: _style == _RecapStyle.light,
                     onTap: () => setState(() => _style = _RecapStyle.light),
                   ),
                   const SizedBox(width: 8),
                   _RecapStyleChip(
-                    label: 'Dark',
+                    label: tr('ins_theme_dark'),
                     colors: const [Color(0xFF181A1D), Color(0xFFF57C00)],
                     selected: _style == _RecapStyle.dark,
                     onTap: () => setState(() => _style = _RecapStyle.dark),
                   ),
                   const SizedBox(width: 8),
                   _RecapStyleChip(
-                    label: 'Lights out',
+                    label: tr('ins_theme_lights_out'),
                     colors: const [Color(0xFF000000), Color(0xFFF57C00)],
                     selected: _style == _RecapStyle.lightsOut,
                     onTap: () => setState(() => _style = _RecapStyle.lightsOut),
@@ -818,7 +846,9 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
             if (insights.isEmpty) ...[
               const SizedBox(height: 12),
               Text(
-                'There isn’t enough viewing activity in ${_period.label.toLowerCase()} to make a recap yet.',
+                tr('ins_not_enough', namedArgs: {
+                  'period': _recapPeriodLabel(_period).toLowerCase()
+                }),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: colors.onSurfaceVariant,
@@ -829,38 +859,37 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
             Container(
               decoration: BoxDecoration(
                 color: _insightSurface(context),
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(9),
               ),
               child: SwitchListTile.adaptive(
                 value: _includeTopTitle,
                 onChanged: (value) => setState(() => _includeTopTitle = value),
                 secondary: Icon(PhosphorIcons.eye()),
-                title: const Text('Include my top title'),
-                subtitle: const Text('Turn this off for a more private recap.'),
+                title: Text(tr('ins_include_top')),
+                subtitle: Text(tr('ins_include_top_desc')),
               ),
             ),
             const SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: PillButton(
+                    height: 48,
                     onPressed: insights.isEmpty ? null : _copyCaption,
-                    icon: Icon(PhosphorIcons.copy(), size: 18),
-                    label: const Text('Copy caption'),
+                    icon: PhosphorIcons.copy(),
+                    label: tr('ins_copy_caption'),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: FilledButton.icon(
-                    onPressed:
-                        _sharing || insights.isEmpty ? null : _shareImage,
-                    icon: _sharing
-                        ? const SizedBox.square(
-                            dimension: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(PhosphorIcons.shareNetwork(), size: 18),
-                    label: Text(_sharing ? 'Creating…' : 'Share image'),
+                  child: PillButton(
+                    primary: true,
+                    height: 48,
+                    busy: _sharing,
+                    onPressed: insights.isEmpty ? null : _shareImage,
+                    icon: PhosphorIcons.shareNetwork(),
+                    label:
+                        _sharing ? tr('ins_creating') : tr('ins_share_image'),
                   ),
                 ),
               ],
@@ -887,12 +916,12 @@ class _RecapStyleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
     return Material(
-      color: selected ? scheme.primary : _insightSurface(context, raised: true),
-      borderRadius: BorderRadius.circular(99),
+      color: selected ? palette.focusFill : palette.idleFill,
+      borderRadius: BorderRadius.circular(8),
       child: InkWell(
-        borderRadius: BorderRadius.circular(99),
+        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 7, 13, 7),
@@ -912,9 +941,8 @@ class _RecapStyleChip extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? scheme.onPrimary : scheme.onSurface,
-                  fontFamily: selected ? 'FigtreeSB' : 'Figtree',
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? palette.onFocus : palette.foreground,
+                  fontFamily: 'FigtreeSB',
                 ),
               ),
               if (selected) ...[
@@ -922,7 +950,7 @@ class _RecapStyleChip extends StatelessWidget {
                 Icon(
                   PhosphorIcons.checkCircle(),
                   size: 17,
-                  color: scheme.onPrimary,
+                  color: palette.onFocus,
                 ),
               ],
             ],
@@ -1026,7 +1054,7 @@ class _ShareRecapCard extends StatelessWidget {
                 Row(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(11),
+                      borderRadius: BorderRadius.circular(5),
                       child: Image.asset(
                         'assets/images/logo.png',
                         width: 34,
@@ -1051,13 +1079,13 @@ class _ShareRecapCard extends StatelessWidget {
                           horizontal: 9, vertical: 5),
                       decoration: BoxDecoration(
                         color: foreground.withValues(alpha: .1),
-                        borderRadius: BorderRadius.circular(99),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: foreground.withValues(alpha: .13),
                         ),
                       ),
                       child: Text(
-                        period.label.toUpperCase(),
+                        _recapPeriodLabel(period).toUpperCase(),
                         style: TextStyle(
                           color: foreground,
                           fontFamily: 'FigtreeSB',
@@ -1071,7 +1099,7 @@ class _ShareRecapCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 25),
                 Text(
-                  'MY VIEWING\nSTORY',
+                  tr('ins_card_story').toUpperCase(),
                   style: TextStyle(
                     color: foreground.withValues(alpha: .7),
                     fontFamily: 'FigtreeSB',
@@ -1095,7 +1123,7 @@ class _ShareRecapCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  'of active playback',
+                  tr('ins_card_playback'),
                   style: TextStyle(
                     color: foreground.withValues(alpha: .76),
                     fontFamily: 'Figtree',
@@ -1106,7 +1134,7 @@ class _ShareRecapCard extends StatelessWidget {
                 const Spacer(),
                 if (includeTopTitle && topTitle != null) ...[
                   Text(
-                    'MOST WATCHED',
+                    tr('ins_most_watched').toUpperCase(),
                     style: TextStyle(
                       color: palette.$4,
                       fontFamily: 'FigtreeSB',
@@ -1129,7 +1157,7 @@ class _ShareRecapCard extends StatelessWidget {
                   ),
                   if (topGenre != null)
                     Text(
-                      'Top genre • $topGenre',
+                      tr('ins_top_genre', namedArgs: {'genre': topGenre}),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1146,21 +1174,21 @@ class _ShareRecapCard extends StatelessWidget {
                     Expanded(
                       child: _RecapMetric(
                         value: '${insights.completedTitles}',
-                        label: 'completed',
+                        label: tr('ins_completed'),
                         foreground: foreground,
                       ),
                     ),
                     Expanded(
                       child: _RecapMetric(
                         value: '${insights.activeDays}',
-                        label: 'active days',
+                        label: tr('ins_active_days_label'),
                         foreground: foreground,
                       ),
                     ),
                     Expanded(
                       child: _RecapMetric(
                         value: '${insights.sessionCount}',
-                        label: 'sessions',
+                        label: tr('ins_sessions'),
                         foreground: foreground,
                       ),
                     ),
@@ -1227,7 +1255,7 @@ class _ShareRecapCard extends StatelessWidget {
                         color: foreground.withValues(alpha: .52), size: 10),
                     const SizedBox(width: 4),
                     Text(
-                      'Active playback only • Pauses excluded',
+                      tr('ins_active_only'),
                       style: TextStyle(
                         color: foreground.withValues(alpha: .52),
                         fontFamily: 'Figtree',
@@ -1308,18 +1336,12 @@ class WellnessPreviewCard extends StatelessWidget {
     final featured = WellnessRecapPeriod.featured(provider.sessions, now);
     final recapReady = featured.hasReadyRecap(provider.sessions, now);
     final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.primaryContainer.withValues(alpha: .72),
-            colors.tertiaryContainer.withValues(alpha: .42),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(22),
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
       ),
       child: Material(
         color: Colors.transparent,
@@ -1334,19 +1356,14 @@ class WellnessPreviewCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Theme.of(context).colorScheme.primary,
-                        Theme.of(context).colorScheme.tertiary,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
+                    color: palette.idleFill,
+                    borderRadius: BorderRadius.circular(AppRadii.card),
                   ),
                   child: Icon(
                     recapReady
                         ? PhosphorIcons.confetti()
                         : PhosphorIcons.chartDonut(),
-                    color: Colors.white,
+                    color: palette.foreground,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -1358,28 +1375,22 @@ class WellnessPreviewCard extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              'Viewing Insights',
+                              tr('viewing_insights'),
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),
                           if (recapReady)
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colors.primary,
-                                borderRadius: BorderRadius.circular(99),
+                              padding: const EdgeInsetsDirectional.only(
+                                start: 8,
                               ),
                               child: Text(
-                                'RECAP READY',
+                                tr('ins_recap_ready').toUpperCase(),
                                 style: TextStyle(
-                                  color: colors.onPrimary,
+                                  color: colors.primary,
                                   fontFamily: 'FigtreeSB',
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: .7,
+                                  fontSize: 10,
+                                  letterSpacing: 1.2,
                                 ),
                               ),
                             ),
@@ -1388,10 +1399,15 @@ class WellnessPreviewCard extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         recapReady
-                            ? '${featured.label} recap is ready to revisit'
+                            ? tr('ins_recap_ready_revisit', namedArgs: {
+                                'period': _recapPeriodLabel(featured)
+                              })
                             : insights.isEmpty
-                                ? 'Your private viewing insights start here'
-                                : '${_duration(insights.totalWatchedMs)} this week • ${insights.completedTitles} completed',
+                                ? tr('ins_start_here')
+                                : tr('ins_this_week_summary', namedArgs: {
+                                    'time': _duration(insights.totalWatchedMs),
+                                    'n': '${insights.completedTitles}',
+                                  }),
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -1399,14 +1415,12 @@ class WellnessPreviewCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: colors.surface.withValues(alpha: .7),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(PhosphorIcons.caretRight(), size: 17),
+                Icon(
+                  Directionality.of(context) == ui.TextDirection.rtl
+                      ? PhosphorIcons.caretLeft()
+                      : PhosphorIcons.caretRight(),
+                  size: 17,
+                  color: palette.mutedText,
                 ),
               ],
             ),
@@ -1428,19 +1442,22 @@ class _InsightsToolbar extends StatelessWidget {
     final status = provider.syncService.status.value;
     final syncing = status == WellnessSyncStatus.syncing;
     final statusLabel = !provider.canSync
-        ? 'On this device'
+        ? tr('on_this_device')
         : syncing
-            ? 'Syncing…'
+            ? tr('ins_syncing')
             : status == WellnessSyncStatus.error
-                ? 'Sync paused'
+                ? tr('ins_sync_paused')
                 : provider.syncService.lastSynced.value == null
-                    ? 'Ready to sync'
-                    : 'Synced ${_relativeTime(provider.syncService.lastSynced.value!)}';
+                    ? tr('ins_ready_sync')
+                    : tr('ins_synced', namedArgs: {
+                        'time': _relativeTime(
+                            provider.syncService.lastSynced.value!),
+                      });
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _insightSurface(context),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1451,15 +1468,15 @@ class _InsightsToolbar extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(11),
+                  color: AppPalette.of(context).idleFill,
+                  borderRadius: BorderRadius.circular(AppRadii.card),
                 ),
                 child: Icon(
                   provider.canSync
                       ? PhosphorIcons.cloudCheck()
                       : PhosphorIcons.deviceMobile(),
                   size: 18,
-                  color: colors.onPrimaryContainer,
+                  color: AppPalette.of(context).foreground,
                 ),
               ),
               const SizedBox(width: 10),
@@ -1468,7 +1485,7 @@ class _InsightsToolbar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Your private viewing story',
+                      tr('ins_private_story'),
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     Text(
@@ -1483,15 +1500,11 @@ class _InsightsToolbar extends StatelessWidget {
                 ),
               ),
               if (provider.canSync)
-                IconButton.filledTonal(
-                  tooltip: 'Sync now',
-                  onPressed: syncing ? null : provider.syncNow,
-                  icon: syncing
-                      ? const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(PhosphorIcons.arrowsClockwise(), size: 19),
+                PillButton(
+                  busy: syncing,
+                  onPressed: provider.syncNow,
+                  icon: PhosphorIcons.arrowsClockwise(),
+                  label: tr('sync'),
                 ),
             ],
           ),
@@ -1515,46 +1528,29 @@ class _RangePicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labels = <WellnessRange, String>{
-      WellnessRange.week: 'Week',
-      WellnessRange.month: 'Month',
-      WellnessRange.year: 'Year',
-      WellnessRange.allTime: 'All time',
+      WellnessRange.week: tr('ins_week'),
+      WellnessRange.month: tr('ins_month'),
+      WellnessRange.year: tr('ins_year'),
+      WellnessRange.allTime: tr('ins_all_time'),
     };
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: WellnessRange.values.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final range = WellnessRange.values[index];
-          final isSelected = selected == range;
-          return ChoiceChip(
-            label: Text(
-              labels[range]!,
-              style: TextStyle(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurface,
-                fontFamily: isSelected ? 'FigtreeSB' : 'Figtree',
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              ),
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final range in WellnessRange.values)
+          ChoicePill(
+            spec: FilterChipSpec(
+              label: labels[range]!,
+              selected: selected == range,
+              onTap: () => onSelected(range),
             ),
-            selected: isSelected,
-            showCheckmark: false,
-            visualDensity: VisualDensity.compact,
-            side: BorderSide.none,
-            backgroundColor: _insightSurface(context, raised: true),
-            selectedColor: Theme.of(context).colorScheme.primary,
-            onSelected: (_) => onSelected(range),
-          );
-        },
-      ),
+          ),
+      ],
     );
   }
 }
 
-enum _InsightsSection { time, titles, taste, patterns }
+enum _InsightsSection { time, titles, taste, patterns, playback }
 
 class _SectionNavigator extends StatelessWidget {
   const _SectionNavigator({required this.onSelected});
@@ -1564,34 +1560,29 @@ class _SectionNavigator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <(_InsightsSection, IconData, String)>[
-      (_InsightsSection.time, PhosphorIcons.clock(), 'Time'),
-      (_InsightsSection.titles, PhosphorIcons.filmSlate(), 'Titles'),
-      (_InsightsSection.taste, PhosphorIcons.palette(), 'Taste'),
-      (_InsightsSection.patterns, PhosphorIcons.calendarDots(), 'Patterns'),
-    ];
-    return SizedBox(
-      height: 42,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return ActionChip(
-            avatar: Icon(item.$2, size: 17),
-            label: Text(
-              item.$3,
-              style: const TextStyle(
-                fontFamily: 'FigtreeSB',
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            side: BorderSide.none,
-            backgroundColor: _insightSurface(context, raised: true),
-            onPressed: () => onSelected(item.$1),
-          );
-        },
+      (_InsightsSection.time, PhosphorIcons.clock(), tr('ins_time')),
+      (_InsightsSection.titles, PhosphorIcons.filmSlate(), tr('ins_titles')),
+      (_InsightsSection.taste, PhosphorIcons.palette(), tr('ins_taste')),
+      (
+        _InsightsSection.patterns,
+        PhosphorIcons.calendarDots(),
+        tr('ins_patterns')
       ),
+      (_InsightsSection.playback, PhosphorIcons.devices(), tr('ins_playback')),
+    ];
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final item in items)
+          ChoicePill(
+            spec: FilterChipSpec(
+              icon: item.$2,
+              label: item.$3,
+              onTap: () => onSelected(item.$1),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -1609,11 +1600,12 @@ class _HeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
+    // A raised panel, not a coloured one: the accent is kept for progress.
     final rawGradient = <Color>[
-      colors.primary,
-      Color.lerp(colors.primary, colors.tertiary, .72)!,
-      colors.tertiary,
+      palette.raisedSurface,
+      Color.lerp(palette.raisedSurface, palette.surface, .5)!,
+      palette.surface,
     ];
     final foreground = _bestGradientForeground(rawGradient);
     final gradient = rawGradient
@@ -1637,10 +1629,18 @@ class _HeroCard extends StatelessWidget {
     // has to be an opaque color rather than a wash over the gradient.
     final trailSurface = Color.alphaBlend(translucentSurface, rawGradient[1]);
     final comparison = range == WellnessRange.allTime
-        ? 'Across ${insights.activeDays} viewing days'
+        ? tr('ins_across_days', namedArgs: {'n': '${insights.activeDays}'})
         : previous.totalWatchedMs == 0
-            ? 'Your story is taking shape'
-            : '${_duration(difference.abs())} ${difference >= 0 ? 'more' : 'less'} than the previous ${_rangeName(range)}';
+            ? tr('ins_taking_shape')
+            : difference >= 0
+                ? tr('ins_more_than', namedArgs: {
+                    'time': _duration(difference.abs()),
+                    'range': _rangeName(range),
+                  })
+                : tr('ins_less_than', namedArgs: {
+                    'time': _duration(difference.abs()),
+                    'range': _rangeName(range),
+                  });
     return Container(
       key: const Key('wellness-hero-card'),
       clipBehavior: Clip.antiAlias,
@@ -1650,14 +1650,7 @@ class _HeroCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: gradient,
         ),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: colors.primary.withValues(alpha: .22),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(AppRadii.hero),
       ),
       child: Stack(
         children: [
@@ -1696,44 +1689,35 @@ class _HeroCard extends StatelessWidget {
                 final headline = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: translucentSurface,
-                            borderRadius: BorderRadius.circular(99),
-                            border: Border.all(
-                              color: foreground.withValues(alpha: .14),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                PhosphorIcons.sparkle(),
-                                color: foreground,
-                                size: 15,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'YOUR VIEWING STORY',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(
-                                      color: foreground,
-                                      letterSpacing: 1.05,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: translucentSurface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: foreground.withValues(alpha: .14)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(PhosphorIcons.sparkle(),
+                              color: foreground, size: 15),
+                          const SizedBox(width: 6),
+                          Flexible(
+                              child: Text(
+                            tr('ins_your_story').toUpperCase(),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: foreground,
+                                  letterSpacing: 1.05,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          )),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 22),
                     Text(
@@ -1747,7 +1731,8 @@ class _HeroCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'active playback this ${_rangeName(range)}',
+                      tr('ins_playback_this',
+                          namedArgs: {'range': _rangeName(range)}),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: foreground.withValues(alpha: .82),
                           ),
@@ -1781,7 +1766,7 @@ class _HeroCard extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
                         decoration: BoxDecoration(
                           color: trailSurface,
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(9),
                           border: Border.all(
                             color: foreground.withValues(alpha: .12),
                           ),
@@ -1795,13 +1780,14 @@ class _HeroCard extends StatelessWidget {
                               height: 38,
                               color: foreground,
                               surfaceColor: trailSurface,
-                              semanticsLabel:
-                                  'Watch time for each of the last 14 days, '
-                                  'ending today at ${_duration(trail.last)}.',
+                              semanticsLabel: tr(
+                                'ins_trail_semantics',
+                                namedArgs: {'time': _duration(trail.last)},
+                              ),
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'LAST 14 DAYS',
+                              tr('ins_last_14').toUpperCase(),
                               style: Theme.of(context)
                                   .textTheme
                                   .labelSmall
@@ -1823,19 +1809,19 @@ class _HeroCard extends StatelessWidget {
                   children: [
                     _HeroMetric(
                       value: '${insights.completedTitles}',
-                      label: 'completed',
+                      label: tr('ins_completed'),
                       foreground: foreground,
                       surface: translucentSurface,
                     ),
                     _HeroMetric(
                       value: '${insights.activeDays}',
-                      label: 'active days',
+                      label: tr('ins_active_days_label'),
                       foreground: foreground,
                       surface: translucentSurface,
                     ),
                     _HeroMetric(
                       value: '${insights.sessionCount}',
-                      label: 'sessions',
+                      label: tr('ins_sessions'),
                       foreground: foreground,
                       surface: translucentSurface,
                     ),
@@ -1890,7 +1876,7 @@ class _HeroMetric extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1936,25 +1922,18 @@ class _RecapShelf extends StatelessWidget {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.primaryContainer.withValues(alpha: .72),
-            _insightSurface(context),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
+        color: _insightSurface(context),
+        borderRadius: BorderRadius.circular(AppRadii.card),
       ),
       child: Stack(
         children: [
-          Positioned(
-            right: -28,
+          PositionedDirectional(
+            end: -28,
             top: -38,
             child: Icon(
               PhosphorIcons.sparkle(PhosphorIconsStyle.fill),
               size: 150,
-              color: colors.primary.withValues(alpha: .07),
+              color: AppPalette.of(context).foreground.withValues(alpha: .04),
             ),
           ),
           Padding(
@@ -1964,24 +1943,14 @@ class _RecapShelf extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: .1),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text(
-                        ready ? 'RECAP READY' : 'YOUR RECAPS',
-                        style: TextStyle(
-                          color: colors.primary,
-                          fontFamily: 'FigtreeSB',
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: .9,
-                        ),
+                    Text(
+                      (ready ? tr('ins_recap_ready') : tr('ins_your_recaps'))
+                          .toUpperCase(),
+                      style: TextStyle(
+                        color: ready ? colors.primary : colors.onSurfaceVariant,
+                        fontFamily: 'FigtreeSB',
+                        fontSize: 11,
+                        letterSpacing: 1.4,
                       ),
                     ),
                     const Spacer(),
@@ -1989,7 +1958,7 @@ class _RecapShelf extends StatelessWidget {
                       ready
                           ? PhosphorIcons.confetti()
                           : PhosphorIcons.calendarDots(),
-                      color: colors.primary,
+                      color: colors.onSurfaceVariant,
                       size: 22,
                     ),
                   ],
@@ -1997,31 +1966,36 @@ class _RecapShelf extends StatelessWidget {
                 const SizedBox(height: 14),
                 Text(
                   ready
-                      ? '${featured.label} recap is ready'
-                      : '${featured.label} recap is taking shape',
+                      ? tr('ins_recap_is_ready',
+                          namedArgs: {'period': _recapPeriodLabel(featured)})
+                      : tr('ins_recap_shaping',
+                          namedArgs: {'period': _recapPeriodLabel(featured)}),
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 5),
                 Text(
                   featuredInsights.isEmpty
-                      ? 'Your next viewing session will start filling in this story.'
-                      : '${_duration(featuredInsights.totalWatchedMs)} watched · ${featuredInsights.completedTitles} completed · ${featuredInsights.activeDays} active ${featuredInsights.activeDays == 1 ? 'day' : 'days'}',
+                      ? tr('ins_next_session')
+                      : tr('ins_shelf_summary', namedArgs: {
+                          'time': _duration(featuredInsights.totalWatchedMs),
+                          'completed': '${featuredInsights.completedTitles}',
+                          'days': plural(
+                              'ins_active_days', featuredInsights.activeDays),
+                        }),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colors.onSurfaceVariant,
                       ),
                 ),
                 const SizedBox(height: 16),
-                FilledButton.icon(
+                PillButton(
+                  primary: true,
                   onPressed: featuredInsights.isEmpty
                       ? null
                       : () => onSelected(featured),
-                  icon: Icon(
-                    ready
-                        ? PhosphorIcons.sparkle()
-                        : PhosphorIcons.arrowUpRight(),
-                    size: 18,
-                  ),
-                  label: Text(ready ? 'See my recap' : 'Preview recap'),
+                  icon: ready
+                      ? PhosphorIcons.sparkle()
+                      : PhosphorIcons.arrowUpRight(),
+                  label: ready ? tr('ins_see_recap') : tr('ins_preview_recap'),
                 ),
                 if (quickPeriods.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -2069,7 +2043,7 @@ class _QuickRecapButton extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return Material(
       color: _insightSurface(context, raised: true),
-      borderRadius: BorderRadius.circular(15),
+      borderRadius: BorderRadius.circular(9),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -2078,13 +2052,14 @@ class _QuickRecapButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(PhosphorIcons.playCircle(), size: 17, color: colors.primary),
+              Icon(PhosphorIcons.playCircle(),
+                  size: 17, color: colors.onSurface),
               const SizedBox(width: 7),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    period.label,
+                    _recapPeriodLabel(period),
                     style: const TextStyle(
                       fontFamily: 'FigtreeSB',
                       fontWeight: FontWeight.w600,
@@ -2117,20 +2092,30 @@ class _StatGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stats = <(IconData, String, String)>[
-      (PhosphorIcons.filmSlate(), '${insights.completedMovies}', 'movies'),
-      (PhosphorIcons.television(), '${insights.completedEpisodes}', 'episodes'),
-      (PhosphorIcons.stack(), '${insights.uniqueSeries}', 'series'),
-      (PhosphorIcons.playCircle(), '${insights.sessionCount}', 'sessions'),
-      (PhosphorIcons.calendarDots(), '${insights.activeDays}', 'active days'),
+      (
+        PhosphorIcons.filmSlate(),
+        '${insights.completedMovies}',
+        tr('ins_stat_movies')
+      ),
+      (
+        PhosphorIcons.television(),
+        '${insights.completedEpisodes}',
+        tr('ins_stat_episodes')
+      ),
+      (
+        PhosphorIcons.stack(),
+        '${insights.uniqueSeries}',
+        tr('ins_stat_series')
+      ),
       (
         PhosphorIcons.arrowCounterClockwise(),
         '${insights.rewatches}',
-        'rewatches'
+        tr('ins_stat_rewatches')
       ),
     ];
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 720 ? 3 : 2;
+        final columns = constraints.maxWidth >= 720 ? 4 : 2;
         const gap = 10.0;
         final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
         final colors = Theme.of(context).colorScheme;
@@ -2145,10 +2130,8 @@ class _StatGrid extends StatelessWidget {
                   constraints: const BoxConstraints(minHeight: 102),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: index == 0
-                        ? colors.primaryContainer.withValues(alpha: .55)
-                        : _insightSurface(context),
-                    borderRadius: BorderRadius.circular(19),
+                    color: _insightSurface(context),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     children: [
@@ -2156,13 +2139,13 @@ class _StatGrid extends StatelessWidget {
                         width: 38,
                         height: 38,
                         decoration: BoxDecoration(
-                          color: colors.primary.withValues(alpha: .1),
-                          borderRadius: BorderRadius.circular(12),
+                          color: AppPalette.of(context).idleFill,
+                          borderRadius: BorderRadius.circular(AppRadii.card),
                         ),
                         child: Icon(
                           stats[index].$1,
                           size: 20,
-                          color: colors.primary,
+                          color: colors.onSurface,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -2228,16 +2211,16 @@ class _MediaBreakdownState extends State<_MediaBreakdown> {
     // Fixed order, fixed slots: movies always wear slot 1, so a period with no
     // live TV never repaints episodes.
     final entries = <(String, int, Color)>[
-      ('Movies', insights.movieMs, palette.categorical[0]),
-      ('Episodes', insights.episodeMs, palette.categorical[1]),
-      ('Live TV', insights.liveMs, palette.categorical[2]),
+      (tr('movies'), insights.movieMs, palette.categorical[0]),
+      (tr('episodes'), insights.episodeMs, palette.categorical[1]),
+      (tr('live_tv'), insights.liveMs, palette.categorical[2]),
     ];
     final total = entries.fold<int>(0, (sum, entry) => sum + entry.$2);
     final selected = _selected;
     final centerLabel =
         selected == null ? _duration(total) : _duration(entries[selected].$2);
     final centerCaption = selected == null
-        ? 'total playback'
+        ? tr('ins_total_playback')
         : '${entries[selected].$1} · ${_share(entries[selected].$2, total)}';
 
     void select(int? index) => setState(() => _selected = index);
@@ -2282,12 +2265,12 @@ class _MediaBreakdownState extends State<_MediaBreakdown> {
             children: [
               Expanded(
                 child: Text(
-                  'Playback mix',
+                  tr('ins_playback_mix'),
                   style: theme.textTheme.titleMedium,
                 ),
               ),
               Text(
-                'Tap a slice',
+                tr('ins_tap_slice'),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -2349,7 +2332,7 @@ class _MediaLegendRow extends StatelessWidget {
       label: '$label, $valueLabel, $shareLabel',
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         child: ExcludeSemantics(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 6),
@@ -2399,94 +2382,6 @@ class _MediaLegendRow extends StatelessWidget {
   }
 }
 
-class _RankedPanel extends StatelessWidget {
-  const _RankedPanel({
-    required this.title,
-    required this.values,
-    required this.emptyMessage,
-    this.valueLabel = _duration,
-  });
-
-  final String title;
-  final List<WellnessRankedValue> values;
-  final String emptyMessage;
-
-  /// Ranked values are not always durations — episode counts use their own
-  /// formatter.
-  final String Function(int value) valueLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final max = values.isEmpty ? 1 : values.first.value;
-    final palette = WellnessChartPalette.of(
-      context,
-      surface: _insightSurface(context),
-    );
-    return _Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 14),
-          if (values.isEmpty)
-            Text(
-              emptyMessage,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            )
-          else
-            for (var index = 0; index < values.length; index++) ...[
-              Row(
-                children: [
-                  Container(
-                    width: 25,
-                    height: 25,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primaryContainer
-                          .withValues(alpha: index == 0 ? .9 : .45),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '${index + 1}',
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      values[index].label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Text(
-                    valueLabel(values[index].value),
-                    style: const TextStyle(
-                      fontFeatures: [ui.FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              LinearProgressIndicator(
-                value: max == 0 ? 0 : values[index].value / max,
-                minHeight: 5,
-                borderRadius: BorderRadius.circular(99),
-                color: palette.primaryMark,
-                backgroundColor: palette.emptyCell,
-              ),
-              if (index != values.length - 1) const SizedBox(height: 14),
-            ],
-        ],
-      ),
-    );
-  }
-}
-
 class _HistoryPanel extends StatelessWidget {
   const _HistoryPanel({required this.sessions});
 
@@ -2503,12 +2398,12 @@ class _HistoryPanel extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Viewing history',
+                tr('ins_history'),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
             Text(
-              '${sessions.length} recent',
+              tr('ins_recent_count', namedArgs: {'n': '${sessions.length}'}),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
                     fontFamily: 'Figtree',
@@ -2519,10 +2414,8 @@ class _HistoryPanel extends StatelessWidget {
         const SizedBox(height: 12),
         for (var index = 0; index < sessions.length; index++) ...[
           Material(
-            color: index == 0
-                ? colors.primaryContainer.withValues(alpha: .3)
-                : _insightSurface(context),
-            borderRadius: BorderRadius.circular(20),
+            color: _insightSurface(context, raised: index == 0),
+            borderRadius: BorderRadius.circular(10),
             clipBehavior: Clip.antiAlias,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
@@ -2557,7 +2450,8 @@ class _HistoryRow extends StatelessWidget {
         .add(Duration(minutes: session.timezoneOffsetMinutes));
     final hasProgress =
         session.mediaType != WellnessMediaType.live && session.durationMs > 0;
-    final statusColor = session.completed ? colors.primary : colors.tertiary;
+    final statusColor =
+        session.completed ? colors.onSurface : colors.onSurfaceVariant;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2565,17 +2459,10 @@ class _HistoryRow extends StatelessWidget {
           width: 46,
           height: 58,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colors.primary.withValues(alpha: .16),
-                colors.tertiary.withValues(alpha: .1),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(15),
+            color: AppPalette.of(context).idleFill,
+            borderRadius: BorderRadius.circular(AppRadii.card),
           ),
-          child: Icon(icon, size: 21, color: colors.primary),
+          child: Icon(icon, size: 21, color: colors.onSurface),
         ),
         const SizedBox(width: 13),
         Expanded(
@@ -2620,7 +2507,11 @@ class _HistoryRow extends StatelessWidget {
                     icon: session.completed
                         ? PhosphorIcons.checkCircle()
                         : PhosphorIcons.playCircle(),
-                    label: session.viewingStatus,
+                    label: switch (session.viewingStatus) {
+                      'completed' => tr('ins_completed'),
+                      'sampled' => tr('ins_sampled'),
+                      _ => tr('ins_in_progress'),
+                    },
                     color: statusColor,
                   ),
                 ],
@@ -2640,7 +2531,7 @@ class _HistoryRow extends StatelessWidget {
           ),
         ),
         IconButton(
-          tooltip: 'Remove from insights',
+          tooltip: tr('ins_remove_tooltip'),
           visualDensity: VisualDensity.compact,
           onPressed: () => _confirmDelete(context),
           icon: Icon(
@@ -2657,18 +2548,18 @@ class _HistoryRow extends StatelessWidget {
     final remove = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove this activity?'),
+        title: Text(tr('ins_remove_q')),
         content: Text(
-          '${session.title} will no longer be included in your viewing insights.',
+          tr('ins_remove_body', namedArgs: {'title': session.title}),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep'),
+            child: Text(tr('ins_keep')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
+            child: Text(tr('remove')),
           ),
         ],
       ),
@@ -2696,13 +2587,15 @@ class _HistoryMeta extends StatelessWidget {
       children: [
         Icon(icon, size: 13, color: foreground),
         const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: foreground,
-            fontFamily: color == null ? 'Figtree' : 'FigtreeSB',
-            fontSize: 11,
-            fontWeight: color == null ? FontWeight.w500 : FontWeight.w600,
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: foreground,
+              fontFamily: color == null ? 'Figtree' : 'FigtreeSB',
+              fontSize: 11,
+              fontWeight: color == null ? FontWeight.w500 : FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -2726,55 +2619,76 @@ class _InsightStrip extends StatelessWidget {
       if (streak > 1)
         (
           PhosphorIcons.flame(),
-          'You have watched something $streak days running — your longest run '
-              'is ${insights.longestStreakDays} days.',
+          tr('ins_obs_streak', namedArgs: {
+            'n': '$streak',
+            'longest': '${insights.longestStreakDays}',
+          }),
         ),
       if (peak != null)
         (
           PhosphorIcons.clock(),
-          'Your most reliable window is ${_weekdayName(peak.$1)} at '
-              '${_hourRange(peak.$2)}, ${_duration(peak.$3)} in total.',
+          tr('ins_obs_window', namedArgs: {
+            'day': _weekdayName(peak.$1),
+            'hours': _hourRange(peak.$2),
+            'time': _duration(peak.$3),
+          }),
         ),
       if (busiest != null)
         (
           PhosphorIcons.calendarStar(),
-          'Your heaviest day was ${DateFormat.MMMEd().format(busiest.$1)} at '
-              '${_duration(busiest.$2)}.',
+          tr('ins_obs_heaviest', namedArgs: {
+            'date': DateFormat.MMMEd().format(busiest.$1),
+            'time': _duration(busiest.$2),
+          }),
         ),
       if (insights.averageSessionMs > 0)
         (
           PhosphorIcons.hourglass(),
-          'A typical sitting runs ${_duration(insights.averageSessionMs)}, and '
-              'a typical active day ${_duration(insights.medianActiveDayMs)}.',
+          tr('ins_obs_typical', namedArgs: {
+            'session': _duration(insights.averageSessionMs),
+            'day': _duration(insights.medianActiveDayMs),
+          }),
+        ),
+      if (insights.hasNetworkUsage && insights.networkBytes > 0)
+        (
+          PhosphorIcons.cellSignalHigh(),
+          tr('ins_obs_data', namedArgs: {
+            'size': _dataSize(insights.networkBytes),
+            'rate': _dataSize(insights.networkBytesPerHour),
+          }),
         ),
       if (total > 0 && insights.lateNightMs > 0)
         (
           PhosphorIcons.moon(),
-          '${_share(insights.lateNightMs, total)} of your viewing happens '
-              'after 10pm.',
+          tr('ins_obs_late',
+              namedArgs: {'share': _share(insights.lateNightMs, total)}),
         ),
       if (insights.titlesStarted > 0)
         (
           PhosphorIcons.checkCircle(),
-          'You finish ${_percent(insights.completionRate)} of what you start '
-              '(${insights.completedTitles} of ${insights.titlesStarted}).',
+          tr('ins_obs_finish', namedArgs: {
+            'share': _percent(insights.completionRate),
+            'done': '${insights.completedTitles}',
+            'started': '${insights.titlesStarted}',
+          }),
         ),
       if (insights.longestSessionMs > 0)
         (
           PhosphorIcons.filmSlate(),
-          'Your longest single session was '
-              '${_duration(insights.longestSessionMs)}.',
+          tr('ins_obs_longest',
+              namedArgs: {'time': _duration(insights.longestSessionMs)}),
         ),
       if (insights.topTitles.isNotEmpty)
         (
           PhosphorIcons.crown(),
-          '${insights.topTitles.first.label} held the most viewing time.',
+          tr('ins_obs_top',
+              namedArgs: {'title': insights.topTitles.first.label}),
         ),
     ];
     if (observations.isEmpty) {
       return _Panel(
         child: Text(
-          'Watch a few things and this is where the patterns show up.',
+          tr('ins_obs_empty'),
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -2785,7 +2699,7 @@ class _InsightStrip extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('What stands out', style: theme.textTheme.titleMedium),
+          Text(tr('ins_stands_out'), style: theme.textTheme.titleMedium),
           const SizedBox(height: 6),
           for (final observation in observations)
             Padding(
@@ -2798,7 +2712,7 @@ class _InsightStrip extends StatelessWidget {
                     child: Icon(
                       observation.$1,
                       size: 17,
-                      color: theme.colorScheme.primary,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -2868,9 +2782,13 @@ class _TimelinePanelState extends State<_TimelinePanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Watch time', style: theme.textTheme.titleMedium),
+                    Text(tr('ins_watch_time'),
+                        style: theme.textTheme.titleMedium),
                     Text(
-                      'by ${series.unitLabel} · ${_rangeName(widget.range)}',
+                      tr('ins_by_unit', namedArgs: {
+                        'unit': _unitName(series.unitLabel),
+                        'range': _rangeName(widget.range),
+                      }),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -2902,9 +2820,12 @@ class _TimelinePanelState extends State<_TimelinePanel> {
             onSelected: (index) => setState(() => _selected = index),
             averageMs: series.averageMs,
             surfaceColor: surface,
-            semanticsLabel: 'Watch time by ${series.unitLabel}. Total '
-                '${_duration(series.totalMs)} across ${series.activeBuckets} '
-                'active ${series.unitLabel}s.',
+            semanticsLabel: tr('ins_timeline_semantics', namedArgs: {
+              'unit': _unitName(series.unitLabel),
+              'time': _duration(series.totalMs),
+              'n': '${series.activeBuckets}',
+              'units': _unitNames(series.unitLabel),
+            }),
           ),
           const SizedBox(height: 14),
           if (selected == null)
@@ -2914,7 +2835,7 @@ class _TimelinePanelState extends State<_TimelinePanel> {
               bucket: series.buckets[selected],
               periodTotalMs: series.totalMs,
               sessions: widget.insights.sessions,
-              unitLabel: series.unitLabel,
+              unitLabel: _unitName(series.unitLabel),
               onClose: () => setState(() => _selected = null),
             ),
           const SizedBox(height: 6),
@@ -2926,7 +2847,8 @@ class _TimelinePanelState extends State<_TimelinePanel> {
                 _showTable ? PhosphorIcons.caretUp() : PhosphorIcons.table(),
                 size: 16,
               ),
-              label: Text(_showTable ? 'Hide values' : 'All values'),
+              label: Text(
+                  _showTable ? tr('ins_hide_values') : tr('ins_all_values')),
             ),
           ),
           if (_showTable)
@@ -2956,7 +2878,7 @@ class _TimelineSummary extends StatelessWidget {
       color: theme.colorScheme.onSurfaceVariant,
     );
     if (series.isEmpty) {
-      return Text('Nothing recorded in this range yet.', style: style);
+      return Text(tr('ins_nothing_range'), style: style);
     }
     final peak = series.buckets[busiest];
     return Row(
@@ -2970,11 +2892,14 @@ class _TimelineSummary extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Tap any bar for that ${series.unitLabel}. Busiest was '
-            '${peak.fullLabel} at ${_duration(peak.totalMs)}; the level line '
-            'marks your ${_duration(series.averageMs.round())} average across '
-            '${series.activeBuckets} active ${series.unitLabel}'
-            '${series.activeBuckets == 1 ? '' : 's'}.',
+            tr('ins_timeline_summary', namedArgs: {
+              'unit': _unitName(series.unitLabel),
+              'label': peak.fullLabel,
+              'time': _duration(peak.totalMs),
+              'average': _duration(series.averageMs.round()),
+              'n': '${series.activeBuckets}',
+              'units': _unitNames(series.unitLabel),
+            }),
             style: style,
           ),
         ),
@@ -3015,7 +2940,7 @@ class _BucketCallout extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 14),
         decoration: BoxDecoration(
           color: surface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(9),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3036,7 +2961,7 @@ class _BucketCallout extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         bucket.isEmpty
-                            ? 'No viewing recorded'
+                            ? tr('ins_no_viewing')
                             : _duration(bucket.totalMs),
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w800,
@@ -3044,9 +2969,11 @@ class _BucketCallout extends StatelessWidget {
                       ),
                       if (!bucket.isEmpty)
                         Text(
-                          '${_share(bucket.totalMs, periodTotalMs)} of the '
-                          'range · ${inside.length} '
-                          'session${inside.length == 1 ? '' : 's'}',
+                          tr('ins_bucket_share', namedArgs: {
+                            'share': _share(bucket.totalMs, periodTotalMs),
+                            'sessions':
+                                plural('ins_session_count', inside.length),
+                          }),
                           style: theme.textTheme.labelMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -3055,7 +2982,7 @@ class _BucketCallout extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Clear selection',
+                  tooltip: tr('ins_clear_selection'),
                   visualDensity: VisualDensity.compact,
                   onPressed: onClose,
                   icon: Icon(PhosphorIcons.x(), size: 16),
@@ -3067,17 +2994,17 @@ class _BucketCallout extends StatelessWidget {
               WellnessSplitMeter(
                 parts: [
                   WellnessSplitPart(
-                    label: 'Movies',
+                    label: tr('movies'),
                     value: split.movieMs,
                     color: palette.categorical[0],
                   ),
                   WellnessSplitPart(
-                    label: 'Episodes',
+                    label: tr('episodes'),
                     value: split.episodeMs,
                     color: palette.categorical[1],
                   ),
                   WellnessSplitPart(
-                    label: 'Live TV',
+                    label: tr('live_tv'),
                     value: split.liveMs,
                     color: palette.categorical[2],
                   ),
@@ -3125,7 +3052,10 @@ class _BucketCallout extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    '+${inside.length - 3} more this $unitLabel',
+                    tr('ins_more_this', namedArgs: {
+                      'n': '${inside.length - 3}',
+                      'unit': unitLabel,
+                    }),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -3174,7 +3104,7 @@ class _ValuesTable extends StatelessWidget {
                 ),
               ),
               Text(
-                'TIME',
+                tr('ins_col_time').toUpperCase(),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   letterSpacing: 1,
@@ -3184,7 +3114,7 @@ class _ValuesTable extends StatelessWidget {
               SizedBox(
                 width: 46,
                 child: Text(
-                  'SHARE',
+                  tr('ins_col_share').toUpperCase(),
                   textAlign: TextAlign.right,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
@@ -3276,11 +3206,12 @@ class _ConsistencyPanel extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Consistency', style: theme.textTheme.titleMedium),
+                    Text(tr('ins_consistency'),
+                        style: theme.textTheme.titleMedium),
                     Text(
                       current == 0
-                          ? 'No active streak right now'
-                          : '$current day${current == 1 ? '' : 's'} in a row',
+                          ? tr('ins_no_streak')
+                          : plural('ins_streak_row', current),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -3298,7 +3229,7 @@ class _ConsistencyPanel extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'longest streak',
+                    tr('ins_longest_streak'),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -3311,22 +3242,24 @@ class _ConsistencyPanel extends StatelessWidget {
           WellnessSparkline(
             values: recent,
             surfaceColor: surface,
-            semanticsLabel: 'Daily watch time for the last 14 days. '
-                '$recentActive of 14 days had viewing.',
+            semanticsLabel:
+                tr('ins_daily_semantics', namedArgs: {'n': '$recentActive'}),
           ),
           const SizedBox(height: 4),
           Row(
             children: [
               Expanded(
                 child: Text(
-                  'Last 14 days · $recentActive active',
+                  tr('ins_last_14_active', namedArgs: {'n': '$recentActive'}),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
               Text(
-                'Peak ${_duration(recent.fold<int>(0, math.max))}/day',
+                tr('ins_peak_day', namedArgs: {
+                  'time': _duration(recent.fold<int>(0, math.max)),
+                }),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -3335,14 +3268,16 @@ class _ConsistencyPanel extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           WellnessMeter(
-            label: 'Days with viewing',
+            label: tr('ins_days_with_viewing'),
             valueLabel: _percent(insights.activeDayShare),
             ratio: insights.activeDayShare,
             // periodDays stops at the last recorded day, so "tracked so far"
             // is what the share actually measures.
-            caption: '${insights.activeDays} of ${insights.periodDays} days '
-                'tracked so far · typical active day '
-                '${_duration(insights.medianActiveDayMs)}',
+            caption: tr('ins_days_caption', namedArgs: {
+              'active': '${insights.activeDays}',
+              'total': '${insights.periodDays}',
+              'time': _duration(insights.medianActiveDayMs),
+            }),
             surfaceColor: surface,
           ),
         ],
@@ -3392,9 +3327,10 @@ class _RhythmPanelState extends State<_RhythmPanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Weekly rhythm', style: theme.textTheme.titleMedium),
+                    Text(tr('ins_weekly_rhythm'),
+                        style: theme.textTheme.titleMedium),
                     Text(
-                      'Every hour you watched, summed across this range',
+                      tr('ins_rhythm_desc'),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -3403,7 +3339,7 @@ class _RhythmPanelState extends State<_RhythmPanel> {
                 ),
               ),
               Text(
-                'Tap a cell',
+                tr('ins_tap_cell'),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -3421,23 +3357,31 @@ class _RhythmPanelState extends State<_RhythmPanel> {
           const SizedBox(height: 12),
           if (selected != null)
             Text(
-              '${_weekdayName(selected.$1)} at ${_hourRange(selected.$2)} — '
-              '${selectedMs == 0 ? 'nothing watched' : _duration(selectedMs)}',
+              tr('ins_cell_selected', namedArgs: {
+                'day': _weekdayName(selected.$1),
+                'hours': _hourRange(selected.$2),
+                'value': selectedMs == 0
+                    ? tr('ins_nothing_watched')
+                    : _duration(selectedMs),
+              }),
               style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             )
           else if (peak != null)
             Text(
-              'Your steadiest window is ${_weekdayName(peak.$1)} at '
-              '${_hourRange(peak.$2)} — ${_duration(peak.$3)} in total.',
+              tr('ins_steadiest', namedArgs: {
+                'day': _weekdayName(peak.$1),
+                'hours': _hourRange(peak.$2),
+                'time': _duration(peak.$3),
+              }),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             )
           else
             Text(
-              'Watch a little more and your weekly shape will appear here.',
+              tr('ins_rhythm_empty'),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -3462,8 +3406,14 @@ class _DayPartsPanel extends StatefulWidget {
 class _DayPartsPanelState extends State<_DayPartsPanel> {
   int? _selected;
 
-  static const _labels = ['Morning', 'Afternoon', 'Evening', 'Late night'];
   static const _windows = ['5a–12p', '12–5p', '5–10p', '10p–5a'];
+
+  List<String> get _labels => [
+        tr('ins_morning'),
+        tr('ins_afternoon'),
+        tr('ins_evening'),
+        tr('ins_late_night'),
+      ];
 
   @override
   void didUpdateWidget(_DayPartsPanel oldWidget) {
@@ -3485,7 +3435,7 @@ class _DayPartsPanelState extends State<_DayPartsPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('How your day splits', style: theme.textTheme.titleMedium),
+          Text(tr('ins_day_split'), style: theme.textTheme.titleMedium),
           const SizedBox(height: 16),
           WellnessOrdinalBars(
             key: const Key('wellness-day-parts'),
@@ -3504,11 +3454,13 @@ class _DayPartsPanelState extends State<_DayPartsPanel> {
           const SizedBox(height: 10),
           Text(
             selected == null
-                ? 'Ordered from morning to late night — darker means later in '
-                    'the day, longer means more time.'
-                : '${_labels[selected]} (${_windows[selected]}): '
-                    '${_duration(parts[selected])}, '
-                    '${_share(parts[selected], total)} of your viewing.',
+                ? tr('ins_dayparts_hint')
+                : tr('ins_daypart_selected', namedArgs: {
+                    'part': _labels[selected],
+                    'window': _windows[selected],
+                    'time': _duration(parts[selected]),
+                    'share': _share(parts[selected], total),
+                  }),
             style: theme.textTheme.bodySmall?.copyWith(
               color: selected == null
                   ? theme.colorScheme.onSurfaceVariant
@@ -3518,7 +3470,7 @@ class _DayPartsPanelState extends State<_DayPartsPanel> {
           ),
           const Divider(height: 30),
           Text(
-            'Weekdays vs weekend',
+            tr('ins_weekdays_weekend'),
             style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -3527,12 +3479,12 @@ class _DayPartsPanelState extends State<_DayPartsPanel> {
           WellnessSplitMeter(
             parts: [
               WellnessSplitPart(
-                label: 'Mon–Fri',
+                label: tr('ins_mon_fri'),
                 value: weekday,
                 color: palette.categorical[0],
               ),
               WellnessSplitPart(
-                label: 'Sat–Sun',
+                label: tr('ins_sat_sun'),
                 value: weekend,
                 color: palette.categorical[1],
               ),
@@ -3542,13 +3494,14 @@ class _DayPartsPanelState extends State<_DayPartsPanel> {
           ),
           const SizedBox(height: 14),
           WellnessMeter(
-            label: 'After 10pm',
+            label: tr('ins_after_10'),
             valueLabel: _percent(
               total == 0 ? 0 : widget.insights.lateNightMs / total,
             ),
             ratio: total == 0 ? 0 : widget.insights.lateNightMs / total,
-            caption: '${_duration(widget.insights.lateNightMs)} of viewing '
-                'landed between 10pm and 5am.',
+            caption: tr('ins_late_caption', namedArgs: {
+              'time': _duration(widget.insights.lateNightMs),
+            }),
             surfaceColor: surface,
           ),
         ],
@@ -3568,24 +3521,26 @@ class _CompletionPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final surface = _insightSurface(context);
     final stats = <(String, String)>[
-      ('${insights.titlesStarted}', 'started'),
-      ('${insights.completedTitles}', 'finished'),
-      ('${insights.sampledTitles}', 'sampled'),
-      ('${insights.rewatches}', 'rewatched'),
+      ('${insights.titlesStarted}', tr('ins_started')),
+      ('${insights.completedTitles}', tr('ins_finished')),
+      ('${insights.sampledTitles}', tr('ins_sampled')),
+      ('${insights.rewatches}', tr('ins_rewatched')),
     ];
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Follow-through', style: theme.textTheme.titleMedium),
+          Text(tr('ins_follow_through'), style: theme.textTheme.titleMedium),
           const SizedBox(height: 14),
           WellnessMeter(
-            label: 'Titles finished',
+            label: tr('ins_titles_finished'),
             valueLabel: _percent(insights.completionRate),
             ratio: insights.completionRate,
-            caption: '${insights.completedTitles} of '
-                '${insights.titlesStarted} titles you started · average '
-                'session ${_duration(insights.averageSessionMs)}',
+            caption: tr('ins_completion_caption', namedArgs: {
+              'done': '${insights.completedTitles}',
+              'started': '${insights.titlesStarted}',
+              'time': _duration(insights.averageSessionMs),
+            }),
             surfaceColor: surface,
           ),
           const SizedBox(height: 16),
@@ -3618,8 +3573,7 @@ class _CompletionPanel extends StatelessWidget {
           if (insights.sampledTitles > 0) ...[
             const SizedBox(height: 12),
             Text(
-              'Sampled means under two minutes and under 5% watched — dropped '
-              'early, not counted against you.',
+              tr('ins_sampled_note'),
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -3645,11 +3599,11 @@ class _GuestMergeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Add this device’s guest history?',
+            Text(tr('ins_guest_q'),
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 6),
-            const Text(
-              'Guest viewing may belong to someone else. It will stay separate unless you choose to merge it.',
+            Text(
+              tr('ins_guest_desc'),
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -3657,11 +3611,11 @@ class _GuestMergeCard extends StatelessWidget {
               children: [
                 FilledButton(
                   onPressed: provider.mergeGuestHistory,
-                  child: const Text('Merge with my account'),
+                  child: Text(tr('ins_guest_merge')),
                 ),
                 TextButton(
                   onPressed: provider.dismissGuestMerge,
-                  child: const Text('Keep separate'),
+                  child: Text(tr('ins_guest_keep')),
                 ),
               ],
             ),
@@ -3684,7 +3638,7 @@ class _PrivacyNote extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colors.secondaryContainer.withValues(alpha: .32),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(9),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3707,13 +3661,11 @@ class _PrivacyNote extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Private by design',
+                Text(tr('ins_private'),
                     style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 3),
                 Text(
-                  canSync
-                      ? 'Stored in SQLite on this device and synced to your FlixQuest account. This history is not sent to product analytics.'
-                      : 'Stored only in SQLite on this device. Sign in when you want to sync it across devices.',
+                  canSync ? tr('ins_private_synced') : tr('ins_private_local'),
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
@@ -3739,15 +3691,8 @@ class _WellnessEmptyState extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.primaryContainer.withValues(alpha: .48),
-            _insightSurface(context),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(28),
+        color: _insightSurface(context),
+        borderRadius: BorderRadius.circular(AppRadii.hero),
       ),
       child: Column(
         children: [
@@ -3755,9 +3700,7 @@ class _WellnessEmptyState extends StatelessWidget {
             width: 82,
             height: 82,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [colors.primary, colors.tertiary],
-              ),
+              color: AppPalette.of(context).idleFill,
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -3765,20 +3708,17 @@ class _WellnessEmptyState extends StatelessWidget {
                   ? PhosphorIcons.calendarBlank()
                   : PhosphorIcons.chartDonut(),
               size: 38,
-              color: Colors.white,
+              color: colors.onSurface,
             ),
           ),
           const SizedBox(height: 20),
-          Text(
-              hasHistory
-                  ? 'Nothing watched in this period'
-                  : 'Your viewing story starts here',
+          Text(hasHistory ? tr('ins_empty_period') : tr('ins_empty_start'),
               style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 8),
           Text(
             hasHistory
-                ? 'Try another time range to revisit your earlier viewing activity.'
-                : 'Watch for at least 30 seconds and FlixQuest will begin building private insights about your time, titles, taste, and patterns.',
+                ? tr('ins_empty_period_desc')
+                : tr('ins_empty_start_desc'),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -3790,11 +3730,15 @@ class _WellnessEmptyState extends StatelessWidget {
             alignment: WrapAlignment.center,
             spacing: 8,
             runSpacing: 8,
-            children: const [
-              _EmptyFeature(icon: Icons.schedule_rounded, label: 'Time'),
-              _EmptyFeature(icon: Icons.movie_outlined, label: 'Titles'),
-              _EmptyFeature(icon: Icons.palette_outlined, label: 'Taste'),
-              _EmptyFeature(icon: Icons.grid_view_rounded, label: 'Patterns'),
+            children: [
+              _EmptyFeature(
+                  icon: Icons.schedule_rounded, label: tr('ins_time')),
+              _EmptyFeature(
+                  icon: Icons.movie_outlined, label: tr('ins_titles')),
+              _EmptyFeature(
+                  icon: Icons.palette_outlined, label: tr('ins_taste')),
+              _EmptyFeature(
+                  icon: Icons.grid_view_rounded, label: tr('ins_patterns')),
             ],
           ),
         ],
@@ -3815,7 +3759,7 @@ class _EmptyFeature extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withValues(alpha: .72),
-        borderRadius: BorderRadius.circular(99),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -3853,10 +3797,10 @@ class _SectionHeader extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: colors.primaryContainer,
-            borderRadius: BorderRadius.circular(14),
+            color: AppPalette.of(context).idleFill,
+            borderRadius: BorderRadius.circular(AppRadii.card),
           ),
-          child: Icon(icon, color: colors.onPrimaryContainer, size: 22),
+          child: Icon(icon, color: colors.onSurface, size: 22),
         ),
         const SizedBox(width: 13),
         Expanded(
@@ -3865,11 +3809,7 @@ class _SectionHeader extends StatelessWidget {
             children: [
               Text(
                 eyebrow,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: colors.primary,
-                      letterSpacing: 1.2,
-                      fontWeight: FontWeight.w800,
-                    ),
+                style: AppType.kicker.copyWith(color: colors.onSurfaceVariant),
               ),
               const SizedBox(height: 2),
               Text(title, style: Theme.of(context).textTheme.headlineSmall),
@@ -3897,7 +3837,7 @@ class _Panel extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: _insightSurface(context),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: child,
     );
@@ -3908,22 +3848,8 @@ bool _isLightsOut(BuildContext context) =>
     Theme.of(context).scaffoldBackgroundColor.computeLuminance() < .003;
 
 Color _insightSurface(BuildContext context, {bool raised = false}) {
-  final theme = Theme.of(context);
-  if (_isLightsOut(context)) {
-    return Color.alphaBlend(
-      Colors.white.withValues(alpha: raised ? .13 : .08),
-      theme.scaffoldBackgroundColor,
-    );
-  }
-  if (theme.brightness == Brightness.light) {
-    return Color.alphaBlend(
-      theme.colorScheme.onSurface.withValues(alpha: raised ? .065 : .035),
-      theme.scaffoldBackgroundColor,
-    );
-  }
-  return raised
-      ? theme.colorScheme.surfaceContainerHighest
-      : theme.colorScheme.surfaceContainerLow;
+  final palette = AppPalette.of(context);
+  return raised ? palette.raisedSurface : palette.surface;
 }
 
 Color _bestGradientForeground(List<Color> colors) {
@@ -3975,7 +3901,19 @@ String _share(int value, int total) =>
 
 String _percent(double ratio) => '${(ratio.clamp(0.0, 1.0) * 100).round()}%';
 
-String _episodeCount(int value) => '$value ep${value == 1 ? '' : 's'}';
+String _episodeCount(int value) => plural('ins_episode_count', value);
+
+String _dataSize(int bytes) {
+  const units = <String>['KB', 'MB', 'GB', 'TB'];
+  if (bytes < 1024) return '$bytes B';
+  var value = bytes / 1024;
+  var unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return '${value.toStringAsFixed(value < 10 ? 1 : 0)} ${units[unit]}';
+}
 
 String _weekdayName(int mondayFirstIndex) =>
     DateFormat.EEEE().format(DateTime(2024, 1, 1 + mondayFirstIndex));
@@ -3988,29 +3926,66 @@ String _hourRange(int hour) {
 }
 
 String _trackingSince(List<WellnessViewingSession> sessions) {
-  if (sessions.isEmpty) return 'Tracking begins with your next viewing session';
+  if (sessions.isEmpty) return tr('ins_tracking_begins');
   final oldest = sessions.reduce(
     (current, session) =>
         session.startedAtUtc.isBefore(current.startedAtUtc) ? session : current,
   );
   final local =
       oldest.startedAtUtc.add(Duration(minutes: oldest.timezoneOffsetMinutes));
-  return 'Tracking since ${DateFormat.yMMMd().format(local)}';
+  return tr('ins_tracking_since',
+      namedArgs: {'date': DateFormat.yMMMd().format(local)});
 }
 
 String _relativeTime(DateTime value) {
   final difference = DateTime.now().difference(value);
-  if (difference.inMinutes < 1) return 'just now';
-  if (difference.inHours < 1) return '${difference.inMinutes}m ago';
-  if (difference.inDays < 1) return '${difference.inHours}h ago';
+  if (difference.inMinutes < 1) return tr('just_now');
+  if (difference.inHours < 1) {
+    return tr('n_minutes_ago', namedArgs: {'n': '${difference.inMinutes}'});
+  }
+  if (difference.inDays < 1) {
+    return tr('n_hours_ago', namedArgs: {'n': '${difference.inHours}'});
+  }
   return DateFormat.MMMd().format(value);
 }
 
+String _unitName(String unit) => switch (unit) {
+      'day' => tr('ins_unit_day'),
+      'week' => tr('ins_unit_week'),
+      'month' => tr('ins_unit_month'),
+      'year' => tr('ins_unit_year'),
+      _ => tr('ins_unit_block'),
+    };
+
+String _unitNames(String unit) => switch (unit) {
+      'day' => tr('ins_unit_days'),
+      'week' => tr('ins_unit_weeks'),
+      'month' => tr('ins_unit_months'),
+      'year' => tr('ins_unit_years'),
+      _ => tr('ins_unit_blocks'),
+    };
+
+String _recapPeriodLabel(WellnessRecapPeriod period) => switch (period.kind) {
+      WellnessRecapPeriodKind.day => tr('today'),
+      WellnessRecapPeriodKind.week => tr('this_week'),
+      WellnessRecapPeriodKind.month ||
+      WellnessRecapPeriodKind.year =>
+        period.label,
+    };
+
+String _recapCaptionLabel(WellnessRecapPeriod period) => switch (period.kind) {
+      WellnessRecapPeriodKind.day => tr('ins_caption_today'),
+      WellnessRecapPeriodKind.week => tr('ins_caption_week'),
+      WellnessRecapPeriodKind.month ||
+      WellnessRecapPeriodKind.year =>
+        tr('ins_caption_named', namedArgs: {'period': period.label}),
+    };
+
 String _rangeName(WellnessRange range) => switch (range) {
-      WellnessRange.week => 'week',
-      WellnessRange.month => 'month',
-      WellnessRange.year => 'year',
-      WellnessRange.allTime => 'all time',
+      WellnessRange.week => tr('ins_range_week'),
+      WellnessRange.month => tr('ins_range_month'),
+      WellnessRange.year => tr('ins_range_year'),
+      WellnessRange.allTime => tr('ins_range_all'),
     };
 
 /// The recap card's bars come from the same bucketing as the live chart, so a
@@ -4027,3 +4002,44 @@ List<WellnessBarDatum> _recapBarData(
               fullLabel: bucket.fullLabel,
             ))
         .toList(growable: false);
+
+/// Viewing Insights' shape while the history loads: the sync bar, the
+/// story card and the grid of counts.
+class _InsightsSkeleton extends StatelessWidget {
+  const _InsightsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final gutter = AppUI.pagePadding(context);
+    return SkeletonPulse(
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(gutter, 12, gutter, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SkeletonBlock(height: 116),
+            const SizedBox(height: 18),
+            const SkeletonBlock(height: 300, radius: AppRadii.hero),
+            const SizedBox(height: 18),
+            const SkeletonBlock(height: 170),
+            const SizedBox(height: 18),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = (constraints.maxWidth - 10) / 2;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (var i = 0; i < 4; i++)
+                      SkeletonBlock(width: width, height: 102),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

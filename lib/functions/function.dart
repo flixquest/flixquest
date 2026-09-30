@@ -170,10 +170,18 @@ String processVttFileTimestamps(String vttFile) {
 }
 
 bool isReleased(String target) {
+  final DateTime? mediaDate = _parseMediaDate(target);
+  if (mediaDate == null) return true;
   DateTime currentDate = DateTime.now();
-  DateTime mediaDate = DateFormat('yyyy-MM-dd').parse(target);
   return mediaDate.isBefore(currentDate) ||
       mediaDate.isAtSameMomentAs(currentDate);
+}
+
+DateTime? _parseMediaDate(String target) {
+  final DateTime? fullDate = DateTime.tryParse(target);
+  if (fullDate != null) return fullDate;
+  final DateTime? yearOnly = DateFormat('yyyy').tryParse(target);
+  return yearOnly == null ? null : DateTime(yearOnly.year);
 }
 
 int createUniqueId() {

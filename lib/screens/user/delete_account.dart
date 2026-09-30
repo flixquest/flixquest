@@ -12,7 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '/provider/settings_provider.dart';
 import '../../provider/wellness_provider.dart';
-import '../../ui_components/app_ui_components.dart';
+import '../../mobile/widgets/account_form.dart';
 
 class DeleteAccountScreen extends StatefulWidget {
   const DeleteAccountScreen({super.key});
@@ -150,129 +150,39 @@ class DeleteAccountScreenState extends State<DeleteAccountScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(title: Text(tr('delete_account'))),
-        body: userDoc == null
-            ? const Center(
-                child: CircularProgressIndicator(),
-              )
-            : AppResponsiveContent(
-                maxWidth: 560,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: SingleChildScrollView(
-                    child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                      Container(
-                        width: 68,
-                        height: 68,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .error
-                              .withValues(alpha: .12),
-                          borderRadius: BorderRadius.circular(22),
-                        ),
-                        child: Icon(PhosphorIcons.trash(),
-                            size: 32,
-                            color: Theme.of(context).colorScheme.primary),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Text(
-                          tr('delete_account'),
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Text(
-                          tr('delete_notice'),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: TextFormField(
-                                  key: const ValueKey('deleteText'),
-                                  validator: (value) {
-                                    if (value != 'DELETE' &&
-                                        value != 'delete') {
-                                      return tr('must_type_delete');
-                                    }
-                                    return null;
-                                  },
-                                  decoration: InputDecoration(
-                                      errorMaxLines: 3,
-                                      filled: true,
-                                      prefixIcon: Icon(PhosphorIcons.textT()),
-                                      labelText: tr('type_delete')),
-                                ),
-                              ),
-                              const SizedBox(
-                                height: 20,
-                              ),
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 25),
-                                child: _isLoading
-                                    ? const CircularProgressIndicator()
-                                    : ElevatedButton(
-                                        style: ButtonStyle(
-                                            backgroundColor:
-                                                WidgetStatePropertyAll(
-                                                    Theme.of(context)
-                                                        .colorScheme
-                                                        .error),
-                                            foregroundColor:
-                                                WidgetStatePropertyAll(
-                                                    Theme.of(context)
-                                                        .colorScheme
-                                                        .onError),
-                                            minimumSize:
-                                                const WidgetStatePropertyAll(
-                                                    Size(200, 50)),
-                                            shape: WidgetStateProperty.all(
-                                              RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(10.0),
-                                              ),
-                                            )),
-                                        onPressed: () {
-                                          _submitForm();
-                                        },
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              tr('delete_account'),
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.w500,
-                                                  fontSize: 17),
-                                            ),
-                                            const SizedBox(
-                                              width: 5,
-                                            ),
-                                            Icon(
-                                              PhosphorIcons.trash(),
-                                              size: 18,
-                                            )
-                                          ],
-                                        )),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    ]))));
+    return AccountFormPage(
+      title: tr('delete_account'),
+      icon: PhosphorIcons.trash(),
+      heading: tr('delete_account'),
+      message: tr('delete_notice'),
+      children: [
+        Form(
+          key: _formKey,
+          child: TextFormField(
+            key: const ValueKey('deleteText'),
+            validator: (value) {
+              if (value != 'DELETE' && value != 'delete') {
+                return tr('must_type_delete');
+              }
+              return null;
+            },
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              errorMaxLines: 3,
+              prefixIcon: Icon(PhosphorIcons.textT()),
+              labelText: tr('type_delete'),
+            ),
+          ),
+        ),
+        AccountSubmitButton(
+          label: tr('delete_account'),
+          icon: PhosphorIcons.trash(),
+          destructive: true,
+          // Working until the account is known, then while it's removed.
+          busy: _isLoading || userDoc == null,
+          onPressed: _submitForm,
+        ),
+      ],
+    );
   }
 }

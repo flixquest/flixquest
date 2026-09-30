@@ -8,6 +8,7 @@ import '../../provider/settings_provider.dart';
 import '../../services/flixquest_auth_service.dart';
 import '../app/tv_design.dart';
 import '../focus/tv_focusable.dart';
+import '../widgets/tv_poster_wall.dart';
 import 'tv_auth_screen.dart';
 import '../../widgets/app_logo.dart';
 
@@ -117,9 +118,8 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
         error.message?.toLowerCase().contains('network') == true) {
       return 'Check your internet connection and retry.';
     }
-    final detail = (error.message?.isNotEmpty ?? false)
-        ? error.message!
-        : error.code;
+    final detail =
+        (error.message?.isNotEmpty ?? false) ? error.message! : error.code;
     return 'Google sign-in is not available on this device '
         '($detail). Make sure Google Play services is installed and a '
         'Google account is set up, or sign in with your email and password.';
@@ -135,30 +135,41 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
+    final palette = TvPalette.of(context);
     return Scaffold(
       key: TvLandingScreen.screenKey,
       backgroundColor: TvDesign.surfaceFor(context),
       body: Stack(
         fit: StackFit.expand,
         children: <Widget>[
-          Image.asset(
-            'assets/images/grid_final.jpg',
-            fit: BoxFit.cover,
-            alignment: Alignment.topCenter,
-            opacity: const AlwaysStoppedAnimation<double>(0.34),
-          ),
-          const DecoratedBox(
+          const TvPosterWall(),
+          // Heavy behind the intro text, light enough on the right that the
+          // wall reads around the actions panel.
+          DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 colors: <Color>[
-                  Color(0xff101110),
-                  Color(0xe6101110),
-                  Color(0xa8101110),
+                  palette.scrim(0.94),
+                  palette.scrim(0.84),
+                  palette.scrim(0.5),
                 ],
+                stops: const <double>[0, 0.42, 1],
+              ),
+            ),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[
+                  palette.scrim(0.2),
+                  palette.scrim(0),
+                  palette.scrim(0.85),
+                ],
+                stops: const <double>[0, 0.4, 1],
               ),
             ),
           ),
@@ -180,12 +191,25 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
                         constraints: const BoxConstraints(maxWidth: 460),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            color: colors.surface.withValues(alpha: 0.94),
-                            borderRadius: BorderRadius.circular(22),
-                            border: Border.all(
-                              color:
-                                  colors.outlineVariant.withValues(alpha: 0.42),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: <Color>[
+                                palette.raisedSurface.withValues(alpha: 0.95),
+                                palette.surface.withValues(alpha: 0.95),
+                              ],
                             ),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: palette.hairline),
+                            boxShadow: <BoxShadow>[
+                              BoxShadow(
+                                color: Colors.black.withValues(
+                                  alpha: palette.dark ? 0.44 : 0.12,
+                                ),
+                                blurRadius: 34,
+                                offset: const Offset(0, 18),
+                              ),
+                            ],
                           ),
                           child: Padding(
                             padding: EdgeInsets.all(compact ? 24 : 32),
@@ -198,16 +222,17 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
                                   Text(
                                     'Ready to watch?',
                                     style: TextStyle(
-                                      color: colors.onSurface,
-                                      fontFamily: 'FigtreeSB',
+                                      color: palette.foreground,
+                                      fontFamily: 'FigtreeBold',
                                       fontSize: compact ? 26 : 32,
+                                      letterSpacing: -0.45,
                                     ),
                                   ),
                                   SizedBox(height: compact ? 8 : 12),
                                   Text(
                                     'Use your remote to choose how you want to continue.',
                                     style: TextStyle(
-                                      color: colors.onSurfaceVariant,
+                                      color: palette.mutedText,
                                       fontSize: compact ? 16 : 19,
                                       height: 1.3,
                                     ),
@@ -278,6 +303,7 @@ class _TvLandingIntro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,7 +314,15 @@ class _TvLandingIntro extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white24),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.32),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: const AppLogo(),
         ),
@@ -296,7 +330,7 @@ class _TvLandingIntro extends StatelessWidget {
         Text(
           'FlixQuest TV',
           style: TextStyle(
-            color: Colors.white,
+            color: palette.foreground,
             fontFamily: 'FigtreeBold',
             fontSize: compact ? 44 : 58,
             height: 1,
@@ -308,7 +342,7 @@ class _TvLandingIntro extends StatelessWidget {
           child: Text(
             'Movies, series, and your watchlist—designed for the big screen.',
             style: TextStyle(
-              color: Colors.white70,
+              color: palette.secondaryText,
               fontSize: compact ? 20 : 24,
               height: 1.35,
             ),
@@ -319,7 +353,7 @@ class _TvLandingIntro extends StatelessWidget {
   }
 }
 
-class _TvLandingAction extends StatelessWidget {
+class _TvLandingAction extends StatefulWidget {
   const _TvLandingAction({
     required this.label,
     required this.icon,
@@ -337,47 +371,62 @@ class _TvLandingAction extends StatelessWidget {
   final bool enabled;
 
   @override
+  State<_TvLandingAction> createState() => _TvLandingActionState();
+}
+
+/// Translucent at rest and white under focus, like every TV button; the main
+/// action only rests a little brighter.
+class _TvLandingActionState extends State<_TvLandingAction> {
+  bool _focused = false;
+
+  @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final palette = TvPalette.of(context);
+    final foreground = _focused ? palette.onFocus : palette.foreground;
     return TvFocusable(
-      semanticLabel: label,
-      autofocus: autofocus,
-      enabled: enabled,
-      onActivate: onActivate,
-      focusScale: 1.025,
-      borderRadius: BorderRadius.circular(13),
+      semanticLabel: widget.label,
+      autofocus: widget.autofocus,
+      enabled: widget.enabled,
+      onActivate: widget.onActivate,
+      onFocusChanged: (hasFocus) {
+        if (hasFocus != _focused) setState(() => _focused = hasFocus);
+      },
+      focusScale: 1.02,
+      focusColor: Colors.transparent,
+      borderRadius: BorderRadius.circular(TvDesign.cardRadius),
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 150),
-        opacity: enabled ? 1 : 0.58,
-        child: Container(
-          height: 58,
+        opacity: widget.enabled ? 1 : 0.58,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 130),
+          height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            color: primary ? colors.primary : colors.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(11),
+            color: _focused
+                ? palette.focusFill
+                : widget.primary
+                    ? palette.idleFillStrong
+                    : palette.idleFill,
+            borderRadius: BorderRadius.circular(TvDesign.cardRadius),
           ),
           child: Row(
             children: <Widget>[
-              Icon(
-                icon,
-                color: primary ? colors.onPrimary : colors.onSurface,
-                size: 25,
-              ),
+              Icon(widget.icon, color: foreground, size: 24),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  label,
+                  widget.label,
                   style: TextStyle(
-                    color: primary ? colors.onPrimary : colors.onSurface,
+                    color: foreground,
                     fontFamily: 'FigtreeSB',
-                    fontSize: 20,
+                    fontSize: 19,
                   ),
                 ),
               ),
               Icon(
                 PhosphorIcons.caretRight(),
-                color: primary ? colors.onPrimary : colors.onSurfaceVariant,
-                size: 21,
+                color: _focused ? palette.onFocusMuted : palette.mutedText,
+                size: 20,
               ),
             ],
           ),

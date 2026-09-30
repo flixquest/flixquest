@@ -12,8 +12,7 @@ import '../../services/globle_method.dart';
 import '../../services/flixquest_auth_service.dart';
 import '../../services/bookmark_sync_service.dart';
 import '../../services/auth_navigation_service.dart';
-import '../../ui_components/app_ui_components.dart';
-import '../../widgets/app_logo.dart';
+import '../../mobile/widgets/account_form.dart';
 import '../../widgets/google_sign_in_button.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -168,161 +167,87 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(tr('login'))),
-      body: AppResponsiveContent(
-          maxWidth: 520,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Center(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Hero(
-                      tag: 'logo_shadow',
-                      child: SizedBox(
-                          height: 112, width: 112, child: const AppLogo())),
-                  const SizedBox(height: 20),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Form(
-                          key: formKey,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: TextFormField(
-                                  key: const ValueKey('email'),
-                                  validator: (value) {
-                                    if (value!.isEmpty ||
-                                        !value.contains('@')) {
-                                      return tr('invalid_email');
-                                    }
-                                    return null;
-                                  },
-                                  textInputAction: TextInputAction.next,
-                                  onEditingComplete: () =>
-                                      FocusScope.of(context)
-                                          .requestFocus(passwordFocusNode),
-                                  keyboardType: TextInputType.emailAddress,
-                                  decoration: InputDecoration(
-                                      prefixIcon:
-                                          Icon(PhosphorIcons.envelopeSimple()),
-                                      labelText: tr('email_address')),
-                                  onSaved: (value) {
-                                    emailAddress = value!;
-                                  },
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: TextFormField(
-                                  key: const ValueKey('Password'),
-                                  validator: (value) {
-                                    if (value!.isEmpty || value.length < 7) {
-                                      return tr('weak_password');
-                                    }
-                                    return null;
-                                  },
-                                  keyboardType: TextInputType.visiblePassword,
-                                  focusNode: passwordFocusNode,
-                                  decoration: InputDecoration(
-                                      prefixIcon: Icon(PhosphorIcons.lock()),
-                                      suffixIcon: GestureDetector(
-                                        onTap: () {
-                                          setState(() {
-                                            obscureText = !obscureText;
-                                          });
-                                        },
-                                        child: Icon(obscureText
-                                            ? PhosphorIcons.eye()
-                                            : PhosphorIcons.eyeSlash()),
-                                      ),
-                                      labelText: tr('password')),
-                                  onSaved: (value) {
-                                    password = value!;
-                                  },
-                                  obscureText: obscureText,
-                                ),
-                              ),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  isLoading
-                                      ? const CircularProgressIndicator()
-                                      : ElevatedButton(
-                                          style: ButtonStyle(
-                                              minimumSize:
-                                                  WidgetStateProperty.all(
-                                                      const Size(150, 50)),
-                                              shape: WidgetStateProperty.all<
-                                                  RoundedRectangleBorder>(
-                                                RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          10.0),
-                                                ),
-                                              )),
-                                          onPressed: submitForm,
-                                          child: Text(
-                                            tr('login'),
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.w500,
-                                                fontSize: 17),
-                                          )),
-                                ],
-                              ),
-                              const SizedBox(height: 22),
-                              Row(
-                                children: [
-                                  const Expanded(child: Divider()),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 14),
-                                    child: Text(
-                                      tr('or'),
-                                      style: TextStyle(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                  const Expanded(child: Divider()),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              GoogleSignInButton(
-                                loading: _googleLoading,
-                                enabled: !isLoading,
-                                onPressed: signInWithGoogle,
-                              ),
-                              const SizedBox(
-                                height: 8,
-                              ),
-                              TextButton(
-                                  style: const ButtonStyle(
-                                      backgroundColor: WidgetStatePropertyAll(
-                                          Colors.transparent)),
-                                  onPressed: () {
-                                    Navigator.push(context,
-                                        MaterialPageRoute(builder: ((context) {
-                                      return const ForgotPasswordScreen();
-                                    })));
-                                  },
-                                  child: Text(
-                                    tr('forgot_password'),
-                                  )),
-                            ],
-                          )),
-                    ),
-                  ),
-                ],
+    return AccountFormPage(
+      title: tr('login'),
+      logo: true,
+      children: [
+        Form(
+          key: formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                key: const ValueKey('email'),
+                validator: (value) {
+                  if (value!.isEmpty || !value.contains('@')) {
+                    return tr('invalid_email');
+                  }
+                  return null;
+                },
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () =>
+                    FocusScope.of(context).requestFocus(passwordFocusNode),
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                decoration: InputDecoration(
+                  prefixIcon: Icon(PhosphorIcons.envelopeSimple()),
+                  labelText: tr('email_address'),
+                ),
+                onSaved: (value) {
+                  emailAddress = value!;
+                },
               ),
-            ),
-          )),
+              const AccountFieldGap(),
+              TextFormField(
+                key: const ValueKey('Password'),
+                validator: (value) {
+                  if (value!.isEmpty || value.length < 7) {
+                    return tr('weak_password');
+                  }
+                  return null;
+                },
+                keyboardType: TextInputType.visiblePassword,
+                autofillHints: const [AutofillHints.password],
+                focusNode: passwordFocusNode,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => submitForm(),
+                decoration: InputDecoration(
+                  prefixIcon: Icon(PhosphorIcons.lock()),
+                  suffixIcon: IconButton(
+                    onPressed: () =>
+                        setState(() => obscureText = !obscureText),
+                    icon: Icon(obscureText
+                        ? PhosphorIcons.eye()
+                        : PhosphorIcons.eyeSlash()),
+                  ),
+                  labelText: tr('password'),
+                ),
+                onSaved: (value) {
+                  password = value!;
+                },
+                obscureText: obscureText,
+              ),
+            ],
+          ),
+        ),
+        AccountSubmitButton(
+          label: tr('login'),
+          busy: isLoading,
+          onPressed: _googleLoading ? null : submitForm,
+        ),
+        AccountLink(
+          label: tr('forgot_password'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+          ),
+        ),
+        const AccountOrDivider(),
+        GoogleSignInButton(
+          loading: _googleLoading,
+          enabled: !isLoading,
+          onPressed: signInWithGoogle,
+        ),
+      ],
     );
   }
 }

@@ -13,11 +13,15 @@ import '../../provider/settings_provider.dart';
 import '../../screens/movie/movie_video_loader.dart';
 import '../../screens/tv/tv_video_loader.dart';
 import '../../services/app_session_state_store.dart';
+import '../../services/live_channel_focus.dart';
 import '../focus/tv_focus_memory.dart';
 import '../focus/tv_screen_focus_controller.dart';
 import '../models/tv_media_item.dart';
 import '../navigation/tv_back_dispatcher.dart';
+import '../controllers/tv_catalog_controller.dart';
+import '../controllers/tv_title_logos.dart';
 import '../screens/tv_catalog_screen.dart';
+import '../screens/tv_collection_screen.dart';
 import '../screens/tv_home_screen.dart';
 import '../screens/tv_library_screen.dart';
 import '../screens/tv_live_screen.dart';
@@ -28,6 +32,7 @@ import '../screens/tv_settings_screen.dart';
 import '../screens/tv_wellness_screen.dart';
 import '../widgets/tv_navigation_rail.dart';
 import 'tv_design.dart';
+import 'tv_shell_layout.dart';
 
 class TvHomeShell extends StatefulWidget {
   const TvHomeShell({super.key});
@@ -43,23 +48,46 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
   static const _liveDestinationId = 'live';
 
   final TvFocusMemory _focusMemory = TvFocusMemory();
-  final GlobalKey<TvNavigationRailState> _navigationRailKey =
-      GlobalKey<TvNavigationRailState>();
-  final TvScreenFocusController _searchFocusController =
-      TvScreenFocusController();
-  final TvScreenFocusController _moviesFocusController =
-      TvScreenFocusController();
-  final TvScreenFocusController _seriesFocusController =
-      TvScreenFocusController();
-  final TvScreenFocusController _liveFocusController =
-      TvScreenFocusController();
-  final TvScreenFocusController _settingsFocusController =
-      TvScreenFocusController();
+  final GlobalKey<TvShellLayoutState> _layoutKey =
+      GlobalKey<TvShellLayoutState>();
   late final FocusScopeNode _shellFocusScope;
   late final List<TvNavigationDestination> _destinations;
+
+  /// Browse pages whose artwork runs under the rail to the screen edge.
+  static const _fullBleedDestinations = <String>{
+    'home',
+    'search',
+    'movies',
+    'series',
+    'library',
+  };
   late final AppSessionStateStore _sessionState;
   late final RestorableString _selectedDestinationId;
   int _libraryRevision = 0;
+
+  /// Title logos found this session, shared by every browse page; a new
+  /// language or proxy starts over, since both change what TMDB returns.
+  TvTitleLogos? _titleLogos;
+
+  TvTitleLogos _titleLogosFor({
+    required String language,
+    required bool proxyEnabled,
+    required String proxyUrl,
+  }) {
+    final current = _titleLogos;
+    if (current != null &&
+        current.language == TvTitleLogos.languageCode(language) &&
+        current.proxyEnabled == proxyEnabled &&
+        current.proxyUrl == proxyUrl) {
+      return current;
+    }
+    current?.dispose();
+    return _titleLogos = TvTitleLogos(
+      language: language,
+      proxyEnabled: proxyEnabled,
+      proxyUrl: proxyUrl,
+    );
+  }
 
   @override
   String get restorationId => 'television_home';
@@ -127,6 +155,7 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
     _selectedDestinationId = RestorableString(
       _sessionState.televisionDestination ?? 'home',
     );
+    LiveChannelFocus.pending.addListener(_showRequestedChannel);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<SettingsProvider>().analytics.trackNavigation(
@@ -134,7 +163,17 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
             surface: 'tv',
             source: 'restored',
           );
+      // A link can be what started the app, before there was a shell to hear it.
+      _showRequestedChannel();
     });
+  }
+
+  /// Opens Live TV for a link to one of its channels. The destination then finds the channel in its
+  /// list and focuses it; this only gets it on screen, and only while Live TV is not switched off.
+  void _showRequestedChannel() {
+    if (!mounted || LiveChannelFocus.pending.value == null) return;
+    if (!context.read<AppDependencyProvider>().displayLiveTV) return;
+    _selectDestination(_liveDestinationId);
   }
 
   @override
@@ -151,8 +190,10 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
 
   @override
   void dispose() {
+    LiveChannelFocus.pending.removeListener(_showRequestedChannel);
     _selectedDestinationId.dispose();
     _shellFocusScope.dispose();
+    _titleLogos?.dispose();
     super.dispose();
   }
 
@@ -167,9 +208,9 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
   }
 
   Future<bool> _handleBack() async {
-    if (_navigationRailKey.currentState?.hasFocus != true) {
-      _navigationRailKey.currentState
-          ?.requestFocus(_selectedDestinationId.value);
+    final layout = _layoutKey.currentState;
+    if (layout != null && !layout.railHasFocus) {
+      layout.focusRail();
       return true;
     }
     if (_selectedDestinationId.value == 'home') return false;
@@ -181,24 +222,7 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
         );
     unawaited(_sessionState.rememberTelevisionDestination('home'));
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _navigationRailKey.currentState?.requestFocus('home');
-    });
-    return true;
-  }
-
-  bool _enterDestination(String destinationId) {
-    final controller = switch (destinationId) {
-      'search' => _searchFocusController,
-      'movies' => _moviesFocusController,
-      'series' => _seriesFocusController,
-      'settings' => _settingsFocusController,
-      'live' => _liveFocusController,
-      _ => null,
-    };
-    if (controller == null) return false;
-    _selectDestination(destinationId);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) controller.requestFocus();
+      _layoutKey.currentState?.focusRail('home');
     });
     return true;
   }
@@ -212,22 +236,42 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
         previousFocus.requestFocus();
         return;
       }
-      _navigationRailKey.currentState
-          ?.requestFocus(_selectedDestinationId.value);
+      final layout = _layoutKey.currentState;
+      if (layout != null && !layout.enterContent()) layout.focusRail();
     });
   }
 
   Future<void> _openMedia(TvMediaItem item) async {
     final previousFocus = FocusManager.instance.primaryFocus;
+    final logos = _titleLogos;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => TvMediaDetailsScreen(item: item),
+        // Routes sit beside the shell, not under it, so the logos go along.
+        builder: (_) => logos == null
+            ? TvMediaDetailsScreen(item: item)
+            : TvTitleLogoScope(
+                logos: logos,
+                child: TvMediaDetailsScreen(item: item),
+              ),
       ),
     );
     if (mounted) {
       setState(() => _libraryRevision++);
       _restoreFocusAfterRoute(previousFocus);
     }
+  }
+
+  Future<void> _openCollection(TvCollection collection) async {
+    final previousFocus = FocusManager.instance.primaryFocus;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => TvCollectionScreen(
+          collection: collection,
+          onOpenMedia: _openMedia,
+        ),
+      ),
+    );
+    if (mounted) _restoreFocusAfterRoute(previousFocus);
   }
 
   Future<void> _continueWatching(TvMediaItem item) async {
@@ -237,6 +281,12 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
     Widget? loader;
 
     if (recentMovie?.id != null) {
+      final movie = recentMovie!;
+      debugPrint(
+        '[MovieRecommendationsDebug][TV_CONTINUE_PLAY] '
+        'movieId=${movie.id} title=${movie.title} '
+        'recommendationsProvided=false (fetched by MovieVideoLoader)',
+      );
       loader = MovieVideoLoader(
         download: false,
         useTvPlayer: true,
@@ -246,12 +296,12 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
           _restoreFocusAfterRoute(previousFocus);
         },
         metadata: MovieStreamMetadata(
-          backdropPath: recentMovie!.backdropPath,
-          elapsed: recentMovie.elapsed,
-          movieId: recentMovie.id,
-          movieName: recentMovie.title,
-          posterPath: recentMovie.posterPath,
-          releaseYear: recentMovie.releaseYear,
+          backdropPath: movie.backdropPath,
+          elapsed: movie.elapsed,
+          movieId: movie.id,
+          movieName: movie.title,
+          posterPath: movie.posterPath,
+          releaseYear: movie.releaseYear,
           isAdult: null,
           releaseDate: null,
         ),
@@ -321,126 +371,115 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
 
   @override
   Widget build(BuildContext context) {
-    final showLiveTv = context.watch<AppDependencyProvider>().displayLiveTV;
+    final palette = TvPalette.of(context);
+    final dependencies = context.watch<AppDependencyProvider>();
+    final showLiveTv = dependencies.displayLiveTV;
     final destinations = _visibleDestinations(showLiveTv: showLiveTv);
     final selectedId = _resolveSelectedId(destinations);
-    return TvFocusMemoryScope(
-      memory: _focusMemory,
-      child: TvBackDispatcher(
-        onBack: _handleBack,
-        child: FocusScope(
-          node: _shellFocusScope,
-          child: Scaffold(
-            key: TvHomeShell.shellKey,
-            backgroundColor: TvDesign.pageBackground,
-            body: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0.75, -1),
-                  radius: 1.35,
-                  colors: <Color>[
-                    Theme.of(context)
-                        .colorScheme
-                        .primary
-                        .withValues(alpha: 0.1),
-                    TvDesign.pageBackground,
-                  ],
+    final titleLogos = _titleLogosFor(
+      language: context.select<SettingsProvider, String>(
+        (settings) => settings.appLanguage,
+      ),
+      proxyEnabled: context.select<SettingsProvider, bool>(
+        (settings) => settings.enableProxy,
+      ),
+      proxyUrl: dependencies.tmdbProxy,
+    );
+    return TvTitleLogoScope(
+      logos: titleLogos,
+      child: TvFocusMemoryScope(
+        memory: _focusMemory,
+        child: TvBackDispatcher(
+          onBack: _handleBack,
+          child: FocusScope(
+            node: _shellFocusScope,
+            child: Scaffold(
+              key: TvHomeShell.shellKey,
+              backgroundColor: palette.page,
+              body: ColoredBox(
+                color: palette.page,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final metrics = TvShellMetrics.fromConstraints(constraints);
+                    // The layout keeps its controls inside the TV-safe margins
+                    // itself, so full-bleed artwork can still reach the edges.
+                    return TvShellLayout(
+                      key: _layoutKey,
+                      destinations: destinations,
+                      selectedId: selectedId,
+                      metrics: metrics,
+                      fullBleedDestinations: _fullBleedDestinations,
+                      onDestinationSelected: _selectDestination,
+                      screenBuilder: (context, id, focusController) =>
+                          _buildScreen(id, metrics, focusController),
+                    );
+                  },
                 ),
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final metrics = TvShellMetrics.fromConstraints(constraints);
-                  return SafeArea(
-                    minimum: EdgeInsets.all(metrics.safeInset),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        TvNavigationRail(
-                          key: _navigationRailKey,
-                          destinations: destinations,
-                          selectedId: selectedId,
-                          autofocusId: selectedId,
-                          metrics: metrics,
-                          onDestinationSelected: _selectDestination,
-                          onMoveRight: _enterDestination,
-                        ),
-                        SizedBox(width: metrics.railGap),
-                        Expanded(
-                          child: ClipRect(
-                            child: Builder(
-                              builder: (context) {
-                                // Keyed by destination id so the stack can
-                                // never drift out of sync with the rail when a
-                                // destination is hidden.
-                                final screens = <String, Widget>{
-                                  'home': TvHomeScreen(
-                                    metrics: metrics,
-                                    onOpenMedia: _openMedia,
-                                    onContinueWatching: _continueWatching,
-                                  ),
-                                  'search': TvSearchScreen(
-                                    metrics: metrics,
-                                    onOpenMedia: _openMedia,
-                                    focusController: _searchFocusController,
-                                  ),
-                                  'movies': TvCatalogScreen(
-                                    kind: TvMediaKind.movie,
-                                    metrics: metrics,
-                                    onOpenMedia: _openMedia,
-                                    focusController: _moviesFocusController,
-                                  ),
-                                  'series': TvCatalogScreen(
-                                    kind: TvMediaKind.series,
-                                    metrics: metrics,
-                                    onOpenMedia: _openMedia,
-                                    focusController: _seriesFocusController,
-                                  ),
-                                  if (showLiveTv)
-                                    _liveDestinationId: TvLiveScreen(
-                                      metrics: metrics,
-                                      focusController: _liveFocusController,
-                                    ),
-                                  'library': TvLibraryScreen(
-                                    key: ValueKey<int>(_libraryRevision),
-                                    metrics: metrics,
-                                    onOpenMedia: _openMedia,
-                                  ),
-                                  'wellness': TvWellnessScreen(
-                                    metrics: metrics,
-                                  ),
-                                  'profile': TvProfileScreen(metrics: metrics),
-                                  'settings': TvSettingsScreen(
-                                    metrics: metrics,
-                                    focusController: _settingsFocusController,
-                                  ),
-                                };
-                                final ids = screens.keys.toList(
-                                  growable: false,
-                                );
-                                final selectedIndex = ids.indexOf(selectedId);
-                                // Keep only the active destination mounted.
-                                // IndexedStack retained every screen (and its
-                                // network images/controllers) in TV RAM.
-                                final activeId = selectedIndex < 0
-                                    ? ids.first
-                                    : ids[selectedIndex];
-                                return KeyedSubtree(
-                                  key: ValueKey<String>(activeId),
-                                  child: screens[activeId]!,
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
               ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildScreen(
+    String destinationId,
+    TvShellMetrics metrics,
+    TvScreenFocusController focusController,
+  ) {
+    return switch (destinationId) {
+      'home' => TvHomeScreen(
+          metrics: metrics,
+          onOpenMedia: _openMedia,
+          onContinueWatching: _continueWatching,
+          focusController: focusController,
+        ),
+      'search' => TvSearchScreen(
+          metrics: metrics,
+          onOpenMedia: _openMedia,
+          onOpenCollection: _openCollection,
+          focusController: focusController,
+        ),
+      'movies' => TvCatalogScreen(
+          kind: TvMediaKind.movie,
+          metrics: metrics,
+          onOpenMedia: _openMedia,
+          onOpenCollection: _openCollection,
+          focusController: focusController,
+        ),
+      'series' => TvCatalogScreen(
+          kind: TvMediaKind.series,
+          metrics: metrics,
+          onOpenMedia: _openMedia,
+          onOpenCollection: _openCollection,
+          focusController: focusController,
+        ),
+      _liveDestinationId => TvLiveScreen(
+          metrics: metrics,
+          focusController: focusController,
+        ),
+      'library' => TvLibraryScreen(
+          metrics: metrics,
+          onOpenMedia: _openMedia,
+          onContinueWatching: _continueWatching,
+          onOpenCollection: _openCollection,
+          revision: _libraryRevision,
+          focusController: focusController,
+        ),
+      'wellness' => TvWellnessScreen(
+          metrics: metrics,
+          focusController: focusController,
+        ),
+      'profile' => TvProfileScreen(
+          metrics: metrics,
+          focusController: focusController,
+        ),
+      'settings' => TvSettingsScreen(
+          metrics: metrics,
+          focusController: focusController,
+        ),
+      _ => const SizedBox.shrink(),
+    };
   }
 }

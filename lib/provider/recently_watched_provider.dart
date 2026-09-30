@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../catalog/up_next.dart';
+import '../constants/app_constants.dart';
 import '../controllers/recently_watched_database_controller.dart';
 import '../models/recently_watched.dart';
 import '../services/recently_watched_sync_service.dart';
 
 class RecentProvider extends ChangeNotifier {
-  RecentProvider() {
+  RecentProvider({UpNextStore? upNextStore}) : _upNextStore = upNextStore {
     RecentlyWatchedSyncService.instance.statusNotifier
         .addListener(_onSyncStatusChanged);
   }
@@ -20,6 +22,30 @@ class RecentProvider extends ChangeNotifier {
 
   List<RecentEpisode> _episodes = [];
   List<RecentEpisode> get episodes => _episodes;
+
+  final UpNextStore? _upNextStore;
+  UpNextBook? _upNextBook;
+
+  /// The most series [upNext] remembers; the oldest go first.
+  static const upNextLimit = 50;
+
+  UpNextBook get _book => _upNextBook ??= UpNextBook(
+        store: _upNextStore ?? _defaultStore(),
+        limit: upNextLimit,
+      );
+
+  static UpNextStore? _defaultStore() {
+    try {
+      return UpNextStore(sharedPrefsSingleton);
+    } catch (_) {
+      // Preferences aren't ready: keep them in memory.
+      return null;
+    }
+  }
+
+  /// For each series whose latest episode was finished, the one after it.
+  /// Kept on this device only.
+  List<UpNext> get upNext => _book.entries;
 
   /// A finished merge may have pulled progress from another device, so reload
   /// both lists to show it.
@@ -61,7 +87,21 @@ class RecentProvider extends ChangeNotifier {
 
   Future<void> fetchEpisodes() async {
     _episodes = await _episodeController.getEpisodeList();
+    _book.reload();
     notifyListeners();
+  }
+
+  /// Remembers [entry] as the series' next episode, replacing any before.
+  Future<void> recordUpNext(UpNext entry) async {
+    final saved = _book.record(entry);
+    notifyListeners();
+    await saved;
+  }
+
+  /// Forgets [seriesId]'s next episode: the series is done, or was taken off
+  /// Continue Watching.
+  Future<void> clearUpNext(int seriesId) async {
+    if (await _book.clear(seriesId)) notifyListeners();
   }
 
   Future<void> addEpisode(RecentEpisode episode) async {

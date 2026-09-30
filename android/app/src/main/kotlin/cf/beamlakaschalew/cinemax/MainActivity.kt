@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.widget.Toast
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -38,6 +39,17 @@ class MainActivity: FlutterActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "isTelevision" -> result.success(isTelevision())
+                // Full-screen ads run in their own activity, above anything
+                // Flutter can draw; a toast still shows on top of them.
+                "showHint" -> {
+                    val text = call.arguments as? String
+                    if (text.isNullOrBlank()) {
+                        result.success(false)
+                    } else {
+                        Toast.makeText(applicationContext, text, Toast.LENGTH_LONG).show()
+                        result.success(true)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
