@@ -637,7 +637,10 @@ class _HomeHeader extends StatelessWidget {
                   // The mark in the theme's colour, as the TV rail has it (a
                   // logo set remotely still takes its place), and the name
                   // in heavy type in the text colour beside it.
+                  // Tight, so the Spacer's share of the free space is all
+                  // that's left and the icons sit at the bar's far end.
                   Flexible(
+                    fit: FlexFit.tight,
                     child: Semantics(
                       header: true,
                       label: 'FlixQuest',

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -178,6 +179,9 @@ class HostedAdsBanner extends StatelessWidget {
   final List<BannerAd> ads;
   final HostedBannerVariant variant;
 
+  /// The widest a banner grows, so a tablet doesn't stretch it edge to edge.
+  static const _maxWidth = 640.0;
+
   /// Android TV's quality rules forbid an in-page ad that opens a web page, so
   /// TV shows the banner without a tap target or D-pad focus.
   final bool interactive;
@@ -210,22 +214,31 @@ class HostedAdsBanner extends StatelessWidget {
       ratio = shape == 'square' || shape == 'portrait' ? ratio : 2.2;
     }
 
-    final maxHeight = variant.isTall ? 420.0 : 320.0;
-    Widget banner = ClipRRect(
-      borderRadius: BorderRadius.circular(5),
-      child: LayoutBuilder(
+    // The banner keeps the image's own shape, so nothing is cropped, and
+    // sits centred. A remotely set width or height only caps its size.
+    final maxWidth = config.width ?? _maxWidth;
+    final maxHeight = config.height ?? (variant.isTall ? 420.0 : 320.0);
+    Widget banner = _AdImageRatio(
+      imageUrl: shownAds.first.imageUrl,
+      fallback: ratio,
+      builder: (context, imageRatio) => LayoutBuilder(
         builder: (context, constraints) {
-          final width = (config.width ?? constraints.maxWidth)
-              .clamp(1.0, constraints.maxWidth)
-              .toDouble();
-          final height = (config.height ?? width / ratio)
-              .clamp(72.0, maxHeight)
-              .toDouble();
-          return _CachedAdCarousel(
-            ads: shownAds,
-            width: width,
-            height: height,
-            interactive: interactive,
+          var width = math.min(constraints.maxWidth, maxWidth);
+          var height = width / imageRatio;
+          if (height > maxHeight) {
+            height = maxHeight;
+            width = height * imageRatio;
+          }
+          return Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(5),
+              child: _CachedAdCarousel(
+                ads: shownAds,
+                width: width,
+                height: height,
+                interactive: interactive,
+              ),
+            ),
           );
         },
       ),
@@ -235,6 +248,72 @@ class HostedAdsBanner extends StatelessWidget {
     }
     return Padding(padding: padding, child: banner);
   }
+}
+
+/// Reads the ad image's own width-to-height ratio, so a banner sized from it
+/// shows the whole image. Until the image loads, [fallback] stands in.
+class _AdImageRatio extends StatefulWidget {
+  const _AdImageRatio({
+    required this.imageUrl,
+    required this.fallback,
+    required this.builder,
+  });
+
+  final String imageUrl;
+  final double fallback;
+  final Widget Function(BuildContext context, double ratio) builder;
+
+  @override
+  State<_AdImageRatio> createState() => _AdImageRatioState();
+}
+
+class _AdImageRatioState extends State<_AdImageRatio> {
+  late final ImageStreamListener _listener =
+      ImageStreamListener(_onImage, onError: (_, __) {});
+  ImageStream? _stream;
+  double? _ratio;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(_AdImageRatio oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl == widget.imageUrl) return;
+    _ratio = null;
+    _resolve();
+  }
+
+  void _resolve() {
+    final stream = CachedNetworkImageProvider(
+      widget.imageUrl,
+      cacheManager: _adImageCache,
+    ).resolve(createLocalImageConfiguration(context));
+    if (stream.key == _stream?.key) return;
+    _stream?.removeListener(_listener);
+    _stream = stream..addListener(_listener);
+  }
+
+  void _onImage(ImageInfo info, bool _) {
+    final image = info.image;
+    final ratio = image.height == 0 ? null : image.width / image.height;
+    info.dispose();
+    if (ratio == null || ratio == _ratio) return;
+    setState(() => _ratio = ratio);
+  }
+
+  @override
+  void dispose() {
+    _stream?.removeListener(_listener);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      widget.builder(context, _ratio ?? widget.fallback);
 }
 
 Future<void> _open(String url) async {

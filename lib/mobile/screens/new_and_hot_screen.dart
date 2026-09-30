@@ -366,11 +366,9 @@ class _PremiereCard extends StatelessWidget {
       semanticLabel: mediaSemanticLabel(item),
       onTap: () => MobilePlayback.openDetails(context, item),
       onLongPress: () => showTitleSheet(context, item),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          _Backdrop(item: item),
-          const SizedBox(height: AppSpace.md),
+      child: _HotCardLayout(
+        item: item,
+        details: <Widget>[
           _HotTitle(item: item, showTitleLogos: showTitleLogos),
           const SizedBox(height: AppSpace.sm),
           Text(
@@ -388,7 +386,7 @@ class _PremiereCard extends StatelessWidget {
               style: AppType.metadata.copyWith(color: palette.mutedText)),
           const SizedBox(height: AppSpace.sm),
           Text(item.overview,
-              maxLines: 2,
+              maxLines: _HotCardLayout.wideFor(context) ? 4 : 2,
               overflow: TextOverflow.ellipsis,
               style: AppType.body.copyWith(color: palette.secondaryText)),
           const SizedBox(height: AppSpace.md),
@@ -412,11 +410,9 @@ class _WatchingCard extends StatelessWidget {
       semanticLabel: mediaSemanticLabel(item),
       onTap: () => MobilePlayback.openDetails(context, item),
       onLongPress: () => showTitleSheet(context, item),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          _Backdrop(item: item),
-          const SizedBox(height: AppSpace.md),
+      child: _HotCardLayout(
+        item: item,
+        details: <Widget>[
           _HotTitle(item: item, showTitleLogos: showTitleLogos),
           const SizedBox(height: AppSpace.sm),
           Text(
@@ -430,7 +426,7 @@ class _WatchingCard extends StatelessWidget {
               style: AppType.metadata.copyWith(color: palette.mutedText)),
           const SizedBox(height: AppSpace.sm),
           Text(item.overview,
-              maxLines: 2,
+              maxLines: _HotCardLayout.wideFor(context) ? 4 : 2,
               overflow: TextOverflow.ellipsis,
               style: AppType.body.copyWith(color: palette.secondaryText)),
           const SizedBox(height: AppSpace.md),
@@ -450,6 +446,44 @@ class _WatchingCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A New & Hot card's backdrop and [details]: stacked on phones; from tablet
+/// width side by side, so one still doesn't fill the screen.
+class _HotCardLayout extends StatelessWidget {
+  const _HotCardLayout({required this.item, required this.details});
+  final MediaItem item;
+  final List<Widget> details;
+
+  static bool wideFor(BuildContext context) =>
+      MediaQuery.sizeOf(context).width >= AppBreakpoints.tablet;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!wideFor(context)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _Backdrop(item: item),
+          const SizedBox(height: AppSpace.md),
+          ...details,
+        ],
+      );
+    }
+    return Row(
+      children: <Widget>[
+        Expanded(flex: 5, child: _Backdrop(item: item)),
+        const SizedBox(width: AppSpace.xl),
+        Expanded(
+          flex: 4,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: details,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -604,6 +638,10 @@ class _HotSkeleton extends StatelessWidget {
     final gutter = AppSpace.gutter(context);
     Widget block(double width, double height) =>
         SkeletonBlock(width: width, height: height);
+    final ranked =
+        segment == HotSegment.topMovies || segment == HotSegment.topSeries;
+    // Matches the cards: the backdrop beside its details on a tablet.
+    final beside = !ranked && _HotCardLayout.wideFor(context);
     return SkeletonPulse(
       child: Padding(
         padding: EdgeInsetsDirectional.symmetric(horizontal: gutter),
@@ -617,25 +655,42 @@ class _HotSkeleton extends StatelessWidget {
                     block(48, 56),
                     const SizedBox(width: AppSpace.md),
                   ],
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        AspectRatio(
-                          aspectRatio:
-                              segment == HotSegment.topMovies ||
-                                  segment == HotSegment.topSeries
-                              ? 3 / 1
-                              : 16 / 9,
-                          child: block(double.infinity, double.infinity),
-                        ),
-                        const SizedBox(height: AppSpace.md),
-                        block(150, 20),
-                        const SizedBox(height: AppSpace.sm),
-                        block(double.infinity, 16),
-                      ],
+                  if (beside) ...<Widget>[
+                    Expanded(
+                      flex: 5,
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: block(double.infinity, double.infinity),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: AppSpace.xl),
+                    Expanded(
+                      flex: 4,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          block(150, 20),
+                          const SizedBox(height: AppSpace.sm),
+                          block(double.infinity, 16),
+                        ],
+                      ),
+                    ),
+                  ] else
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          AspectRatio(
+                            aspectRatio: ranked ? 3 / 1 : 16 / 9,
+                            child: block(double.infinity, double.infinity),
+                          ),
+                          const SizedBox(height: AppSpace.md),
+                          block(150, 20),
+                          const SizedBox(height: AppSpace.sm),
+                          block(double.infinity, 16),
+                        ],
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: AppSpace.rowGap),
