@@ -575,9 +575,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                     // cost the whole backdrop an offscreen layer.
                     AnimatedContainer(
                       duration: _motion,
-                      color: browsing
-                          ? palette.scrim(0.8)
-                          : palette.scrim(0),
+                      color: browsing ? palette.scrim(0.8) : palette.scrim(0),
                     ),
                     Positioned(
                       left: inset,
@@ -646,6 +644,9 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                     Positioned(
                       top: inset * 0.6,
                       right: inset,
+                      width: (constraints.maxWidth - inset * 2)
+                          .clamp(0.0, 360.0)
+                          .toDouble(),
                       child: Visibility(
                         visible: !browsing,
                         maintainState: true,

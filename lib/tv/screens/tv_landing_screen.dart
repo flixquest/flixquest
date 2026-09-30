@@ -8,6 +8,7 @@ import '../../provider/settings_provider.dart';
 import '../../services/flixquest_auth_service.dart';
 import '../app/tv_design.dart';
 import '../focus/tv_focusable.dart';
+import '../widgets/tv_poster_wall.dart';
 import 'tv_auth_screen.dart';
 import '../../widgets/app_logo.dart';
 
@@ -141,22 +142,20 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: <Widget>[
-          Image.asset(
-            'assets/images/grid_final.jpg',
-            fit: BoxFit.cover,
-            alignment: Alignment.topCenter,
-            opacity: const AlwaysStoppedAnimation<double>(0.3),
-          ),
+          const TvPosterWall(),
+          // Heavy behind the intro text, light enough on the right that the
+          // wall reads around the actions panel.
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 colors: <Color>[
-                  palette.scrim(1),
-                  palette.scrim(0.95),
-                  palette.scrim(0.65),
+                  palette.scrim(0.94),
+                  palette.scrim(0.84),
+                  palette.scrim(0.5),
                 ],
+                stops: const <double>[0, 0.42, 1],
               ),
             ),
           ),
@@ -166,11 +165,11 @@ class _TvLandingScreenState extends State<TvLandingScreen> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: <Color>[
-                  palette.scrim(0.07),
-                  palette.scrim(0.16),
-                  palette.scrim(0.8),
+                  palette.scrim(0.2),
+                  palette.scrim(0),
+                  palette.scrim(0.85),
                 ],
-                stops: const <double>[0, 0.55, 1],
+                stops: const <double>[0, 0.4, 1],
               ),
             ),
           ),

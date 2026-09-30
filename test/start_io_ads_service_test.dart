@@ -1,4 +1,6 @@
 import 'package:flixquest/services/start_io_ads_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -58,5 +60,49 @@ void main() {
     expect(ads.tagFor('title_detail'), 'title_detail');
     ads.setTelevision(true);
     expect(ads.tagFor('title_detail'), 'title_detail_tv');
+  });
+
+  test('TV loads banners but never loads or shows interstitials', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    final ads = StartIoAdsService.instance;
+    final calls = <MethodCall>[];
+    const channel = MethodChannel('com.startapp.flutter');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'loadBannerAd') {
+        return <String, Object>{'id': 1, 'width': 320, 'height': 50};
+      }
+      return null;
+    });
+    addTearDown(() {
+      ads.updateConfig(const StartIoAdsConfig());
+      ads.setTelevision(false);
+      debugDefaultTargetPlatformOverride = null;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    ads.setTelevision(true);
+    // Even a remotely enabled interstitial must remain blocked on TV.
+    ads.updateConfig(const StartIoAdsConfig(
+      bannerEnabled: true,
+      interstitialEnabled: true,
+    ));
+    await ads.preloadPlaybackInterstitial();
+    await ads.showPlaybackInterstitial();
+    final banner = await ads.loadBanner(
+      placement: ads.tagFor('title_detail'),
+      testMode: false,
+    );
+
+    expect(banner, isNotNull);
+    expect(banner!.width, 320);
+    final loads = calls.where((call) => call.method == 'loadBannerAd');
+    expect(loads, hasLength(1));
+    expect(loads.single.arguments['adTag'], 'title_detail_tv');
+    expect(calls.where((call) => call.method == 'loadInterstitialAd'), isEmpty);
+    expect(calls.where((call) => call.method == 'showInterstitialAd'), isEmpty);
+    banner.dispose();
   });
 }

@@ -250,7 +250,7 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
       expect(find.byType(HostedAdsBanner), findsNothing);
     });
 
-    testWidgets('TV shows a targeted announcement without input or Start.io',
+    testWidgets('TV stacks a display-only announcement and Start.io banner',
         (tester) async {
       StartIoAdsService.instance.setTelevision(true);
       await pumpSlot(
@@ -265,7 +265,16 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
         find.byType(HostedAdsBanner),
       );
       expect(banner.interactive, isFalse);
-      expect(find.byType(StartIoBannerWidget), findsNothing);
+      expect(find.byType(StartIoBannerWidget), findsOneWidget);
+    });
+
+    testWidgets('TV keeps Start.io when hosted banners are off', (tester) async {
+      StartIoAdsService.instance.setTelevision(true);
+      provider.setHostedBannerMode(HostedBannerMode.off);
+      await pumpSlot(tester, placement: 'title_detail', ads: <BannerAd>[_ad()]);
+
+      expect(find.byType(HostedAdsBanner), findsNothing);
+      expect(find.byType(StartIoBannerWidget), findsOneWidget);
     });
 
     testWidgets('TV ignores an ad that is not aimed at it', (tester) async {
@@ -277,6 +286,7 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
       );
 
       expect(find.byType(HostedAdsBanner), findsNothing);
+      expect(find.byType(StartIoBannerWidget), findsOneWidget);
     });
   });
 }

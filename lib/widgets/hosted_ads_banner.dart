@@ -70,8 +70,8 @@ class _RemoteHostedAdsBannerState extends State<RemoteHostedAdsBanner> {
     }
     final television = StartIoAdsService.instance.isTelevision;
     final hostedActive = dependencies.isHostedBannerActive;
-    // Android TV shows no Start.io banners; hosted ones stay display-only.
-    final startIoActive = dependencies.isStartIoBannerActive && !television;
+    // Both sources can show on Android TV; their widgets stay display-only.
+    final startIoActive = dependencies.isStartIoBannerActive;
     if (!hostedActive) return _startIo(dependencies, widget.padding);
     final ads = _ads ??= _load(dependencies);
     final priority = dependencies.hostedBannerMode == HostedBannerMode.priority;
@@ -125,8 +125,7 @@ class _RemoteHostedAdsBannerState extends State<RemoteHostedAdsBanner> {
     AppDependencyProvider dependencies,
     EdgeInsetsGeometry padding,
   ) {
-    if (!dependencies.isStartIoBannerActive ||
-        StartIoAdsService.instance.isTelevision) {
+    if (!dependencies.isStartIoBannerActive) {
       return const SizedBox.shrink();
     }
     return StartIoBannerWidget(

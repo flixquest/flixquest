@@ -41,6 +41,7 @@ import '../movie/movie_video_loader.dart';
 import '../tv/tv_video_loader.dart';
 import 'player/player_data_management.dart';
 import 'player/player_completion_detector.dart';
+import 'player/tv_subtitle_timing_panel.dart';
 import 'player/player_external_subtitles.dart';
 import 'player/player_local_subtitles.dart';
 import 'player/player_episode_selection.dart';
@@ -165,6 +166,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   /// means watching them.
   bool _tvNextEpisodeAtCredits = false;
   _TvPlayerMenuData? _tvMenu;
+  bool _tvSubtitleTimingOpen = false;
   int? _portraitBrowsedSeasonNumber;
   bool _portraitSeasonLoading = false;
   Orientation? _lastScreenOrientation;
@@ -406,7 +408,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                 BetterPlayerOverflowMenuItem(
                   PhosphorIcons.timer(),
                   tr('subtitle_timing'),
-                  _showSubtitleTimingAdjuster,
+                  _showTvSubtitleTiming,
                 ),
                 BetterPlayerOverflowMenuItem(
                   PhosphorIcons.fileArrowUp(),
@@ -1045,7 +1047,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   bool _canSkipIntroDbSegment() =>
       _activeIntroDbSegment != null &&
       widget.settings.enableIntroDbSkipButtons &&
-      (!widget.useTvControls || (_tvMenu == null && _tvNextEpisode == null));
+      (!widget.useTvControls ||
+          (_tvMenu == null &&
+              _tvNextEpisode == null &&
+              !_tvSubtitleTimingOpen));
 
   Widget _buildIntroDbSkipButton(BuildContext context) {
     final segment = _activeIntroDbSegment;
@@ -2162,9 +2167,29 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     }
   }
 
+  /// Subtitle timing over the picture, with the controls out of the way so
+  /// the captions can be watched against the dialogue.
+  void _showTvSubtitleTiming() {
+    if (!mounted || !widget.useTvControls) return;
+    setState(() => _tvSubtitleTimingOpen = true);
+    _tvControlsController.hide(preserveFocus: true);
+  }
+
+  void _closeTvSubtitleTiming({bool showControls = true}) {
+    if (!mounted || !_tvSubtitleTimingOpen) return;
+    setState(() => _tvSubtitleTimingOpen = false);
+    if (showControls) {
+      _tvControlsController.show(restorePreviousFocus: true);
+    }
+  }
+
   bool _handleTvOverlayBack() {
     if (_tvMenu != null) {
       _closeTvMenu();
+      return true;
+    }
+    if (_tvSubtitleTimingOpen) {
+      _closeTvSubtitleTiming();
       return true;
     }
     if (_tvNextEpisode != null) {
@@ -2390,6 +2415,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final seconds = atCredits ? _creditsCountdown : _endCountdown;
     setState(() {
       _tvMenu = null;
+      _tvSubtitleTimingOpen = false;
       _tvNextEpisode = nextEpisode;
       _tvNextEpisodeAtCredits = atCredits;
       _tvNextEpisodeCountdownTotal = seconds;
@@ -2436,6 +2462,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     if (mounted) {
       setState(() {
         _tvMenu = null;
+        _tvSubtitleTimingOpen = false;
         _tvNextEpisode = null;
         _tvNextEpisodeCountdown = null;
       });
@@ -2834,6 +2861,14 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                   title: menu.title,
                   items: menu.items,
                   onClose: _closeTvMenu,
+                  accentColor: widget.colors.first,
+                ),
+              ),
+            if (_tvSubtitleTimingOpen)
+              Positioned.fill(
+                child: TvSubtitleTimingPanel(
+                  controller: _betterPlayerController,
+                  onClose: _closeTvSubtitleTiming,
                   accentColor: widget.colors.first,
                 ),
               ),
@@ -3673,6 +3708,18 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
     final elapsed = seconds == null
         ? null
         : ((countdownTotal - seconds + 1) / countdownTotal).clamp(0.0, 1.0);
+    // On the TV it follows the app's theme like the player's other panels,
+    // shading its corner with the page colour; on the phone it stays white
+    // over black, like the controls around it.
+    final tv = touch ? null : BetterPlayerTvPanelColors.of(context);
+    final shade = tv == null
+        ? const Color(0xb3000000)
+        : Theme.of(context).scaffoldBackgroundColor.withValues(alpha: .85);
+    final foreground = tv?.foreground ?? Colors.white;
+    final muted = tv?.muted ?? Colors.white70;
+    final placeholder = tv == null
+        ? const Color(0xff1b1c1c)
+        : Color.alphaBlend(tv.idleFill, shade.withValues(alpha: 1));
     return Focus(
       onKeyEvent: (_, event) {
         if (event is KeyDownEvent &&
@@ -3689,13 +3736,13 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
         children: [
         // Only the corner the card sits in is shaded, and the shade takes no
         // taps: the picture and its controls stay usable around the card.
-        const IgnorePointer(
+        IgnorePointer(
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: RadialGradient(
                 center: AlignmentDirectional.bottomEnd,
                 radius: 1.1,
-                colors: [Color(0xb3000000), Color(0x00000000)],
+                colors: [shade, shade.withValues(alpha: 0)],
               ),
             ),
           ),
@@ -3725,11 +3772,11 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
                           width: touch ? 128 : 160,
                           height: touch ? 72 : 90,
                           child: episode.stillPath == null
-                              ? const ColoredBox(
-                                  color: Color(0xff1b1c1c),
+                              ? ColoredBox(
+                                  color: placeholder,
                                   child: Icon(
                                     PhosphorIconsRegular.filmStrip,
-                                    color: Colors.white54,
+                                    color: tv?.disabled ?? Colors.white54,
                                     size: 30,
                                   ),
                                 )
@@ -3737,9 +3784,7 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
                                   'https://image.tmdb.org/t/p/w300${episode.stillPath}',
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) =>
-                                      const ColoredBox(
-                                    color: Color(0xff1b1c1c),
-                                  ),
+                                      ColoredBox(color: placeholder),
                                 ),
                         ),
                       ),
@@ -3750,8 +3795,8 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
                           children: [
                             Text(
                               tr('next_episode').toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white70,
+                              style: TextStyle(
+                                color: muted,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 1.4,
@@ -3763,8 +3808,8 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
                               '${episode.episodeName}',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: foreground,
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
                                 height: 1.2,
@@ -3777,8 +3822,8 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
                                 episode.overview!.trim(),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white70,
+                                style: TextStyle(
+                                  color: muted,
                                   fontSize: 13,
                                   height: 1.3,
                                 ),
@@ -3799,12 +3844,14 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
                         icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
                         progress: elapsed,
                         autofocus: !touch,
+                        colors: tv,
                         onPressed: onPlay,
                       ),
                       const SizedBox(width: 10),
                       _TvPromptButton(
                         label: cancelLabel,
                         icon: PhosphorIcons.x(),
+                        colors: tv,
                         onPressed: onCancel,
                       ),
                     ],
@@ -3821,8 +3868,9 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
   }
 }
 
-/// A prompt action: translucent at rest, white under focus. [progress]
-/// fills it from the left, for a countdown.
+/// A prompt action: translucent at rest, white under focus, or in the
+/// theme's [colors] on the TV. [progress] fills it from the left, for a
+/// countdown.
 class _TvPromptButton extends StatefulWidget {
   const _TvPromptButton({
     required this.label,
@@ -3830,6 +3878,7 @@ class _TvPromptButton extends StatefulWidget {
     required this.onPressed,
     this.progress,
     this.autofocus = false,
+    this.colors,
   });
 
   final String label;
@@ -3837,6 +3886,7 @@ class _TvPromptButton extends StatefulWidget {
   final VoidCallback onPressed;
   final double? progress;
   final bool autofocus;
+  final BetterPlayerTvPanelColors? colors;
 
   @override
   State<_TvPromptButton> createState() => _TvPromptButtonState();
@@ -3854,7 +3904,10 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
   Widget build(BuildContext context) {
     // Focus on a remote, a finger on a phone: either lights it white.
     final lit = _focused || _pressed;
-    final foreground = lit ? Colors.black : Colors.white;
+    final colors = widget.colors;
+    final foreground = colors == null
+        ? (lit ? Colors.black : Colors.white)
+        : (lit ? colors.onFocus : colors.foreground);
     return FocusableActionDetector(
       autofocus: widget.autofocus,
       onFocusChange: (focused) => setState(() => _focused = focused),
@@ -3885,9 +3938,9 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
                 duration: const Duration(milliseconds: 120),
                 height: 44,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                color: lit
-                    ? const Color(0xf2ffffff)
-                    : const Color(0x40ffffff),
+                color: colors == null
+                    ? (lit ? const Color(0xf2ffffff) : const Color(0x40ffffff))
+                    : (lit ? colors.focusFill : colors.idleFill),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -3915,9 +3968,9 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
                         alignment: AlignmentDirectional.centerStart,
                         widthFactor: value,
                         child: ColoredBox(
-                          color: lit
-                              ? const Color(0x26000000)
-                              : const Color(0x33ffffff),
+                          color: foreground.withValues(
+                            alpha: lit ? .15 : .2,
+                          ),
                         ),
                       ),
                     ),

@@ -4,9 +4,12 @@ import 'package:flixquest/models/tv.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/provider/recently_watched_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
+import 'package:flixquest/services/hosted_ads_repository.dart';
+import 'package:flixquest/services/start_io_ads_service.dart';
 import 'package:flixquest/tv/controllers/tv_media_details_controller.dart';
 import 'package:flixquest/tv/models/tv_media_item.dart';
 import 'package:flixquest/tv/screens/tv_media_details_screen.dart';
+import 'package:flixquest/widgets/start_io_banner_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -140,6 +143,7 @@ Future<_FakeController> _pumpDetails(
   WidgetTester tester, {
   TvMediaItem? item,
   RecentProvider? recent,
+  AppDependencyProvider? dependencies,
 }) async {
   tester.view.physicalSize = const Size(960, 540);
   tester.view.devicePixelRatio = 1;
@@ -149,7 +153,9 @@ Future<_FakeController> _pumpDetails(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
-        ChangeNotifierProvider(create: (_) => AppDependencyProvider()),
+        ChangeNotifierProvider(
+          create: (_) => dependencies ?? AppDependencyProvider(),
+        ),
         if (recent != null)
           ChangeNotifierProvider<RecentProvider>.value(value: recent),
       ],
@@ -173,6 +179,35 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     sharedPrefsSingleton = await SharedPreferences.getInstance();
+  });
+
+  testWidgets('TV details lays out the enabled top-right banner slot',
+      (tester) async {
+    final ads = StartIoAdsService.instance;
+    ads.setTelevision(true);
+    HostedAdsRepository.instance.useFetcherForTesting((_) async => []);
+    addTearDown(() {
+      ads.setTelevision(false);
+      HostedAdsRepository.instance.useFetcherForTesting((_) async => []);
+    });
+    final dependencies = AppDependencyProvider()
+      ..setStartIoAdsConfig(
+        bannerEnabled: true,
+        interstitialEnabled: false,
+      );
+    await _pumpDetails(tester, dependencies: dependencies);
+
+    final banner = find.byType(StartIoBannerWidget);
+    expect(banner, findsOneWidget);
+    expect(
+        tester.widget<StartIoBannerWidget>(banner).placement, 'title_detail');
+    final slot = tester.widget<Positioned>(
+      find.ancestor(of: banner, matching: find.byType(Positioned)).first,
+    );
+    expect(slot.right, isNotNull);
+    expect(slot.top, isNotNull);
+    expect(slot.width, 360);
+    expect(tester.takeException(), isNull);
   });
 
   group('TvResumePoint', () {

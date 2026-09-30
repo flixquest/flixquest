@@ -25,6 +25,7 @@ import '../../provider/wellness_provider.dart';
 import '../../services/wellness_sync_service.dart';
 import '../../ui_components/app_ui_components.dart';
 import '../../widgets/wellness_charts.dart';
+import 'widgets/insights_dashboard.dart';
 
 class WellnessScreen extends StatefulWidget {
   const WellnessScreen({super.key});
@@ -38,6 +39,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
   final GlobalKey _titlesSectionKey = GlobalKey();
   final GlobalKey _tasteSectionKey = GlobalKey();
   final GlobalKey _patternsSectionKey = GlobalKey();
+  final GlobalKey _playbackSectionKey = GlobalKey();
   bool _sharing = false;
 
   @override
@@ -68,20 +70,24 @@ class _WellnessScreenState extends State<WellnessScreen> {
           loading: wellness.loading,
           skeleton: const _InsightsSkeleton(),
           child: RefreshIndicator(
-              color: palette.foreground,
-              backgroundColor: palette.raisedSurface,
-              onRefresh: wellness.canSync ? wellness.syncNow : wellness.reload,
-              child: AppResponsiveContent(
-                maxWidth: 920,
-                padding: EdgeInsets.zero,
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(
-                    AppUI.pagePadding(context),
-                    12,
-                    AppUI.pagePadding(context),
-                    40,
-                  ),
+            color: palette.foreground,
+            backgroundColor: palette.raisedSurface,
+            onRefresh: wellness.canSync ? wellness.syncNow : wellness.reload,
+            child: AppResponsiveContent(
+              maxWidth: 920,
+              padding: EdgeInsets.zero,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  AppUI.pagePadding(context),
+                  12,
+                  AppUI.pagePadding(context),
+                  40,
+                ),
+                // Keep report anchors mounted so a snapshot or section chip
+                // can jump directly to a section outside the viewport.
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (wellness.shouldOfferGuestMerge)
                       _GuestMergeCard(provider: wellness),
@@ -113,29 +119,47 @@ class _WellnessScreenState extends State<WellnessScreen> {
                         range: wellness.range,
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _trackingSince(wellness.sessions),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
+                      LayoutBuilder(builder: (context, constraints) {
+                        final tracking = Text(
+                          _trackingSince(wellness.sessions),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: Theme.of(context)
                                         .colorScheme
                                         .onSurfaceVariant,
                                   ),
-                            ),
-                          ),
-                          PillButton(
-                            busy: _sharing,
-                            onPressed: () => _openShareRecap(wellness),
-                            icon: PhosphorIcons.shareNetwork(),
-                            label: tr('ins_share_recap'),
-                          ),
-                        ],
+                        );
+                        final share = PillButton(
+                          busy: _sharing,
+                          onPressed: () => _openShareRecap(wellness),
+                          icon: PhosphorIcons.shareNetwork(),
+                          label: tr('ins_share_recap'),
+                        );
+                        if (constraints.maxWidth < 520) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              tracking,
+                              const SizedBox(height: 10),
+                              share
+                            ],
+                          );
+                        }
+                        return Row(children: [
+                          Expanded(child: tracking),
+                          const SizedBox(width: 12),
+                          share,
+                        ]);
+                      }),
+                      const SizedBox(height: 18),
+                      InsightsSnapshot(
+                        insights: insights,
+                        onTitles: () => _jumpToSection(_titlesSectionKey),
+                        onTaste: () => _jumpToSection(_tasteSectionKey),
+                        onPatterns: () => _jumpToSection(_patternsSectionKey),
                       ),
+                      const SizedBox(height: 18),
+                      _StatGrid(insights: insights),
                       const SizedBox(height: 18),
                       _RecapShelf(
                         sessions: wellness.sessions,
@@ -144,8 +168,6 @@ class _WellnessScreenState extends State<WellnessScreen> {
                           initialPeriod: period,
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      _StatGrid(insights: insights),
                       const SizedBox(height: 20),
                       _SectionNavigator(
                         onSelected: (section) =>
@@ -154,6 +176,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                           _InsightsSection.titles => _titlesSectionKey,
                           _InsightsSection.taste => _tasteSectionKey,
                           _InsightsSection.patterns => _patternsSectionKey,
+                          _InsightsSection.playback => _playbackSectionKey,
                         }),
                       ),
                       const SizedBox(height: 34),
@@ -162,8 +185,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                         icon: PhosphorIcons.clockCounterClockwise(),
                         eyebrow: tr('ins_time').toUpperCase(),
                         title: tr('ins_time_title'),
-                        description:
-                            tr('ins_time_desc'),
+                        description: tr('ins_time_desc'),
                       ),
                       const SizedBox(height: 14),
                       _TimelinePanel(
@@ -181,25 +203,24 @@ class _WellnessScreenState extends State<WellnessScreen> {
                         icon: PhosphorIcons.filmSlate(),
                         eyebrow: tr('ins_titles').toUpperCase(),
                         title: tr('ins_titles_title'),
-                        description:
-                            tr('ins_titles_desc'),
+                        description: tr('ins_titles_desc'),
                       ),
+                      const SizedBox(height: 14),
+                      InsightsDiscoveryPanel(insights: insights),
                       const SizedBox(height: 14),
                       _CompletionPanel(insights: insights),
                       const SizedBox(height: 14),
-                      _RankedPanel(
+                      InsightsRankedPanel(
                         title: tr('ins_most_watched'),
-                        values: insights.topTitles.take(5).toList(),
-                        emptyMessage:
-                            tr('ins_most_watched_empty'),
+                        values: insights.topTitles,
+                        emptyMessage: tr('ins_most_watched_empty'),
                       ),
                       const SizedBox(height: 14),
                       if (insights.topSeriesEpisodes.isNotEmpty) ...[
-                        _RankedPanel(
+                        InsightsRankedPanel(
                           title: tr('ins_series_kept'),
-                          values: insights.topSeriesEpisodes.take(5).toList(),
-                          emptyMessage:
-                              tr('ins_series_kept_empty'),
+                          values: insights.topSeriesEpisodes,
+                          emptyMessage: tr('ins_series_kept_empty'),
                           valueLabel: _episodeCount,
                         ),
                         const SizedBox(height: 14),
@@ -212,9 +233,10 @@ class _WellnessScreenState extends State<WellnessScreen> {
                         icon: PhosphorIcons.palette(),
                         eyebrow: tr('ins_taste').toUpperCase(),
                         title: tr('ins_taste_title'),
-                        description:
-                            tr('ins_taste_desc'),
+                        description: tr('ins_taste_desc'),
                       ),
+                      const SizedBox(height: 14),
+                      InsightsTasteBreadth(insights: insights),
                       const SizedBox(height: 14),
                       LayoutBuilder(
                         builder: (context, constraints) {
@@ -223,35 +245,30 @@ class _WellnessScreenState extends State<WellnessScreen> {
                               ? (constraints.maxWidth - 14) / 2
                               : constraints.maxWidth;
                           final panels = <Widget>[
-                            _RankedPanel(
+                            InsightsRankedPanel(
                               title: tr('genres'),
-                              values: insights.topGenres.take(5).toList(),
-                              emptyMessage:
-                                  tr('ins_genres_empty'),
+                              values: insights.topGenres,
+                              emptyMessage: tr('ins_genres_empty'),
                             ),
-                            _RankedPanel(
+                            InsightsRankedPanel(
                               title: tr('ins_languages'),
-                              values: insights.topLanguages.take(5).toList(),
-                              emptyMessage:
-                                  tr('ins_languages_empty'),
+                              values: insights.topLanguages,
+                              emptyMessage: tr('ins_languages_empty'),
                             ),
-                            _RankedPanel(
+                            InsightsRankedPanel(
                               title: tr('ins_countries'),
-                              values: insights.topCountries.take(5).toList(),
-                              emptyMessage:
-                                  tr('ins_countries_empty'),
+                              values: insights.topCountries,
+                              emptyMessage: tr('ins_countries_empty'),
                             ),
-                            _RankedPanel(
+                            InsightsRankedPanel(
                               title: tr('ins_decades'),
-                              values: insights.topDecades.take(5).toList(),
-                              emptyMessage:
-                                  tr('ins_decades_empty'),
+                              values: insights.topDecades,
+                              emptyMessage: tr('ins_decades_empty'),
                             ),
-                            _RankedPanel(
+                            InsightsRankedPanel(
                               title: tr('ins_providers'),
-                              values: insights.topProviders.take(5).toList(),
-                              emptyMessage:
-                                  tr('ins_providers_empty'),
+                              values: insights.topProviders,
+                              emptyMessage: tr('ins_providers_empty'),
                             ),
                           ];
                           return Wrap(
@@ -270,8 +287,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                         icon: PhosphorIcons.calendarDots(),
                         eyebrow: tr('ins_patterns').toUpperCase(),
                         title: tr('ins_patterns_title'),
-                        description:
-                            tr('ins_patterns_desc'),
+                        description: tr('ins_patterns_desc'),
                       ),
                       const SizedBox(height: 14),
                       _RhythmPanel(
@@ -282,6 +298,16 @@ class _WellnessScreenState extends State<WellnessScreen> {
                       _DayPartsPanel(insights: insights),
                       const SizedBox(height: 14),
                       _InsightStrip(insights: insights),
+                      const SizedBox(height: 34),
+                      _SectionHeader(
+                        key: _playbackSectionKey,
+                        icon: PhosphorIcons.devices(),
+                        eyebrow: tr('ins_playback').toUpperCase(),
+                        title: tr('ins_playback_title'),
+                        description: tr('ins_playback_desc'),
+                      ),
+                      const SizedBox(height: 14),
+                      InsightsPlaybackPanel(insights: insights),
                       const SizedBox(height: 26),
                       _PrivacyNote(canSync: wellness.canSync),
                     ],
@@ -290,6 +316,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
               ),
             ),
           ),
+        ),
       ),
     );
   }
@@ -340,9 +367,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
           builder: (context) => AlertDialog(
             title: Text(tr('ins_clear_q')),
             content: Text(
-              wellness.canSync
-                  ? tr('ins_clear_synced')
-                  : tr('ins_clear_local'),
+              wellness.canSync ? tr('ins_clear_synced') : tr('ins_clear_local'),
             ),
             actions: [
               TextButton(
@@ -821,8 +846,9 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
             if (insights.isEmpty) ...[
               const SizedBox(height: 12),
               Text(
-                tr('ins_not_enough',
-                    namedArgs: {'period': _recapPeriodLabel(_period).toLowerCase()}),
+                tr('ins_not_enough', namedArgs: {
+                  'period': _recapPeriodLabel(_period).toLowerCase()
+                }),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: colors.onSurfaceVariant,
@@ -862,7 +888,8 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
                     busy: _sharing,
                     onPressed: insights.isEmpty ? null : _shareImage,
                     icon: PhosphorIcons.shareNetwork(),
-                    label: _sharing ? tr('ins_creating') : tr('ins_share_image'),
+                    label:
+                        _sharing ? tr('ins_creating') : tr('ins_share_image'),
                   ),
                 ),
               ],
@@ -1372,7 +1399,9 @@ class WellnessPreviewCard extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         recapReady
-                            ? tr('ins_recap_ready_revisit', namedArgs: {'period': _recapPeriodLabel(featured)})
+                            ? tr('ins_recap_ready_revisit', namedArgs: {
+                                'period': _recapPeriodLabel(featured)
+                              })
                             : insights.isEmpty
                                 ? tr('ins_start_here')
                                 : tr('ins_this_week_summary', namedArgs: {
@@ -1521,7 +1550,7 @@ class _RangePicker extends StatelessWidget {
   }
 }
 
-enum _InsightsSection { time, titles, taste, patterns }
+enum _InsightsSection { time, titles, taste, patterns, playback }
 
 class _SectionNavigator extends StatelessWidget {
   const _SectionNavigator({required this.onSelected});
@@ -1539,6 +1568,7 @@ class _SectionNavigator extends StatelessWidget {
         PhosphorIcons.calendarDots(),
         tr('ins_patterns')
       ),
+      (_InsightsSection.playback, PhosphorIcons.devices(), tr('ins_playback')),
     ];
     return Wrap(
       spacing: 8,
@@ -1659,44 +1689,35 @@ class _HeroCard extends StatelessWidget {
                 final headline = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: translucentSurface,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: foreground.withValues(alpha: .14),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                PhosphorIcons.sparkle(),
-                                color: foreground,
-                                size: 15,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                tr('ins_your_story').toUpperCase(),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(
-                                      color: foreground,
-                                      letterSpacing: 1.05,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: translucentSurface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: foreground.withValues(alpha: .14)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(PhosphorIcons.sparkle(),
+                              color: foreground, size: 15),
+                          const SizedBox(width: 6),
+                          Flexible(
+                              child: Text(
+                            tr('ins_your_story').toUpperCase(),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: foreground,
+                                  letterSpacing: 1.05,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          )),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 22),
                     Text(
@@ -1923,7 +1944,8 @@ class _RecapShelf extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      (ready ? tr('ins_recap_ready') : tr('ins_your_recaps')).toUpperCase(),
+                      (ready ? tr('ins_recap_ready') : tr('ins_your_recaps'))
+                          .toUpperCase(),
                       style: TextStyle(
                         color: ready ? colors.primary : colors.onSurfaceVariant,
                         fontFamily: 'FigtreeSB',
@@ -1944,8 +1966,10 @@ class _RecapShelf extends StatelessWidget {
                 const SizedBox(height: 14),
                 Text(
                   ready
-                      ? tr('ins_recap_is_ready', namedArgs: {'period': _recapPeriodLabel(featured)})
-                      : tr('ins_recap_shaping', namedArgs: {'period': _recapPeriodLabel(featured)}),
+                      ? tr('ins_recap_is_ready',
+                          namedArgs: {'period': _recapPeriodLabel(featured)})
+                      : tr('ins_recap_shaping',
+                          namedArgs: {'period': _recapPeriodLabel(featured)}),
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 5),
@@ -1953,8 +1977,7 @@ class _RecapShelf extends StatelessWidget {
                   featuredInsights.isEmpty
                       ? tr('ins_next_session')
                       : tr('ins_shelf_summary', namedArgs: {
-                          'time':
-                              _duration(featuredInsights.totalWatchedMs),
+                          'time': _duration(featuredInsights.totalWatchedMs),
                           'completed': '${featuredInsights.completedTitles}',
                           'days': plural(
                               'ins_active_days', featuredInsights.activeDays),
@@ -2029,7 +2052,8 @@ class _QuickRecapButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(PhosphorIcons.playCircle(), size: 17, color: colors.onSurface),
+              Icon(PhosphorIcons.playCircle(),
+                  size: 17, color: colors.onSurface),
               const SizedBox(width: 7),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2068,11 +2092,21 @@ class _StatGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stats = <(IconData, String, String)>[
-      (PhosphorIcons.filmSlate(), '${insights.completedMovies}', tr('ins_stat_movies')),
-      (PhosphorIcons.television(), '${insights.completedEpisodes}', tr('ins_stat_episodes')),
-      (PhosphorIcons.stack(), '${insights.uniqueSeries}', tr('ins_stat_series')),
-      (PhosphorIcons.playCircle(), '${insights.sessionCount}', tr('ins_sessions')),
-      (PhosphorIcons.calendarDots(), '${insights.activeDays}', tr('ins_active_days_label')),
+      (
+        PhosphorIcons.filmSlate(),
+        '${insights.completedMovies}',
+        tr('ins_stat_movies')
+      ),
+      (
+        PhosphorIcons.television(),
+        '${insights.completedEpisodes}',
+        tr('ins_stat_episodes')
+      ),
+      (
+        PhosphorIcons.stack(),
+        '${insights.uniqueSeries}',
+        tr('ins_stat_series')
+      ),
       (
         PhosphorIcons.arrowCounterClockwise(),
         '${insights.rewatches}',
@@ -2081,7 +2115,7 @@ class _StatGrid extends StatelessWidget {
     ];
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 720 ? 3 : 2;
+        final columns = constraints.maxWidth >= 720 ? 4 : 2;
         const gap = 10.0;
         final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
         final colors = Theme.of(context).colorScheme;
@@ -2348,93 +2382,6 @@ class _MediaLegendRow extends StatelessWidget {
   }
 }
 
-class _RankedPanel extends StatelessWidget {
-  const _RankedPanel({
-    required this.title,
-    required this.values,
-    required this.emptyMessage,
-    this.valueLabel = _duration,
-  });
-
-  final String title;
-  final List<WellnessRankedValue> values;
-  final String emptyMessage;
-
-  /// Ranked values are not always durations — episode counts use their own
-  /// formatter.
-  final String Function(int value) valueLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final max = values.isEmpty ? 1 : values.first.value;
-    final palette = WellnessChartPalette.of(
-      context,
-      surface: _insightSurface(context),
-    );
-    return _Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 14),
-          if (values.isEmpty)
-            Text(
-              emptyMessage,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            )
-          else
-            for (var index = 0; index < values.length; index++) ...[
-              Row(
-                children: [
-                  Container(
-                    width: 25,
-                    height: 25,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: index == 0
-                          ? AppPalette.of(context).idleFillStrong
-                          : AppPalette.of(context).idleFill,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '${index + 1}',
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      values[index].label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Text(
-                    valueLabel(values[index].value),
-                    style: const TextStyle(
-                      fontFeatures: [ui.FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              LinearProgressIndicator(
-                value: max == 0 ? 0 : values[index].value / max,
-                minHeight: 5,
-                borderRadius: BorderRadius.circular(99),
-                color: palette.primaryMark,
-                backgroundColor: palette.emptyCell,
-              ),
-              if (index != values.length - 1) const SizedBox(height: 14),
-            ],
-        ],
-      ),
-    );
-  }
-}
-
 class _HistoryPanel extends StatelessWidget {
   const _HistoryPanel({required this.sessions});
 
@@ -2640,13 +2587,15 @@ class _HistoryMeta extends StatelessWidget {
       children: [
         Icon(icon, size: 13, color: foreground),
         const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: foreground,
-            fontFamily: color == null ? 'Figtree' : 'FigtreeSB',
-            fontSize: 11,
-            fontWeight: color == null ? FontWeight.w500 : FontWeight.w600,
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: foreground,
+              fontFamily: color == null ? 'Figtree' : 'FigtreeSB',
+              fontSize: 11,
+              fontWeight: color == null ? FontWeight.w500 : FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -2833,7 +2782,8 @@ class _TimelinePanelState extends State<_TimelinePanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(tr('ins_watch_time'), style: theme.textTheme.titleMedium),
+                    Text(tr('ins_watch_time'),
+                        style: theme.textTheme.titleMedium),
                     Text(
                       tr('ins_by_unit', namedArgs: {
                         'unit': _unitName(series.unitLabel),
@@ -2897,7 +2847,8 @@ class _TimelinePanelState extends State<_TimelinePanel> {
                 _showTable ? PhosphorIcons.caretUp() : PhosphorIcons.table(),
                 size: 16,
               ),
-              label: Text(_showTable ? tr('ins_hide_values') : tr('ins_all_values')),
+              label: Text(
+                  _showTable ? tr('ins_hide_values') : tr('ins_all_values')),
             ),
           ),
           if (_showTable)
@@ -3101,11 +3052,10 @@ class _BucketCallout extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    tr('ins_more_this',
-                        namedArgs: {
-                          'n': '${inside.length - 3}',
-                          'unit': unitLabel,
-                        }),
+                    tr('ins_more_this', namedArgs: {
+                      'n': '${inside.length - 3}',
+                      'unit': unitLabel,
+                    }),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -3292,8 +3242,8 @@ class _ConsistencyPanel extends StatelessWidget {
           WellnessSparkline(
             values: recent,
             surfaceColor: surface,
-            semanticsLabel: tr('ins_daily_semantics',
-                namedArgs: {'n': '$recentActive'}),
+            semanticsLabel:
+                tr('ins_daily_semantics', namedArgs: {'n': '$recentActive'}),
           ),
           const SizedBox(height: 4),
           Row(
@@ -3307,10 +3257,9 @@ class _ConsistencyPanel extends StatelessWidget {
                 ),
               ),
               Text(
-                tr('ins_peak_day',
-                    namedArgs: {
-                      'time': _duration(recent.fold<int>(0, math.max)),
-                    }),
+                tr('ins_peak_day', namedArgs: {
+                  'time': _duration(recent.fold<int>(0, math.max)),
+                }),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -3378,7 +3327,8 @@ class _RhythmPanelState extends State<_RhythmPanel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(tr('ins_weekly_rhythm'), style: theme.textTheme.titleMedium),
+                    Text(tr('ins_weekly_rhythm'),
+                        style: theme.textTheme.titleMedium),
                     Text(
                       tr('ins_rhythm_desc'),
                       style: theme.textTheme.labelSmall?.copyWith(
@@ -3715,9 +3665,7 @@ class _PrivacyNote extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 3),
                 Text(
-                  canSync
-                      ? tr('ins_private_synced')
-                      : tr('ins_private_local'),
+                  canSync ? tr('ins_private_synced') : tr('ins_private_local'),
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
@@ -3764,10 +3712,7 @@ class _WellnessEmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          Text(
-              hasHistory
-                  ? tr('ins_empty_period')
-                  : tr('ins_empty_start'),
+          Text(hasHistory ? tr('ins_empty_period') : tr('ins_empty_start'),
               style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 8),
           Text(
@@ -3996,8 +3941,7 @@ String _relativeTime(DateTime value) {
   final difference = DateTime.now().difference(value);
   if (difference.inMinutes < 1) return tr('just_now');
   if (difference.inHours < 1) {
-    return tr('n_minutes_ago',
-        namedArgs: {'n': '${difference.inMinutes}'});
+    return tr('n_minutes_ago', namedArgs: {'n': '${difference.inMinutes}'});
   }
   if (difference.inDays < 1) {
     return tr('n_hours_ago', namedArgs: {'n': '${difference.inHours}'});
@@ -4029,8 +3973,7 @@ String _recapPeriodLabel(WellnessRecapPeriod period) => switch (period.kind) {
         period.label,
     };
 
-String _recapCaptionLabel(WellnessRecapPeriod period) =>
-    switch (period.kind) {
+String _recapCaptionLabel(WellnessRecapPeriod period) => switch (period.kind) {
       WellnessRecapPeriodKind.day => tr('ins_caption_today'),
       WellnessRecapPeriodKind.week => tr('ins_caption_week'),
       WellnessRecapPeriodKind.month ||

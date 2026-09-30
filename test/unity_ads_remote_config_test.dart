@@ -351,7 +351,8 @@ UNITY_TEST_MODE=false
       expect(find.byType(StartIoBannerWidget), findsNothing);
     });
 
-    testWidgets('Renders nothing on Android TV', (WidgetTester tester) async {
+    testWidgets('Renders a Start.io banner on Android TV',
+        (WidgetTester tester) async {
       StartIoAdsService.instance.setTelevision(true);
       addTearDown(() => StartIoAdsService.instance.setTelevision(false));
       provider.setStartIoAdsConfig(
@@ -375,7 +376,7 @@ UNITY_TEST_MODE=false
 
       await tester.pump();
 
-      expect(find.byType(StartIoBannerWidget), findsNothing);
+      expect(find.byType(StartIoBannerWidget), findsOneWidget);
     });
   });
 }

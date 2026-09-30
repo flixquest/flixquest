@@ -3,6 +3,7 @@ package dev.beamlak.flixquest_v2
 import android.app.Application
 import android.app.UiModeManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
@@ -18,6 +19,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowBuild
+import org.robolectric.shadows.ShadowLog
 import org.robolectric.util.ReflectionHelpers
 import org.robolectric.util.ReflectionHelpers.ClassParameter
 import java.util.concurrent.Executors
@@ -25,7 +27,7 @@ import java.util.concurrent.Executors
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30], manifest = Config.NONE, application = Application::class)
 @LooperMode(LooperMode.Mode.PAUSED)
-class ShieldRendererTest {
+class TvRendererTest {
     private val context: Context get() = RuntimeEnvironment.getApplication()
     private val executor = Executors.newCachedThreadPool()
 
@@ -34,53 +36,94 @@ class ShieldRendererTest {
         FlutterInjector.reset()
     }
 
-    @Test fun onlyNvidiaShieldTelevisionsMatch() {
-        for (model in listOf("SHIELD Android TV", "SHIELD TV", "SHIELD TV Pro", "shield")) {
-            assertTrue(model, needsShieldRendererWorkaround("NVIDIA", model, true))
-        }
-        assertTrue(needsShieldRendererWorkaround("nvidia", "SHIELD Android TV", true))
-        assertFalse(needsShieldRendererWorkaround("NVIDIA", "SHIELD Tablet", false))
-        assertFalse(needsShieldRendererWorkaround("NVIDIA", "Tegra reference device", true))
-        assertFalse(needsShieldRendererWorkaround("Google", "Google TV Streamer", true))
-        assertFalse(needsShieldRendererWorkaround("Amazon", "AFTMM", true))
-        assertFalse(needsShieldRendererWorkaround("Sony", "BRAVIA", true))
-        assertFalse(needsShieldRendererWorkaround("Samsung", "SHIELD", true))
-        assertFalse(needsShieldRendererWorkaround("", "", false))
-    }
-
-    @Test fun shieldInstallsLoaderDuringAttachmentWithoutStartingFlutter() {
-        ShadowBuild.setManufacturer("NVIDIA")
-        ShadowBuild.setModel("SHIELD Android TV")
+    @Test fun xiaomiAndroid11InstallsLoaderDuringAttachmentWithoutStartingFlutter() {
+        ShadowBuild.setManufacturer("Xiaomi")
+        ShadowBuild.setModel("Mi TV")
         shadowOf(context.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager)
             .setCurrentModeType(Configuration.UI_MODE_TYPE_TELEVISION)
 
         attachApplication()
         val injector = FlutterInjector.instance()
         try {
-            assertTrue(injector.flutterLoader() is ShieldFlutterLoader)
+            assertTrue(injector.flutterLoader() is TvCompatibilityFlutterLoader)
             assertFalse(injector.flutterLoader().initialized())
         } finally {
             injector.executorService().shutdownNow()
         }
     }
 
-    @Test fun otherDevicesKeepExistingInjectorAndRendererDefaults() {
-        ShadowBuild.setManufacturer("Google")
-        ShadowBuild.setModel("Google TV Streamer")
+    @Test @Config(sdk = [34])
+    fun philipsInstallsCompatibilityLoaderBeforeForegroundOrBackgroundStartup() {
+        ShadowBuild.setManufacturer("TP Vision")
+        ShadowBuild.setBrand("Philips")
+        ShadowBuild.setModel("Philips TV")
         shadowOf(context.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager)
             .setCurrentModeType(Configuration.UI_MODE_TYPE_TELEVISION)
+
+        attachApplication()
+        val injector = FlutterInjector.instance()
+        try {
+            assertTrue(injector.flutterLoader() is TvCompatibilityFlutterLoader)
+            assertFalse(injector.flutterLoader().initialized())
+            assertTrue(ShadowLog.getLogsForTag("FlixQuestRenderer").any {
+                it.msg.contains("policy=skia") && it.msg.contains("brand=Philips")
+            })
+        } finally {
+            injector.executorService().shutdownNow()
+        }
+    }
+
+    @Test fun phonesKeepExistingInjectorAndRendererDefaults() {
+        ShadowBuild.setManufacturer("Google")
+        ShadowBuild.setModel("Pixel")
+        shadowOf(context.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager)
+            .setCurrentModeType(Configuration.UI_MODE_TYPE_NORMAL)
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_LEANBACK, false)
         val original = FlutterInjector.Builder().setExecutorService(executor).build()
         FlutterInjector.setInstance(original)
 
         attachApplication()
 
         assertSame(original, FlutterInjector.instance())
-        assertFalse(original.flutterLoader() is ShieldFlutterLoader)
+        assertFalse(original.flutterLoader() is TvCompatibilityFlutterLoader)
+    }
+
+    @Test fun leanbackFeatureSelectsSkiaEvenWhenUiModeIsNotTelevision() {
+        shadowOf(context.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager)
+            .setCurrentModeType(Configuration.UI_MODE_TYPE_NORMAL)
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_LEANBACK, true)
+
+        attachApplication()
+        val injector = FlutterInjector.instance()
+        try {
+            assertTrue(injector.flutterLoader() is TvCompatibilityFlutterLoader)
+            assertFalse(injector.flutterLoader().initialized())
+        } finally {
+            injector.executorService().shutdownNow()
+        }
+    }
+
+    @Test fun unknownTvBrandsSelectSkiaWithoutAnAllowlist() {
+        ShadowBuild.setManufacturer("unknown")
+        ShadowBuild.setBrand("unknown")
+        ShadowBuild.setModel("unknown")
+        shadowOf(context.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager)
+            .setCurrentModeType(Configuration.UI_MODE_TYPE_TELEVISION)
+        shadowOf(context.packageManager).setSystemFeature(PackageManager.FEATURE_LEANBACK, false)
+
+        attachApplication()
+        val injector = FlutterInjector.instance()
+        try {
+            assertTrue(injector.flutterLoader() is TvCompatibilityFlutterLoader)
+            assertFalse(injector.flutterLoader().initialized())
+        } finally {
+            injector.executorService().shutdownNow()
+        }
     }
 
     @Test fun foregroundInitializationSelectsSkiaAndPreservesOtherArguments() {
         val jni = RecordingFlutterJNI()
-        val loader = ShieldFlutterLoader(jni, executor)
+        val loader = TvCompatibilityFlutterLoader(jni, executor)
         loader.startInitialization(context)
         loader.ensureInitializationComplete(
             context, arrayOf("--trace-startup", "--enable-impeller=true", "--enable-impeller"),
@@ -94,7 +137,7 @@ class ShieldRendererTest {
 
     @Test fun backgroundAsyncInitializationAlsoSelectsSkiaWithNoActivityArguments() {
         val jni = RecordingFlutterJNI()
-        val loader = ShieldFlutterLoader(jni, executor)
+        val loader = TvCompatibilityFlutterLoader(jni, executor)
         loader.startInitialization(context)
         var callbackCalled = false
         loader.ensureInitializationCompleteAsync(context, null, Handler(Looper.getMainLooper())) {
