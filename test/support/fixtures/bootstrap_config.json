@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "data": {
+    "features": {"enable_stream": true, "enable_download": true, "enable_live_tv": true, "enable_ott": true},
+    "branding": {"app_logo_url": "", "cinemax_logo": "default"},
+    "updates": {"forced_update": false, "latest_version": "4.2.0", "latest_build_number": 5, "min_build_number": 1, "app_download_url": "https://flixquest.app/download", "change_log": "Migrated to Laravel backend with enhanced sync."},
+    "network": {"flixquest_api_instances": ["https://scraper-1.flixquest.app"], "flixquest_api_url_v2": "https://scraper-1.flixquest.app", "tmdb_api_key": "", "tmdb_proxy": ""},
+    "ads": {"banner_ad_network": "native", "hosted_banner_mode": "stack", "unity_game_id_android": "5445375", "unity_banner_placement_id": "Banner_Android", "unity_test_mode": false, "startio_banner_enabled": false, "startio_interstitial_enabled": false, "startio_interstitial_interval_seconds": 600, "startio_tv_interstitial_mode": "video"},
+    "banners": [],
+    "occasional_theme": {"schema_version": 2, "enabled": true, "allow_user_selection": true, "effects_enabled": true, "allow_user_effects_toggle": true, "default_theme_id": "", "active_theme_id": "custom_campaign", "themes": [{"id": "custom_campaign", "display_name": "Custom Campaign", "enabled": true, "user_selectable": true, "priority": 75, "colors": ["#7B1FA2", "#00897B"], "starts_at": "2026-10-01T00:00:00+00:00", "ends_at": "2026-10-15T23:59:59+00:00", "effect": {"enabled": true, "type": "confetti", "density": 30, "speed": 0.8, "opacity": 0.55, "colors": ["#7B1FA2", "#00897B", "#F9A825"]}}]}
+  }
+}

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import '../models/in_app_message_payload.dart';
@@ -6,7 +7,10 @@ import '../ui_components/in_app_message_dialog.dart';
 class InAppMessagingService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-  static void initialize() {
+  static Future<void> Function(Map<String, dynamic>)? configHintHandler;
+
+  static void initialize({Future<void> Function(Map<String, dynamic>)? onConfigHint}) {
+    configHintHandler = onConfigHint;
     // Listen for foreground FCM messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       _handleIncomingMessage(message);
@@ -21,6 +25,7 @@ class InAppMessagingService {
   static void _handleIncomingMessage(RemoteMessage message) {
     final data = message.data;
     if (data.isEmpty) return;
+    unawaited(configHintHandler?.call(data));
 
     // Check if this payload is intended for in-app messaging display
     final isExplicitInApp = data['type'] == 'in_app_message';

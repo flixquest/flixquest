@@ -1,4 +1,5 @@
 import 'package:flixquest/data/repositories/auth_repository.dart';
+import 'package:flixquest/data/repositories/config_repository.dart';
 import 'package:flixquest/data/sources/laravel_api.dart';
 import 'package:flixquest/data/sources/google_identity_client.dart';
 import 'package:flixquest/presentation/session/session_view_model.dart';
@@ -30,6 +31,7 @@ class AppInjector {
     required this.httpCache,
     required this.tmdbRepository,
     required this.authRepository,
+    required this.configRepository,
     required this.session,
   });
 
@@ -44,6 +46,7 @@ class AppInjector {
   final TmdbRepository tmdbRepository;
 
   final AuthRepository authRepository;
+  final ConfigRepository configRepository;
   final SessionViewModel session;
 
   Future<void> dispose() async {
@@ -102,6 +105,7 @@ Future<AppInjector> buildInjector({
     httpCache: cache,
     tmdbRepository: TmdbRepository(TmdbApi(publicClient)),
     authRepository: auth,
+    configRepository: ConfigRepository(laravelClient, preferences),
     session: session,
   );
 }

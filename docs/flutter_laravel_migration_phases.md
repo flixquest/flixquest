@@ -2,7 +2,7 @@
 
 **Document Version:** 1.0
 **Branch:** `feat/laravel`
-**Status:** F0 implemented and verified against the measured baseline (2026-10-03); F1 implemented and automatically verified (2026-10-03), device smoke pending; F2 implemented and automatically verified (2026-10-03), staging/device smoke pending; F3–F8 pending
+**Status:** F0 implemented and verified against the measured baseline (2026-10-03); F1 implemented and automatically verified (2026-10-03), device smoke pending; F2 implemented and automatically verified (2026-10-03), staging/device smoke pending; F3 implemented and automatically verified (2026-10-03), device/Filament smoke pending; F4–F8 pending
 **Sources of truth:**
 - `docs/migration_prd_firebase_to_laravel.md` (this repo)
 - `~/Documents/web/phplaravel/flixquest-backend` — backend + `docs/migration_phases.md` (Phases 1 & 3 complete)
@@ -681,27 +681,27 @@ Work stops at F2; F3 config bootstrap is the next phase.
 Replace `firebase_remote_config` with `/api/v1/config/bootstrap` + ETag + SharedPreferences cache, keeping `AppDependencyProvider` as the single consumer.
 
 ### Prerequisite (backend repo)
-- [ ] **G3:** add `hosted_banner_mode`, `startio_banner_enabled`, `startio_interstitial_enabled`, `startio_interstitial_interval_seconds`, `startio_tv_interstitial_mode` to `AppConfigurationSeeder` and the `ads` block of `ConfigController@bootstrap`; ship seed tests.
+- [x] **G3:** add `hosted_banner_mode`, `startio_banner_enabled`, `startio_interstitial_enabled`, `startio_interstitial_interval_seconds`, `startio_tv_interstitial_mode` to `AppConfigurationSeeder` and the `ads` block of `ConfigController@bootstrap`; ship seed tests.
 
 ### Milestones
 
 **F3.1 DTOs & repository**
-- [ ] Freezed `BootstrapConfig` with `FeaturesConfig`, `BrandingConfig`, `UpdateConfig`, `NetworkConfig`, `AdsConfig`, `BannerDisplayConfig`, `OccasionalThemeCatalog` + `OccasionalTheme` + `ThemeEffect`.
-- [ ] Parsing must preserve the exact v2 semantics in `docs/firebase_remote_config.md`: aliases (`xmas`, `ethiopian-new-year`, `enkutatash`, `valentine`…), `starts_at`/`ends_at`, priority, `user_selectable`, `default_theme_id`, `active_theme_id`, dual-color `colors[]` entries, `effect.enabled`, `effect_type` list, presets for invalid entries.
-- [ ] `data/repositories/config_repository.dart` — `GET /config/bootstrap` with ETag persisted in `KvStore` (`config.bootstrap.etag`), raw JSON persisted under the existing `AppDependencies` keys (`FLIXQUEST_LOGO_URL`, `FLIXQUEST_API_URL(S)`, `TMDB_PROXY`, `OCCASIONAL_THEME*`, update keys) so rollback and offline boot keep working.
-- [ ] `RefreshController`: refresh on boot, on app resume if older than 1 h, and after a push-data config hint; 304 keeps the persisted payload.
-- [ ] Tests: parse fixture from the backend contract test; 304 path; offline uses last payload; empty cache uses safe defaults (`features.* = true`); theme window/priority/alias parity tests ported from `test/occasional_theme_provider_test.dart`.
+- [x] Freezed `BootstrapConfig` with `FeaturesConfig`, `BrandingConfig`, `UpdateConfig`, `NetworkConfig`, `AdsConfig`, `BannerDisplayConfig`, `OccasionalThemeCatalog` + `OccasionalTheme` + `ThemeEffect`.
+- [x] Parsing must preserve the exact v2 semantics in `docs/firebase_remote_config.md`: aliases (`xmas`, `ethiopian-new-year`, `enkutatash`, `valentine`…), `starts_at`/`ends_at`, priority, `user_selectable`, `default_theme_id`, `active_theme_id`, dual-color `colors[]` entries, `effect.enabled`, `effect_type` list, presets for invalid entries.
+- [x] `data/repositories/config_repository.dart` — `GET /config/bootstrap` with ETag persisted in `KvStore` (`config.bootstrap.etag`), raw JSON persisted under the existing `AppDependencies` keys (`FLIXQUEST_LOGO_URL`, `FLIXQUEST_API_URL(S)`, `TMDB_PROXY`, `OCCASIONAL_THEME*`, update keys) so rollback and offline boot keep working.
+- [x] `RefreshController`: refresh on boot, on app resume if older than 1 h, and after a push-data config hint; 304 keeps the persisted payload.
+- [x] Tests: parse fixture from the backend contract test; 304 path; offline uses last payload; empty cache uses safe defaults (`features.* = true`); theme window/priority/alias parity tests ported from `test/occasional_theme_provider_test.dart`.
 
 **F3.2 Consume in `AppDependencyProvider`**
-- [ ] Replace `AppRemoteConfig.apply(config, provider)` with `BootstrapViewModel` pushing into the existing setters (`setBannerConfigs`, `setBannerAdNetwork`, `setHostedBannerMode`, `setUnityAdsConfig`, `setStartIoAdsConfig`, `setFlixquestApiConfig`, `setUpdateConfiguration`) — this is the single choke point identified in `lib/provider/app_dependency_provider.dart`.
-- [ ] TMDB key: keep `TMDB_API_KEY` runtime setter in `lib/constants/api_constants.dart`; bootstrap supplies the same key as Remote Config did.
-- [ ] `bootstrap` also feeds the **network config** (scraper instances list) used by `HostedAdsRepository`/`ScraperApi` callers.
-- [ ] Rewire `flixquest_main.dart` `_initConfig` to the new controller; delete the `FirebaseRemoteConfig` code there. Keep `firebase_remote_config` in pubspec until F7.
+- [x] Replace `AppRemoteConfig.apply(config, provider)` with `BootstrapViewModel` pushing into the existing setters (`setBannerConfigs`, `setBannerAdNetwork`, `setHostedBannerMode`, `setUnityAdsConfig`, `setStartIoAdsConfig`, `setFlixquestApiConfig`, `setUpdateConfiguration`) — this is the single choke point identified in `lib/provider/app_dependency_provider.dart`.
+- [x] TMDB key: keep `TMDB_API_KEY` runtime setter in `lib/constants/api_constants.dart`; bootstrap supplies the same key as Remote Config did.
+- [x] `bootstrap` also feeds the **network config** (scraper instances list) used by `HostedAdsRepository`/`ScraperApi` callers.
+- [x] Rewire `flixquest_main.dart` `_initConfig` to the new controller; delete the `FirebaseRemoteConfig` code there. Keep `firebase_remote_config` in pubspec until F7.
 
 **F3.3 Theme engine**
-- [ ] Keep `AmbientThemeService` and the particle overlay; feed them from the new catalog.
-- [ ] Preserve user selection persistence and boundary timers; honor server-computed `active_theme_id` (the backend already resolves windows/priority).
-- [ ] Tests: existing theme tests migrated 1:1; add offline theme boot.
+- [x] Keep `AmbientThemeService` and the particle overlay; feed them from the new catalog.
+- [x] Preserve user selection persistence and boundary timers; honor server-computed `active_theme_id` (the backend already resolves windows/priority).
+- [x] Tests: existing theme tests migrated 1:1; add offline theme boot.
 
 **F3.4 Verification**
 - [ ] Airplane-mode cold boot: cached config renders, features default true, no blank screens.
@@ -709,6 +709,103 @@ Replace `firebase_remote_config` with `/api/v1/config/bootstrap` + ETag + Shared
 
 ### Exit criteria
 `FirebaseRemoteConfig` is no longer used; bootstrap is the only config source; offline boot is safe; analyze 0; suite green.
+
+### F3 verification report — 2026-10-03
+
+**Branch:** `feat/laravel-f3-config`, based on the user's committed F2. The
+Laravel G3 prerequisite is implemented in the backend checkout. No commits,
+pushes, PRs, real database seeding, or device interaction were performed.
+
+- Added typed bootstrap DTOs, a config repository, a bootstrap view model, and
+  one controller for boot/resume/push refresh. `AppDependencyProvider` remains
+  the consumer for phone, tablet and TV, including scraper instances, TMDB
+  key/proxy, updates, banner display rules, and Start.io pacing.
+- Hydrates the persisted snapshot before rendering and fetches asynchronously
+  at boot. Resume refreshes after one hour; `type=config_updated`,
+  `type=config_refresh`, or `refresh_config=true` FCM data requests an immediate
+  refresh. Concurrent lifecycle calls share a request; a hint during a request
+  schedules another validation. Disposed controllers ignore late UI updates.
+- The repository owns its persistent payload/ETag pair and bypasses the HTTP
+  response cache to avoid competing validators. It mirrors the ETag at
+  `config.bootstrap.etag` and config into existing `AppDependencies` keys.
+  A 304 retains the payload; transport/envelope failures retain the snapshot.
+  Without a Laravel snapshot, offline startup reads legacy config and defaults
+  all features to true. Invalid seasonal updates retain the previous catalog
+  while valid feature changes apply. Empty backend catalogs are supported.
+- Kept the existing theme engine, ambient service, particle overlay, selection
+  persistence and boundary timers. DTOs use the same parser for aliases,
+  custom dual-color palettes, presets, effects, dates and priority. A server
+  active theme guides automatic selection until the next local boundary;
+  explicit user selection still wins. The original theme/provider tests are
+  retained unchanged, preserving every assertion 1:1, with additional Laravel
+  DTO parity and offline restart coverage.
+- Removed Firebase Remote Config setup/listeners from `flixquest_main.dart`.
+  The isolated `lib/legacy/firebase_config_controller.dart` retains the
+  `AppRemoteConfig` rollback when the config migration flag is off. Firebase
+  packages remain until F7; F4 hosted-ad transport is unchanged.
+- Backend G3 adds the five hosted/Start.io fields to the bootstrap response and
+  default seeder. Defaults keep Start.io disabled and use hosted `stack` mode.
+  Seed tests verify operator values survive reseeding. Both repositories keep
+  the same sanitized fixture, verified by Laravel's exact JSON response test
+  and Flutter's typed parser.
+
+| Verification | Result |
+|---|---|
+| New F3 tests | 5 files; 31/31 passing |
+| F3 plus retained theme/provider tests | 49/49 passing; 18 existing tests unchanged |
+| Final analysis | 0 issues |
+| Full suite | 124 files; 935 passing / the same 2 existing failures (937 executed) |
+| Herd backend config tests | 22/22; 244 assertions across `BootstrapAdsConfigTest` and `ConfigBootstrapTest` |
+| Live Herd read-only checks | bootstrap 200 with all five G3 fields; conditional GET 304 with empty body |
+| Code generation | two new outputs; repeat build wrote 0 outputs; all 15 pre-existing generated files unchanged |
+| Diff whitespace checks | clean in both repositories |
+
+The existing failures remain `player_menu_route_test.dart` (episodes route) and
+`subtitle_options_test.dart` (incoming subtitle order). Neither file was changed,
+skipped or weakened. The four repository lint fixes after the full run only
+added braces; final analysis and all 49 focused tests passed afterward.
+The backend tests used the isolated SQLite in-memory test database. No real
+configuration, theme or account was created/changed. `test/_preview/` is absent;
+no visual/device previews were performed because the phase keeps the existing
+mobile/TV theme rendering. F3's automated implementation is complete; the two
+manual F3.4 checks remain pending.
+
+Flutter files added: `lib/data/models/bootstrap_config.dart` and its two
+Freezed/JSON outputs; `lib/data/repositories/config_repository.dart`;
+`lib/presentation/config/bootstrap_view_model.dart`;
+`lib/presentation/config/refresh_controller.dart`;
+`lib/legacy/firebase_config_controller.dart`; five test files under `test/data`,
+`test/presentation` and `test/core`; `test/support/fixtures/bootstrap_config.json`.
+Changed: `lib/core/di/injector.dart`, `lib/main.dart`, `lib/flixquest_main.dart`,
+`lib/models/occasional_theme.dart`, `lib/services/in_app_messaging_service.dart`,
+and this plan. No files deleted.
+
+Backend files changed: `app/Http/Controllers/Api/V1/ConfigController.php` and
+`database/seeders/AppConfigurationSeeder.php`. Added:
+`tests/Feature/BootstrapAdsConfigTest.php` and
+`tests/Fixtures/bootstrap_config.json`. Existing unrelated backend changes
+remain untouched.
+
+User-run smoke (pending; no device access by the agent):
+
+1. Start a phone/TV build with `--dart-define=FLIXQUEST_MIGRATION=auth,config`
+   and `--dart-define=LARAVEL_API_URL=<reachable backend URL>`. A changed
+   dart-define requires restarting the Flutter process; **R** suffices only
+   if the running process already has these defines. Do not use Herd's local
+   `.test` hostname on a physical device unless it resolves there.
+2. Confirm online bootstrap, updates, scraper selection and seasonal theme;
+   choose another available theme and turn its effects off. Disable networking,
+   close/relaunch and confirm config and user preferences are retained.
+3. Change a feature in Filament, resume after an hour or send the documented
+   config hint, and confirm the provider updates. Relaunch unchanged config
+   and confirm an HTTP 304 in the debug network logs.
+4. For admin editing, run `herd php artisan db:seed --class=AppConfigurationSeeder`
+   in the backend checkout on the intended environment to create the five
+   new settings. The API supplies safe defaults
+   even before seeding; no real database was seeded during this phase.
+5. Remove `config` from the migration flag to verify the Firebase rollback.
+
+Work stops at F3; F4 ads cutover is the next phase.
 
 ### Rollback
 `migration_flags.config` off → `AppRemoteConfig` path still present until F7.

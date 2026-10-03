@@ -1,3 +1,5 @@
+import 'presentation/config/bootstrap_view_model.dart';
+import 'presentation/config/refresh_controller.dart';
 import 'services/local_account_data.dart';
 import 'presentation/session/auth_runtime.dart';
 import 'presentation/session/session_view_model.dart';
@@ -182,6 +184,12 @@ void main() async {
     await recentProvider.fetchEpisodes();
     await wellnessProvider.reload();
   });
+  RefreshController? configController;
+  if (injector.migrationFlags.config) {
+    final bootstrap = BootstrapViewModel(injector.configRepository, appDependencyProvider);
+    await bootstrap.hydrate();
+    configController = RefreshController(bootstrap);
+  }
   AuthRuntime.configure(injector.session, enabled: injector.migrationFlags.auth);
   if (AuthRuntime.enabled) {
     await injector.session.restore();
@@ -210,6 +218,7 @@ void main() async {
       bookmarkProvider: bookmarkProvider,
       appDependencyProvider: appDependencyProvider,
       devicePresentation: devicePresentation,
+      configController: configController,
     ),
   ))));
 }
