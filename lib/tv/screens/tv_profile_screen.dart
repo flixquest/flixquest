@@ -1,18 +1,20 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../../legacy/firebase_auth/tv/screens/tv_profile_screen.dart' as legacy;
+import 'package:flixquest/presentation/session/auth_runtime.dart';
+import 'package:flixquest/services/flixquest_auth_service.dart';
+
+
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../services/auth_navigation_service.dart';
-import '../../services/flixquest_auth_service.dart';
 import '../app/tv_design.dart';
 import '../focus/tv_screen_focus_controller.dart';
 import '../widgets/tv_dialog.dart';
 import '../widgets/tv_page_header.dart';
 import '../widgets/tv_pill_button.dart';
 
-class TvProfileScreen extends StatelessWidget {
-  const TvProfileScreen({
+class LaravelTvProfileScreen extends StatelessWidget {
+  const LaravelTvProfileScreen({
     required this.metrics,
     this.focusController,
     super.key,
@@ -23,45 +25,15 @@ class TvProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.isAnonymous) {
-      return _ProfileLayout(
-        metrics: metrics,
-        name: 'Guest',
-        subtitle: 'Local watchlist and browsing session',
-        profileId: 0,
-        isGuest: true,
-        focusController: focusController,
-        onSignOut: () => _confirmSignOut(context),
-      );
-    }
-
-    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      future:
-          FirebaseFirestore.instance.collection('users').doc(user.uid).get(),
-      builder: (context, snapshot) {
-        final data = snapshot.data?.data();
-        final name = data?['name']?.toString().trim();
-        final username = data?['username']?.toString().trim();
-        final profileId = data?['profileId'] is int
-            ? data!['profileId'] as int
-            : int.tryParse(data?['profileId']?.toString() ?? '') ?? 0;
-        return _ProfileLayout(
-          metrics: metrics,
-          name: name == null || name.isEmpty
-              ? user.displayName ?? 'FlixQuest member'
-              : name,
-          subtitle: username == null || username.isEmpty
-              ? user.email ?? 'Signed in'
-              : '@$username',
-          profileId: profileId,
-          photoUrl: data?['photoUrl']?.toString(),
-          loading: snapshot.connectionState != ConnectionState.done,
-          focusController: focusController,
-          onSignOut: () => _confirmSignOut(context),
-        );
-      },
-    );
+    return ListenableBuilder(listenable: AuthRuntime.session, builder: (context, _) {
+      final user = AuthRuntime.session.user;
+      return _ProfileLayout(metrics: metrics,
+        name: user?.name ?? 'Guest',
+        subtitle: user == null ? 'Local watchlist and browsing session' : '@${user.username}',
+        profileId: user?.profileId ?? 0, photoUrl: user?.photoUrl,
+        isGuest: user == null, focusController: focusController,
+        onSignOut: () => _confirmSignOut(context));
+    });
   }
 
   Future<void> _confirmSignOut(BuildContext context) async {
@@ -82,8 +54,7 @@ class TvProfileScreen extends StatelessWidget {
           isPrimary: true,
           onPressed: () async {
             Navigator.of(context).pop();
-            await FlixQuestAuthService.signOutGoogle();
-            await FirebaseAuth.instance.signOut();
+            await FlixQuestAuthService().signOut();
             if (context.mounted) {
               await AuthNavigationService.returnToSignedOutRoot(context);
             }
@@ -102,7 +73,6 @@ class _ProfileLayout extends StatelessWidget {
     required this.profileId,
     required this.onSignOut,
     this.photoUrl,
-    this.loading = false,
     this.isGuest = false,
     this.focusController,
   });
@@ -113,7 +83,7 @@ class _ProfileLayout extends StatelessWidget {
   final int profileId;
   final String? photoUrl;
   final VoidCallback onSignOut;
-  final bool loading;
+  final bool loading = false;
   final bool isGuest;
   final TvScreenFocusController? focusController;
 
@@ -336,4 +306,14 @@ class _ProfileFocusEntryState extends State<_ProfileFocusEntry> {
 
   @override
   Widget build(BuildContext context) => widget.builder(_signOutFocusNode);
+}
+
+class TvProfileScreen extends StatelessWidget {
+  const TvProfileScreen({required this.metrics, this.focusController, super.key});
+  final TvShellMetrics metrics;
+  final TvScreenFocusController? focusController;
+  @override
+  Widget build(BuildContext context) => AuthRuntime.enabled
+      ? LaravelTvProfileScreen(metrics: metrics, focusController: focusController)
+      : legacy.TvProfileScreen(metrics: metrics, focusController: focusController);
 }

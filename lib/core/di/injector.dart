@@ -1,3 +1,9 @@
+import 'package:flixquest/data/repositories/auth_repository.dart';
+import 'package:flixquest/data/sources/laravel_api.dart';
+import 'package:flixquest/data/sources/google_identity_client.dart';
+import 'package:flixquest/presentation/session/session_view_model.dart';
+import 'package:flixquest/core/network/interceptors/auth_interceptor.dart';
+import 'package:flixquest/services/local_account_data.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cache_interceptor/dio_cache_interceptor.dart';
 import 'package:flixquest/core/cache/http_cache.dart';
@@ -23,6 +29,8 @@ class AppInjector {
     required this.laravelDio,
     required this.httpCache,
     required this.tmdbRepository,
+    required this.authRepository,
+    required this.session,
   });
 
   final AppEnvironment environment;
@@ -35,7 +43,11 @@ class AppInjector {
   final HttpCache httpCache;
   final TmdbRepository tmdbRepository;
 
+  final AuthRepository authRepository;
+  final SessionViewModel session;
+
   Future<void> dispose() async {
+    session.dispose();
     publicDio.close(force: true);
     laravelDio.close(force: true);
     await httpCache.close();
@@ -51,6 +63,8 @@ Future<AppInjector> buildInjector({
   Dio? publicDio,
   Dio? laravelDio,
   CacheStore? responseCacheStore,
+  GoogleIdentityClient? googleIdentity,
+  Future<void> Function(String)? deleteLocalData,
 }) async {
   if (publicDio != null && identical(publicDio, laravelDio)) {
     throw ArgumentError(
@@ -71,15 +85,23 @@ Future<AppInjector> buildInjector({
   final cache = HttpCache(cacheStore);
   final publicClient = createPublicDio(config, dio: publicDio, httpCache: cache);
   final laravelClient = createLaravelDio(config, dio: laravelDio, httpCache: cache);
+  final tokens = tokenStore ?? SecureTokenStore();
+  final auth = AuthRepository(LaravelApi(laravelClient));
+  final session = SessionViewModel(repository: auth, tokens: tokens,
+      preferences: preferences, cache: cache, google: googleIdentity,
+      deleteLocalData: deleteLocalData ?? LocalAccountData.delete);
+  laravelClient.interceptors.insert(0, AuthInterceptor(session, config.laravelApiUrl));
   return AppInjector._(
     environment: config,
     migrationFlags: migrationFlags ?? MigrationFlags.fromRuntime(),
     kvStore: preferences,
-    tokenStore: tokenStore ?? SecureTokenStore(),
+    tokenStore: tokens,
     serverClock: serverClock ?? ServerClock(preferences),
     publicDio: publicClient,
     laravelDio: laravelClient,
     httpCache: cache,
     tmdbRepository: TmdbRepository(TmdbApi(publicClient)),
+    authRepository: auth,
+    session: session,
   );
 }

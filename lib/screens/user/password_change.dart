@@ -1,27 +1,30 @@
-import 'package:easy_localization/easy_localization.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
-import '../../constants/app_constants.dart';
-import '../../services/globle_method.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '/provider/settings_provider.dart';
+import '../../legacy/firebase_auth/screens/user/password_change.dart' as legacy;
+import 'package:flixquest/presentation/session/auth_runtime.dart';
+import 'package:flixquest/services/flixquest_auth_service.dart';
+import 'package:flixquest/data/models/auth_requests.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import '../../services/globle_method.dart';
+
+import 'package:flutter/material.dart';
 import '../../mobile/widgets/account_form.dart';
 
-class PasswordChangeScreen extends StatefulWidget {
-  const PasswordChangeScreen({super.key});
+class LaravelPasswordChangeScreen extends StatefulWidget {
+  const LaravelPasswordChangeScreen({super.key});
 
   @override
   PasswordChangeScreenState createState() => PasswordChangeScreenState();
 }
 
-class PasswordChangeScreenState extends State<PasswordChangeScreen> {
+class PasswordChangeScreenState extends State<LaravelPasswordChangeScreen> {
   String currentPassword = '';
   String newPassword = '';
   bool _obscureText = true;
-  User? user;
+
   final _formKey = GlobalKey<FormState>();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FlixQuestAuthService _auth = FlixQuestAuthService();
   final GlobalMethods _globalMethods = GlobalMethods();
   bool _isLoading = false;
   final FocusNode _newPasswordFocusNode = FocusNode();
@@ -34,69 +37,26 @@ class PasswordChangeScreenState extends State<PasswordChangeScreen> {
     getUserData();
   }
 
-  void getUserData() async {
-    User? user = _auth.currentUser;
-    setState(() {
-      _emailAddress = user!.email;
-    });
+  void getUserData() {
+    _emailAddress = AuthRuntime.session.user?.email;
   }
 
   void _submitForm() async {
-    final isValid = _formKey.currentState!.validate();
+    if (_isLoading || !_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
-    if (isValid) {
-      setState(() {
-        _isLoading = true;
-      });
-      _formKey.currentState!.save();
-      try {
-        user = _auth.currentUser;
-
-        await user!.updatePassword(newPassword).then((value) {
-          if (!mounted) return;
-          Provider.of<SettingsProvider>(context, listen: false)
-              .analytics
-              .trackPasswordChanged();
-          GlobalMethods.showCustomScaffoldMessage(
-              SnackBar(
-                content: Text(
-                  tr('password_changed'),
-                  maxLines: 3,
-                  style: kTextSmallBodyStyle,
-                ),
-                duration: const Duration(seconds: 4),
-              ),
-              context.mounted ? context : null);
-        });
-      } on FirebaseAuthException catch (e) {
-        if (mounted) {
-          if (e.code == 'user-mismatch') {
-            _globalMethods.authErrorHandle(tr('user_mismatch'), context);
-          } else if (e.code == 'user-not-found') {
-            _globalMethods.authErrorHandle(tr('user_not_found'), context);
-          } else if (e.code == 'invalid-credential') {
-            _globalMethods.authErrorHandle(tr('invalid_credential'), context);
-          } else if (e.code == 'invalid-email') {
-            _globalMethods.authErrorHandle(tr('invalid_email'), context);
-          } else if (e.code == 'wrong-password:') {
-            _globalMethods.authErrorHandle(tr('wrong_password'), context);
-          } else if (e.code == 'weak-password') {
-            _globalMethods.authErrorHandle(tr('weak_password'), context);
-          } else if (e.code == 'requires-recent-login') {
-            _globalMethods.authErrorHandle(
-                tr('requires_recent_login'), context);
-          }
-        }
-        // print('error occured ${error.message}');
-      } finally {
-        setState(() {
-          _isLoading = false;
-        });
-
-        if (mounted) {
-          Navigator.pop(context);
-        }
-      }
+    _formKey.currentState!.save();
+    setState(() => _isLoading = true);
+    final analytics = context.read<SettingsProvider>().analytics;
+    try {
+      await _auth.changePassword(ChangePasswordRequest(currentPassword: currentPassword, password: newPassword));
+      analytics.trackPasswordChanged();
+      if (!mounted) return;
+      GlobalMethods.showCustomScaffoldMessage(SnackBar(content: Text(tr('password_changed'))), context);
+      Navigator.of(context).pop();
+    } on AuthActionException catch (error) {
+      if (mounted) _globalMethods.authErrorHandle(error.message, context);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -118,6 +78,15 @@ class PasswordChangeScreenState extends State<PasswordChangeScreen> {
           key: _formKey,
           child: Column(
             children: [
+              TextFormField(
+                key: const ValueKey('currentPassword'),
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Current password'),
+                validator: (value) => AuthRuntime.session.user?.provider != 'google' &&
+                    (value == null || value.isEmpty) ? 'Enter your current password.' : null,
+                onSaved: (value) => currentPassword = value ?? '',
+              ),
+              const AccountFieldGap(),
               TextFormField(
                 key: const ValueKey('newPassword'),
                 validator: (value) {
@@ -185,4 +154,11 @@ class PasswordChangeScreenState extends State<PasswordChangeScreen> {
       ],
     );
   }
+}
+
+class PasswordChangeScreen extends StatelessWidget {
+  const PasswordChangeScreen({super.key});
+  @override
+  Widget build(BuildContext context) => AuthRuntime.enabled
+      ? const LaravelPasswordChangeScreen() : const legacy.PasswordChangeScreen();
 }

@@ -1,15 +1,19 @@
+import 'package:flixquest/data/models/app_user.dart';
+import '../../legacy/firebase_auth/screens/user/edit_profile.dart' as legacy;
+import 'package:flixquest/presentation/session/auth_runtime.dart';
+import 'package:flixquest/services/flixquest_auth_service.dart';
+import 'package:flixquest/data/models/auth_requests.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '/screens/user/delete_account.dart';
 import '/screens/user/email_change.dart';
 import '/screens/user/password_change.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '/provider/settings_provider.dart';
-import '../../constants/app_constants.dart';
 import '../../models/profile_image_list.dart';
 import '../../services/globle_method.dart';
 import '../../design/app_palette.dart';
@@ -18,16 +22,15 @@ import '../../design/skeleton.dart';
 import '../../mobile/widgets/account_form.dart';
 import '../../mobile/widgets/page_kit.dart';
 
-class ProfileEdit extends StatefulWidget {
-  const ProfileEdit({super.key});
+class LaravelProfileEdit extends StatefulWidget {
+  const LaravelProfileEdit({super.key});
 
   @override
-  State<ProfileEdit> createState() => _ProfileEditState();
+  State<LaravelProfileEdit> createState() => _ProfileEditState();
 }
 
-class _ProfileEditState extends State<ProfileEdit> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  FirebaseFirestore firebaseInstance = FirebaseFirestore.instance;
+class _ProfileEditState extends State<LaravelProfileEdit> {
+  final FlixQuestAuthService _auth = FlixQuestAuthService();
   String? uid;
   String? userId;
   String? userEmail;
@@ -35,7 +38,7 @@ class _ProfileEditState extends State<ProfileEdit> {
   String? name;
   String? email;
   String? joinedAt;
-  Timestamp? createdAt;
+  DateTime? createdAt;
   int? profileId;
   bool? userAnonymous;
   String? username;
@@ -51,60 +54,33 @@ class _ProfileEditState extends State<ProfileEdit> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   final GlobalMethods _globalMethods = GlobalMethods();
-  DocumentSnapshot? userDoc;
+  AppUser? userProfile;
   final ScrollController _profileScrollController = ScrollController();
 
-  /// Reads a field from [userDoc] without throwing when the document omits it.
-  /// `DocumentSnapshot.get` throws a `StateError` for missing keys, which is
-  /// common for older accounts that never stored `photoUrl`.
-  dynamic _userField(String key) {
-    final data = userDoc?.data();
-    return data is Map ? data[key] : null;
-  }
-
-  void getData() async {
-    User? user = _auth.currentUser;
-    uid = user!.uid;
-
-    if (user.isAnonymous) {
-      setState(() {
-        userAnonymous = true;
-      });
-    } else {
-      userDoc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
-
-      setState(() {
-        userAnonymous = false;
-        name = _userField('name');
-        email = user.email;
-        joinedAt = _userField('joinedAt');
-        final joinedDate =
-            joinedAt == null ? null : DateTime.tryParse(joinedAt!);
-        if (joinedDate != null) {
-          month = DateFormat('MMMM').format(DateTime(0, joinedDate.month));
-          year = joinedDate.year;
+  void getData() {
+    final user = AuthRuntime.session.user;
+    if (user == null) {
+      setState(() => userAnonymous = true);
+      return;
+    }
+    setState(() {
+      userAnonymous = false;
+      uid = user.id.toString(); userId = uid;
+      name = user.name; email = user.email; userEmail = user.email;
+      joinedAt = user.joinedAt.toIso8601String(); createdAt = user.createdAt;
+      month = DateFormat('MMMM').format(user.joinedAt); year = user.joinedAt.year;
+      isVerified = user.isVerified; profileId = user.profileId;
+      username = user.username; photoUrl = user.photoUrl;
+      userProfile = user;
+    });
+    if (profileId != null && profileId! > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_profileScrollController.hasClients) {
+          final double offset = (profileId! * (72.0 + 14.0)).clamp(
+            0.0, _profileScrollController.position.maxScrollExtent);
+          _profileScrollController.jumpTo(offset);
         }
-        isVerified = _userField('verified') as bool?;
-        profileId = (_userField('profileId') as num?)?.toInt();
-        username = _userField('username');
-        photoUrl = _userField('photoUrl')?.toString();
-        createdAt = _userField('createdAt') as Timestamp?;
-        userEmail = _userField('email');
-        userId = _userField('id');
       });
-
-      if (profileId != null && profileId! > 0) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_profileScrollController.hasClients) {
-            final double offset = (profileId! * (72.0 + 14.0)).clamp(
-              0.0,
-              _profileScrollController.position.maxScrollExtent,
-            );
-            _profileScrollController.jumpTo(offset);
-          }
-        });
-      }
     }
   }
 
@@ -115,107 +91,24 @@ class _ProfileEditState extends State<ProfileEdit> {
   }
 
   void updateProfile() async {
-    final isValid = _formKey.currentState!.validate();
-    if (isValid) {
-      _formKey.currentState!.save();
-      try {
-        setState(() {
-          _isLoading = true;
-        });
-
-        /// Check If Document Exists
-        Future<bool> checkIfDocExists(String docId) async {
-          try {
-            // Get reference to Firestore collection
-            var collectionRef =
-                FirebaseFirestore.instance.collection('usernames');
-
-            var doc = await collectionRef.doc(docId).get();
-            return doc.exists;
-          } catch (e) {
-            rethrow;
-          }
-        }
-
-        if (username == _userName) {
-          await FirebaseFirestore.instance.collection('users').doc(uid).update({
-            'createdAt': createdAt,
-            'email': userEmail,
-            'id': userId,
-            'joinedAt': joinedAt,
-            'name': _fullName,
-            'profileId': profileId,
-            'photoUrl': _avatarChanged ? '' : (photoUrl ?? ''),
-            'username': username!.trim().toLowerCase(),
-            'verified': isVerified
-          }).then((value) {
-            if (mounted) {
-              Provider.of<SettingsProvider>(context, listen: false)
-                  .analytics
-                  .trackProfileUpdated();
-              Navigator.pop(context);
-            }
-          });
-        } else if (username != _userName) {
-          if (await checkIfDocExists(_userName) == true) {
-            if (mounted) {
-              GlobalMethods.showCustomScaffoldMessage(
-                  SnackBar(
-                    content: Text(
-                      tr('username_exists'),
-                      maxLines: 3,
-                      style: kTextSmallBodyStyle,
-                    ),
-                    duration: const Duration(seconds: 4),
-                  ),
-                  context);
-            }
-            setState(() {
-              username = _userField('username');
-            });
-            return;
-          }
-          await firebaseInstance
-              .collection('usernames')
-              .doc(username)
-              .get()
-              .then((value) {
-            if (value.exists) {
-              firebaseInstance
-                  .collection('usernames')
-                  .doc(_userName)
-                  .set({'uid': uid, 'uname': _userName}).then((value) {
-                firebaseInstance.collection('usernames').doc(username).delete();
-              });
-            }
-          });
-          await FirebaseFirestore.instance.collection('users').doc(uid).update({
-            'createdAt': createdAt,
-            'email': userEmail,
-            'id': userId,
-            'joinedAt': joinedAt,
-            'name': _fullName,
-            'profileId': profileId,
-            'photoUrl': _avatarChanged ? '' : (photoUrl ?? ''),
-            'username': _userName.trim().toLowerCase(),
-            'verified': isVerified
-          }).then((value) {
-            if (mounted) {
-              Navigator.pop(context);
-            }
-          });
-        }
-      } catch (e) {
-        if (mounted) {
-          _globalMethods.authErrorHandle(e.toString(), context);
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
+    if (_isLoading || !_formKey.currentState!.validate()) return;
+    _formKey.currentState!.save();
+    setState(() => _isLoading = true);
+    try {
+      if (_userName.trim().toLowerCase() != username &&
+          !await _auth.usernameAvailable(_userName)) {
+        throw const AuthActionException(code: 'username-already-in-use', message: 'That username is already in use.');
       }
+      await _auth.updateProfile(UpdateProfileRequest(name: _fullName.trim(),
+          username: _userName.trim().toLowerCase(), profileId: profileId,
+          photoUrl: _avatarChanged ? '' : photoUrl));
+      if (!mounted) return;
+      context.read<SettingsProvider>().analytics.trackProfileUpdated();
+      Navigator.pop(context);
+    } on AuthActionException catch (error) {
+      if (mounted) _globalMethods.authErrorHandle(error.message, context);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -406,4 +299,11 @@ class _ProfileEditState extends State<ProfileEdit> {
       ],
     );
   }
+}
+
+class ProfileEdit extends StatelessWidget {
+  const ProfileEdit({super.key});
+  @override
+  Widget build(BuildContext context) => AuthRuntime.enabled
+      ? const LaravelProfileEdit() : const legacy.ProfileEdit();
 }

@@ -1,33 +1,35 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flixquest/data/models/auth_session.dart';
+import '../../legacy/firebase_auth/tv/screens/tv_auth_screen.dart' as legacy;
+import 'package:flixquest/presentation/session/auth_runtime.dart';
+import 'package:flixquest/services/flixquest_auth_service.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../provider/settings_provider.dart';
-import '../../services/flixquest_auth_service.dart';
 import '../../services/auth_navigation_service.dart';
-import '../../services/bookmark_sync_service.dart';
 import '../app/tv_design.dart';
 import '../focus/tv_focusable.dart';
 import '../widgets/tv_pill_button.dart';
 
 enum TvAuthMode { signIn, createAccount }
 
-class TvAuthScreen extends StatefulWidget {
-  const TvAuthScreen({required this.mode, super.key});
+class LaravelTvAuthScreen extends StatefulWidget {
+  const LaravelTvAuthScreen({required this.mode, super.key});
 
-  const TvAuthScreen.signIn({super.key}) : mode = TvAuthMode.signIn;
+  const LaravelTvAuthScreen.signIn({super.key}) : mode = TvAuthMode.signIn;
 
-  const TvAuthScreen.createAccount({super.key})
+  const LaravelTvAuthScreen.createAccount({super.key})
       : mode = TvAuthMode.createAccount;
 
   final TvAuthMode mode;
 
   @override
-  State<TvAuthScreen> createState() => _TvAuthScreenState();
+  State<LaravelTvAuthScreen> createState() => _TvAuthScreenState();
 }
 
-class _TvAuthScreenState extends State<TvAuthScreen> {
+class _TvAuthScreenState extends State<LaravelTvAuthScreen> {
   final _formKey = GlobalKey<FormState>();
   final _authService = FlixQuestAuthService();
   final _nameController = TextEditingController();
@@ -70,14 +72,13 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
       _error = null;
     });
     try {
-      late final UserCredential credential;
+      late final AuthSession credential;
       if (_isSignIn) {
         credential = await _authService.signIn(
           email: _emailController.text,
           password: _passwordController.text,
         );
         if (mounted) {
-          BookmarkSyncService.instance.autoSyncIfSignedIn();
           context.read<SettingsProvider>().analytics.trackLogin('email');
         }
       } else {
@@ -95,10 +96,10 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
       if (mounted) {
         await AuthNavigationService.returnToAppRoot(
           context,
-          authenticatedUserId: credential.user!.uid,
+          authenticatedUserId: credential.user.id.toString(),
         );
       }
-    } on FirebaseAuthException catch (error) {
+    } on AuthActionException catch (error) {
       if (mounted) setState(() => _error = _authMessage(error));
     } catch (_) {
       if (mounted) {
@@ -109,7 +110,7 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
     }
   }
 
-  String _authMessage(FirebaseAuthException error) {
+  String _authMessage(AuthActionException error) {
     return switch (error.code) {
       'invalid-credential' ||
       'wrong-password' =>
@@ -121,19 +122,18 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
       'username-already-in-use' => 'That username is already in use.',
       'weak-password' => 'Use a password with at least 7 characters.',
       'network-request-failed' => 'Check your internet connection and retry.',
-      _ => error.message ?? 'Authentication failed. Please try again.',
+      _ => error.message,
     };
   }
 
-  String _googleAuthMessage(FirebaseAuthException error) {
+  String _googleAuthMessage(AuthActionException error) {
     return switch (error.code) {
       'account-exists-with-different-credential' =>
-        'That email is already used by an email-and-password account. '
-            'Sign in with your email and password instead.',
+        error.message,
       'network-request-failed' => 'Check your internet connection and retry.',
       'operation-not-allowed' => 'Google sign-in is currently unavailable.',
       'invalid-credential' => 'Google sign-in failed. Please try again.',
-      _ => error.message ?? 'Unable to sign in with Google.',
+      _ => error.message,
     };
   }
 
@@ -169,16 +169,15 @@ class _TvAuthScreenState extends State<TvAuthScreen> {
       final credential = await _authService.signInWithGoogle();
       if (credential == null) return;
       if (mounted) {
-        BookmarkSyncService.instance.autoSyncIfSignedIn();
         context.read<SettingsProvider>().analytics.trackLogin('google');
       }
       if (mounted) {
         await AuthNavigationService.returnToAppRoot(
           context,
-          authenticatedUserId: credential.user!.uid,
+          authenticatedUserId: credential.user.id.toString(),
         );
       }
-    } on FirebaseAuthException catch (error) {
+    } on AuthActionException catch (error) {
       if (mounted) setState(() => _error = _googleAuthMessage(error));
     } on PlatformException catch (error) {
       if (mounted && !_isGoogleSignInCancel(error)) {
@@ -685,4 +684,15 @@ class _BackAction extends StatelessWidget {
       ),
     );
   }
+}
+
+class TvAuthScreen extends StatelessWidget {
+  const TvAuthScreen({required this.mode, super.key});
+  const TvAuthScreen.signIn({super.key}) : mode = TvAuthMode.signIn;
+  const TvAuthScreen.createAccount({super.key}) : mode = TvAuthMode.createAccount;
+  final TvAuthMode mode;
+  @override
+  Widget build(BuildContext context) => AuthRuntime.enabled
+      ? LaravelTvAuthScreen(mode: mode)
+      : legacy.TvAuthScreen(mode: mode == TvAuthMode.signIn ? legacy.TvAuthMode.signIn : legacy.TvAuthMode.createAccount);
 }

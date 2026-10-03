@@ -1,3 +1,4 @@
+import '../presentation/session/auth_runtime.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -51,7 +52,7 @@ class BookmarkSyncService {
   }
 
   User? get currentUser => _auth.currentUser;
-  bool get canSync => currentUser != null && !currentUser!.isAnonymous;
+  bool get canSync => !AuthRuntime.enabled && currentUser != null && !currentUser!.isAnonymous;
 
   Future<bool> checkIfDocExists(String uid) async {
     try {

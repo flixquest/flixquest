@@ -1,8 +1,12 @@
+import '../../legacy/firebase_auth/mobile/screens/my_flixquest_screen.dart' as legacy;
+import 'package:flixquest/presentation/session/auth_runtime.dart';
+import 'package:flixquest/services/flixquest_auth_service.dart';
+import 'package:flixquest/data/models/app_user.dart';
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:easy_localization/easy_localization.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
@@ -27,7 +31,6 @@ import '../../screens/common/update_screen.dart';
 import '../../screens/user/edit_profile.dart';
 import '../../screens/wellness/wellness_screen.dart';
 import '../../services/auth_navigation_service.dart';
-import '../../services/flixquest_auth_service.dart';
 import '../widgets/media_rows.dart';
 import '../widgets/page_kit.dart';
 import '../widgets/pill_button.dart';
@@ -35,21 +38,22 @@ import '../widgets/section_header.dart';
 
 /// The phone library and account tab. Local media is useful immediately and
 /// remote profile data only enhances the header when it is available.
-class MyFlixQuestScreen extends StatefulWidget {
-  const MyFlixQuestScreen({super.key});
+class LaravelMyFlixQuestScreen extends StatefulWidget {
+  const LaravelMyFlixQuestScreen({super.key});
 
   @override
-  State<MyFlixQuestScreen> createState() => _MyFlixQuestScreenState();
+  State<LaravelMyFlixQuestScreen> createState() => _MyFlixQuestScreenState();
 }
 
-class _MyFlixQuestScreenState extends State<MyFlixQuestScreen> {
-  User? _user;
+class _MyFlixQuestScreenState extends State<LaravelMyFlixQuestScreen> {
+  AppUser? _user;
 
   @override
   void initState() {
     super.initState();
     try {
-      _user = FirebaseAuth.instance.currentUser;
+      _user = AuthRuntime.session.user;
+      AuthRuntime.session.addListener(_onSessionChanged);
     } catch (_) {
       _user = null;
     }
@@ -83,6 +87,16 @@ class _MyFlixQuestScreenState extends State<MyFlixQuestScreen> {
       // My FlixQuest is an offline-first surface. A stale local section is
       // preferable to an error replacing the whole page.
     }
+  }
+
+  void _onSessionChanged() {
+    if (mounted) setState(() => _user = AuthRuntime.session.user);
+  }
+
+  @override
+  void dispose() {
+    AuthRuntime.session.removeListener(_onSessionChanged);
+    super.dispose();
   }
 
   @override
@@ -225,7 +239,7 @@ class _MyFlixQuestScreenState extends State<MyFlixQuestScreen> {
 
   bool get _isSignedIn {
     final user = _user;
-    return user != null && !user.isAnonymous;
+    return user != null;
   }
 
   Future<void> _shareApp() async {
@@ -258,20 +272,11 @@ class _MyFlixQuestScreenState extends State<MyFlixQuestScreen> {
     await _signOut();
   }
 
-  /// Guests sign in by discarding the anonymous account, as the old profile
-  /// page did.
-  Future<void> _leaveGuestSession() async {
-    try {
-      await FirebaseAuth.instance.currentUser?.delete();
-    } catch (_) {
-      // A guest session can still be cleared locally when offline.
-    }
-    await _signOut();
-  }
+  /// Return local guests to the account landing page.
+  Future<void> _leaveGuestSession() => _signOut();
 
   Future<void> _signOut() async {
-    await FlixQuestAuthService.signOutGoogle();
-    await FirebaseAuth.instance.signOut();
+    await FlixQuestAuthService().signOut();
     if (!mounted) return;
     await AuthNavigationService.returnToSignedOutRoot(context);
   }
@@ -290,17 +295,17 @@ class _ProfileHeader extends StatelessWidget {
     required this.onSignIn,
   });
 
-  final User? user;
+  final AppUser? user;
   final VoidCallback onProfile;
   final VoidCallback onSignIn;
 
   @override
   Widget build(BuildContext context) {
     final user = this.user;
-    final guest = user == null || user.isAnonymous;
+    final guest = user == null;
     final fallback = _ProfileSnapshot(
       name: guest ? tr('guest') : _fallbackName(user),
-      photoUrl: guest ? '' : user.photoURL ?? '',
+      photoUrl: guest ? '' : user.photoUrl ?? '',
       profileId: 0,
     );
     if (guest) {
@@ -312,50 +317,22 @@ class _ProfileHeader extends StatelessWidget {
         onAction: onSignIn,
       );
     }
-    return StreamBuilder<_ProfileSnapshot>(
-      initialData: fallback,
-      stream: _profileUpdates(user.uid, fallback),
-      builder: (context, snapshot) => _ProfileHeaderContent(
-        profile: snapshot.data ?? fallback,
-        status: tr('signed_in'),
-        actionLabel: tr('profile'),
-        actionIcon: PhosphorIcons.user(),
-        onAction: onProfile,
-      ),
+    return _ProfileHeaderContent(
+      profile: _ProfileSnapshot(name: user.name, photoUrl: user.photoUrl ?? '', profileId: user.profileId),
+      status: tr('signed_in'), actionLabel: tr('profile'),
+      actionIcon: PhosphorIcons.user(), onAction: onProfile,
     );
   }
 
-  static String _fallbackName(User user) {
-    final displayName = user.displayName?.trim();
-    if (displayName != null && displayName.isNotEmpty) return displayName;
-    final email = user.email ?? '';
+  static String _fallbackName(AppUser user) {
+    final displayName = user.name.trim();
+    if (displayName.isNotEmpty) return displayName;
+    final email = user.email;
     final localPart = email.split('@').first.trim();
     return localPart.isEmpty ? tr('not_available') : localPart;
   }
 
-  Stream<_ProfileSnapshot> _profileUpdates(
-    String uid,
-    _ProfileSnapshot fallback,
-  ) async* {
-    try {
-      await for (final document in FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .snapshots()) {
-        final data = document.data();
-        if (data == null) continue;
-        yield _ProfileSnapshot(
-          name: data['name']?.toString().trim().isNotEmpty == true
-              ? data['name'].toString()
-              : fallback.name,
-          photoUrl: data['photoUrl']?.toString() ?? fallback.photoUrl,
-          profileId: data['profileId'] ?? fallback.profileId,
-        );
-      }
-    } catch (_) {
-      // Keep the Firebase Auth fallback when profile metadata is unavailable.
-    }
-  }
+
 }
 
 class _ProfileHeaderContent extends StatelessWidget {
@@ -521,4 +498,11 @@ class _DownloadSummaryRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class MyFlixQuestScreen extends StatelessWidget {
+  const MyFlixQuestScreen({super.key});
+  @override
+  Widget build(BuildContext context) => AuthRuntime.enabled
+      ? const LaravelMyFlixQuestScreen() : const legacy.MyFlixQuestScreen();
 }

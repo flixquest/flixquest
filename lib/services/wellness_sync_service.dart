@@ -1,3 +1,4 @@
+import '../presentation/session/auth_runtime.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -60,7 +61,7 @@ class WellnessSyncService {
   final ValueNotifier<DateTime?> lastSynced = ValueNotifier<DateTime?>(null);
 
   User? get currentUser => _auth.currentUser;
-  bool get canSync => currentUser != null && !currentUser!.isAnonymous;
+  bool get canSync => !AuthRuntime.enabled && currentUser != null && !currentUser!.isAnonymous;
   String? get currentUid => canSync ? currentUser!.uid : null;
 
   /// Pulls sessions other devices wrote since the last pull, then pushes this

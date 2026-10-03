@@ -1,3 +1,4 @@
+import '../presentation/session/auth_runtime.dart';
 import 'dart:async';
 import 'dart:math';
 
@@ -30,6 +31,7 @@ class WellnessProvider extends ChangeNotifier {
       WellnessDatabaseController.instance;
   late final WellnessSyncService _syncService;
   StreamSubscription<User?>? _authSubscription;
+  ValueListenable<String?>? _laravelOwner;
   Timer? _syncDebounce;
   DateTime? _pushDueAt;
   String? _lastAutoSyncOwner;
@@ -69,11 +71,33 @@ class WellnessProvider extends ChangeNotifier {
     _syncService = WellnessSyncService(database: _database);
     _syncService.status.addListener(notifyListeners);
     _syncService.lastSynced.addListener(notifyListeners);
+    if (AuthRuntime.enabled) {
+      await _applyUser(null, sync: false);
+      return;
+    }
     await _applyUser(FirebaseAuth.instance.currentUser, sync: false);
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen(
           (user) => unawaited(_applyUser(user)),
         );
     if (canSync) unawaited(_autoSync());
+  }
+
+  Future<void> bindLaravelOwner(ValueListenable<String?> owner) async {
+    _laravelOwner?.removeListener(_onLaravelOwner);
+    _laravelOwner = owner;
+    owner.addListener(_onLaravelOwner);
+    await _applyLaravelOwner();
+  }
+
+  void _onLaravelOwner() => unawaited(_applyLaravelOwner());
+
+  Future<void> _applyLaravelOwner() async {
+    _syncDebounce?.cancel();
+    _ownerId = _laravelOwner?.value ?? guestOwnerId;
+    _guestMergeDismissed = false;
+    await reload();
+    _hasGuestHistory = await _database.ownerSessionCount(guestOwnerId) > 0;
+    notifyListeners();
   }
 
   String _newDeviceId() {
@@ -130,7 +154,10 @@ class WellnessProvider extends ChangeNotifier {
   Future<void> reload() async {
     _loading = true;
     notifyListeners();
-    _sessions = await _database.sessionsForOwner(_ownerId);
+    final owner = _ownerId;
+    final sessions = await _database.sessionsForOwner(owner);
+    if (owner != _ownerId) return;
+    _sessions = sessions;
     _loading = false;
     notifyListeners();
   }
@@ -210,7 +237,7 @@ class WellnessProvider extends ChangeNotifier {
       _sessions = await _database.sessionsForOwner(_ownerId);
       notifyListeners();
     }
-    if (ownerAtWrite.startsWith('user:')) {
+    if (canSync && ownerAtWrite.startsWith('user:')) {
       _schedulePush(syncImmediately ? _urgentPushDelay : _routinePushDelay);
     }
   }
@@ -269,6 +296,7 @@ class WellnessProvider extends ChangeNotifier {
   void dispose() {
     _syncDebounce?.cancel();
     _authSubscription?.cancel();
+    _laravelOwner?.removeListener(_onLaravelOwner);
     _syncService.status.removeListener(notifyListeners);
     _syncService.lastSynced.removeListener(notifyListeners);
     super.dispose();

@@ -1,3 +1,7 @@
+import 'services/local_account_data.dart';
+import 'presentation/session/auth_runtime.dart';
+import 'presentation/session/session_view_model.dart';
+import 'services/auth_session_controller.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:provider/provider.dart';
@@ -160,8 +164,10 @@ Future<DevicePresentation> appInitialize({
   await appDependencyProvider.getTmdbProxy();
   await appDependencyProvider.getUpdateConfiguration();
 
-  await BookmarkSyncService.instance.init();
-  await RecentlyWatchedSyncService.instance.init();
+  if (!AuthRuntime.enabled) {
+    await BookmarkSyncService.instance.init();
+    await RecentlyWatchedSyncService.instance.init();
+  }
 
   return devicePresentation;
 }
@@ -169,7 +175,19 @@ Future<DevicePresentation> appInitialize({
 void main() async {
   final devicePresentation = await appInitialize();
   HttpOverrides.global = MyHttpOverrides();
-  final injector = await buildInjector();
+  final injector = await buildInjector(deleteLocalData: (owner) async {
+    await LocalAccountData.delete(owner);
+    await bookmarkProvider.fetchBookmarks();
+    await recentProvider.fetchMovies();
+    await recentProvider.fetchEpisodes();
+    await wellnessProvider.reload();
+  });
+  AuthRuntime.configure(injector.session, enabled: injector.migrationFlags.auth);
+  if (AuthRuntime.enabled) {
+    await injector.session.restore();
+    AuthSessionController.instance.initialize();
+    await wellnessProvider.bindLaravelOwner(injector.session.ownerId);
+  }
   NetworkRuntime.configure(publicDio: injector.publicDio,
       httpCache: injector.httpCache, tmdb: injector.tmdbRepository);
   Timer.run(() => unawaited(injector.httpCache.pruneExpired().catchError((Object _) {})));
@@ -181,7 +199,7 @@ void main() async {
     ),
   );
   await MediaLinkNavigationService.initialize();
-  runApp(Provider<AppInjector>.value(value: injector, child: EasyLocalization(
+  runApp(ChangeNotifierProvider<SessionViewModel>.value(value: injector.session, child: Provider<AppInjector>.value(value: injector, child: EasyLocalization(
     supportedLocales: Translation.all,
     path: 'assets/translations',
     fallbackLocale: Translation.all[0],
@@ -193,5 +211,5 @@ void main() async {
       appDependencyProvider: appDependencyProvider,
       devicePresentation: devicePresentation,
     ),
-  )));
+  ))));
 }

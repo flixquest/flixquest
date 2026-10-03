@@ -1,3 +1,4 @@
+import '../presentation/session/auth_runtime.dart';
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -100,7 +101,7 @@ class RecentlyWatchedSyncService {
   StreamSubscription<User?>? _authSubscription;
 
   User? get currentUser => _auth.currentUser;
-  bool get canSync => currentUser != null && !currentUser!.isAnonymous;
+  bool get canSync => !AuthRuntime.enabled && currentUser != null && !currentUser!.isAnonymous;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();

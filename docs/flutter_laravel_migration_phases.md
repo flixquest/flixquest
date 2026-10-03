@@ -2,7 +2,7 @@
 
 **Document Version:** 1.0
 **Branch:** `feat/laravel`
-**Status:** F0 implemented and verified against the measured baseline (2026-10-03); F1 implemented and automatically verified (2026-10-03), device smoke pending; F2–F8 pending
+**Status:** F0 implemented and verified against the measured baseline (2026-10-03); F1 implemented and automatically verified (2026-10-03), device smoke pending; F2 implemented and automatically verified (2026-10-03), staging/device smoke pending; F3–F8 pending
 **Sources of truth:**
 - `docs/migration_prd_firebase_to_laravel.md` (this repo)
 - `~/Documents/web/phplaravel/flixquest-backend` — backend + `docs/migration_phases.md` (Phases 1 & 3 complete)
@@ -567,42 +567,108 @@ Replace `firebase_auth` and the raw Firestore profile reads with Laravel Sanctum
 ### Milestones
 
 **F2.1 Data layer**
-- [ ] Freezed DTOs: `AppUser`, `AuthSession {token, user}`, `RegisterRequest`, `LoginRequest`, `UpdateProfileRequest`, `ChangePasswordRequest`, `ChangeEmailRequest`.
-- [ ] `data/sources/laravel_api.dart` — all auth/profile endpoints from §2; central envelope parsing; `Failure` mapping incl. `requires_password_setup`, 409 Google conflict, 403 disabled, 429 throttle with `Retry-After`.
-- [ ] `data/repositories/auth_repository.dart` — thin methods returning `Result<T>`.
-- [ ] Tests: repository contract with fixtures for every status above; token never logged.
+- [x] Freezed DTOs: `AppUser`, `AuthSession {token, user}`, `RegisterRequest`, `LoginRequest`, `UpdateProfileRequest`, `ChangePasswordRequest`, `ChangeEmailRequest`.
+- [x] `data/sources/laravel_api.dart` — all auth/profile endpoints from §2; central envelope parsing; `Failure` mapping incl. `requires_password_setup`, 409 Google conflict, 403 disabled, 429 throttle with `Retry-After`.
+- [x] `data/repositories/auth_repository.dart` — thin methods returning `Result<T>`.
+- [x] Tests: repository contract with fixtures for every status above; token never logged.
 
 **F2.2 Session**
-- [ ] `presentation/session/session_view_model.dart` — Freezed `SessionState {initializing, guest, authenticated(AppUser), expired}`.
+- [x] `presentation/session/session_view_model.dart` — Freezed `SessionState {initializing, guest, authenticated(AppUser), expired}`.
   - `restore()` at boot: token present → `GET /user/profile`; 401 → clear + guest.
   - `signIn`, `signUp` (then guest-data merge hook, wired in F5), `signInWithGoogle(accessToken)`, `signOut`, `deleteAccount`.
   - Persist token in `SecureTokenStore`; expose `ValueNotifier<String?>` for owner-key consumers.
-- [ ] `AuthInterceptor` attaches `Authorization: Bearer`; on 401 clears token and flips state to `expired` once (no retry storm).
-- [ ] Rebuild `AuthSessionController` as an adapter over `SessionViewModel` (`userId` ValueNotifier, `setAuthenticatedUserId` no-op shim) so untouched screens keep compiling.
-- [ ] Owner namespace decision: persisted owner id becomes `user:<laravelId>`; old `user:<firebaseUid>` local rows are left in place and handled by the F5 merge (never silently reused).
+- [x] `AuthInterceptor` attaches `Authorization: Bearer`; on 401 clears token and flips state to `expired` once (no retry storm).
+- [x] Rebuild `AuthSessionController` as an adapter over `SessionViewModel` (`userId` ValueNotifier, `setAuthenticatedUserId` no-op shim) so untouched screens keep compiling.
+- [x] Owner namespace decision: persisted owner id becomes `user:<laravelId>`; old `user:<firebaseUid>` local rows are left in place and handled by the F5 merge (never silently reused).
 
 **F2.3 Google Sign-In**
-- [ ] `google_sign_in` → `accessToken` (fallback `idToken`) → `POST /auth/google` `{access_token}`.
-- [ ] Handle 409 with a clear message: "This email already has a password account. Sign in with your password first." (backend does not auto-link).
-- [ ] Keep `GoogleSignIn.signOut()` on sign-out; remove `FirebaseAuthProvider` credential code.
-- [ ] Tests with a fake Google client.
+- [x] `google_sign_in` → `accessToken` (fallback `idToken`) → `POST /auth/google` `{access_token}`.
+- [x] Handle 409 with a clear message: "This email already has a password account. Sign in with your password first." (backend does not auto-link).
+- [x] Keep `GoogleSignIn.signOut()` on sign-out; remove `FirebaseAuthProvider` credential code.
+- [x] Tests with a fake Google client.
 
 **F2.4 Screens (phone + TV)**
-- [ ] Phone: `landing_screen.dart`, `login_screen.dart`, `signup_screen.dart`, `forgot_password.dart`, `password_change.dart`, `email_change.dart`, `delete_account.dart`, `edit_profile.dart`, `sync_screen.dart`, `my_flixquest_screen.dart`, `user_state.dart`/`auth_navigation_service.dart` wiring.
-- [ ] TV: `tv_landing_screen.dart`, `tv_auth_screen.dart`, `tv_profile_screen.dart`.
-- [ ] Replace every raw Firestore `users` read (`edit_profile`, `email_change`, `delete_account`, `tv_profile_screen`, `my_flixquest_screen`) with `SessionViewModel`/`AuthRepository`.
-- [ ] Forgot password uses `POST /auth/forgot-password`; the email links to the backend web form — no in-app token screen is needed.
-- [ ] Username availability uses `GET /users/check-username`.
-- [ ] Delete account: `DELETE /user/account` + local wipe (existing local wipe logic reused).
-- [ ] Remove `FirebaseAuth` imports from all touched screens; `firebase_auth` stays in `pubspec.yaml` until F7.
-- [ ] Widget tests: login success/401, signup username taken, forgot flow, expired session routes to landing, TV auth smoke, guest browse.
+- [x] Phone: `landing_screen.dart`, `login_screen.dart`, `signup_screen.dart`, `forgot_password.dart`, `password_change.dart`, `email_change.dart`, `delete_account.dart`, `edit_profile.dart`, `sync_screen.dart`, `my_flixquest_screen.dart`, `user_state.dart`/`auth_navigation_service.dart` wiring.
+- [x] TV: `tv_landing_screen.dart`, `tv_auth_screen.dart`, `tv_profile_screen.dart`.
+- [x] Replace every raw Firestore `users` read (`edit_profile`, `email_change`, `delete_account`, `tv_profile_screen`, `my_flixquest_screen`) with `SessionViewModel`/`AuthRepository`.
+- [x] Forgot password uses `POST /auth/forgot-password`; the email links to the backend web form — no in-app token screen is needed.
+- [x] Username availability uses `GET /users/check-username`.
+- [x] Delete account: `DELETE /user/account` + local wipe (existing local wipe logic reused).
+- [x] Remove `FirebaseAuth` imports from all touched screens; `firebase_auth` stays in `pubspec.yaml` until F7.
+- [x] Widget tests: login success/401, signup username taken, forgot flow, expired session routes to landing, TV auth smoke, guest browse.
 
 **F2.5 Backend-first verification**
 - [ ] On staging, log in with a migrated Firebase-Scrypt account; confirm `users.password` became `$2y$…` after first login and the second login is Bcrypt (backend Pest already covers this; the client test proves the request shape).
-- [ ] Confirm 401 from a revoked token (password change) routes the app to landing.
+- [x] Confirm 401 from a revoked token (password change) routes the app to landing.
 
 ### Exit criteria
 No `firebase_auth` or Firestore-profile call remains on the auth/profile/TV paths; sessions persist across restarts; expired tokens log out cleanly; suite green.
+
+### F2 verification report — 2026-10-03
+
+**Branch:** `feat/laravel-f2-auth`, based on the user's committed F1. No commits,
+pushes, PRs, backend source changes or device interaction were performed.
+
+- Added typed auth requests/session, the Laravel auth repository, Google token
+  exchange, secure token persistence, profile persistence, and a shared session
+  gate for phone and TV. Account endpoints explicitly bypass HTTP caching.
+- Boot validates a stored token against `/user/profile`; an offline boot can use
+  only the profile matching its persisted Laravel owner. Guest browsing requires
+  no request or anonymous account. Owners use `user:<laravelId>`.
+- Protected 401 responses expire the session once and dismiss account routes.
+  Public login failures do not expire a current session. Revision checks prevent
+  late storage reads, writes, logout responses, or old-token rejections from
+  overwriting a newer login. Password changes clear the revoked session;
+  email changes retain it, matching the actual backend contract.
+- Migrated the specified phone/TV auth and profile routes. Username checks and
+  password-reset emails use Laravel. Profile editing uses `AppUser` and updates
+  the mounted account header. Account deletion wipes local libraries and the
+  deleted Laravel owner's wellness rows, then reloads the providers.
+- Preserved all 15 original auth/profile files under `lib/legacy/firebase_auth/`;
+  verified their bodies match F1 exactly apart from imports. Public routes choose
+  them when the auth flag is off. With Laravel auth enabled, Firebase sync cannot
+  run; libraries remain local until F5. Legacy Firebase and guest wellness rows
+  stay separate and are not silently merged into Laravel owners.
+
+| Verification | Result |
+|---|---|
+| New F2 tests | 7 files; 70/70 passing (including 8 widget flows) |
+| Final analysis | 0 issues |
+| Full suite | 119 files; 904 passing / the same 2 existing failures (906 executed) |
+| Herd backend auth tests | 29/29; 128 assertions, including first Scrypt login → Bcrypt and second login |
+| Backend account/reset compatibility tests | 42/42; 212 assertions across `MigrationReadinessTest`, `MobileCompatibilityTest`, and `PasswordResetTest` |
+| Live Herd read-only checks | username availability 200; unauthenticated profile 401 |
+| Generated files | 5 new Freezed/JSON files; all 10 pre-existing generated files unchanged |
+| Diff whitespace check | clean |
+
+The existing failures remain `player_menu_route_test.dart` (episodes route) and
+`subtitle_options_test.dart` (incoming subtitle order). Neither file was modified,
+skipped or weakened. The backend tests use the configured isolated SQLite
+in-memory test database; no real accounts were created or changed.
+
+F2's automated implementation is complete. The migrated-account staging login
+and phone/TV device checks remain pending; no staging credentials were provided.
+The fake Google plugin verifies access-token preference, ID-token fallback,
+cancellation, and logout; an actual Google login still needs device verification.
+The backend's Socialite exchange expects an OAuth access token, so the ID-token
+fallback has only been verified at the client request boundary.
+
+User-run smoke (no device access by the agent):
+
+1. Start a phone/TV build with `--dart-define=FLIXQUEST_MIGRATION=auth` and
+   `--dart-define=LARAVEL_API_URL=<reachable backend URL>`. Herd's local `.test`
+   hostname needs a reachable host/network address on a physical device.
+2. Sign in with a migrated account; verify the backend password becomes `$2y$…`
+   after the first login and confirm the second login. Close/relaunch the app and
+   confirm the session restores. Check Google sign-in and the password-account
+   conflict message on a supported device.
+3. Edit the profile and email, send a password-reset email, and complete its
+   backend web form. Change the password and confirm the app returns to landing.
+   Check local guest browsing offline. Use a disposable account for deletion.
+4. Restart with `auth` removed from the migration flag and verify Firebase
+   rollback. Cloud sync under Laravel remains unavailable until F5.
+
+Work stops at F2; F3 config bootstrap is the next phase.
 
 ### Rollback
 `migration_flags.auth` off → old Firebase auth path still present until F7 (do not delete Firebase auth code in F2; delete in F7).

@@ -1,30 +1,29 @@
+import '../../legacy/firebase_auth/screens/user/signup_screen.dart' as legacy;
+import 'package:flixquest/presentation/session/auth_runtime.dart';
+import 'package:flixquest/services/flixquest_auth_service.dart';
 // ignore_for_file: use_build_context_synchronously
-import '/functions/function.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import '/constants/app_constants.dart';
 import '/models/profile_image_list.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/globle_method.dart';
-import '../../services/flixquest_auth_service.dart';
 import '../../services/auth_navigation_service.dart';
-import '../../services/bookmark_sync_service.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../mobile/widgets/account_form.dart';
 
-class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+class LaravelSignupScreen extends StatefulWidget {
+  const LaravelSignupScreen({super.key});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  State<LaravelSignupScreen> createState() => _SignupScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+class _SignupScreenState extends State<LaravelSignupScreen> {
   final FocusNode _emailFocusNode = FocusNode();
   final FocusNode _usernameFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
@@ -59,23 +58,6 @@ class _SignupScreenState extends State<SignupScreen> {
     FocusScope.of(context).unfocus();
     if (!isValid) return;
 
-    if (!await checkConnection()) {
-      if (mounted) {
-        GlobalMethods.showCustomScaffoldMessage(
-          SnackBar(
-            content: Text(
-              tr('check_connection'),
-              maxLines: 3,
-              style: kTextSmallBodyStyle,
-            ),
-            duration: const Duration(seconds: 3),
-          ),
-          context,
-        );
-      }
-      return;
-    }
-
     if (!mounted) return;
     _formKey.currentState!.save();
     setState(() => _isLoading = true);
@@ -89,15 +71,14 @@ class _SignupScreenState extends State<SignupScreen> {
         verified: _isUserVerified,
       );
       if (!mounted) return;
-      BookmarkSyncService.instance.autoSyncIfSignedIn();
       Provider.of<SettingsProvider>(context, listen: false)
           .analytics
           .trackSignup();
       await AuthNavigationService.returnToAppRoot(
         context,
-        authenticatedUserId: credential.user!.uid,
+        authenticatedUserId: credential.user.id.toString(),
       );
-    } on FirebaseAuthException catch (error) {
+    } on AuthActionException catch (error) {
       if (!mounted) return;
       if (error.code == 'weak-password') {
         _globalMethods.authErrorHandle(tr('weak_password'), context);
@@ -113,7 +94,7 @@ class _SignupScreenState extends State<SignupScreen> {
         _globalMethods.authErrorHandle(tr('check_connection'), context);
       } else {
         _globalMethods.authErrorHandle(
-          error.message ?? tr('error_occured'),
+          error.message,
           context,
         );
       }
@@ -342,4 +323,11 @@ class _SignupScreenState extends State<SignupScreen> {
       ],
     );
   }
+}
+
+class SignupScreen extends StatelessWidget {
+  const SignupScreen({super.key});
+  @override
+  Widget build(BuildContext context) => AuthRuntime.enabled
+      ? const LaravelSignupScreen() : const legacy.SignupScreen();
 }

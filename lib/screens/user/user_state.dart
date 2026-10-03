@@ -1,3 +1,5 @@
+import '../../presentation/session/auth_runtime.dart';
+import '../../presentation/session/session_gate.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -63,18 +65,18 @@ class _UserStateState extends State<UserState> {
     }
 
     final authSession = AuthSessionController.instance..initialize();
-    return AuthStateRouter(
-      userIdListenable: authSession.userId,
-      builder: (context, isAuthenticated) {
-        final previewTvHome =
-            widget.devicePresentation == DevicePresentation.television &&
-                TvDebugOptions.previewHomeShell;
-        return presentationShellFor(
-          devicePresentation: widget.devicePresentation,
-          isAuthenticated: isAuthenticated || previewTvHome,
-        );
-      },
-    );
+    Widget shell(BuildContext context, bool isAuthenticated) {
+      final previewTvHome =
+          widget.devicePresentation == DevicePresentation.television &&
+              TvDebugOptions.previewHomeShell;
+      return presentationShellFor(
+        devicePresentation: widget.devicePresentation,
+        isAuthenticated: isAuthenticated || previewTvHome,
+      );
+    }
+    return AuthRuntime.enabled
+        ? SessionGate(session: AuthRuntime.session, builder: shell)
+        : AuthStateRouter(userIdListenable: authSession.userId, builder: shell);
   }
 }
 
