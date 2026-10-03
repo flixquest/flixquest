@@ -1,0 +1,7 @@
+{
+  "success": false,
+  "message": "Clock skew detected.",
+  "error": "clock_skew_detected",
+  "server_time_utc": 1700000000000,
+  "max_drift_ms": 86400000
+}

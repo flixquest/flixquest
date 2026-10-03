@@ -1,0 +1,21 @@
+{
+  "success": true,
+  "ads": [
+    {
+      "id": "1",
+      "key": "nordvpn_summer",
+      "name": "NordVPN Summer Campaign",
+      "imageUrl": "https://cdn.flixquest.app/ads/nordvpn.png",
+      "targetUrl": "https://nordvpn.com/flixquest",
+      "altText": "NordVPN discount banner",
+      "shape": "rectangle",
+      "aspectRatio": 2.2,
+      "width": 320.5,
+      "height": 50.0,
+      "placements": [
+        "home_movies",
+        "movie_detail"
+      ]
+    }
+  ]
+}

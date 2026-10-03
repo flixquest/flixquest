@@ -1,0 +1,17 @@
+{
+  "id": 7,
+  "name": "Beamlak Aschalew",
+  "fullName": "Beamlak Aschalew",
+  "email": "beamlak@example.com",
+  "username": "beamlak",
+  "profileId": 1,
+  "profile_id": 1,
+  "photoUrl": null,
+  "photo_url": null,
+  "provider": "email",
+  "isVerified": false,
+  "verified": false,
+  "joinedAt": "2026-10-03T09:00:00.000000Z",
+  "createdAt": "2026-10-03T09:00:00.000000Z",
+  "updatedAt": "2026-10-03T09:00:00.000000Z"
+}

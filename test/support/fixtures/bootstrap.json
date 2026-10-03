@@ -1,0 +1,48 @@
+{
+  "success": true,
+  "data": {
+    "features": {
+      "enable_stream": true,
+      "enable_download": true,
+      "enable_live_tv": true,
+      "enable_ott": true
+    },
+    "branding": {
+      "app_logo_url": "",
+      "cinemax_logo": "default"
+    },
+    "updates": {
+      "forced_update": false,
+      "latest_version": "4.2.0",
+      "latest_build_number": 5,
+      "min_build_number": 1,
+      "app_download_url": "https://flixquest.app/download",
+      "change_log": ""
+    },
+    "network": {
+      "flixquest_api_instances": [
+        "https://scraper-1.flixquest.app"
+      ],
+      "flixquest_api_url_v2": "https://scraper-1.flixquest.app",
+      "tmdb_api_key": "sanitized-key",
+      "tmdb_proxy": ""
+    },
+    "ads": {
+      "banner_ad_network": "native",
+      "unity_game_id_android": "",
+      "unity_banner_placement_id": "Banner_Android",
+      "unity_test_mode": false
+    },
+    "banners": [],
+    "occasional_theme": {
+      "schema_version": 2,
+      "enabled": true,
+      "allow_user_selection": true,
+      "effects_enabled": true,
+      "allow_user_effects_toggle": true,
+      "default_theme_id": "",
+      "active_theme_id": "",
+      "themes": []
+    }
+  }
+}

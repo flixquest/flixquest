@@ -9,6 +9,8 @@
 # packages, and plugins designed to encourage good coding practices.
 analyzer:
   exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
     - build/**
     - android/**
 include: package:flutter_lints/flutter.yaml
