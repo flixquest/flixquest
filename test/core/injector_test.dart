@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:dio_cache_interceptor/dio_cache_interceptor.dart' hide CachePolicy;
 import 'package:flixquest/core/config/app_environment.dart';
 import 'package:flixquest/core/di/injector.dart';
 import 'package:flixquest/core/storage/kv_store.dart';
@@ -23,6 +24,7 @@ void main() {
     final injector = await buildInjector(
       environment:
           AppEnvironment.resolve(defineUrl: 'https://backend.example/api/v1'),
+      responseCacheStore: MemCacheStore(),
       kvStore: store,
       tokenStore: tokens,
       publicDio: publicDio,
@@ -46,6 +48,7 @@ void main() {
     final clock = FakeServerClock();
     final injector = await buildInjector(
       environment: AppEnvironment.resolve(defineUrl: 'http://localhost:8000'),
+      responseCacheStore: MemCacheStore(),
       kvStore: FakeKvStore(),
       tokenStore: FakeSecureTokenStore(),
       serverClock: clock,

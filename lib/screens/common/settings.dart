@@ -1,3 +1,4 @@
+import '../../core/network/network_runtime.dart';
 import 'dart:io';
 import 'package:flixquest/models/app_colors.dart';
 import 'package:flixquest/models/default_home.dart';
@@ -332,6 +333,7 @@ class _SettingsState extends State<Settings> {
                       label: tr('clear'),
                       icon: PhosphorIcons.eraser(),
                       onPressed: () async {
+                        await NetworkRuntime.httpCache.clearAll();
                         await clearCache().then((value) {
                           if (!context.mounted) {
                             return;

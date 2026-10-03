@@ -3,7 +3,10 @@ import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+
+import '../core/cache/cache_policy.dart';
+import '../core/network/network_runtime.dart';
 import 'package:provider/provider.dart';
 import 'package:xml/xml.dart';
 
@@ -117,7 +120,6 @@ class _SafeRemoteSvg extends StatefulWidget {
 
 class _SafeRemoteSvgState extends State<_SafeRemoteSvg> {
   static const _maximumLogoBytes = 1024 * 1024;
-  static final Map<Uri, Future<String?>> _cache = <Uri, Future<String?>>{};
   late Future<String?> _svg;
 
   @override
@@ -133,23 +135,17 @@ class _SafeRemoteSvgState extends State<_SafeRemoteSvg> {
   }
 
   void _load() {
-    final uri = widget.uri;
-    _svg = _cache.putIfAbsent(uri, () {
-      final request = _fetchSvg(uri);
-      request.then((value) {
-        if (value == null && identical(_cache[uri], request)) {
-          _cache.remove(uri);
-        }
-      });
-      return request;
-    });
+    _svg = _fetchSvg(widget.uri);
   }
 
   static Future<String?> _fetchSvg(Uri uri) async {
     try {
-      final response = await http.get(uri).timeout(const Duration(seconds: 12));
-      if (response.statusCode < 200 || response.statusCode >= 300) return null;
-      final bytes = response.bodyBytes;
+      final response = await NetworkRuntime.publicDio.get<List<int>>(uri.toString(),
+          options: Options(responseType: ResponseType.bytes,
+            receiveTimeout: const Duration(seconds: 12),
+            extra: {'cachePolicy': CachePolicy.logo}));
+      if ((response.statusCode ?? 0) < 200 || (response.statusCode ?? 0) >= 300) return null;
+      final bytes = response.data ?? const <int>[];
       if (bytes.isEmpty || bytes.length > _maximumLogoBytes) return null;
       final source = utf8.decode(bytes, allowMalformed: false).trim();
       return isValidRemoteLogoSvg(source) ? source : null;

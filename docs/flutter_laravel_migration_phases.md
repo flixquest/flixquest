@@ -2,7 +2,7 @@
 
 **Document Version:** 1.0
 **Branch:** `feat/laravel`
-**Status:** F0 implemented and verified against the measured baseline (2026-10-03); F1–F8 pending
+**Status:** F0 implemented and verified against the measured baseline (2026-10-03); F1 implemented and automatically verified (2026-10-03), device smoke pending; F2–F8 pending
 **Sources of truth:**
 - `docs/migration_prd_firebase_to_laravel.md` (this repo)
 - `~/Documents/web/phplaravel/flixquest-backend` — backend + `docs/migration_phases.md` (Phases 1 & 3 complete)
@@ -465,40 +465,94 @@ Every TMDB metadata call and every cache-safe scraper call goes through one Dio 
 ### Milestones
 
 **F1.1 Dio foundation**
-- [ ] `core/network/dio_factory.dart`: `createPublicDio(...)` and `createLaravelDio(...)`.
-- [ ] `HeaderInterceptor` (Accept, gzip, platform UA), `RetryInterceptor` (GET + idempotent only; 2 retries; 300 ms × 2ⁿ; gives up on 4xx), `LoggingInterceptor` (debug builds only, redacts tokens), `ErrorInterceptor` (`DioException` → `Failure`).
-- [ ] `TmdbProxyInterceptor` — centralizes the current `?destination=$proxyUrl` logic from `lib/functions/network.dart`; applies only to TMDB hosts.
-- [ ] Keep the existing `retryOptions` behavior semantics (`SocketException`/`TimeoutException` retried).
+- [x] `core/network/dio_factory.dart`: `createPublicDio(...)` and `createLaravelDio(...)`.
+- [x] `HeaderInterceptor` (Accept, gzip, platform UA), `RetryInterceptor` (GET + idempotent only; 2 retries; 300 ms × 2ⁿ; gives up on 4xx), `LoggingInterceptor` (debug builds only, redacts tokens), `ErrorInterceptor` (`DioException` → `Failure`).
+- [x] `TmdbProxyInterceptor` — centralizes the current `?destination=$proxyUrl` logic from `lib/functions/network.dart`; applies only to TMDB hosts.
+- [x] Keep the existing `retryOptions` behavior semantics (`SocketException`/`TimeoutException` retried).
 
 **F1.2 Response cache**
-- [ ] `core/cache/cache_policy.dart` + `cache_policies.dart` (exact table in §1.6).
-- [ ] `core/cache/response_cache_store.dart` — sqflite `flixquest_http_cache_v1.db`, schema + migrations, memory LRU, `get/put/touch/evict/clearScope/clearAll/sizeBytes`, `pruneExpired()`.
-- [ ] `core/cache/cache_interceptor.dart` — fresh-hit, conditional revalidation, stale-serve-on-failure, `refreshStale` background mode, in-flight dedupe, cache-key normalization (sorted params, strip `api_key`/`destination`), `auth_scope`, and `extra['cache']` diagnostics.
-- [ ] Unit tests for store + interceptor with the fake adapter: fresh/stale/expired, ETag 304, offline fallback, non-GET bypass, error-status bypass, scope clearing, concurrent dedupe, API-key rotation, param-order normalization.
+- [x] `core/cache/cache_policy.dart` + `cache_policies.dart` (exact table in §1.6).
+- [x] `core/cache/response_cache_store.dart` — sqflite `flixquest_http_cache_v1.db`, schema + migrations, memory LRU, `get/put/touch/evict/clearScope/clearAll/sizeBytes`, `pruneExpired()`.
+- [x] `core/cache/cache_interceptor.dart` — fresh-hit, conditional revalidation, stale-serve-on-failure, `refreshStale` background mode, in-flight dedupe, cache-key normalization (sorted params, strip `api_key`/`destination`), `auth_scope`, and `extra['cache']` diagnostics.
+- [x] Unit tests for store + interceptor with the fake adapter: fresh/stale/expired, ETag 304, offline fallback, non-GET bypass, error-status bypass, scope clearing, concurrent dedupe, API-key rotation, param-order normalization.
 
 **F1.3 TMDB migration**
-- [ ] `data/sources/tmdb_api.dart` — `getJson(String url, {CachePolicy policy})` (URLs still built by `Endpoints`).
-- [ ] `data/repositories/tmdb_repository.dart` — thin wrapper used by `network.dart` and `catalog/*`.
-- [ ] Rewrite `lib/functions/network.dart` internals to delegate (public function signatures unchanged). All `fetchMovies/fetchTV/fetchGenre/...` call sites are automatically cached.
-- [ ] Route `lib/catalog/title_logos.dart` and `lib/widgets/app_logo.dart` through Dio + long TTL.
-- [ ] Tests: the second identical `fetchMovies` call hits cache (fake adapter called once); offline second call returns cached data; proxy still applied; `TMDB_API_KEY` rotation served from cache.
+- [x] `data/sources/tmdb_api.dart` — `getJson(String url, {CachePolicy policy})` (URLs still built by `Endpoints`).
+- [x] `data/repositories/tmdb_repository.dart` — thin wrapper used by `network.dart` and `catalog/*`.
+- [x] Rewrite `lib/functions/network.dart` internals to delegate (public function signatures unchanged). All `fetchMovies/fetchTV/fetchGenre/...` call sites are automatically cached.
+- [x] Route `lib/catalog/title_logos.dart` and `lib/widgets/app_logo.dart` through Dio + long TTL.
+- [x] Tests: the second identical `fetchMovies` call hits cache (fake adapter called once); offline second call returns cached data; proxy still applied; `TMDB_API_KEY` rotation served from cache.
 
 **F1.4 Scraper migration**
-- [ ] Refactor `video_providers/scraper_api.dart` onto Dio with per-endpoint policies. Stream/`stream-size` requests set `CachePolicy.noStore`.
-- [ ] `providers`, `providers/status`, `subtitles/search` cached per §1.6.
-- [ ] Tests: stream endpoints never cached; providers cached; 60 s stream timeout preserved; existing `test/scraper_api_test.dart` migrated to the Dio seam.
+- [x] Refactor `video_providers/scraper_api.dart` onto Dio with per-endpoint policies. Stream/`stream-size` requests set `CachePolicy.noStore`.
+- [x] `providers`, `providers/status`, `subtitles/search` cached per §1.6.
+- [x] Tests: stream endpoints never cached; providers cached; 60 s stream timeout preserved; existing `test/scraper_api_test.dart` migrated to the Dio seam.
 
 **F1.5 Cache management**
-- [ ] `HttpCache.pruneExpired()` at boot (idle).
-- [ ] Settings: optional "Clear cache (xx MB)" row. Keep it neutral (no accent) per `docs/codex_handover.md` §3.1.
-- [ ] Bounded cache: max 5 000 entries / 50 MB, LRU eviction.
+- [x] `HttpCache.pruneExpired()` at boot (idle).
+- [x] Existing Settings clear-cache action also clears HTTP responses. No additional size row was added (optional).
+- [x] Bounded cache: max 5 000 entries / 50 MB, LRU eviction.
 
 **F1.6 Verification**
-- [ ] Full suite green; `test/tv_*.dart` green.
+- [x] No new full-suite failures against the measured baseline; `test/tv_*.dart` green.
 - [ ] Manual: fetch Home, kill network, relaunch → cached rows render; Play still loads streams (uncached).
 
 ### Exit criteria
-No new network call bypasses Dio in touched files; TMDB and safe scraper GETs are served from a persistent cache with offline fallback; analyze 0; suite green.
+No new network call bypasses Dio in touched files; TMDB and safe scraper GETs are served from a persistent cache with offline fallback; analyze 0; no new failures against the measured suite baseline. Device smoke remains a user-run check.
+
+### F1 verification report — 2026-10-03
+
+**Branch:** `feat/laravel-f1-cache`, based on the user's committed F0. No commits,
+pushes, PRs, backend edits or device interaction were performed.
+
+- Selected `dio_cache_interceptor` for HTTP validation/serialization (D3).
+  FlixQuest adds the endpoint TTL registry, SQLite persistence, bounded memory LRU,
+  user namespaces, normalized keys, background refresh and shared in-flight GETs.
+- Wired the shared injector/Provider and legacy network bridge at boot. Phone and
+  TV use the same TMDB/scraper engine. Public TMDB function signatures and DTO
+  parsing remain compatible; title logos and validated remote SVGs use Dio.
+- Migrated all nine existing scraper tests and the existing logo/TV browse seams
+  to injected Dio, preserving their assertions. Streams/size requests bypass the
+  cache, with stream/subtitle timeouts preserved. Vix retains its original single
+  attempt; metadata gets the planned two retries instead of unbounded retries.
+- Added tests for fresh/stale/expired responses, ETag 304 (both Dio status paths),
+  offline fallback after SQLite reopen, API-key/proxy/query normalization,
+  non-GET/error/no-store bypass, user clearing, concurrent cancellation, background
+  refresh, in-flight clearing/retries, entry/byte bounds and LRU timestamp ties.
+- Herd smoke now also verifies automatic bootstrap revalidation returns the
+  cached JSON after Laravel's 304. No backend source changes are required.
+
+| Verification | Result |
+|---|---|
+| New F1 tests | 6 files; 45/45 passing |
+| Final analysis | 0 issues |
+| Final full suite | 112 files; 834 passing / the same 2 existing failures (836 executed) |
+| TV tests (`test/tv_*.dart`, within full suite) | 129/129 passing |
+| Live Herd smoke | 1/1 passing, including automatic bootstrap ETag revalidation |
+| Repeated `build_runner` | 0 outputs; all 10 tracked generated files unchanged from F0 HEAD |
+| Diff whitespace check | clean |
+
+The two existing failures remain `player_menu_route_test.dart` (episodes route)
+and `subtitle_options_test.dart` (incoming subtitle order). Neither file was
+modified, skipped or weakened. A playback-loader layout test now uses its existing
+fake-ad seam so the newly asynchronous Dio transport does not leave timers pending;
+all its layout assertions and test names are preserved.
+
+F1's automated implementation is complete. The device check below remains
+unchecked, and work stops at this phase boundary.
+
+User-run device smoke (no device access by the agent):
+
+1. After fetching dependencies, hot restart with **R**. Browse Home and title
+   details online on phone and TV.
+2. Disable networking, close/relaunch the app, and confirm previously visited
+   metadata renders from SQLite within the configured offline limit.
+3. Restore networking and play a movie/TV episode; confirm stream extraction still
+   runs. Use Settings → Clear cache, restart offline, and confirm HTTP rows have
+   been cleared.
+
+The deterministic offline/restart test verifies the persistence path; it does
+not claim this device smoke was performed. F2 auth is the next phase.
 
 ### Rollback
 Revert. Firebase paths are untouched in this phase.
@@ -998,7 +1052,7 @@ The scraper is a pure extraction service, matching the PRD Phase 2 objective.
 |---|---|---|---|
 | D1 | Freezed scope | Incremental: new DTOs + VM states + converted-on-touch models (§1.4) | F0 |
 | D2 | Crash reporting replacement | Sentry Flutter for crashes + Laravel `/telemetry/errors` for non-fatal breadcrumbs | F6 |
-| D3 | Cache implementation | Custom `CacheInterceptor` + sqflite store (no extra dependency; testable) — alternative `dio_cache_interceptor` | F1 |
+| D3 | Cache implementation | Selected `dio_cache_interceptor` for HTTP validation/serialization, with app policies and a bounded sqflite store | F1 |
 | D4 | Ads fetch strategy | One shared `GET /ads` + local placement filtering (matches today's `HostedAdsRepository`); `?placement=` remains available for server-side filtering if desired | F4 |
 | D5 | Sanctum token expiry | Keep never-expiring tokens + revocation on password/email change (current backend), or add `expiration` + refresh later | F2 |
 | D6 | Rollout switches | Compile-time `migration_flags` for development; single cutover release; no Firebase RC kill-switches in production | F0 |

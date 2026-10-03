@@ -16,8 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
+import 'support/callback_dio.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -505,9 +504,9 @@ void main() {
       language: 'en',
       proxyEnabled: false,
       proxyUrl: '',
-      client: MockClient((request) async {
-        requested.add(int.parse(request.url.pathSegments[2]));
-        return http.Response('{"logos": []}', 200);
+      dio: scriptedDio((request) async {
+        requested.add(int.parse(request.uri.pathSegments[2]));
+        return jsonResponse('{"logos": []}', 200);
       }),
     );
     final controller = await _pumpBrowse(tester, logos: logos);
@@ -789,9 +788,9 @@ void main() {
       language: 'en',
       proxyEnabled: false,
       proxyUrl: '',
-      client: MockClient((request) async {
-        requested.add(int.parse(request.url.pathSegments[2]));
-        return http.Response('{"logos": []}', 200);
+      dio: scriptedDio((request) async {
+        requested.add(int.parse(request.uri.pathSegments[2]));
+        return jsonResponse('{"logos": []}', 200);
       }),
     );
     final controller = await _pumpBrowse(tester, logos: logos);

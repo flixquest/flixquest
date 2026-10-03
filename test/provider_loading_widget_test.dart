@@ -1,4 +1,5 @@
 import 'package:flixquest/models/provider_load_state.dart';
+import 'package:flixquest/services/hosted_ads_repository.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/widgets/playback_loading_screen.dart';
 import 'package:flixquest/widgets/provider_loading_widget.dart';
@@ -10,6 +11,10 @@ import 'package:provider/provider.dart';
 void main() {
   setUpAll(() {
     dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://example.com');
+  });
+
+  setUp(() {
+    HostedAdsRepository.instance.useFetcherForTesting((_) async => const []);
   });
 
   testWidgets('fits the provider loader in a compact landscape viewport',

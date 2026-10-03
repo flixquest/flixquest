@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:dio_cache_interceptor/dio_cache_interceptor.dart' hide CachePolicy;
 import 'package:flixquest/core/config/app_environment.dart';
+import 'package:flixquest/core/cache/cache_policy.dart';
 import 'package:flixquest/core/di/injector.dart';
 import 'package:flixquest/data/models/api_error.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +18,7 @@ void main() {
     }
     final injector = await buildInjector(
       environment: AppEnvironment.resolve(defineUrl: url),
+      responseCacheStore: MemCacheStore(),
       kvStore: FakeKvStore(),
       tokenStore: FakeSecureTokenStore(),
     );
@@ -42,10 +45,15 @@ void main() {
       'config/bootstrap',
       options: Options(
         headers: {'If-None-Match': etag},
+        extra: {'cachePolicy': CachePolicy.noStore},
         validateStatus: (status) => status == 304,
       ),
     );
     expect(conditional.statusCode, 304);
+    final cachedBootstrap = await client.get<Map<String, dynamic>>('config/bootstrap');
+    expect(cachedBootstrap.statusCode, 200);
+    expect(cachedBootstrap.data, bootstrap.data);
+    expect(cachedBootstrap.extra['cache'], 'revalidated');
     final ads = await client.get<Map<String, dynamic>>('ads');
     expect(ads.data!['success'], isTrue);
     expect(ads.data!['ads'], isA<List>());

@@ -1,7 +1,7 @@
 # Flutter migration architecture
 
-F0 introduces the Laravel foundations without connecting them to `main.dart` or
-changing existing phone/TV providers. Cutovers belong to F1–F6. The implementation
+F0 supplies the Laravel foundations. F1 wires the injector into `main.dart` and
+migrates shared phone/TV networking and caching. Feature cutovers belong to F2–F6. The implementation
 plan is `docs/flutter_laravel_migration_phases.md`.
 
 ## Layers and dependency ownership
@@ -14,13 +14,49 @@ plan is `docs/flutter_laravel_migration_phases.md`.
 - `lib/presentation/`: Provider/ChangeNotifier ViewModels and Freezed UI states
   arrive with the features they own. Existing providers retain their public APIs.
 
-`await buildInjector()` returns one `AppInjector` for an app lifecycle. Later phases
-will expose that object with Provider and add repositories to it. Dependencies can
-be supplied at construction for tests; injected Dio clients transfer lifecycle
-ownership to the injector. Call `dispose()` when that lifecycle ends. Public and
-Laravel clients must be different instances. F0 configures timeouts/Accept/base URL;
-auth, retry, caching and logging interceptors belong to later phases. The SQLite
-response cache is F1 work; F0 does not introduce a placeholder cache engine.
+`await buildInjector()` returns one `AppInjector` for an app lifecycle, exposed by
+Provider above the phone/TV UI. Dependencies can be supplied for tests; injected
+Dio clients transfer lifecycle ownership to the injector. Await `dispose()` when
+that lifecycle ends. Public and Laravel clients must be separate instances.
+`NetworkRuntime` bridges existing top-level functions to these app-owned clients;
+standalone widgets/tests get a volatile cache until explicitly configured.
+
+Both clients use headers, GET retries (two, 300/600 ms), cache policies, debug-only
+logging and typed error mapping. Public requests apply the TMDB proxy centrally.
+Logs omit headers, query values and bodies. Authentication belongs to F2.
+
+## Response caching
+
+`dio_cache_interceptor` handles HTTP validation and response serialization. The
+app supplies endpoint policies, normalized keys, scope management, single-flight
+GET sharing, and `ResponseCacheStore`. SQLite stores responses in
+`flixquest_http_cache_v1.db`, bounded to 5,000 entries / 50 MiB of response bodies
+and headers; its memory LRU holds up to 300 entries / 16 MiB. Store failures cannot
+make a successful network response fail. If SQLite cannot open, the injector uses
+a volatile memory cache. `sqflite_common_ffi` is test-only.
+
+TMDB keys sort query parameters and omit API keys/proxy wrappers, retaining
+language/page/query values. Laravel cacheable requests with credentials must set
+`extra['authScope'] = 'user:<id>'`; requests without an owner bypass caching.
+The endpoint TTLs and offline limits are in `core/cache/cache_policies.dart` and
+the migration plan. `extra['cache']` reports `hit`, `miss`, `stale` or `revalidated`.
+Set `extra['refreshStale'] = true` to serve stale data while refreshing in the
+background. Reading a cache entry never extends its offline expiration deadline.
+
+Only eligible GET 200 responses persist. Streams, writes, error statuses,
+`no-store`, cookie-setting responses and `Vary: *` bypass storage. Errors from
+HTTP responses never use offline fallback; transport failures can use entries
+within their deadline. Clearing invalidates in-flight writes, including retries.
+`HttpCache.clearScope('tmdb'|'scraper'|'laravel'|'user'|'user:<id>')`, `clearAll()`
+and `sizeBytes()` provide management. Boot prunes expired entries at idle; the
+existing Settings clear-cache action also clears HTTP responses.
+
+Legacy `functions/network.dart` signatures delegate through `TmdbRepository`.
+Title logos use the same TMDB cache, and remote SVG logos use a long-lived bytes
+policy with XML validation retained. Raster image caching stays with
+`cached_network_image`. `ScraperApi(baseUrl, {Dio? dio})` uses this shared client:
+providers/health/subtitle searches cache; streams/size requests never do, with
+60-second streams and 45-second subtitle timeouts. Scraper ads stay until F4.
 
 ## Deployment configuration
 

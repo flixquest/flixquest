@@ -1,4 +1,8 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:provider/provider.dart';
+import 'core/di/injector.dart';
+import 'core/network/network_runtime.dart';
 import 'dart:ui' show PlatformDispatcher;
 import 'package:flixquest/flixquest_main.dart';
 import '../models/translation.dart';
@@ -165,6 +169,10 @@ Future<DevicePresentation> appInitialize({
 void main() async {
   final devicePresentation = await appInitialize();
   HttpOverrides.global = MyHttpOverrides();
+  final injector = await buildInjector();
+  NetworkRuntime.configure(publicDio: injector.publicDio,
+      httpCache: injector.httpCache, tmdb: injector.tmdbRepository);
+  Timer.run(() => unawaited(injector.httpCache.pruneExpired().catchError((Object _) {})));
   HomeWidgetNavigationService.configure(
     source: () => (
       language: settingsProvider.appLanguage,
@@ -173,7 +181,7 @@ void main() async {
     ),
   );
   await MediaLinkNavigationService.initialize();
-  runApp(EasyLocalization(
+  runApp(Provider<AppInjector>.value(value: injector, child: EasyLocalization(
     supportedLocales: Translation.all,
     path: 'assets/translations',
     fallbackLocale: Translation.all[0],
@@ -185,5 +193,5 @@ void main() async {
       appDependencyProvider: appDependencyProvider,
       devicePresentation: devicePresentation,
     ),
-  ));
+  )));
 }
