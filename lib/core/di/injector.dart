@@ -1,3 +1,4 @@
+import 'package:flixquest/data/repositories/ads_repository.dart';
 import 'package:flixquest/data/repositories/auth_repository.dart';
 import 'package:flixquest/data/repositories/config_repository.dart';
 import 'package:flixquest/data/sources/laravel_api.dart';
@@ -32,6 +33,7 @@ class AppInjector {
     required this.tmdbRepository,
     required this.authRepository,
     required this.configRepository,
+    required this.adsRepository,
     required this.session,
   });
 
@@ -47,10 +49,12 @@ class AppInjector {
 
   final AuthRepository authRepository;
   final ConfigRepository configRepository;
+  final AdsRepository adsRepository;
   final SessionViewModel session;
 
   Future<void> dispose() async {
     session.dispose();
+    await adsRepository.dispose();
     publicDio.close(force: true);
     laravelDio.close(force: true);
     await httpCache.close();
@@ -106,6 +110,7 @@ Future<AppInjector> buildInjector({
     tmdbRepository: TmdbRepository(TmdbApi(publicClient)),
     authRepository: auth,
     configRepository: ConfigRepository(laravelClient, preferences),
+    adsRepository: AdsRepository(laravelClient),
     session: session,
   );
 }

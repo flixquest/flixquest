@@ -9,6 +9,8 @@ class BannerAd {
     this.shape = 'rectangle',
     this.aspectRatio = 2.2,
     this.placements = const [],
+    this.width,
+    this.height,
   });
 
   final String key;
@@ -20,6 +22,8 @@ class BannerAd {
   final String shape;
   final double aspectRatio;
   final List<String> placements;
+  final double? width;
+  final double? height;
 
   /// Whether the backend targets this ad at [placement].
   ///

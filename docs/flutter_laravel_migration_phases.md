@@ -818,34 +818,107 @@ Work stops at F3; F4 ads cutover is the next phase.
 Serve all hosted banners from Laravel, track impressions/clicks, and delete the scraper `/ads` path — without losing a single revenue slot.
 
 ### Prerequisite (backend repo)
-- [ ] **G1:** extend `BannerPlacement` with every live client placement (list below) and add them to the Filament multi-select; deploy before the client switches.
+- [x] **G1:** extend `BannerPlacement` with every live client placement (list below) and add them to the Filament multi-select; deploy before the client switches.
   `home_all_hero`, `home_all_trending`, `home_all_genres`, `home_movies_hero`, `home_movies_trending`, `home_movies_genres`, `home_series_hero`, `home_series_trending`, `home_series_genres`, `movie_list`, `tv_list`, `streaming_movies`, `streaming_tv`, `movie_detail`, `tv_detail`, `season_detail`, `episode_detail`, `collection_detail`, `person_detail`, `bookmarks`, `downloads`, `new_and_hot`, `stream_loading`, `live_tv_top`, `live_tv_list_a`, `live_tv_list_b`, `live_tv_list_c`, `discover_movies`, `discover_tv`, `genre_movies`, `genre_tv`, plus TV tags `title_detail_tv`, `live_tv_strip_tv`.
-- [ ] Decide with the user whether to alias legacy `home_movies`/`home_tv` to the new `home_*_*` slots or keep both (recommend: keep both, priority-based).
+- [x] Compatibility policy: keep both sets (recommended assumption; no aliases). Legacy `home_movies`/`home_tv` campaigns remain separate from new `home_*_*` slots. Production deployment remains a rollout prerequisite.
 
 ### Milestones
 
 **F4.1 Ads data layer**
-- [ ] `BannerAdDto` Freezed; `AdsRepository` (one shared `GET /ads` fetch per app session, 5 min fresh / 24 h stale via cache; local `appliesTo` filtering unchanged, so one fetch serves every slot).
-- [ ] `reportImpression(id)` / `reportClick(id)` — fire-and-forget with an offline queue in SQLite (`ad_events`: id, ad_id, type, created_at, sent); flush at boot and on reconnect; drop events older than 7 days.
-- [ ] Tests: shared fetch, queue flush, dedupe impression per ad per screen view, click on tap, 404 tolerated.
+- [x] `BannerAdDto` Freezed; `AdsRepository` (one shared `GET /ads` fetch per app session, 5 min fresh / 24 h stale via cache; local `appliesTo` filtering unchanged, so one fetch serves every slot).
+- [x] `reportImpression(id)` / `reportClick(id)` — fire-and-forget with an offline queue in SQLite (`ad_events`: id, ad_id, type, created_at, sent); flush at boot and on reconnect; drop events older than 7 days.
+- [x] Tests: shared fetch, queue flush, dedupe impression per ad per screen view, click on tap, 404 tolerated.
 
 **F4.2 Widget refactor**
-- [ ] `HostedAdsRepository` delegates to `AdsRepository` (keep `useFetcherForTesting`); `RemoteHostedAdsBanner` behavior unchanged (carousel, `HostedBannerMode`, Start.io coexistence).
-- [ ] Add visibility-based impression (≥50% visible for ≥1 s, once per ad per mount) and click reporting in `HostedAdsBanner._open`.
-- [ ] Port `test/hosted_ads_coexistence_test.dart` and the placement-matching tests.
+- [x] `HostedAdsRepository` delegates to `AdsRepository` (keep `useFetcherForTesting`); `RemoteHostedAdsBanner` behavior unchanged (carousel, `HostedBannerMode`, Start.io coexistence).
+- [x] Add visibility-based impression (≥50% visible for ≥1 s, once per ad per mount) and click reporting in `HostedAdsBanner._open`.
+- [x] Port `test/hosted_ads_coexistence_test.dart` and the placement-matching tests.
 
 **F4.3 Scraper cleanup**
-- [ ] Delete `ScraperApi.getAds()` and its parsing code (`lib/video_providers/scraper_api.dart`).
-- [ ] Delete the scraper ads fixtures/references in this client repo; the scraper repo's `/ads` removal is backend Phase 2 (separate repo, coordinate).
-- [ ] Add a regression test that no `RemoteHostedAdsBanner` placement string is missing from a checked-in placement manifest (`lib/data/ads/placements.dart`), and a test that compares it to the backend enum values copied into `test/support/fixtures/banner_placements.json`.
+- [x] Delete `ScraperApi.getAds()` and its parsing code (`lib/video_providers/scraper_api.dart`).
+- [x] Remove active scraper ads references; retain the isolated flag-off rollback below. No scraper-specific ads fixture existed. The scraper repo's `/ads` removal is backend Phase 2 (separate repo, coordinate).
+- [x] Add a regression test that no `RemoteHostedAdsBanner` placement string is missing from a checked-in placement manifest (`lib/data/ads/placements.dart`), and a test that compares it to the backend enum values copied into `test/support/fixtures/banner_placements.json`.
 
 **F4.4 Verification**
 - [ ] Filament shows impression/click increments from a debug device.
 - [ ] Every placement renders its intended ad or nothing (never a broken slot); TV `_tv` tags still match.
-- [ ] `grep -rn "getAds" lib` returns nothing.
+- [x] `grep -rn "getAds" lib` returns nothing.
 
 ### Exit criteria
 Hosted ads come exclusively from Laravel; impressions/clicks recorded; placement manifest matches backend; scraper no longer serves ads from the client's perspective.
+
+### F4 implementation handover (2026-10-04)
+
+Implemented on `feat/laravel-f4-ads`; neither repository committed or pushed.
+The `ads` flag selects Laravel independently of `auth` and `config`. All slots
+share the unfiltered catalog; their existing placement matching, coexistence
+modes, carousel and TV interaction rules remain intact. The backend and client
+manifest contain 36 tags: 33 shipped placements plus three legacy tags.
+
+The SQLite queue records impressions/clicks before delivery, serializes flushes,
+retries at boot/reconnect/resume and on new events, expires rows after seven
+days, and acknowledges 404s for deleted campaigns. Throttling and server errors
+retain pending rows. Impressions require a loaded creative, at least 50%
+visibility for one continuous second, foreground/current-route eligibility,
+and deduplicate each ad for the carousel's mounted lifetime. API counters do
+not accept idempotency keys: an accepted request whose response is lost can
+be retried, so delivery is at least once rather than exactly once.
+
+The rollback requirement takes precedence over deleting every scraper reference:
+`ScraperApi.getAds()` and its import are removed, while the temporary fallback
+lives in `lib/legacy/scraper_ads_fetcher.dart` until F7. The existing `ads.json`
+is a Laravel fixture and is retained. The scraper repository is untouched.
+The original 18 coexistence/matching tests are preserved without changes.
+
+| Verification | Result |
+| --- | --- |
+| Flutter targeted checks | 48 passing (15 new F4 tests plus retained ads, scraper and injector coverage) |
+| Flutter analysis | No issues |
+| Full Flutter suite | 130 files; 950 passing / the same 2 existing failures (952 executed) |
+| Laravel complete suite | 223 passing / 1,082 assertions |
+| Laravel formatter | Pint completed |
+| Herd smoke | Catalog 200, empty-body 304, representative new Home/Live/TV tags 200 |
+| Cleanup | No `getAds` references in `lib`; no `test/_preview`; original 17 generated files unchanged |
+
+The two unchanged failures are `player_menu_route_test.dart` (episodes route
+from navigator overlay) and `subtitle_options_test.dart` (incoming subtitle
+order). No tests were deleted, skipped or weakened.
+
+Added client files: `lib/data/models/banner_ad_dto.dart` and its two generated
+parts; `lib/data/repositories/ads_repository.dart`; `lib/data/ads/{placements,
+ad_event_queue,ad_events_controller}.dart`; `lib/legacy/scraper_ads_fetcher.dart`;
+`lib/widgets/ad_impression_tracker.dart`; six test files and the placement JSON
+fixture. Changed client files: injector, both app entrypoints, `BannerAd`,
+`HostedAdsRepository`, `ScraperApi`, hosted banner widget, pubspec/lock and this
+plan. No files deleted.
+
+Changed backend files for F4: `BannerPlacement`, `BannerAdForm` and
+`BannerAdTest`; added `BannerPlacementCompatibilityTest` and the placement JSON
+fixture. Existing F3 backend changes and unrelated local files remain intact.
+No real campaigns or counters were created/modified, and no real database was
+seeded. Herd currently has zero active campaigns.
+
+User-run smoke remains pending (no device or UI preview by the agent):
+
+1. Deploy the backend placement/form updates first. In Filament, target a
+   campaign at the desired new Home/Live tags; TV requires `title_detail_tv`
+   or `live_tv_strip_tv`. Empty placement lists apply globally on handheld.
+2. Restart the Flutter run process with
+   `--dart-define=FLIXQUEST_MIGRATION=auth,config,ads` and
+   `--dart-define=LARAVEL_API_URL=<device-reachable backend URL>`. A full process
+   restart is necessary for the new connectivity plugin and changed defines;
+   **R** can be used for subsequent Dart-only edits. Herd's local `.test`
+   hostname usually does not resolve on physical devices.
+3. Keep a banner at least half visible for a second, then revisit it within
+   the same mount: its impression should increment once. Tap on handheld:
+   the click should increment and open the destination. Confirm TV displays
+   explicitly tagged campaigns with no tap/focus target.
+4. Go offline, generate events, close/relaunch, then reconnect; confirm pending
+   counters flush in Filament. Check every intended slot with an actual
+   campaign and verify empty/disabled slots preserve Start.io behavior.
+5. Remove `ads` from the migration flag and restart to verify rollback.
+
+Work stops at F4. F5 sync is not started.
 
 ### Rollback
 `migration_flags.ads` off restores the scraper fetcher (keep it until F7).

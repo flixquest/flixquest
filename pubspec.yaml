@@ -16,6 +16,7 @@ dependencies:
   carousel_slider: ^5.0.0
   clipboard: ^0.1.3
   cloud_firestore: ^6.8.0
+  connectivity_plus: ^6.1.5
   cupertino_icons: ^1.0.8
   device_info_plus: ^10.1.2
   dio: ^5.9.0
@@ -70,6 +71,7 @@ dependencies:
   sqflite: ^2.4.0
   startapp_sdk: ^1.0.1
   url_launcher: ^6.3.2
+  visibility_detector: ^0.4.0+2
   wakelock_plus: ^1.4.0
   xml: ^6.6.1
 

@@ -1,3 +1,6 @@
+import 'package:visibility_detector/visibility_detector.dart';
+import 'data/ads/ad_events_controller.dart';
+import 'services/hosted_ads_repository.dart';
 import 'presentation/config/bootstrap_view_model.dart';
 import 'presentation/config/refresh_controller.dart';
 import 'services/local_account_data.dart';
@@ -184,6 +187,12 @@ void main() async {
     await recentProvider.fetchEpisodes();
     await wellnessProvider.reload();
   });
+  HostedAdsRepository.instance.configure(injector.adsRepository, enabled: injector.migrationFlags.ads);
+  if (injector.migrationFlags.ads) {
+    // Observe each rendered frame so brief visibility interruptions reset dwell.
+    VisibilityDetectorController.instance.updateInterval = Duration.zero;
+  }
+  final adsController = injector.migrationFlags.ads ? AdEventsController(injector.adsRepository) : null;
   RefreshController? configController;
   if (injector.migrationFlags.config) {
     final bootstrap = BootstrapViewModel(injector.configRepository, appDependencyProvider);
@@ -219,6 +228,7 @@ void main() async {
       appDependencyProvider: appDependencyProvider,
       devicePresentation: devicePresentation,
       configController: configController,
+      adsController: adsController,
     ),
   ))));
 }

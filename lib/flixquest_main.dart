@@ -1,3 +1,4 @@
+import 'data/ads/ad_events_controller.dart';
 import 'dart:async';
 
 import 'package:dynamic_color/dynamic_color.dart';
@@ -35,6 +36,7 @@ class FlixQuest extends StatefulWidget {
       required this.appDependencyProvider,
       required this.devicePresentation,
       this.configController,
+      this.adsController,
       super.key});
 
   final SettingsProvider settingsProvider;
@@ -43,6 +45,7 @@ class FlixQuest extends StatefulWidget {
   final AppDependencyProvider appDependencyProvider;
   final DevicePresentation devicePresentation;
   final RefreshController? configController;
+  final AdEventsController? adsController;
 
   @override
   State<FlixQuest> createState() => _FlixQuestState();
@@ -72,6 +75,7 @@ class _FlixQuestState extends State<FlixQuest>
     WellnessProvider.instance.addListener(_scheduleLocalWidgetRefresh);
     widget.bookmarkProvider.addListener(_scheduleLocalWidgetRefresh);
     _initConfig();
+    unawaited(widget.adsController?.boot());
     fileDelete();
     InAppMessagingService.initialize(onConfigHint: widget.configController?.onPushData);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -107,6 +111,7 @@ class _FlixQuestState extends State<FlixQuest>
     }
     DeepLinkDispatcher.onAppReady();
     unawaited(widget.configController?.onResume());
+    unawaited(widget.adsController?.onResume());
     unawaited(_refreshHomeWidgets());
     unawaited(RecentlyWatchedSyncService.instance.autoSyncIfSignedIn());
   }
@@ -119,6 +124,7 @@ class _FlixQuestState extends State<FlixQuest>
     _widgetRefreshDebounce?.cancel();
     _legacyConfig?.dispose();
     widget.configController?.dispose();
+    unawaited(widget.adsController?.dispose());
     InAppMessagingService.configHintHandler = null;
     super.dispose();
   }
