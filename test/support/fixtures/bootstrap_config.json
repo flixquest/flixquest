@@ -1,6 +1,7 @@
 {
   "success": true,
   "data": {
+    "config_source": "laravel",
     "features": {"enable_stream": true, "enable_download": true, "enable_live_tv": true, "enable_ott": true},
     "branding": {"app_logo_url": "", "cinemax_logo": "default"},
     "updates": {"forced_update": false, "latest_version": "4.2.0", "latest_build_number": 5, "min_build_number": 1, "app_download_url": "https://flixquest.app/download", "change_log": "Migrated to Laravel backend with enhanced sync."},

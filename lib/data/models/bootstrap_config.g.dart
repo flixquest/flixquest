@@ -234,6 +234,7 @@ Map<String, dynamic> _$$BannerDisplayConfigImplToJson(
 _$BootstrapConfigImpl _$$BootstrapConfigImplFromJson(
         Map<String, dynamic> json) =>
     _$BootstrapConfigImpl(
+      configSource: json['config_source'] as String?,
       features: json['features'] == null
           ? const FeaturesConfig()
           : FeaturesConfig.fromJson(json['features'] as Map<String, dynamic>),
@@ -263,6 +264,7 @@ _$BootstrapConfigImpl _$$BootstrapConfigImplFromJson(
 Map<String, dynamic> _$$BootstrapConfigImplToJson(
         _$BootstrapConfigImpl instance) =>
     <String, dynamic>{
+      'config_source': instance.configSource,
       'features': instance.features.toJson(),
       'branding': instance.branding.toJson(),
       'updates': instance.updates.toJson(),

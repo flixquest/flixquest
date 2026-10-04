@@ -2757,6 +2757,8 @@ BootstrapConfig _$BootstrapConfigFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$BootstrapConfig {
+  @JsonKey(name: 'config_source')
+  String? get configSource => throw _privateConstructorUsedError;
   FeaturesConfig get features => throw _privateConstructorUsedError;
   BrandingConfig get branding => throw _privateConstructorUsedError;
   UpdateConfig get updates => throw _privateConstructorUsedError;
@@ -2784,7 +2786,8 @@ abstract class $BootstrapConfigCopyWith<$Res> {
       _$BootstrapConfigCopyWithImpl<$Res, BootstrapConfig>;
   @useResult
   $Res call(
-      {FeaturesConfig features,
+      {@JsonKey(name: 'config_source') String? configSource,
+      FeaturesConfig features,
       BrandingConfig branding,
       UpdateConfig updates,
       NetworkConfig network,
@@ -2816,6 +2819,7 @@ class _$BootstrapConfigCopyWithImpl<$Res, $Val extends BootstrapConfig>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
+    Object? configSource = freezed,
     Object? features = null,
     Object? branding = null,
     Object? updates = null,
@@ -2825,6 +2829,10 @@ class _$BootstrapConfigCopyWithImpl<$Res, $Val extends BootstrapConfig>
     Object? occasionalTheme = null,
   }) {
     return _then(_value.copyWith(
+      configSource: freezed == configSource
+          ? _value.configSource
+          : configSource // ignore: cast_nullable_to_non_nullable
+              as String?,
       features: null == features
           ? _value.features
           : features // ignore: cast_nullable_to_non_nullable
@@ -2927,7 +2935,8 @@ abstract class _$$BootstrapConfigImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {FeaturesConfig features,
+      {@JsonKey(name: 'config_source') String? configSource,
+      FeaturesConfig features,
       BrandingConfig branding,
       UpdateConfig updates,
       NetworkConfig network,
@@ -2963,6 +2972,7 @@ class __$$BootstrapConfigImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
+    Object? configSource = freezed,
     Object? features = null,
     Object? branding = null,
     Object? updates = null,
@@ -2972,6 +2982,10 @@ class __$$BootstrapConfigImplCopyWithImpl<$Res>
     Object? occasionalTheme = null,
   }) {
     return _then(_$BootstrapConfigImpl(
+      configSource: freezed == configSource
+          ? _value.configSource
+          : configSource // ignore: cast_nullable_to_non_nullable
+              as String?,
       features: null == features
           ? _value.features
           : features // ignore: cast_nullable_to_non_nullable
@@ -3008,7 +3022,8 @@ class __$$BootstrapConfigImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$BootstrapConfigImpl implements _BootstrapConfig {
   const _$BootstrapConfigImpl(
-      {this.features = const FeaturesConfig(),
+      {@JsonKey(name: 'config_source') this.configSource,
+      this.features = const FeaturesConfig(),
       this.branding = const BrandingConfig(),
       this.updates = const UpdateConfig(),
       this.network = const NetworkConfig(),
@@ -3021,6 +3036,9 @@ class _$BootstrapConfigImpl implements _BootstrapConfig {
   factory _$BootstrapConfigImpl.fromJson(Map<String, dynamic> json) =>
       _$$BootstrapConfigImplFromJson(json);
 
+  @override
+  @JsonKey(name: 'config_source')
+  final String? configSource;
   @override
   @JsonKey()
   final FeaturesConfig features;
@@ -3051,7 +3069,7 @@ class _$BootstrapConfigImpl implements _BootstrapConfig {
 
   @override
   String toString() {
-    return 'BootstrapConfig(features: $features, branding: $branding, updates: $updates, network: $network, ads: $ads, banners: $banners, occasionalTheme: $occasionalTheme)';
+    return 'BootstrapConfig(configSource: $configSource, features: $features, branding: $branding, updates: $updates, network: $network, ads: $ads, banners: $banners, occasionalTheme: $occasionalTheme)';
   }
 
   @override
@@ -3059,6 +3077,8 @@ class _$BootstrapConfigImpl implements _BootstrapConfig {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$BootstrapConfigImpl &&
+            (identical(other.configSource, configSource) ||
+                other.configSource == configSource) &&
             (identical(other.features, features) ||
                 other.features == features) &&
             (identical(other.branding, branding) ||
@@ -3075,6 +3095,7 @@ class _$BootstrapConfigImpl implements _BootstrapConfig {
   @override
   int get hashCode => Object.hash(
       runtimeType,
+      configSource,
       features,
       branding,
       updates,
@@ -3102,7 +3123,8 @@ class _$BootstrapConfigImpl implements _BootstrapConfig {
 
 abstract class _BootstrapConfig implements BootstrapConfig {
   const factory _BootstrapConfig(
-      {final FeaturesConfig features,
+      {@JsonKey(name: 'config_source') final String? configSource,
+      final FeaturesConfig features,
       final BrandingConfig branding,
       final UpdateConfig updates,
       final NetworkConfig network,
@@ -3114,6 +3136,9 @@ abstract class _BootstrapConfig implements BootstrapConfig {
   factory _BootstrapConfig.fromJson(Map<String, dynamic> json) =
       _$BootstrapConfigImpl.fromJson;
 
+  @override
+  @JsonKey(name: 'config_source')
+  String? get configSource;
   @override
   FeaturesConfig get features;
   @override

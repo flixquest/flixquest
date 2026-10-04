@@ -16,10 +16,10 @@ class BootstrapViewModel extends ChangeNotifier {
   bool _disposed = false;
   DateTime? get lastValidatedAt => repository.lastValidatedAt;
 
-  Future<void> hydrate() async => _apply(await repository.loadCached());
-  Future<void> refresh() async => _apply(await repository.refresh());
+  Future<void> hydrate() async => apply(await repository.loadCached());
+  Future<void> refresh() async => apply(await repository.refresh());
 
-  void _apply(BootstrapConfig value) {
+  void apply(BootstrapConfig value, {bool preserveThemeSelection = false}) {
     if (_disposed) return;
     _config = value;
     dependencies.displayWatchNowButton = value.features.enableStream;
@@ -59,8 +59,9 @@ class BootstrapViewModel extends ChangeNotifier {
         minimumBuild: value.updates.minBuildNumber,
         downloadUrl: value.updates.appDownloadUrl,
         changeLog: value.updates.changeLog);
-    dependencies.occasionalThemeCatalog =
-        value.occasionalTheme.toDomain(resolvedAt: lastValidatedAt);
+    dependencies.applyOccasionalThemeCatalog(
+        value.occasionalTheme.toDomain(resolvedAt: lastValidatedAt),
+        preserveSelection: preserveThemeSelection);
     notifyListeners();
   }
 

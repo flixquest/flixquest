@@ -243,6 +243,7 @@ List<Map<String, dynamic>> _banners(Object? value) {
 @freezed
 class BootstrapConfig with _$BootstrapConfig {
   const factory BootstrapConfig({
+    @JsonKey(name: 'config_source') String? configSource,
     @Default(FeaturesConfig()) FeaturesConfig features,
     @Default(BrandingConfig()) BrandingConfig branding,
     @Default(UpdateConfig()) UpdateConfig updates,

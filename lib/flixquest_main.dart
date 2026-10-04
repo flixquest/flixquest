@@ -46,7 +46,7 @@ class FlixQuest extends StatefulWidget {
   final BookmarkProvider bookmarkProvider;
   final AppDependencyProvider appDependencyProvider;
   final DevicePresentation devicePresentation;
-  final RefreshController? configController;
+  final ConfigLifecycle? configController;
   final AdEventsController? adsController;
 
   @override

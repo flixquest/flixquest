@@ -1,14 +1,20 @@
 # FlixQuest Flutter — Laravel Migration Implementation Plan
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Branch:** `feat/laravel`
-**Status:** F0 implemented and verified against the measured baseline (2026-10-03); F1 implemented and automatically verified (2026-10-03), device smoke pending; F2 implemented and automatically verified (2026-10-03), staging/device smoke pending; F3 implemented and automatically verified (2026-10-03), device/Filament smoke pending; F4 implemented and automatically verified (2026-10-04), device/Filament smoke pending; F5 implemented (2026-10-04), automated verification recorded below and two-device/staging smoke pending; F6–F8 pending
+**Status:** F0 implemented and verified against the measured baseline (2026-10-03); F1 implemented and automatically verified (2026-10-03), device smoke pending; F2 implemented and automatically verified (2026-10-03), staging/device smoke pending; original F3 implemented and automatically verified (2026-10-03), device/Filament smoke pending, F3.5 server-controlled source selection implemented (2026-10-04), automated verification recorded below and device smoke pending; F4 implemented and automatically verified (2026-10-04), device/Filament smoke pending; F5 implemented (2026-10-04), automated verification recorded below and two-device/staging smoke pending; F6–F8 pending
 **Sources of truth:**
 - `docs/migration_prd_firebase_to_laravel.md` (this repo)
 - `~/Documents/web/phplaravel/flixquest-backend` — backend + `docs/migration_phases.md` (Phases 1 & 3 complete)
 - `~/Documents/web/flixquest-scraper` — the extraction service covered by Part B
 - `docs/firebase_remote_config.md` — exact Remote Config key + occasional-theme v2 semantics
 - `docs/codex_handover.md` — repo/working conventions that still apply
+
+**User decisions — 2026-10-04 (override conflicting PRD/removal instructions):**
+
+- Laravel decides whether the app uses **Firebase Remote Config or Laravel config** at every configuration refresh. Both implementations remain available after cutover; the production source is not chosen by a build-time flag.
+- **Firebase Crashlytics and Google Analytics for Firebase remain enabled under the existing collection/consent settings.** Keep their Flutter packages, initialization, reporting/event calls and native integrations. Do not replace them with Sentry or Laravel, or copy their crashes, non-fatal reports, breadcrumbs, analytics events or streaming-duration events to Laravel.
+- F3.5 implements server-controlled source selection on `feat/laravel-f3-config-source`. Its automated verification is recorded below; the same-build phone/TV and Google reporting smoke remains user-run before production cutover.
 
 **Verified baseline on `feat/laravel` (2026-10-03):**
 
@@ -33,7 +39,7 @@
    The full tally before F0 is the regression baseline; F-work must not reduce it (except tests deliberately migrated in the same phase, which must be renamed/replaced 1:1).
 4. Use `.fvm/flutter_sdk/bin/flutter` and `.fvm/flutter_sdk/bin/dart` — Flutter is not on PATH (see `docs/codex_handover.md` §2.1).
 5. Never run `dart format` on existing hand-formatted files; only on files created in the phase.
-6. TV parity is required: every migration phase lists its `lib/tv/**` touchpoints. Do not leave TV on Firebase after the phase that owns that feature.
+6. TV parity is required: every migration phase lists its `lib/tv/**` touchpoints. Phone and TV must use the same Laravel-controlled config-source selection and retain Firebase Messaging, Remote Config, Crashlytics and Analytics. Migrate Auth/Firestore only in their owning phases.
 7. Each phase ends with a short report (what changed, files, test numbers, anything the user must do) and then stops.
 
 This plan has two parts:
@@ -60,7 +66,8 @@ graph LR
   F1 --> F4
   F1 --> F5
   F5 --> F6
-  F1 --> F7[F7 Firebase removal]
+  F3 -->|F3.5 source selection| F6
+  F1 --> F7[F7 Firebase cleanup]
   F2 --> F7
   F3 --> F7
   F4 --> F7
@@ -140,11 +147,11 @@ lib/data/
   repositories/wellness_repository.dart
   repositories/announcement_repository.dart
   repositories/device_repository.dart
-  repositories/telemetry_repository.dart
   repositories/tmdb_repository.dart
 lib/presentation/
   session/session_view_model.dart
   bootstrap/bootstrap_view_model.dart
+  config/config_source_controller.dart # F3.5 runtime selector
   ...
 ```
 
@@ -270,8 +277,18 @@ All repository methods return `Result<T, Failure>` (Freezed). `Failure` kinds: `
 ### 1.9 Cutover flags and rollback
 
 - `lib/core/config/migration_flags.dart` (read from `--dart-define=FLIXQUEST_MIGRATION=auth,config,ads,sync,...`) controls per-feature cutover during development so both code paths can be tested side by side.
-- Production cutover is a single release (F8) because the backend is already complete and tested. Optional remote kill-switches during the transition read from the still-present Firebase Remote Config (`staging` builds only); once F7 lands, rollback is an app-version rollback.
-- Each phase must be revertible by reverting its commits: never delete a working path (`FirebaseAuth`, Firestore sync) in the same commit that adds its replacement. Delete only in the phase that declares the Firebase feature dead (F7).
+- Production cutover remains a single release (F8). Laravel's runtime config selector controls Firebase-versus-Laravel configuration in staging and production. Changing it in Filament switches the source on the next refresh without an app release; app-version rollback remains available for code changes.
+- The development `config` flag may enable/test the new source-selection controller, but must not force a production source or bypass the Laravel decision. Neither client provider adapter may override Laravel's selection.
+- Each phase must be revertible by reverting its commits. Delete the replaced Firebase Auth/Firestore paths only in F7; retain Remote Config, Crashlytics, Analytics and Messaging permanently under this plan.
+
+### 1.10 Laravel-controlled configuration source
+
+- On every cold launch, app resume, config push hint, explicit refresh and Firebase realtime-config update, revalidate Laravel's public bootstrap endpoint before applying a fresh configuration. Remove the existing one-hour resume throttle for this selector. Concurrent refreshes may share an in-flight request; a new update hint during it schedules a follow-up validation.
+- The response field is `data.config_source` (`firebase` or `laravel`). Laravel/Filament owns this setting, with `laravel` as the migrated environment's seeded default. Include it in the bootstrap ETag so a source change produces a new response; a 304 confirms the cached Laravel choice remains current. F3.5 implements this backend/client contract.
+- When `firebase` is selected, fetch/activate Firebase Remote Config and map its values into `AppDependencyProvider`. When `laravel` is selected, apply the Laravel bootstrap configuration. The selected source owns the whole configuration snapshot (features, branding, updates, network, ads settings and seasonal themes); do not merge values from competing active sources. Laravel auth, sync and ads endpoints remain Laravel endpoints whichever config source is selected.
+- Keep a single consumer/API for phone and TV and separate source caches. Persist the last valid Laravel selection and each source's last good snapshot. Render the matching cached snapshot while revalidating and when offline; retain that selection on errors or invalid/missing selector values. With no valid selection/cache on first offline launch, use bundled safe defaults until Laravel is reachable. Do not silently select a different provider on a fetch failure.
+- Cancel or ignore requests/listeners from the previously selected source so delayed updates cannot overwrite the current snapshot. Preserve user-selected themes, effect preferences and existing key/schema compatibility across switches.
+- The Laravel bootstrap URL comes from deployment configuration and must remain reachable independently of the selected provider's network settings. Firebase cannot override the selector or that control endpoint. Source selection does not disable or reroute Crashlytics/Analytics collection.
 
 ---
 
@@ -298,6 +315,7 @@ Base URL: `/api/v1`; all responses include top-level `success`; resources emit *
 
 ### Config
 - `GET /config/bootstrap` → `{success, data:{features, branding, updates, network, ads, banners, occasional_theme}}`; supports ETag/304; `Cache-Control: public, no-cache`.
+- **F3.5 addition:** `data.config_source: 'firebase' | 'laravel'`, editable in Filament and included in ETag calculation; see §1.10. Retain the existing config blocks for the Laravel-selected path.
 
 ### Ads
 - `GET /ads` (optional `?placement=`) → `{success, ads:[{id (string), key, name, imageUrl, targetUrl, altText, shape, aspectRatio, width, height, placements}]}`; ETag/304.
@@ -309,10 +327,10 @@ Base URL: `/api/v1`; all responses include top-level `success`; resources emit *
 - `POST /sync/recently-watched` — request `{since_revision? | since_utc?, client_time_utc?, movies[], episodes[]}`; LWW on `updated_at_utc`; 90-day server-side tombstone purge; response `{success, server_revision, serverRevision, server_time_utc, serverTimeUtc, movies[], episodes[]}`; future timestamps > 24 h drift → `422 {error:'clock_skew_detected', server_time_utc, max_drift_ms}`.
 - `POST /sync/wellness` — same envelope plus `sessions[]` (client UUID `id`), `daily[]`; pagination `cursor`, `limit` (default 450, max 1000) with `has_more`/`next_cursor`; **uploads are rejected while paginating**; checkpoint ahead of server → 422 requiring a full sync.
 
-### Notifications & telemetry
+### Notifications
 - `POST /devices/register` (Bearer) — `{fcm_token/fcmToken, platform, app_version/appVersion}`.
 - `GET /messages/active` (public) — `{success, messages:[{id, title, body, image_url, action_url, button_text, display_type}]}`.
-- `POST /telemetry/errors` (public, optional user) — `error_message, stack_trace, app_version, device_info, occurred_at`.
+- Existing backend capability, **excluded from this client migration:** `POST /telemetry/errors`. Do not call it for Crashlytics reports or analytics, create a client `TelemetryRepository`, or add Laravel copies of Google reporting. Backend endpoint existence does not authorize integrating it.
 
 ### Reference resources
 `app/Http/Resources/V1/*` and `tests/Feature/*` in the backend are the executable contract. When a payload question comes up during implementation, read the resource + its Pest test rather than the PRD.
@@ -326,7 +344,7 @@ These are concrete conflicts found between the PRD, the backend as implemented, 
 | # | Gap | Impact | Resolution owner | Phase |
 |---|---|---|---|---|
 | **G1** | **Placement names drifted.** Client uses `home_all_hero/trending/genres`, `home_movies_*`, `home_series_*`, `new_and_hot`, `stream_loading`, `live_tv_top`, `live_tv_list_a/b/c`, `title_detail`, `live_tv_strip`, plus the PRD's legacy 19. Backend `BannerPlacement` enum only contains the legacy 19, so Filament cannot target the newer slots and `?placement=` validation rejects them. | Revenue slots stop being fillable | Backend enum + Filament options; client stops sending invalid `?placement=` | F4 |
-| **G2** | **`firebase_core` cannot be removed.** PRD says remove it but retain `firebase_messaging`, which requires `Firebase.initializeApp()` and `google-services.json`. | Build breaks; KPI "≥250 ms faster startup" overstated | Keep `firebase_core` + `firebase_messaging` + google-services; adjust KPI in F8 | F7/F8 |
+| **G2** | **Retained Firebase services require their SDKs/native setup.** Messaging, Remote Config, Crashlytics and Analytics remain in scope. | Removing core/plugins/pods breaks retained services; original size/startup targets are overstated | Keep all five Firebase packages and required native hooks; measure actual KPIs | F7/F8 |
 | **G3** | **Start.io/hosted-ads keys missing server-side.** Client reads `hosted_banner_mode`, `startio_banner_enabled`, `startio_interstitial_enabled`, `startio_interstitial_interval_seconds`, `startio_tv_interstitial_mode`; backend bootstrap/seed does not include them. | Ads engine changes behavior after config cutover | Backend seeder + `ConfigController` mapping | F3 |
 | **G4** | **No user model.** Profile is raw Firestore maps read in ~7 screens. | Can't type the new API | Introduce Freezed `AppUser` | F0/F2 |
 | **G5** | **`SyncCheckpoint` is Firestore-coupled** (`Timestamp`, `syncedAt`). | Blocks sync migration | Replace with revision-based `SyncCursor` | F5 |
@@ -337,13 +355,15 @@ These are concrete conflicts found between the PRD, the backend as implemented, 
 | **G10** | **Firebase uid → Laravel id.** Owner namespace `user:<uid>` and checkpoint keys must not mix old and new data. | False "already synced" state / data loss | New owner namespace + fresh checkpoints on first Laravel login | F2/F5 |
 | **G11** | **`AuthSessionController` is a plain UID notifier**, not a session model. | No token/user state for repositories | `SessionViewModel` + adapter | F2 |
 | **G12** | **`messages/active` is public** (PRD says Bearer). | Minor | Use public endpoint as implemented | F6 |
-| **G13** | **Crashlytics replacement is undecided** (Sentry vs Laravel telemetry endpoint). | Blocks F6 | Decision D2 | F6 |
+| **G13** | **Original telemetry/removal plan conflicts with the user's decision.** | Loss or duplication of Google crash/analytics reporting | Resolved D2: keep Crashlytics/Analytics; exclude Laravel telemetry integration and replacement reporting | F6/F7 |
 | **G14** | **Scraper `/api/v2/ads` still exists** (`src/routes/ads.ts`, mount, test, root catalog, boot log) and the repo has no layered architecture: `src/index.ts` is 1,247 lines owning routing + orchestration + caching + validation. | The PRD Phase 2 goal (pure extraction service) is unmet; new client architecture has no service-side counterpart | Part B phases S1/S4 | S4 (after F4) |
 | **G15** | **No HTTP cache validators on the scraper** (no `ETag`/`If-None-Match`; core stream routes set no `Cache-Control`; `providers` responses have no explicit policy) and Redis stats/flush use blocking `KEYS`. The Flutter cache layer cannot revalidate. | F1 cache can't do conditional requests against the scraper | Part B phase S3 | S3 (with F1) |
 | **G16** | **Scraper repo is mid-merge** (`Merge branch 'v2' into optimize`, resolved but uncommitted, plus staged/unstaged Viv/VidUp work) and CI never runs tests (Node 18/20 vs required Node 22, no `test` script). | Any refactor starts from a dirty, untested tree | Land/stash the merge; Part B S0 adds the test script + CI test step | S0 (before any Part B work) |
+| **G17** | **Original F3 chose the config path at build time and throttled resume refresh for an hour.** | Laravel cannot choose the source on every refresh | Resolved by F3.5: bootstrap/Filament selector and shared runtime controller per §1.10; both providers retained | F3.5 before F6 |
 
 **Coordinated backend tasks (do in the backend repo, before the matching Flutter phase):**
 1. F3: add `hosted_banner_mode`, `startio_*` keys to `AppConfigurationSeeder` + `ConfigController` bootstrap (`ads` block).
+   F3.5 follow-up: add/validate `config_source`, its Filament select, seeded default and ETag coverage; add tests for both choices and selector-only changes. Do not add crash/analytics tracking.
 2. F4: extend `BannerPlacement` enum and the Filament multi-select with every placement in G1; optionally normalize existing `home_movies_*` seeds.
 3. F5: no backend change required — revisions/cursors are ready.
 4. F6: ensure `FIREBASE_CREDENTIALS` is configured in the target environment.
@@ -358,11 +378,11 @@ These are concrete conflicts found between the PRD, the backend as implemented, 
 | **F0** | Architecture foundation | — | S | Dio/Freezed/secure storage/DI/cache scaffolding; zero behavior change |
 | **F1** | Network + response cache (TMDB & scraper) | F0 | M | All TMDB + safe scraper GETs cached; `network.dart` delegating to Dio |
 | **F2** | Auth, session & account screens | F0 | L | Firebase Auth replaced by Sanctum bearer sessions on phone + TV |
-| **F3** | Config bootstrap & seasonal themes | F0 | M | Remote Config replaced by `/config/bootstrap` (ETag, offline) |
+| **F3** | Config source selection & seasonal themes | F0 | M | Laravel chooses Firebase/Laravel config at every refresh; both providers retained (ETag, offline) |
 | **F4** | Ads cutover & placement reconciliation | F1, F3 + backend G1 | M | Ads served from Laravel; impressions/clicks tracked |
 | **F5** | Sync engine | F2 + F1 | L | Bookmarks/recents/wellness on Laravel with revisions, cursors, skew |
-| **F6** | Notifications, in-app messages, telemetry | F2, F5 | M | FCM registration, announcements polling, error telemetry, Mixpanel duration |
-| **F7** | Firebase removal & native slimming | F1–F6 | S | 6 Firebase packages + native hooks removed (`core`/`messaging` retained) |
+| **F6** | Notifications, in-app messages & reporting preservation | F2, F5, F3.5 | M | FCM registration, announcements polling; existing Crashlytics/Google Analytics retained with no Laravel mirror |
+| **F7** | Firebase cleanup & native slimming | F1–F6 | S | Auth/Firestore/in-app-messaging removed; core, Messaging, Remote Config, Crashlytics and Analytics retained |
 | **F8** | QA, staging & cutover | F7 | M | Staging rehearsal, integration matrix, production release |
 
 ---
@@ -675,10 +695,15 @@ Work stops at F2; F3 config bootstrap is the next phase.
 
 ---
 
-## Phase F3 — Config bootstrap & seasonal themes
+## Phase F3 — Config source selection & seasonal themes
 
 ### Goal
-Replace `firebase_remote_config` with `/api/v1/config/bootstrap` + ETag + SharedPreferences cache, keeping `AppDependencyProvider` as the single consumer.
+Let Laravel choose Firebase Remote Config or Laravel bootstrap configuration on every refresh, with ETag validation and offline snapshots, keeping `AppDependencyProvider` as the single consumer. Retain `firebase_remote_config` and both provider implementations after cutover.
+
+F3.1–F3.4 below record the original bootstrap implementation and verification.
+The 2026-10-04 user decision adds F3.5, implemented below. It replaces the
+original build-time routing and one-hour resume throttle with the runtime
+behavior in §1.10.
 
 ### Prerequisite (backend repo)
 - [x] **G3:** add `hosted_banner_mode`, `startio_banner_enabled`, `startio_interstitial_enabled`, `startio_interstitial_interval_seconds`, `startio_tv_interstitial_mode` to `AppConfigurationSeeder` and the `ads` block of `ConfigController@bootstrap`; ship seed tests.
@@ -696,7 +721,7 @@ Replace `firebase_remote_config` with `/api/v1/config/bootstrap` + ETag + Shared
 - [x] Replace `AppRemoteConfig.apply(config, provider)` with `BootstrapViewModel` pushing into the existing setters (`setBannerConfigs`, `setBannerAdNetwork`, `setHostedBannerMode`, `setUnityAdsConfig`, `setStartIoAdsConfig`, `setFlixquestApiConfig`, `setUpdateConfiguration`) — this is the single choke point identified in `lib/provider/app_dependency_provider.dart`.
 - [x] TMDB key: keep `TMDB_API_KEY` runtime setter in `lib/constants/api_constants.dart`; bootstrap supplies the same key as Remote Config did.
 - [x] `bootstrap` also feeds the **network config** (scraper instances list) used by `HostedAdsRepository`/`ScraperApi` callers.
-- [x] Rewire `flixquest_main.dart` `_initConfig` to the new controller; delete the `FirebaseRemoteConfig` code there. Keep `firebase_remote_config` in pubspec until F7.
+- [x] Original implementation: rewire `flixquest_main.dart` `_initConfig` to the bootstrap controller and isolate Firebase setup in its own controller. **Revised retention:** keep `firebase_remote_config` and the Firebase controller in F7 and beyond; F3.5 selects between both at runtime.
 
 **F3.3 Theme engine**
 - [x] Keep `AmbientThemeService` and the particle overlay; feed them from the new catalog.
@@ -707,10 +732,97 @@ Replace `firebase_remote_config` with `/api/v1/config/bootstrap` + ETag + Shared
 - [ ] Airplane-mode cold boot: cached config renders, features default true, no blank screens.
 - [ ] Change a feature toggle in Filament → refresh → app reflects it; ETag 304 on second launch (verify via logs).
 
-### Exit criteria
-`FirebaseRemoteConfig` is no longer used; bootstrap is the only config source; offline boot is safe; analyze 0; suite green.
+**F3.5 Server-controlled source selection (implemented; before F6)**
 
-### F3 verification report — 2026-10-03
+- [x] Backend: add `config_source` (`firebase`/`laravel`) to configuration storage, seeder, Filament and `GET /config/bootstrap`; include it in the ETag. Default migrated environments to `laravel`, with an operator-editable choice.
+- [x] Extend the bootstrap DTO/repository and add one runtime source-selection controller implementing §1.10. Revalidate Laravel on every boot/resume/config refresh, including Firebase realtime hints; the previous one-hour resume throttle must not hide selector changes.
+- [x] Keep the Firebase SDK, `AppRemoteConfig` mapping and Firebase controller as a supported provider, alongside the Laravel provider. Both feed the same phone/TV `AppDependencyProvider`; Laravel alone chooses which snapshot applies.
+- [x] Cache the valid server decision and source snapshots independently; use matching last-good config offline, and safe bundled defaults on a first offline launch. Prevent late updates from the previous source from applying.
+- [x] Tests: both server choices, switching in both directions without rebuilding, selector-only ETag changes, 304, every-resume revalidation, offline/invalid-response retention, first-launch defaults, old-source race rejection, schema/theme parity and phone/TV behavior.
+- [ ] Manual smoke: change `config_source` in Filament and resume the same phone/TV build to switch both directions; then verify offline boot. Confirm Crashlytics/Analytics still report only through their existing Google SDK paths.
+
+### Exit criteria
+Laravel selects the source on every refresh; Firebase and Laravel config both work on phone/TV without rebuilding; offline boot uses the last valid server selection and matching snapshot; Crashlytics/Analytics remain intact; analyze 0; suite preserves the documented baseline.
+
+### F3.5 implementation handover — 2026-10-04
+
+Implemented on `feat/laravel-f3-config-source`, continuing the committed F5 work.
+F6 has not started. No commits, pushes or PRs were created.
+
+- Laravel bootstrap now returns `data.config_source`. `AppConfigurationSeeder`
+  creates a `laravel` default without replacing an operator's existing choice.
+  Filament uses a Firebase/Laravel select and restricts the setting to string;
+  model writes also reject unsupported providers/types. Source edits invalidate
+  the bootstrap cache and ETag.
+- `ConfigSourceController` implements the shared lifecycle contract. Every boot,
+  resume, explicit `refresh()`, FCM config hint and Firebase realtime hint first
+  revalidates Laravel. Concurrent HTTP validations coalesce; a hint during one
+  schedules another validation. An old Firebase fetch cannot block a Laravel
+  switch or apply/persist its response after the decision changes or disposal.
+- Profile/release builds always use this controller. Debug builds enable it with
+  the development `config` migration flag; omitting that flag keeps the legacy
+  Firebase development rollback. No build flag chooses the production provider.
+- The bootstrap snapshot stores the valid decision, Laravel settings and matching
+  ETag. Firebase's normalized snapshot has its own `config.firebase.snapshot` key.
+  Invalid/missing choices preserve the last valid decision and validator; an
+  orphaned 304 retries unconditionally. Offline hydration uses the selected
+  provider's snapshot, or bundled defaults when its cache/decision is absent.
+  Laravel candidates do not write Firebase-selected legacy preferences.
+- `SdkFirebaseConfigSource` retains `AppRemoteConfig.configure`, maps published
+  flat Firebase keys through the same bootstrap DTO, and preserves `enable_ott`,
+  legacy logo, banner and theme schema compatibility. SDK defaults cannot mask
+  published legacy keys. An empty successful template restores bundled defaults;
+  unavailable or malformed Firebase payloads retain the selected Firebase cache.
+- Both providers use the same phone/TV mapper. Network/ads/branding/features are
+  replaced as a whole snapshot. A theme omitted by the current provider resolves
+  automatically while its saved user selection and effect preferences survive
+  source changes and cold restarts. The deployment Laravel URL is independent
+  of either provider's scraper/proxy settings.
+- Crashlytics, Google Analytics, native reporting setup, existing event calls and
+  Mixpanel remain unchanged. No Laravel crash/analytics submissions were added.
+
+Files added: `lib/data/sources/firebase_config_source.dart`,
+`lib/presentation/config/config_source_controller.dart`,
+`test/presentation/config_source_controller_test.dart`, and backend
+`tests/Feature/ConfigSourceTest.php`.
+
+Files updated: bootstrap DTO and its two generated files, config repository,
+shared bootstrap/lifecycle mapper, `main.dart`, `flixquest_main.dart`,
+`AppDependencyProvider`, the existing refresh test (one-for-one replacement of
+hourly throttle coverage), and the shared bootstrap fixture in both repositories.
+Backend changes are in `ConfigController`, `AppConfiguration`,
+`AppConfigurationForm`, and `AppConfigurationSeeder`. Existing backend F3/F4/F5
+uncommitted work was retained.
+
+Verification:
+
+| Check | Result |
+|---|---|
+| Flutter analyze | 0 issues |
+| Full Flutter suite | 141 files, 996 executed: 995 passed, 1 existing failure (`subtitle_options_test.dart`, incoming preference order). The known player-menu test passed this run. Neither known test was edited, skipped or weakened. |
+| New config-source/SDK tests | 21 passed; real repository, DTO, mapper/provider and preference storage, with only HTTP transport and Firebase SDK boundaries faked |
+| Existing refresh-controller tests | All 6 retained; one hourly-throttle test migrated one-for-one to every-resume validation |
+| Backend full suite | 229 passed, 1,115 assertions, using isolated test databases |
+| Backend formatting | Pint passed; only the new selector form/test needed formatting |
+| Live Herd bootstrap | Read-only HTTP 200 with `config_source: laravel`, then conditional 304; no real database seeding or account writes |
+| Code generation | Successful final build, 0 outputs written. Of 19 tracked generated files, only the two bootstrap DTO outputs differ from pre-F3.5; the other 17 hashes are unchanged. |
+
+No phone/TV device or Google reporting smoke was run. `test/_preview/` was not
+created; nothing is committed.
+
+Manual smoke remains unchecked. Apply the backend configuration seeder when
+updating the target environment (`herd php artisan db:seed
+--class=AppConfigurationSeeder --no-interaction` from the backend). For a debug
+build include `config` in `FLIXQUEST_MIGRATION`; press **R** in the existing
+Flutter terminal. Change `config_source` in Filament and resume the same phone/TV
+build in both directions, then test offline boot. Confirm existing Google
+reporting/consent behavior. No device run/install/input was performed here.
+
+### F3 verification report — 2026-10-03 (original implementation)
+
+Historical results below do not verify the new F3.5 selector. References to the
+config migration flag describe the original development path. Firebase Remote
+Config is now retained permanently rather than removed in F7.
 
 **Branch:** `feat/laravel-f3-config`, based on the user's committed F2. The
 Laravel G3 prerequisite is implemented in the backend checkout. No commits,
@@ -742,7 +854,8 @@ pushes, PRs, real database seeding, or device interaction were performed.
 - Removed Firebase Remote Config setup/listeners from `flixquest_main.dart`.
   The isolated `lib/legacy/firebase_config_controller.dart` retains the
   `AppRemoteConfig` rollback when the config migration flag is off. Firebase
-  packages remain until F7; F4 hosted-ad transport is unchanged.
+  Auth/Firestore cleanup remains scheduled for F7; Remote Config, Crashlytics,
+  Analytics and Messaging are retained. F4 hosted-ad transport is unchanged.
 - Backend G3 adds the five hosted/Start.io fields to the bootstrap response and
   default seeder. Defaults keep Start.io disabled and use hosted `stack` mode.
   Seed tests verify operator values survive reseeding. Both repositories keep
@@ -805,10 +918,13 @@ User-run smoke (pending; no device access by the agent):
    even before seeding; no real database was seeded during this phase.
 5. Remove `config` from the migration flag to verify the Firebase rollback.
 
-Work stops at F3; F4 ads cutover is the next phase.
+Original F3 work stopped before F4. F3.5 is implemented; its device smoke remains open before production cutover.
 
 ### Rollback
-`migration_flags.config` off → `AppRemoteConfig` path still present until F7.
+Current debug development rollback: `migration_flags.config` off uses `AppRemoteConfig`.
+With F3.5, operators switch `config_source` in Laravel to select Firebase or
+Laravel config; retain both providers after F7. A code regression may still
+require reverting the app version.
 
 ---
 
@@ -1061,10 +1177,10 @@ Revert the phase branch; Firestore code remains until F7.
 
 ---
 
-## Phase F6 — Notifications, in-app messages & telemetry
+## Phase F6 — Notifications, in-app messages & reporting preservation
 
 ### Goal
-Register FCM tokens with Laravel, poll announcements instead of FCM data payloads, replace Crashlytics, and route streaming-duration analytics to Mixpanel.
+Register FCM tokens with Laravel and poll announcements while preserving FCM data payloads, Firebase Crashlytics and Google Analytics for Firebase. Laravel does not collect or mirror these crash/analytics reports. Complete F3.5 first.
 
 ### Milestones
 
@@ -1080,42 +1196,43 @@ Register FCM tokens with Laravel, poll announcements instead of FCM data payload
 - [ ] `InAppMessageDialog` unchanged.
 - [ ] Tests: both sources, dedupe, display types modal/bottom_sheet/banner.
 
-**F6.3 Telemetry**
-- [ ] Decision D2: adopt **Sentry Flutter** (`sentry_flutter`) for crash/fatal reporting (recommended: real crash quality, release health) and keep `POST /telemetry/errors` for non-fatal breadcrumbs; or use the Laravel endpoint for both. Document the choice and the DSN/config.
-- [ ] Remove `FirebaseCrashlytics` from `main.dart`; keep the `_isRecoverableImageError` filter.
-- [ ] `updateAndLogTotalStreamingDuration` in `lib/functions/function.dart` → `AnalyticsService.trackStreamingDuration(seconds)` (Mixpanel). Remove the `firebase_analytics` import.
-- [ ] Tests: error handler does not recurse on reporter failures; event name/payload asserted.
+**F6.3 Preserve Google reporting (resolved decision D2)**
+- [ ] Keep `FirebaseCrashlytics` initialization/error handlers in `main.dart`, including `_isRecoverableImageError`, fatal/non-fatal handling and existing collection controls. Keep Android/iOS Crashlytics integrations and symbol/mapping uploads.
+- [ ] Keep `firebase_analytics`, existing Analytics calls and `updateAndLogTotalStreamingDuration` in `lib/functions/function.dart` using the existing Google Analytics path. Preserve existing consent/collection behavior.
+- [ ] Do not introduce Sentry as a replacement, a Laravel `TelemetryRepository`, `/telemetry/errors` client submissions, analytics ingestion endpoints, or forwarding/duplication of these events to Laravel. Existing Mixpanel usage continues unchanged; this phase does not migrate Google events to Mixpanel.
+- [ ] Tests/smoke: Google reporting hooks remain wired, error-handler filtering and recursion safeguards remain intact, existing analytics payloads are preserved, and Laravel requests contain no mirrored crash reports/analytics events. Verify retained SDKs on phone and TV.
 
 ### Exit criteria
-Crashlytics and Firebase Analytics imports are gone from code; device tokens registered; announcements render from both sources; suite green.
+Device tokens registered; announcements render from both sources; Crashlytics and Firebase Analytics remain operational with existing behavior; no Laravel crash/analytics tracking is added; suite preserves the documented baseline.
 
 ---
 
-## Phase F7 — Firebase removal & native build slimming
+## Phase F7 — Firebase cleanup & native build slimming
 
 ### Goal
-Remove dead Firebase packages and native hooks — while keeping FCM working (G2).
+Remove replaced Firebase Auth, Firestore and in-app-messaging packages/hooks. Keep Firebase Core, Messaging, Remote Config, Crashlytics and Analytics working on phone and TV (G2).
 
 ### Milestones
 
 **F7.1 `pubspec.yaml`**
-- [ ] Remove: `cloud_firestore`, `firebase_auth`, `firebase_crashlytics`, `firebase_remote_config`, `firebase_analytics`, `firebase_in_app_messaging`.
-- [ ] **Keep:** `firebase_core` (required by `firebase_messaging`) and `firebase_messaging`.
+- [ ] Remove only: `cloud_firestore`, `firebase_auth`, `firebase_in_app_messaging` after their callers have migrated.
+- [ ] **Keep:** `firebase_core`, `firebase_messaging`, `firebase_remote_config`, `firebase_crashlytics`, `firebase_analytics`, and required supporting dependencies.
 - [ ] Remove `http` if all importers migrated (grep; migrate stragglers first) and `google_sign_in` stays.
 - [ ] `flutter pub get`; resolve conflicts; full suite + `test/tv_*.dart` green.
 
 **F7.2 Native**
-- [ ] Android: remove Crashlytics Gradle plugin + `apply plugin`; scrub Crashlytics/Firestore ProGuard rules; **keep** `google-services.json` and the google-services plugin for FCM (the backend's `docs/migration_phases.md` §5.2 warning applies).
-- [ ] iOS: remove Crashlytics/Remote Config/Firestore pods; keep `Firebase/Core` + `Firebase/Messaging`; `pod install`.
-- [ ] Delete dead code: `app_remote_config.dart`, `sync_checkpoint.dart` (if not already), Firestore references in `delete_account.dart`, and any orphaned imports.
+- [ ] Android: remove only obsolete Auth/Firestore/in-app-messaging setup/rules. **Keep** Google Services configuration/plugin, Crashlytics Gradle plugin and tasks, reporting/symbol-upload setup and rules required by all retained SDKs.
+- [ ] iOS: remove only obsolete Auth/Firestore/in-app-messaging pods/hooks; keep Core, Messaging, Remote Config, Crashlytics and Analytics pods and Crashlytics symbol-upload scripts; `pod install`.
+- [ ] Delete dead Auth/Firestore code, legacy sync/checkpoint code and orphaned imports after grep. **Keep** `app_remote_config.dart` and the Firebase config controller (promote from `legacy` if appropriate), as well as Crashlytics/Analytics adapters and calls.
 
 **F7.3 Build verification**
-- [ ] `flutter build apk --release`; record size delta vs the pre-migration build. Expect a smaller bundle than today but **not** the full ~3.5 MB from the PRD (FCM + core remain) — record the real number.
-- [ ] Cold-start timing with and without `Firebase.initializeApp()` retained; record the real improvement.
-- [ ] `grep -rn "cloud_firestore\|firebase_auth\|firebase_crashlytics\|firebase_remote_config\|firebase_analytics\|firebase_in_app_messaging" lib` → only FCM/core files allowed.
+- [ ] `flutter build apk --release`; record size delta vs the pre-migration build. Do not assume the PRD's ~3.5 MB reduction: five Firebase packages/native integrations remain.
+- [ ] Measure cold-start timing with the production Firebase initialization and all retained SDKs enabled; record the real result, without promising a fixed reduction.
+- [ ] `rg 'cloud_firestore|firebase_auth|firebase_in_app_messaging' lib` → no remaining imports/callers. Separately verify Core/Messaging/Remote Config/Crashlytics/Analytics initialization, imports and native hooks remain.
+- [ ] Smoke both config sources, FCM delivery, a Crashlytics test report and an existing Google Analytics event in the release/test builds on phone and TV; confirm these reports are not sent to Laravel.
 
 ### Exit criteria
-App builds and runs with only `firebase_core` + `firebase_messaging`; nothing else Firebase; measured APK/startup numbers reported.
+App builds with Auth/Firestore/in-app-messaging removed and all five retained Firebase SDKs operational; Laravel still chooses the config source at runtime and receives no Google crash/analytics mirror; measured APK/startup numbers reported.
 
 ---
 
@@ -1134,6 +1251,8 @@ Prove parity end-to-end on staging, then ship the cutover release with the backe
 - [ ] 90-day tombstone purge uses server time.
 - [ ] Offline cold boot uses cached bootstrap and cached TMDB rows; no blank screens.
 - [ ] ETag 304 on bootstrap and ads.
+- [ ] Switch Laravel `config_source` between Firebase and Laravel in the same phone/TV build; revalidate on every resume/config refresh and verify matching cached-source offline boot.
+- [ ] Crashlytics/Google Analytics reporting and consent behavior remain intact; confirm no client crash/analytics payloads reach Laravel telemetry endpoints.
 - [ ] Wellness pagination > 450 sessions across two pages; upload rejected mid-pagination is avoided by ordering.
 - [ ] Guest → register → local data appears on the second device.
 - [ ] Ad impression/click counters increment in Filament.
@@ -1144,15 +1263,15 @@ Prove parity end-to-end on staging, then ship the cutover release with the backe
 - [ ] Spot-check counts per user against the export manifest.
 
 **F8.3 Cutover playbook** (mirrors backend Phase 6.3)
-- [ ] Freeze Firebase writes (rules read-only) at the start of the window.
+- [ ] Freeze migrated Firestore data writes (rules read-only) at the start of the window. Keep Firebase Remote Config publishing and Crashlytics/Analytics collection operational.
 - [ ] Final delta export/import + verification.
 - [ ] Deploy backend (MySQL 8 + Redis), health checks, Filament access.
 - [ ] Ship Flutter release (`version: 4.3.0+7` or agreed number) to phone + TV tracks.
-- [ ] Monitor 24–48 h: login success rate, sync error rate, Filament error feed, ad CTR.
+- [ ] Monitor 24–48 h: Laravel API health/login/sync and ad counters; review app crashes and Google analytics in their existing Firebase/Google consoles, without a Laravel telemetry mirror.
 
 **F8.4 Post-cutover**
-- [ ] Firebase project downgraded to FCM-only usage; keep Auth export + hash config archived.
-- [ ] Remove rollout flags (`migration_flags.dart` simplifies to defaults on).
+- [ ] Firebase project continues Messaging, Remote Config, Crashlytics and Analytics usage; archive the Auth export/hash config and retire migrated Auth/Firestore data paths.
+- [ ] Remove development rollout flags (`migration_flags.dart` simplifies to defaults on), preserving Laravel's production runtime `config_source` selector and both providers.
 - [ ] Update `docs/migration_prd_firebase_to_laravel.md` status and this plan's checkboxes.
 
 ---
@@ -1340,15 +1459,16 @@ The scraper is a pure extraction service, matching the PRD Phase 2 objective.
 | Auth repository status mapping (401/409/422/429/403) | ✅ fixtures | login/signup widget flows | F2 |
 | Session restore/expiry | ✅ | routing to landing | F2 |
 | Google token exchange + collision message | ✅ fake Google client | TV + phone smoke | F2 |
-| Bootstrap parsing/theme v2 parity | ✅ fixtures + ported theme tests | offline boot | F3 |
+| Bootstrap parsing/theme v2 parity | ✅ original fixtures + ported theme tests | offline boot | F3 |
+| Laravel config-source choice / switching / ETag / offline / races | shared fixtures + controller/SDK boundary tests | same phone/TV build switches both ways on resume | F3.5 |
 | Ads shared fetch / queue / impressions | ✅ | placement manifest parity test | F4 |
 | Bookmarks union merge | ✅ | manual two-device | F5 |
 | Recents LWW + revision cursor + skew retry | ✅ ported tests | manual two-device | F5 |
 | Wellness pagination drain + ledger | ✅ ported tests | manual stale-history account | F5 |
 | Guest → account merge | ✅ | staging manual | F5 |
 | Device register / announcements dedupe | ✅ | resume smoke | F6 |
-| Sentry/telemetry error path | ✅ | crash test build | F6 |
-| Firebase removal grep + build | — | `flutter build apk --release` | F7 |
+| Retained Crashlytics/Google Analytics; no Laravel mirror | preserve hooks/payloads; assert no telemetry submissions | Google reporting smoke + consent controls | F6 |
+| Replaced Firebase SDK cleanup; retained SDK verification | import/native hook checks | release build + both config sources + Google reporting | F7 |
 | Full integration matrix | — | staging | F8 |
 
 ## 7. Definition of done / KPIs (adjusted)
@@ -1359,28 +1479,30 @@ The scraper is a pure extraction service, matching the PRD Phase 2 objective.
 | `flutter analyze` | 0 issues | current state |
 | Password resets for migrated users | 0 (backend already proven by Pest) | F2/F8 |
 | Data parity | 100% counts vs export manifest | F8 |
-| APK size | reduced; **measured**, not the PRD's ~3.5 MB (G2) | F7 |
-| Cold-start | reduced; measured, not the PRD's 250 ms while FCM/core remain (G2) | F7 |
+| APK size | measured vs baseline; no fixed reduction promised with five Firebase packages retained (G2) | F7 |
+| Cold-start | measured with all retained SDKs; no fixed 250 ms improvement promised (G2) | F7 |
 | TMDB metadata requests | served from cache on repeat/offline | F1 |
 | Scraper safe GETs | cached; streams never cached | F1 |
 | Ad placements | every slot fillable from Filament | F4 |
-| Admin toggles | themes/flags/ads manageable without deploys | F3/F4 |
+| Admin toggles | Laravel chooses config provider at each refresh; themes/flags/ads manageable without app deploys | F3.5/F4 |
+| Google reporting | Crashlytics/Analytics retained; no Laravel ingestion or duplication | F6/F7/F8 |
 
-## 8. Open decisions
+## 8. Decisions and recommendations
 
-| # | Decision | Recommendation | Needed by |
+| # | Decision | Resolution / recommendation | Needed by |
 |---|---|---|---|
 | D1 | Freezed scope | Incremental: new DTOs + VM states + converted-on-touch models (§1.4) | F0 |
-| D2 | Crash reporting replacement | Sentry Flutter for crashes + Laravel `/telemetry/errors` for non-fatal breadcrumbs | F6 |
+| D2 | Crash/analytics reporting — **resolved by user, 2026-10-04** | Keep Firebase Crashlytics and Google Analytics for Firebase, including native setup and existing events; no replacement or Laravel mirror. Existing Mixpanel usage unchanged. | F6/F7 |
 | D3 | Cache implementation | Selected `dio_cache_interceptor` for HTTP validation/serialization, with app policies and a bounded sqflite store | F1 |
 | D4 | Ads fetch strategy | One shared `GET /ads` + local placement filtering (matches today's `HostedAdsRepository`); `?placement=` remains available for server-side filtering if desired | F4 |
 | D5 | Sanctum token expiry | Keep never-expiring tokens + revocation on password/email change (current backend), or add `expiration` + refresh later | F2 |
-| D6 | Rollout switches | Compile-time `migration_flags` for development; single cutover release; no Firebase RC kill-switches in production | F0 |
+| D6 | Rollout/config source — **resolved by user, 2026-10-04** | Compile-time flags are development aids. Laravel chooses Firebase/Laravel config at every refresh in production too; retain both providers after F7. | F3.5/F8 |
 | D7 | Legacy placement aliasing | Keep legacy `home_movies`/`home_tv` targeting working alongside new `home_*_*` names | F4 |
 | D8 | TV ads placement names | Add `title_detail_tv`/`live_tv_strip_tv` to the backend enum so TV slots are targetable | F4 |
 | D9 | Scraper validation library | `zod` (runtime validation + inferred DTOs + OpenAPI generation) | S2 |
 | D10 | Scraper error envelope | `{success:false, message, errors?}` with `error` kept as a legacy alias; Flutter reads `success` first either way | S2 |
 | D11 | Scraper lifetime after cutover | Keep as the pure extraction service (recommended) vs. fold extraction into Laravel; either way S0–S3 are prerequisites | S0 |
+| D12 | Config selector contract | Implemented `data.config_source: firebase \| laravel` in public Laravel bootstrap, Filament-controlled and ETag-covered; last valid choice plus matching source cache offline. | F3.5 |
 
 ---
 

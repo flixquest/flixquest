@@ -31,14 +31,14 @@ void main() {
     final vm = BootstrapViewModel(
         ConfigRepository(dio, KvStore(sharedPrefsSingleton), now: () => now),
         provider);
-    controller = RefreshController(vm, now: () => now);
+    controller = RefreshController(vm);
   });
   tearDown(() {
     controller.dispose();
     provider.dispose();
     dio.close();
   });
-  test('boot fetches config and resume revalidates only after one hour',
+  test('boot fetches config and every resume revalidates the cached ETag',
       () async {
     adapter.enqueueJson({
       'success': true,
@@ -47,15 +47,13 @@ void main() {
       'etag': ['"v1"']
     });
     await controller.boot();
-    now = now.add(const Duration(hours: 1));
-    await controller.onResume();
-    expect(adapter.requests.length, 1);
-    now = now.add(const Duration(milliseconds: 1));
     adapter.enqueueJson(null, statusCode: 304);
     await controller.onResume();
-    expect(adapter.requests.last.headers['If-None-Match'], '"v1"');
-    await controller.onResume();
     expect(adapter.requests.length, 2);
+    expect(adapter.requests.last.headers['If-None-Match'], '"v1"');
+    adapter.enqueueJson(null, statusCode: 304);
+    await controller.onResume();
+    expect(adapter.requests.length, 3);
   });
   test('config push hints refresh immediately while unrelated messages do not',
       () async {

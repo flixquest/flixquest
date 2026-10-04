@@ -17,14 +17,18 @@ class ConfigRepository {
   static const _snapshotKey = 'config.bootstrap.snapshot';
   static const _etagKey = 'config.bootstrap.etag';
 
-  Map<String, dynamic>? _snapshot() {
+  Map<String, dynamic>? _snapshot({bool requireSource = false}) {
     final value = _store.getJson(_snapshotKey);
     if (value is! Map<String, dynamic> ||
         value['data'] is! Map<String, dynamic>) {
       return null;
     }
     try {
-      BootstrapConfig.fromJson(value['data'] as Map<String, dynamic>);
+      final config =
+          BootstrapConfig.fromJson(value['data'] as Map<String, dynamic>);
+      if (requireSource && !{'firebase', 'laravel'}.contains(config.configSource)) {
+        return null;
+      }
       return value;
     } catch (_) {
       return null;
@@ -36,11 +40,12 @@ class ConfigRepository {
     return time is String ? DateTime.tryParse(time)?.toUtc() : null;
   }
 
-  Future<BootstrapConfig> loadCached() async {
-    final snapshot = _snapshot();
+  Future<BootstrapConfig> loadCached({bool requireSource = false}) async {
+    final snapshot = _snapshot(requireSource: requireSource);
     if (snapshot != null) {
       return BootstrapConfig.fromJson(snapshot['data'] as Map<String, dynamic>);
     }
+    if (requireSource) return const BootstrapConfig();
     // First cutover can be offline before Laravel has ever returned a payload.
     final update = _legacy.getUpdateConfiguration();
     final theme = await _legacy.getOccasionalTheme();
@@ -70,8 +75,11 @@ class ConfigRepository {
     });
   }
 
-  Future<BootstrapConfig> refresh() async {
-    final snapshot = _snapshot();
+  Future<BootstrapConfig> refresh({
+    bool requireSource = false,
+    bool persistLegacy = true,
+  }) async {
+    final snapshot = _snapshot(requireSource: requireSource);
     final etag = snapshot?['etag'];
     try {
       var response = await _fetch(etag is String ? etag : null);
@@ -93,6 +101,10 @@ class ConfigRepository {
       }
       final data =
           Map<String, dynamic>.from(envelope['data'] as Map<String, dynamic>);
+      if (requireSource &&
+          !{'firebase', 'laravel'}.contains(data['config_source'])) {
+        throw const FormatException('Invalid config source');
+      }
       if (data.containsKey('occasional_theme')) {
         try {
           final theme = data['occasional_theme'];
@@ -102,7 +114,8 @@ class ConfigRepository {
           OccasionalThemeCatalog.fromJson(theme);
         } catch (_) {
           data['occasional_theme'] =
-              (await loadCached()).occasionalTheme.toJson();
+              (await loadCached(requireSource: requireSource))
+                  .occasionalTheme.toJson();
         }
       }
       final config = BootstrapConfig.fromJson(data);
@@ -117,10 +130,10 @@ class ConfigRepository {
       } else {
         await _store.setString(_etagKey, validator);
       }
-      await _persistLegacy(config, data);
+      if (persistLegacy) await _persistLegacy(config, data);
       return config;
     } catch (_) {
-      return loadCached();
+      return loadCached(requireSource: requireSource);
     }
   }
 

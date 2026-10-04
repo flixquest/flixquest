@@ -377,7 +377,7 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> getOccasionalTheme() async {
+  Future<void> getOccasionalTheme({bool preserveSelection = false}) async {
     _occasionalThemeCatalog = OccasionalThemeCatalog.fromJsonString(
       await _preferences.getOccasionalTheme(),
     );
@@ -386,7 +386,7 @@ class AppDependencyProvider extends ChangeNotifier {
     _occasionalThemeEnabled = await _preferences.getOccasionalThemeEnabled();
     _occasionalEffectsEnabled =
         await _preferences.getOccasionalEffectsEnabled();
-    _normalizeOccasionalThemeSelection(persist: true);
+    if (!preserveSelection) _normalizeOccasionalThemeSelection(persist: true);
     _scheduleOccasionalThemeBoundary();
     notifyListeners();
   }
@@ -436,10 +436,16 @@ class AppDependencyProvider extends ChangeNotifier {
     if (_effectSuppressionScopes.isEmpty) notifyListeners();
   }
 
-  set occasionalThemeCatalog(OccasionalThemeCatalog value) {
+  set occasionalThemeCatalog(OccasionalThemeCatalog value) =>
+      applyOccasionalThemeCatalog(value);
+
+  /// Provider switches may temporarily omit a theme the user chose. Resolve
+  /// the current catalog normally while keeping that preference for its return.
+  void applyOccasionalThemeCatalog(OccasionalThemeCatalog value,
+      {bool preserveSelection = false}) {
     _occasionalThemeCatalog = value;
     _preferences.setOccasionalTheme(value.toJsonString());
-    _normalizeOccasionalThemeSelection(persist: true);
+    if (!preserveSelection) _normalizeOccasionalThemeSelection(persist: true);
     _scheduleOccasionalThemeBoundary();
     notifyListeners();
   }

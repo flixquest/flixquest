@@ -4,6 +4,9 @@ import 'data/ads/ad_events_controller.dart';
 import 'services/hosted_ads_repository.dart';
 import 'presentation/config/bootstrap_view_model.dart';
 import 'presentation/config/refresh_controller.dart';
+import 'presentation/config/config_source_controller.dart';
+import 'data/sources/firebase_config_source.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'services/local_account_data.dart';
 import 'presentation/session/auth_runtime.dart';
 import 'presentation/session/session_view_model.dart';
@@ -164,7 +167,7 @@ Future<DevicePresentation> appInitialize({
   await bookmarkProvider.fetchBookmarks();
   await wellnessProvider.initialize();
   await appDependencyProvider.getFlixQuestLogo();
-  await appDependencyProvider.getOccasionalTheme();
+  await appDependencyProvider.getOccasionalTheme(preserveSelection: true);
   await appDependencyProvider.getAmbientMode();
   await appDependencyProvider.getFQUrl();
   await appDependencyProvider.getTmdbProxy();
@@ -194,11 +197,13 @@ void main() async {
     VisibilityDetectorController.instance.updateInterval = Duration.zero;
   }
   final adsController = injector.migrationFlags.ads ? AdEventsController(injector.adsRepository) : null;
-  RefreshController? configController;
-  if (injector.migrationFlags.config) {
+  ConfigLifecycle? configController;
+  if (!kDebugMode || injector.migrationFlags.config) {
     final bootstrap = BootstrapViewModel(injector.configRepository, appDependencyProvider);
-    await bootstrap.hydrate();
-    configController = RefreshController(bootstrap);
+    final sourceController = ConfigSourceController(injector.configRepository,
+        bootstrap, injector.kvStore, SdkFirebaseConfigSource());
+    await sourceController.hydrate();
+    configController = sourceController;
   }
   AuthRuntime.configure(injector.session, enabled: injector.migrationFlags.auth);
   SyncRuntime.configure(injector.syncCoordinator,

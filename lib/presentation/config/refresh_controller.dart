@@ -1,25 +1,26 @@
 import 'bootstrap_view_model.dart';
 
+abstract interface class ConfigLifecycle {
+  Future<void> boot();
+  Future<void> onResume();
+  Future<void> onPushData(Map<String, dynamic> data);
+  void dispose();
+}
+
 /// One refresh path for boot, lifecycle resume and FCM config hints.
-class RefreshController {
-  RefreshController(this.viewModel, {DateTime Function()? now})
-      : _now = now ?? DateTime.now;
+class RefreshController implements ConfigLifecycle {
+  RefreshController(this.viewModel);
   final BootstrapViewModel viewModel;
-  final DateTime Function() _now;
   Future<void>? _inFlight;
   bool _disposed = false;
   bool _hintPending = false;
 
+  @override
   Future<void> boot() => _refresh();
-  Future<void> onResume() {
-    final validated = viewModel.lastValidatedAt;
-    if (validated != null &&
-        _now().toUtc().difference(validated) <= const Duration(hours: 1)) {
-      return Future.value();
-    }
-    return _refresh();
-  }
+  @override
+  Future<void> onResume() => _refresh();
 
+  @override
   Future<void> onPushData(Map<String, dynamic> data) {
     final hint = data['refresh_config'];
     if (!{'config_updated', 'config_refresh'}.contains(data['type']) &&
@@ -48,6 +49,7 @@ class RefreshController {
     }
   }
 
+  @override
   void dispose() {
     if (_disposed) return;
     _disposed = true;
