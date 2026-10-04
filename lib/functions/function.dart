@@ -105,8 +105,8 @@ void fileDelete() async {
 int totalStreamingDuration = 0; // Keep track of the total streaming duration
 
 // Function to update and log the aggregate streaming duration
-void updateAndLogTotalStreamingDuration(int durationInSeconds) {
-  final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+void updateAndLogTotalStreamingDuration(int durationInSeconds, {FirebaseAnalytics? analytics}) {
+  analytics ??= FirebaseAnalytics.instance;
   totalStreamingDuration += durationInSeconds;
 
   // Log the new total duration as a custom event for tracking purposes

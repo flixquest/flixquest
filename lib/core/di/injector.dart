@@ -1,3 +1,5 @@
+import '../../data/repositories/announcement_repository.dart';
+import '../../data/repositories/device_repository.dart';
 import '../../data/repositories/bookmark_repository.dart';
 import '../../data/repositories/recently_watched_repository.dart';
 import '../../data/repositories/wellness_repository.dart';
@@ -39,6 +41,8 @@ class AppInjector {
     required this.authRepository,
     required this.configRepository,
     required this.adsRepository,
+    required this.deviceRepository,
+    required this.announcementRepository,
     required this.session,
     required this.syncCoordinator,
   });
@@ -56,6 +60,8 @@ class AppInjector {
   final AuthRepository authRepository;
   final ConfigRepository configRepository;
   final AdsRepository adsRepository;
+  final DeviceRepository deviceRepository;
+  final AnnouncementRepository announcementRepository;
   final SessionViewModel session;
   final LaravelSyncCoordinator syncCoordinator;
 
@@ -138,6 +144,8 @@ Future<AppInjector> buildInjector({
     authRepository: auth,
     configRepository: ConfigRepository(laravelClient, preferences),
     adsRepository: AdsRepository(laravelClient),
+    deviceRepository: DeviceRepository(laravelClient),
+    announcementRepository: AnnouncementRepository(laravelClient),
     session: session,
     syncCoordinator: sync,
   );

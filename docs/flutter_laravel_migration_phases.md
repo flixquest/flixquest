@@ -2,7 +2,7 @@
 
 **Document Version:** 1.1
 **Branch:** `feat/laravel`
-**Status:** F0 implemented and verified against the measured baseline (2026-10-03); F1 implemented and automatically verified (2026-10-03), device smoke pending; F2 implemented and automatically verified (2026-10-03), staging/device smoke pending; original F3 implemented and automatically verified (2026-10-03), device/Filament smoke pending, F3.5 server-controlled source selection implemented (2026-10-04), automated verification recorded below and device smoke pending; F4 implemented and automatically verified (2026-10-04), device/Filament smoke pending; F5 implemented (2026-10-04), automated verification recorded below and two-device/staging smoke pending; F6–F8 pending
+**Status:** F0 implemented and verified against the measured baseline (2026-10-03); F1 implemented and automatically verified (2026-10-03), device smoke pending; F2 implemented and automatically verified (2026-10-03), staging/device smoke pending; original F3 implemented and automatically verified (2026-10-03), device/Filament smoke pending, F3.5 server-controlled source selection implemented (2026-10-04), automated verification recorded below and device smoke pending; F4 implemented and automatically verified (2026-10-04), device/Filament smoke pending; F5 implemented (2026-10-04), automated verification recorded below and two-device/staging smoke pending; F6 implemented (2026-10-04), automated verification recorded below and phone/TV Google reporting + push smoke pending; F7–F8 pending
 **Sources of truth:**
 - `docs/migration_prd_firebase_to_laravel.md` (this repo)
 - `~/Documents/web/phplaravel/flixquest-backend` — backend + `docs/migration_phases.md` (Phases 1 & 3 complete)
@@ -747,7 +747,7 @@ Laravel selects the source on every refresh; Firebase and Laravel config both wo
 ### F3.5 implementation handover — 2026-10-04
 
 Implemented on `feat/laravel-f3-config-source`, continuing the committed F5 work.
-F6 has not started. No commits, pushes or PRs were created.
+F6 had not started at this handover. No commits, pushes or PRs were created.
 
 - Laravel bootstrap now returns `data.config_source`. `AppConfigurationSeeder`
   creates a `laravel` default without replacing an operator's existing choice.
@@ -1092,7 +1092,7 @@ No Firestore import remains in `lib/services/*sync*`, `lib/provider/wellness_pro
 
 F5.1–F5.5 are implemented on `feat/laravel-f5-sync`. Enable the Laravel
 path with `FLIXQUEST_MIGRATION=auth,config,ads,sync`; `sync` requires Laravel
-`auth`. F6 has not started. F5.6 and authenticated staging/device verification
+`auth`. F6 had not started at this handover. F5.6 and authenticated staging/device verification
 remain user-run; automated tests use scripted Dio responses and real temporary
 SQLite databases, plus isolated Laravel feature tests.
 
@@ -1159,7 +1159,7 @@ the delete/re-add race, cross-account deletion/journaling and delayed player sav
 they now pass. The pre-existing subtitle-order failure was left unchanged.
 
 F5's implementation and automated verification are complete. Its staging and
-two-device exit checks remain open; F6 has not started.
+two-device exit checks remain open; F6 had not started at this handover.
 
 User-run F5.6 checklist: run both devices with the migration flags and a reachable
 Laravel URL, sign into the same account, sync distinct progress, verify newest
@@ -1185,25 +1185,123 @@ Register FCM tokens with Laravel and poll announcements while preserving FCM dat
 ### Milestones
 
 **F6.1 Device push registration**
-- [ ] `DeviceRepository.register(fcmToken, platform, appVersion)` → `POST /devices/register`; call after login and on `FirebaseMessaging.onTokenRefresh`; skip when guest.
-- [ ] Persist last registered token in `KvStore` to avoid duplicate calls; re-register on boot when signed in.
-- [ ] Keep `FirebaseMessaging.onBackgroundMessage` in `main.dart` (retained FCM).
-- [ ] Tests: payload shape (snake + camel accepted), no-op for guests, refresh re-registers.
+- [x] `DeviceRepository.register(fcmToken, platform, appVersion)` → `POST /devices/register`; call after login and on `FirebaseMessaging.onTokenRefresh`; skip when guest.
+- [x] Persist last registered token in `KvStore` to avoid duplicate calls; re-register on boot when signed in.
+- [x] Keep `FirebaseMessaging.onBackgroundMessage` in `main.dart` (retained FCM).
+- [x] Tests: payload shape (snake + camel accepted), no-op for guests, refresh re-registers.
 
 **F6.2 In-app messages**
-- [ ] `AnnouncementRepository.fetchActive()` → `GET /messages/active` (15 min cache); poll on resume + cold start (throttled), and still accept FCM `data.type == 'in_app_message'` payloads.
-- [ ] `InAppMessagingService` builds `InAppMessagePayload` from either source; dedupe by announcement `id` in `KvStore` so a message is not shown twice.
-- [ ] `InAppMessageDialog` unchanged.
-- [ ] Tests: both sources, dedupe, display types modal/bottom_sheet/banner.
+- [x] `AnnouncementRepository.fetchActive()` → `GET /messages/active` (15 min cache); poll on resume + cold start (throttled), and still accept FCM `data.type == 'in_app_message'` payloads.
+- [x] `InAppMessagingService` builds `InAppMessagePayload` from either source; dedupe by announcement `id` in `KvStore` so a message is not shown twice.
+- [x] `InAppMessageDialog` unchanged.
+- [x] Tests: both sources, dedupe, display types modal/bottom_sheet/banner.
 
 **F6.3 Preserve Google reporting (resolved decision D2)**
-- [ ] Keep `FirebaseCrashlytics` initialization/error handlers in `main.dart`, including `_isRecoverableImageError`, fatal/non-fatal handling and existing collection controls. Keep Android/iOS Crashlytics integrations and symbol/mapping uploads.
-- [ ] Keep `firebase_analytics`, existing Analytics calls and `updateAndLogTotalStreamingDuration` in `lib/functions/function.dart` using the existing Google Analytics path. Preserve existing consent/collection behavior.
-- [ ] Do not introduce Sentry as a replacement, a Laravel `TelemetryRepository`, `/telemetry/errors` client submissions, analytics ingestion endpoints, or forwarding/duplication of these events to Laravel. Existing Mixpanel usage continues unchanged; this phase does not migrate Google events to Mixpanel.
-- [ ] Tests/smoke: Google reporting hooks remain wired, error-handler filtering and recursion safeguards remain intact, existing analytics payloads are preserved, and Laravel requests contain no mirrored crash reports/analytics events. Verify retained SDKs on phone and TV.
+- [x] Keep `FirebaseCrashlytics` initialization/error handlers in `main.dart`, including `_isRecoverableImageError`, fatal/non-fatal handling and existing collection controls. Keep Android/iOS Crashlytics integrations and symbol/mapping uploads.
+- [x] Keep `firebase_analytics`, existing Analytics calls and `updateAndLogTotalStreamingDuration` in `lib/functions/function.dart` using the existing Google Analytics path. Preserve existing consent/collection behavior.
+- [x] Do not introduce Sentry as a replacement, a Laravel `TelemetryRepository`, `/telemetry/errors` client submissions, analytics ingestion endpoints, or forwarding/duplication of these events to Laravel. Existing Mixpanel usage continues unchanged; this phase does not migrate Google events to Mixpanel.
+- [x] Automated checks: Google reporting hooks remain wired, the existing image filter remains unchanged, SDK failure/recursion guards and existing analytics payloads are tested. Client reporting paths call the Google SDKs without Laravel ingestion or mirroring.
+- [ ] User-run smoke: verify retained Google reporting SDKs and collection/consent behavior on phone and TV, including real FCM delivery.
 
 ### Exit criteria
 Device tokens registered; announcements render from both sources; Crashlytics and Firebase Analytics remain operational with existing behavior; no Laravel crash/analytics tracking is added; suite preserves the documented baseline.
+
+
+### F6 implementation handover — 2026-10-04
+
+Implemented on `feat/laravel-f6-notifications`, continuing committed F3.5
+(`ec702a1`). Enable this phase with
+`--dart-define=FLIXQUEST_MIGRATION=auth,config,ads,sync,notifications` and a
+reachable `--dart-define=LARAVEL_API_URL=<Laravel base URL>`. Device registration
+uses the Laravel session; public announcements also work for guests. F7 has not
+started. No commits, pushes or PRs were created.
+
+- `DeviceRepository` sends authenticated, uncached snake-case fields. The
+  controller registers on authenticated cold boot, login/account changes and
+  token refresh, then suppresses unchanged resumes and duplicate refreshes.
+  The durable receipt contains owner, FCM token, platform and app version.
+  Guests do not look up or upload a token. Missing tokens, SDK failures and
+  failed HTTP calls retry on resume; late responses cannot acknowledge a
+  different owner or overwrite a newer token. An owner guard in the shared
+  auth interceptor rejects queued registrations for a previous account.
+- The Freezed `Announcement` DTO accepts resource aliases and nullable bodies.
+  `AnnouncementRepository` polls the public endpoint, coalesces concurrent
+  requests and throttles successful polls (including empty catalogs) for
+  fifteen minutes. Shared HTTP caching supports ETag revalidation and the
+  existing seven-day offline deadline. Inactive/expired cached messages are
+  filtered on each read; invalid rows do not hide valid announcements.
+- `InAppMessageController` queues API and FCM messages through the unchanged
+  dialog. API `id` and FCM `announcement_id` share installation-level durable
+  deduplication, acknowledged when presentation opens, before dismissal.
+  Pending duplicates are suppressed, dialogs are serialized, unavailable
+  navigation retains messages and queued expired messages are dropped.
+  Legacy FCM aliases/manual messages remain supported; ID-less messages cannot
+  be durably deduplicated. The SDK adapter uses the FCM message ID as a fallback
+  identity when no announcement ID is present.
+- `InAppMessagingService` owns/cancels foreground and notification-tap
+  subscriptions and handles cold-start notification taps. Late initial-message
+  responses after disposal are ignored. Config hints still reach the F3.5
+  controller; failed config refreshes do not interrupt message delivery.
+  `FlixQuest` starts both controllers and refreshes on resume through the
+  shared phone/TV root. Platform registration uses `android`, `ios` or `tv`.
+  The existing background FCM handler and permission flow remain in place;
+  registration retries after that permission flow completes.
+- Firebase initialization, `_isRecoverableImageError`, Google collection
+  controls and native integrations are retained. `GoogleErrorReporting` routes
+  the same fatal Flutter/platform reports to Crashlytics and contains SDK
+  failures and synchronous recursion. Streaming-duration events retain
+  `total_streaming_duration` and cumulative `duration_seconds`; the helper's
+  optional SDK argument only permits testing the existing Google path. Other
+  Analytics/Crashlytics calls and Mixpanel are unchanged. No Sentry dependency,
+  Laravel telemetry repository, reporting submission or Google event mirror
+  was introduced.
+
+Files added: announcement DTO and its two generated outputs; device and
+announcement repositories; the push SDK adapter; three notification controllers;
+Google reporting guard; seven test files and fake push SDK support. Existing
+files changed: injector, auth interceptor, main/shared app root, in-app message
+payload/service and streaming-duration helper, plus this document. No UI dialog,
+`lib/tv/**`, native setup, package/dependency file or backend source was changed.
+
+| Check | Result |
+|---|---|
+| Flutter analyze | **0 issues** (`/tmp/f6-analyze-final.log`). Two style notices in new files were resolved; no existing file was formatted. |
+| Added F6 coverage | **31 new tests across 7 files, all passed** (`/tmp/f6-targeted-final.log`), including token/account races, guest mode, public polling/cache expiry, API/FCM deduplication, late disposal, all three display types, cold taps, Google payload preservation and SDK failure/recursion guards. |
+| Full Flutter suite | **148 files, 1,027 executed: 1,026 passed / 1 existing failure** (`/tmp/f6-full-suite-final.jsonl`, hidden loader tests excluded). `subtitle_options_test.dart` retains its incoming-preference-order failure; the known `player_menu_route_test.dart` passed. Neither baseline test was edited, skipped or weakened. Final style-only braces were followed by the analyzer and all 31 F6 tests. |
+| Laravel tests | Targeted compatibility/push checks: **29 passed, 151 assertions**. Full suite: **229 passed, 1,115 assertions** (`/tmp/f6-backend-targeted.log`, `/tmp/f6-backend-full.log`), using the existing isolated memory database and mocked FCM transport. |
+| Code generation | Successful rebuild (`/tmp/f6-codegen-final.log`); repeat build wrote **0 outputs** (`/tmp/f6-codegen-repeat.log`). All **19 pre-F6 tracked generated files** retain their hashes; the **2 new announcement outputs** are stable. |
+| Google/native preservation | All **7 checked native setup files** retain their pre-F6 hashes; dependency files, Firebase background handler, image-filter body and collection controls remain unchanged. Reporting uses the existing Google SDKs; no client telemetry ingestion/mirroring was added. Real Google console/device verification remains pending. |
+| Live Herd smoke | Public `GET /api/v1/messages/active` returned **200**, `success: true`, an empty catalog and an ETag; conditional revalidation returned **304**. No live campaign, account or device token was created. |
+| Diff checks | Flutter and Laravel `git diff --check` clean. Existing backend changes were preserved; no backend source edits, commits, pushes or PRs were made in F6. |
+
+The first registration and queue tests failed against their stubs before
+implementation. Additional failing checks exposed the in-flight identical-token
+upload and SDK reporting failure/recursion cases; they now pass. The full suite
+preserves the documented baseline and adds all 31 F6 cases.
+
+User-run exit checks remain open:
+
+- On phone and TV, sign in with the migration defines and a device-reachable
+  Laravel URL. Verify device registration (`tv` on TV), a cold-launch
+  re-registration, no guest upload and an updated token after FCM rotation.
+- Create an active announcement in Filament for each display type; poll it,
+  deliver/tap its FCM message and cold-launch from the notification. Confirm
+  one presentation across sources and restarts, and check offline/resume
+  behavior. Herd returned an empty public catalog during this phase, so real
+  campaign rendering/delivery remains a device smoke.
+- Configure backend Firebase credentials and run the queue worker in the target
+  environment for real push delivery. Automated backend tests mock outbound
+  FCM; this phase sent no real push and created no live accounts/campaigns.
+- Verify Google Analytics DebugView receives the existing duration event and
+  Crashlytics receives an intentional test report under the existing collection
+  settings. Confirm reports/events go to Google, with no Laravel submissions.
+  The repository currently contains Android native setup; iOS device/build
+  verification requires the target's iOS project and remains pending.
+
+A hot restart does not change compile-time defines; restart the user's existing
+run with these arguments for the smoke. No device was installed, run or operated
+by the agent. F6's automated implementation can be reviewed now; device/staging
+exit criteria remain pending before production cutover.
 
 ---
 

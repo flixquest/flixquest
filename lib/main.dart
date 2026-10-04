@@ -1,3 +1,9 @@
+import 'services/google_error_reporting.dart';
+import 'presentation/notifications/device_registration_controller.dart';
+import 'presentation/notifications/in_app_message_controller.dart';
+import 'presentation/notifications/notification_controller.dart';
+import 'data/sources/push_messaging_client.dart';
+import 'services/in_app_messaging_service.dart';
 import 'data/sync/sync_runtime.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'data/ads/ad_events_controller.dart';
@@ -91,14 +97,10 @@ Future<DevicePresentation> appInitialize({
 
   // Surface uncaught Dart and platform errors to Crashlytics. Installed only
   // after Firebase initialization so the recorder is always ready.
-  FlutterError.onError = (details) {
-    if (_isRecoverableImageError(details)) return;
-    FirebaseCrashlytics.instance.recordFlutterFatalError(details);
-  };
-  PlatformDispatcher.instance.onError = (error, stackTrace) {
-    FirebaseCrashlytics.instance.recordError(error, stackTrace, fatal: true);
-    return true;
-  };
+  final reporting = GoogleErrorReporting(FirebaseCrashlytics.instance,
+      ignoreFlutterError: _isRecoverableImageError);
+  FlutterError.onError = reporting.flutterError;
+  PlatformDispatcher.instance.onError = reporting.platformError;
 
   final devicePresentation = await resolveDevicePresentation(
     detector: devicePresentationDetector,
@@ -231,6 +233,19 @@ void main() async {
       unawaited(injector.syncCoordinator.syncAll());
     }
   }
+  NotificationController? notifications;
+  if (injector.migrationFlags.notifications) {
+    final messaging = SdkPushMessagingClient();
+    notifications = NotificationController(
+      DeviceRegistrationController(injector.deviceRepository, injector.session,
+          injector.kvStore, messaging,
+          platform: devicePresentation == DevicePresentation.television ? 'tv' : Platform.isIOS ? 'ios' : 'android',
+          appVersion: currentAppVersion),
+      InAppMessageController(injector.announcementRepository, injector.kvStore,
+          InAppMessagingService.present),
+      messaging,
+    );
+  }
   NetworkRuntime.configure(publicDio: injector.publicDio,
       httpCache: injector.httpCache, tmdb: injector.tmdbRepository);
   Timer.run(() => unawaited(injector.httpCache.pruneExpired().catchError((Object _) {})));
@@ -255,6 +270,7 @@ void main() async {
       devicePresentation: devicePresentation,
       configController: configController,
       adsController: adsController,
+      notifications: notifications,
     ),
   ))));
 }

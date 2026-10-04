@@ -1,3 +1,4 @@
+import 'presentation/notifications/notification_controller.dart';
 import 'data/sync/sync_runtime.dart';
 import 'services/bookmark_sync_service.dart';
 import 'data/ads/ad_events_controller.dart';
@@ -39,6 +40,7 @@ class FlixQuest extends StatefulWidget {
       required this.devicePresentation,
       this.configController,
       this.adsController,
+      this.notifications,
       super.key});
 
   final SettingsProvider settingsProvider;
@@ -48,6 +50,7 @@ class FlixQuest extends StatefulWidget {
   final DevicePresentation devicePresentation;
   final ConfigLifecycle? configController;
   final AdEventsController? adsController;
+  final NotificationController? notifications;
 
   @override
   State<FlixQuest> createState() => _FlixQuestState();
@@ -67,7 +70,10 @@ class _FlixQuestState extends State<FlixQuest>
       _legacyConfig = legacy;
       await legacy.start();
     }
-    if (mounted) await requestNotificationPermissions();
+    if (mounted) {
+      await requestNotificationPermissions();
+      if (mounted) await widget.notifications?.devices.onResume();
+    }
   }
 
   @override
@@ -79,9 +85,12 @@ class _FlixQuestState extends State<FlixQuest>
     _initConfig();
     unawaited(widget.adsController?.boot());
     fileDelete();
-    InAppMessagingService.initialize(onConfigHint: widget.configController?.onPushData);
+    InAppMessagingService.initialize(onConfigHint: widget.configController?.onPushData,
+        messages: widget.notifications?.messages, messaging: widget.notifications?.messaging);
+    unawaited(widget.notifications?.boot());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       DeepLinkDispatcher.onAppReady();
+      unawaited(widget.notifications?.messages.onReady());
       unawaited(_refreshHomeWidgets());
     });
   }
@@ -115,6 +124,7 @@ class _FlixQuestState extends State<FlixQuest>
     DeepLinkDispatcher.onAppReady();
     unawaited(widget.configController?.onResume());
     unawaited(widget.adsController?.onResume());
+    unawaited(widget.notifications?.onResume());
     unawaited(_refreshHomeWidgets());
     unawaited(RecentlyWatchedSyncService.instance.autoSyncIfSignedIn());
     if (SyncRuntime.enabled) {
@@ -132,7 +142,8 @@ class _FlixQuestState extends State<FlixQuest>
     _legacyConfig?.dispose();
     widget.configController?.dispose();
     unawaited(widget.adsController?.dispose());
-    InAppMessagingService.configHintHandler = null;
+    InAppMessagingService.dispose();
+    widget.notifications?.dispose();
     super.dispose();
   }
 
