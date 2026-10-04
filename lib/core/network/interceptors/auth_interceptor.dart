@@ -10,6 +10,12 @@ class AuthInterceptor extends Interceptor {
     final uri = options.uri;
     final allowed = uri.origin == _api.origin && uri.path.startsWith(_api.path);
     options.extra.remove('sessionToken');
+    final syncOwner = options.extra['syncOwner'];
+    if (syncOwner != null && syncOwner != session.ownerId.value) {
+      handler.reject(DioException(requestOptions: options,
+          type: DioExceptionType.cancel, message: 'Sync account changed.'));
+      return;
+    }
     if (allowed &&
         options.extra['authRequired'] != false &&
         session.token != null) {

@@ -1,3 +1,4 @@
+import '../data/sync/library_scope.dart';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
@@ -32,7 +33,7 @@ Future<void> _addSyncColumns(
 
 class RecentlyWatchedMoviesController {
   static RecentlyWatchedMoviesController? _recentlyWatchedMoviesController;
-  Database? _database;
+  final Map<String, Future<Database>> _databases = {};
   String tableName = 'recently_watched_movies_table';
   String colId = 'id';
   String colTitle = 'title';
@@ -51,9 +52,11 @@ class RecentlyWatchedMoviesController {
     return _recentlyWatchedMoviesController!;
   }
 
-  Future<Database> initializeDatabase() async {
-    Directory directory = await getApplicationDocumentsDirectory();
-    String path = '${directory.path}recent_movies.db';
+  Future<Database> initializeDatabase({String? owner, String? directoryPath}) async {
+    final capturedOwner = owner ?? LibraryScope.owner;
+    Directory directory = directoryPath == null
+        ? await getApplicationDocumentsDirectory() : Directory(directoryPath);
+    String path = LibraryScope.filename('${directory.path}recent_movies.db', capturedOwner);
     var recentMoviesDatabase = await openDatabase(
       path,
       version: 2,
@@ -72,11 +75,15 @@ class RecentlyWatchedMoviesController {
   }
 
   Future<Database> get database async {
-    _database ??= await initializeDatabase();
-    return _database!;
+    return databaseForOwner(LibraryScope.owner);
   }
 
-  void _createDb(Database db, int newVersion) async {
+  Future<Database> databaseForOwner(String owner) {
+    final key = LibraryScope.enabled ? owner : 'legacy';
+    return _databases.putIfAbsent(key, () => initializeDatabase(owner: owner));
+  }
+
+  Future<void> _createDb(Database db, int newVersion) async {
     await db.execute(
         'CREATE TABLE $tableName($colId INTEGER PRIMARY KEY, $colTitle TEXT, $posterPathCol TEXT, $backdropPathCol TEXT, $colReleaseYear INTEGER, $elapsedCol NUMERIC, $remainingCol NUMERIC, $dateTimeCol TEXT, $_updatedAtCol INTEGER, $_deletedAtCol INTEGER, $_syncedCol INTEGER NOT NULL DEFAULT 0)');
   }
@@ -108,7 +115,7 @@ class RecentlyWatchedMoviesController {
   /// the other devices on the next sync.
   Future<int> tombstoneMovie(int id) async {
     var db = await database;
-    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final now = LibraryScope.nowUtcMs();
     return db.update(
       tableName,
       <String, dynamic>{
@@ -224,7 +231,7 @@ class RecentlyWatchedMoviesController {
 
 class RecentlyWatchedEpisodeController {
   static RecentlyWatchedEpisodeController? _recentlyWatchedEpisodeController;
-  static Database? _database;
+  static final Map<String, Future<Database>> _databases = {};
   String tableName = 'recently_watched_tv_shows_table';
   String colId = 'id';
   String colTitle = 'series_name';
@@ -244,9 +251,11 @@ class RecentlyWatchedEpisodeController {
         RecentlyWatchedEpisodeController._createInstance();
     return _recentlyWatchedEpisodeController!;
   }
-  Future<Database> initializeDatabase() async {
-    Directory directory = await getApplicationDocumentsDirectory();
-    String path = '${directory.path}recent_episodes_v2.db';
+  Future<Database> initializeDatabase({String? owner, String? directoryPath}) async {
+    final capturedOwner = owner ?? LibraryScope.owner;
+    Directory directory = directoryPath == null
+        ? await getApplicationDocumentsDirectory() : Directory(directoryPath);
+    String path = LibraryScope.filename('${directory.path}recent_episodes_v2.db', capturedOwner);
     var episodesDatabase = await openDatabase(
       path,
       version: 3,
@@ -270,11 +279,15 @@ class RecentlyWatchedEpisodeController {
   }
 
   Future<Database> get database async {
-    _database ??= await initializeDatabase();
-    return _database!;
+    return databaseForOwner(LibraryScope.owner);
   }
 
-  void _createDb(Database db, int newVersion) async {
+  Future<Database> databaseForOwner(String owner) {
+    final key = LibraryScope.enabled ? owner : 'legacy';
+    return _databases.putIfAbsent(key, () => initializeDatabase(owner: owner));
+  }
+
+  Future<void> _createDb(Database db, int newVersion) async {
     await db.execute(
         'CREATE TABLE $tableName($colId INTEGER PRIMARY KEY, $colSeriesId INTEGER, $colTitle TEXT, $colEpisodeTitle TEXT, $colEpisodeNum INTEGER, $colSeasonNum INTEGER, $colElapsed NUMERIC, $colRemaining NUMERIC, $colPosterPath TEXT, $colBackdropPath TEXT, $colDateAdded TEXT, $_updatedAtCol INTEGER, $_deletedAtCol INTEGER, $_syncedCol INTEGER NOT NULL DEFAULT 0)');
   }
@@ -310,7 +323,7 @@ class RecentlyWatchedEpisodeController {
   /// the removal up on their next sync.
   Future<int> tombstoneTV(int id, int episodeNum, int seasonNum) async {
     var db = await database;
-    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final now = LibraryScope.nowUtcMs();
     return db.update(
       tableName,
       <String, dynamic>{

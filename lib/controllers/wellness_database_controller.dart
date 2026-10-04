@@ -1,3 +1,4 @@
+import '../data/sync/library_scope.dart';
 import 'dart:convert';
 
 import 'package:path/path.dart';
@@ -7,17 +8,23 @@ import '../models/wellness.dart';
 
 class WellnessDatabaseController {
   WellnessDatabaseController._();
+  WellnessDatabaseController.forDatabase(Database database) : _database = database;
 
   static final WellnessDatabaseController instance =
       WellnessDatabaseController._();
 
   Database? _database;
+  Future<Database>? _opening;
 
   Future<Database> get database async {
     final existing = _database;
     if (existing != null) return existing;
-    final path = join(await getDatabasesPath(), 'flixquest_wellness_v1.db');
-    return _database = await openDatabase(
+    return _database = await (_opening ??= initializeDatabase());
+  }
+
+  Future<Database> initializeDatabase({String? databasePath}) async {
+    final path = databasePath ?? join(await getDatabasesPath(), 'flixquest_wellness_v1.db');
+    return openDatabase(
       path,
       // Columns added since version 1 are nullable and added in [onOpen]
       // rather than by a version bump, so a build that predates them can
@@ -184,7 +191,7 @@ class WellnessDatabaseController {
 
   Future<void> tombstoneSession(String ownerId, String id) async {
     final db = await database;
-    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final now = LibraryScope.nowUtcMs();
     await db.update(
       'wellness_sessions',
       <String, Object?>{
@@ -200,7 +207,7 @@ class WellnessDatabaseController {
 
   Future<void> tombstoneAll(String ownerId) async {
     final db = await database;
-    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final now = LibraryScope.nowUtcMs();
     await db.update(
       'wellness_sessions',
       <String, Object?>{
@@ -229,7 +236,7 @@ class WellnessDatabaseController {
     required String toOwnerId,
   }) async {
     final db = await database;
-    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final now = LibraryScope.nowUtcMs();
     await db.update(
       'wellness_sessions',
       <String, Object?>{

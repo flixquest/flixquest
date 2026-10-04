@@ -164,6 +164,7 @@ class Movie {
   }
 
   Movie.fromMapObject(Map<String, dynamic> map) {
+    dateAdded = map['date_added'] as String?;
     id = map['id'];
     title = map['title'];
     genreIds = parseGenreIds(map['genre_ids']);

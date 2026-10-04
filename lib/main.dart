@@ -1,3 +1,4 @@
+import 'data/sync/sync_runtime.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import 'data/ads/ad_events_controller.dart';
 import 'services/hosted_ads_repository.dart';
@@ -200,10 +201,30 @@ void main() async {
     configController = RefreshController(bootstrap);
   }
   AuthRuntime.configure(injector.session, enabled: injector.migrationFlags.auth);
+  SyncRuntime.configure(injector.syncCoordinator,
+      enabled: injector.migrationFlags.auth && injector.migrationFlags.sync);
+  if (SyncRuntime.enabled) {
+    await BookmarkSyncService.instance.init();
+    await RecentlyWatchedSyncService.instance.init();
+    wellnessProvider.syncService.bind();
+    injector.session.ownerId.addListener(() {
+      bookmarkProvider.resetForOwner();
+      recentProvider.resetForOwner();
+      unawaited(bookmarkProvider.fetchBookmarks());
+      unawaited(recentProvider.fetchMovies());
+      unawaited(recentProvider.fetchEpisodes());
+    });
+  }
   if (AuthRuntime.enabled) {
     await injector.session.restore();
     AuthSessionController.instance.initialize();
     await wellnessProvider.bindLaravelOwner(injector.session.ownerId);
+    if (SyncRuntime.enabled) {
+      await bookmarkProvider.fetchBookmarks();
+      await recentProvider.fetchMovies();
+      await recentProvider.fetchEpisodes();
+      unawaited(injector.syncCoordinator.syncAll());
+    }
   }
   NetworkRuntime.configure(publicDio: injector.publicDio,
       httpCache: injector.httpCache, tmdb: injector.tmdbRepository);

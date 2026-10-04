@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../data/sync/library_scope.dart';
 
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -53,6 +54,7 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
     _wellnessTracker = WellnessPlaybackTracker(
       id: _wellnessSessionId,
       createdAt: now,
+      libraryGeneration: LibraryScope.generation,
     );
   }
 

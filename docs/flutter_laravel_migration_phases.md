@@ -2,7 +2,7 @@
 
 **Document Version:** 1.0
 **Branch:** `feat/laravel`
-**Status:** F0 implemented and verified against the measured baseline (2026-10-03); F1 implemented and automatically verified (2026-10-03), device smoke pending; F2 implemented and automatically verified (2026-10-03), staging/device smoke pending; F3 implemented and automatically verified (2026-10-03), device/Filament smoke pending; F4–F8 pending
+**Status:** F0 implemented and verified against the measured baseline (2026-10-03); F1 implemented and automatically verified (2026-10-03), device smoke pending; F2 implemented and automatically verified (2026-10-03), staging/device smoke pending; F3 implemented and automatically verified (2026-10-03), device/Filament smoke pending; F4 implemented and automatically verified (2026-10-04), device/Filament smoke pending; F5 implemented (2026-10-04), automated verification recorded below and two-device/staging smoke pending; F6–F8 pending
 **Sources of truth:**
 - `docs/migration_prd_firebase_to_laravel.md` (this repo)
 - `~/Documents/web/phplaravel/flixquest-backend` — backend + `docs/migration_phases.md` (Phases 1 & 3 complete)
@@ -918,7 +918,7 @@ User-run smoke remains pending (no device or UI preview by the agent):
    campaign and verify empty/disabled slots preserve Start.io behavior.
 5. Remove `ads` from the migration flag and restart to verify rollback.
 
-Work stops at F4. F5 sync is not started.
+F4 implementation is complete. F5 status follows below.
 
 ### Rollback
 `migration_flags.ads` off restores the scraper fetcher (keep it until F7).
@@ -933,36 +933,36 @@ Replace Firestore's union-merge/LWW sync with the Laravel batch endpoints, using
 ### Milestones
 
 **F5.1 Bookmarks**
-- [ ] Freezed `BookmarkDto` (or keep the legacy `Movie`/`TV` models with explicit mapping) + `BookmarkRepository`.
-- [ ] `sync(movies, tvShows, deletedMedia)` → `POST /sync/bookmarks`; response union-merged into SQLite with the existing genre-backfill behavior (`_keepGenres`).
-- [ ] `deleteMedia(type, id)` → `DELETE /sync/bookmarks/{type}/{id}`.
-- [ ] Keep `BookmarkSyncService` public API (`init`, `onBookmarkChanged`, `statusNotifier`, `lastSyncedNotifier`) as an adapter; delete Firestore internals.
-- [ ] Debounce 3 s, auto-sync 10 min (existing constants preserved).
+- [x] Freezed `BookmarkDto` (or keep the legacy `Movie`/`TV` models with explicit mapping) + `BookmarkRepository`.
+- [x] `sync(movies, tvShows, deletedMedia)` → `POST /sync/bookmarks`; response union-merged into SQLite with the existing genre-backfill behavior (`_keepGenres`).
+- [x] `deleteMedia(type, id)` → `DELETE /sync/bookmarks/{type}/{id}`.
+- [x] Keep `BookmarkSyncService` public API (`init`, `onBookmarkChanged`, `statusNotifier`, `lastSyncedNotifier`) as an adapter; delete Firestore internals.
+- [x] Debounce 3 s, auto-sync 10 min (existing constants preserved).
 
 **F5.2 Recently watched**
-- [ ] Convert `RecentMovie`/`RecentEpisode` mapping to the backend field names (add `sync_revision`, `synced_at_utc` handling); keep SQLite columns.
-- [ ] `RecentlyWatchedRepository.sync(...)` → `POST /sync/recently-watched` with `since_revision` (preferred) and `client_time_utc`.
-- [ ] Replace `SyncCheckpoint` with `SyncCursor` in `KvStore` (per user): `serverRevision`, `lastServerTimeUtc`, `lastSyncAt`, `lastFullPullAt`; full pull every 7 days, or when the server replies `since_revision` ahead / requires full sync.
-- [ ] `ServerClock.record(serverTimeUtc)` on every sync; outgoing `updated_at_utc` stamped through the corrected clock; on `422 clock_skew_detected` record server time, recompute offset, retry once, then surface an error.
-- [ ] Keep debounce 5 s, auto-sync 2 min, flush on background (`flushPending`), 450-row batches, local tombstone pruning (server prunes at 90 d).
-- [ ] Port `test/recent_watched_sync_test.dart` and `test/sync_checkpoint_test.dart` to the new cursor/revision semantics; add skew-retry and revision-ahead full-sync tests.
+- [x] Convert `RecentMovie`/`RecentEpisode` mapping to the backend field names (add `sync_revision`, `synced_at_utc` handling); keep SQLite columns.
+- [x] `RecentlyWatchedRepository.sync(...)` → `POST /sync/recently-watched` with `since_revision` (preferred) and `client_time_utc`.
+- [x] Replace `SyncCheckpoint` with `SyncCursor` in `KvStore` (per user): `serverRevision`, `lastServerTimeUtc`, `lastSyncAt`, `lastFullPullAt`; full pull every 7 days, or when the server replies `since_revision` ahead / requires full sync.
+- [x] `ServerClock.record(serverTimeUtc)` on every sync; outgoing `updated_at_utc` stamped through the corrected clock; on `422 clock_skew_detected` record server time, recompute offset, retry once, then surface an error.
+- [x] Keep debounce 5 s, auto-sync 2 min, flush on background (`flushPending`), 450-row batches, local tombstone pruning (server prunes at 90 d).
+- [x] Port `test/recent_watched_sync_test.dart` and `test/sync_checkpoint_test.dart` to the new cursor/revision semantics; add skew-retry and revision-ahead full-sync tests.
 
 **F5.3 Wellness**
-- [ ] `WellnessRepository`:
+- [x] `WellnessRepository`:
   1. Upload pass: pending sessions (`synced=0`) + daily ledger diff (`planDailyWrites` unchanged).
   2. Pull pass: paginate `cursor`/`limit: 450` until `has_more == false` (never upload while paginating); LWW-merge; reseed the daily ledger after a full pull.
-- [ ] `WellnessProvider` owner key derived from `SessionViewModel` (`guest` / `user:<laravelId>`); session-level Freezed conversion of `WellnessViewingSession` optional — keep `toMap/fromMap` and add backend mapping only.
-- [ ] `deleteRemoteAccountData` becomes `DELETE /user/account` (server cascade) + local wipe.
-- [ ] Tests: pagination drain, upload-after-drain ordering, LWW, tombstone handling, ledger reseed, `network_bytes` round-trip.
+- [x] `WellnessProvider` owner key derived from `SessionViewModel` (`guest` / `user:<laravelId>`); session-level Freezed conversion of `WellnessViewingSession` optional — keep `toMap/fromMap` and add backend mapping only.
+- [x] `deleteRemoteAccountData` becomes `DELETE /user/account` (server cascade) + local wipe.
+- [x] Tests: pagination drain, upload-after-drain ordering, LWW, tombstone handling, ledger reseed, `network_bytes` round-trip.
 
 **F5.4 Guest → account first-login merge**
-- [ ] On successful register/login with existing guest data: remap local owner (`guest` → `user:<laravelId>`), mark rows pending, run bookmarks + recents + wellness sync immediately, then clear the guest namespace.
-- [ ] Verify deletion of an account removes server data (cascade) and does not resurrect on next login.
+- [x] On successful register/login with existing guest data: remap local owner (`guest` → `user:<laravelId>`), mark rows pending, run bookmarks + recents + wellness sync immediately, then clear the guest namespace.
+- [x] Verify deletion of an account removes server data (cascade) and does not resurrect on next login.
 
 **F5.5 Adapters & cleanup**
-- [ ] `RecentlyWatchedSyncService`/`WellnessSyncService` become adapters; remove `cloud_firestore` imports from all three services and from `sync_screen.dart`.
-- [ ] `sync_checkpoint.dart` deleted after all callers move (grep first).
-- [ ] `RecentlyWatchedSyncService` pull/push lifecycle callbacks in `flixquest_main.dart` re-pointed at repositories.
+- [x] `RecentlyWatchedSyncService`/`WellnessSyncService` become adapters; remove `cloud_firestore` imports from all three services and from `sync_screen.dart`.
+- [x] `sync_checkpoint.dart` deleted after all callers move (grep first).
+- [x] `RecentlyWatchedSyncService` pull/push lifecycle callbacks in `flixquest_main.dart` re-pointed at repositories.
 
 **F5.6 Two-device verification (user-run)**
 - [ ] Device A and B signed into the same account; play different titles; confirm both devices converge with LWW (newest `updated_at_utc` wins).
@@ -971,6 +971,90 @@ Replace Firestore's union-merge/LWW sync with the Laravel batch endpoints, using
 
 ### Exit criteria
 No Firestore import remains in `lib/services/*sync*`, `lib/provider/wellness_provider.dart`, or `sync_screen.dart`; LWW/delta/pagination verified on staging; guest merge works; suite green.
+
+### F5 implementation handover (2026-10-04)
+
+F5.1–F5.5 are implemented on `feat/laravel-f5-sync`. Enable the Laravel
+path with `FLIXQUEST_MIGRATION=auth,config,ads,sync`; `sync` requires Laravel
+`auth`. F6 has not started. F5.6 and authenticated staging/device verification
+remain user-run; automated tests use scripted Dio responses and real temporary
+SQLite databases, plus isolated Laravel feature tests.
+
+- `BookmarkRepository` and the SQLite engine map the existing Movie/TV models,
+  preserve save dates and genres, and persist acknowledged IDs and offline
+  deletes per account. Delete and sync requests are serialized so re-adding a
+  title cannot race a pending DELETE. A deletion during an account transition
+  remains queued for its original owner. Only local additions are uploaded
+  again. Laravel returns
+  the full union, so a title deleted elsewhere is removed locally after it has
+  previously been acknowledged, rather than being uploaded on every sync.
+- Recent history uses snake-case payloads, per-account revision cursors, 7-day
+  full pulls, revision-ahead/explicit-full recovery and 450-row uploads. Rows
+  are acknowledged only if their submitted version is still current. The
+  corrected clock stamps subsequent local writes; one skew retry adjusts
+  future version/tombstone stamps, including batches uploaded after that retry.
+  Synced tombstones are locally pruned after 90 days. `sync_revision` and
+  `synced_at_utc` are decoded without altering the legacy SQLite columns.
+- Wellness finishes all pending session/daily uploads before opening its pull
+  snapshot, then drains every cursor page without another upload. A failed
+  later page leaves the durable cursor/ledger unchanged. Merged sessions retain
+  `network_bytes`; daily summaries are rebuilt from them and the daily ledger
+  is reseeded from full responses. `planDailyWrites` keeps its prior semantics.
+  The API has no daily DELETE endpoint, so removed days are sent as newer zero
+  aggregates; a null ledger stamp remembers an acknowledged zero day.
+- Login, registration and Google login copy guest bookmarks/recents into account
+  files and remap wellness ownership. Failed sync stays authenticated with
+  durable pending rows and a claimed guest snapshot. A later successful sync
+  clears only unchanged copied guest rows. Account switching captures database
+  handles, invalidates old responses, resets providers, and rejects old-owner
+  requests before attaching a different account's token. Streaming, live and
+  offline players capture the library generation; delayed wellness saves after
+  a switch or wipe are discarded. Account deletion uses
+  the Laravel account cascade and wipes that owner's files, cursor, daily
+  ledger and next-episode hints.
+- The public services are adapters and the Sync screen shows each collection's
+  state with manual sync. Player debounce/background flush and resume throttles
+  continue through these adapters. Firestore implementation and its checkpoint
+  are retained only in `lib/legacy/firebase_sync/` for rollback until F7;
+  `lib/services/sync_checkpoint.dart` was removed after caller migration.
+
+Laravel adjustment: explicit `since_revision: 0` now includes retained
+recent/wellness tombstones and imported revision-zero rows. Omitting the revision
+keeps legacy full-pull behavior (active rows only). This closes the full-pull
+resurrection gap without changing the legacy clients' contract. The backend
+changes are confined to `RecentlyWatchedSyncService`, `WellnessSyncService` and
+`RevisionFullPullTest`; earlier F3/F4 backend changes remain untouched.
+
+| Check | Result |
+|---|---|
+| Flutter analyze | **0 issues** (`/tmp/f5-analyze-final.log`) |
+| Full Flutter suite | **140 files, 975 executed: 974 passed / 1 existing failure** (`/tmp/flixquest-f5-full-suite-final.log`). `subtitle_options_test.dart` still fails its incoming-order assertion. The other baseline failure, `player_menu_route_test.dart`, passed in this run. |
+| Added Flutter coverage | **23 new tests** across 10 files; all passed in the full run. The existing 14 recent-history and 11 checkpoint/daily-plan tests were migrated without reducing their count. Coverage includes 450-row batches, skew retries, revision recovery, paginated failure/restart, LWW/tombstones, durable deletes and re-add ordering, guest merge/retry, owner transitions, delayed player saves, account wipe and ledger cleanup. |
+| Code generation | Successful full rebuild: **25 builder outputs**; all **19 tracked generated files** retain their pre-F5 hashes (`/tmp/f5-codegen-final.log`). |
+| Full Laravel suite | **224 passed, 1,090 assertions** (`/tmp/f5-backend-full.log`); memory-database feature tests include the new revision-zero/tombstone compatibility test. |
+| Laravel formatter | Pint completed successfully on dirty files. |
+| Live Herd smoke | Unauthenticated `POST http://flixquest-backend.test/api/v1/sync/recently-watched` returned **401**, confirming the running API's auth boundary. Authenticated staging convergence remains pending. |
+| Diff checks | Flutter and Laravel `git diff --check` clean; generated files have no diff. No commit, push or PR. |
+
+The first full run exposed an owner-binding initialization regression and a test
+compilation mismatch while source was still changing. Both were corrected before
+the final run above. Additional regression tests were first observed failing for
+the delete/re-add race, cross-account deletion/journaling and delayed player save;
+they now pass. The pre-existing subtitle-order failure was left unchanged.
+
+F5's implementation and automated verification are complete. Its staging and
+two-device exit checks remain open; F6 has not started.
+
+User-run F5.6 checklist: run both devices with the migration flags and a reachable
+Laravel URL, sign into the same account, sync distinct progress, verify newest
+versions converge, remove a bookmark/history entry on A and sync B, then set A
+25 hours fast and verify the skew retry recovers. Also verify guest login while
+offline followed by reconnect, and account deletion followed by a new login.
+Use `--dart-define=FLIXQUEST_MIGRATION=auth,config,ads,sync` and set
+`--dart-define=LARAVEL_API_URL=<device-reachable Laravel base URL>` when starting
+the app; the URL is normalized to `/api/v1/`. Hot restart alone does not change
+compile-time defines. Apply the two Laravel service changes before this smoke.
+No devices, real accounts, production data, or scraper files were modified here.
 
 ### Rollback
 Revert the phase branch; Firestore code remains until F7.

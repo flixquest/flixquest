@@ -210,6 +210,12 @@ class WellnessViewingSession {
         'synced': synced ? 1 : 0,
       };
 
+  Map<String, dynamic> toLaravelMap() => {
+    ...toCloudMap()..remove('updatedAtUtc')..remove('deletedAtUtc'),
+    'updated_at_utc': updatedAtUtc.millisecondsSinceEpoch > 0 ? updatedAtUtc.millisecondsSinceEpoch : 1,
+    'deleted_at_utc': deletedAtUtc?.millisecondsSinceEpoch,
+  };
+
   Map<String, dynamic> toCloudMap() => <String, dynamic>{
         'schemaVersion': 1,
         'deviceId': deviceId,
@@ -339,11 +345,13 @@ class WellnessViewingSession {
 }
 
 class WellnessPlaybackTracker {
-  WellnessPlaybackTracker({required this.id, DateTime? createdAt})
+  WellnessPlaybackTracker({required this.id, DateTime? createdAt, this.libraryGeneration})
       : createdAtUtc = (createdAt ?? DateTime.now()).toUtc();
 
   final String id;
   final DateTime createdAtUtc;
+  // Captured by players so a delayed save cannot cross an account transition.
+  final int? libraryGeneration;
   final List<WellnessPlaybackSegment> _segments = <WellnessPlaybackSegment>[];
   DateTime? _activeStartedAtUtc;
 

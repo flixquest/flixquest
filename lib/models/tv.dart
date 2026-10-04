@@ -125,6 +125,7 @@ class TV {
   }
 
   TV.fromMapObject(Map<String, dynamic> map) {
+    dateAdded = map['date_added'] as String?;
     id = map['id'];
     genreIds = parseGenreIds(map['genre_ids']);
     posterPath = map['poster_path'];

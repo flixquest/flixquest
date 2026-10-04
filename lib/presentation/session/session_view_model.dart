@@ -19,10 +19,12 @@ class SessionViewModel extends ChangeNotifier {
       required this.cache,
       GoogleIdentityClient? google,
       Future<void> Function(String owner)? deleteLocalData,
-      Future<void> Function(AppUser user)? mergeGuestData})
+      Future<void> Function(AppUser user)? mergeGuestData,
+      void Function(String? owner)? onOwnerChanged})
       : google = google ?? PlatformGoogleIdentityClient(),
         _deleteLocalData = deleteLocalData ?? ((_) async {}),
-        _mergeGuestData = mergeGuestData;
+        _mergeGuestData = mergeGuestData,
+        _onOwnerChanged = onOwnerChanged;
   final AuthRepository repository;
   final SecureTokenStore tokens;
   final KvStore preferences;
@@ -30,6 +32,7 @@ class SessionViewModel extends ChangeNotifier {
   final GoogleIdentityClient google;
   final Future<void> Function(String)? _deleteLocalData;
   final Future<void> Function(AppUser)? _mergeGuestData;
+  final void Function(String?)? _onOwnerChanged;
   final ValueNotifier<String?> ownerId = ValueNotifier(null);
   final ValueNotifier<String?> gateIdentity = ValueNotifier(null);
   SessionState _state = const SessionState.initializing();
@@ -50,6 +53,7 @@ class SessionViewModel extends ChangeNotifier {
   void _publish(SessionState state) {
     if (_disposed) return;
     _state = state;
+    _onOwnerChanged?.call(user == null ? null : 'user:${user!.id}');
     ownerId.value = user == null ? null : 'user:${user!.id}';
     gateIdentity.value = state.maybeWhen(
         guest: (browsing) => browsing ? 'guest' : null,
@@ -152,7 +156,7 @@ class SessionViewModel extends ChangeNotifier {
   }
 
   Future<Result<AuthSession>> signIn(LoginRequest request) =>
-      _authenticate(() => repository.signIn(request));
+      _authenticate(() => repository.signIn(request), mergeGuest: true);
   Future<Result<AuthSession>> signUp(RegisterRequest request) =>
       _authenticate(() => repository.signUp(request), mergeGuest: true);
   Future<Result<AuthSession?>> signInWithGoogle() async {

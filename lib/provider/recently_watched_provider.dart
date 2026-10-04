@@ -1,3 +1,4 @@
+import '../data/sync/library_scope.dart';
 import 'package:flutter/material.dart';
 
 import '../catalog/up_next.dart';
@@ -29,14 +30,22 @@ class RecentProvider extends ChangeNotifier {
   /// The most series [upNext] remembers; the oldest go first.
   static const upNextLimit = 50;
 
-  UpNextBook get _book => _upNextBook ??= UpNextBook(
+  String? _bookOwner;
+  UpNextBook get _book {
+    final owner = LibraryScope.enabled ? LibraryScope.owner : 'guest';
+    if (_bookOwner != owner && _upNextStore == null) _upNextBook = null;
+    _bookOwner = owner;
+    return _upNextBook ??= UpNextBook(
         store: _upNextStore ?? _defaultStore(),
         limit: upNextLimit,
       );
+  }
 
   static UpNextStore? _defaultStore() {
     try {
-      return UpNextStore(sharedPrefsSingleton);
+      return UpNextStore(sharedPrefsSingleton, storageKey: LibraryScope.enabled
+          ? 'sync.${LibraryScope.owner}.up_next' : UpNextStore.key,
+          kvStore: LibraryScope.enabled ? LibraryScope.store : null);
     } catch (_) {
       // Preferences aren't ready: keep them in memory.
       return null;
@@ -58,8 +67,18 @@ class RecentProvider extends ChangeNotifier {
     fetchEpisodes();
   }
 
+  void resetForOwner() {
+    _movies = []; _episodes = []; _upNextBook = null; notifyListeners();
+  }
+
   Future<void> fetchMovies() async {
-    _movies = await _movieController.getRecentMovieList();
+    final owner = LibraryScope.owner; final generation = LibraryScope.generation;
+    final db = await _movieController.databaseForOwner(owner);
+    final movies = (await db.query(_movieController.tableName,
+        where: 'deleted_at_utc IS NULL', orderBy: 'date_watched DESC'))
+        .map(RecentMovie.fromMapObject).toList();
+    if (generation != LibraryScope.generation) return;
+    _movies = movies;
     notifyListeners();
   }
 
@@ -86,7 +105,13 @@ class RecentProvider extends ChangeNotifier {
   /// Episode
 
   Future<void> fetchEpisodes() async {
-    _episodes = await _episodeController.getEpisodeList();
+    final owner = LibraryScope.owner; final generation = LibraryScope.generation;
+    final db = await _episodeController.databaseForOwner(owner);
+    final episodes = (await db.query(_episodeController.tableName,
+        where: 'deleted_at_utc IS NULL', orderBy: 'date_added DESC'))
+        .map(RecentEpisode.fromMapObject).toList();
+    if (generation != LibraryScope.generation) return;
+    _episodes = episodes;
     _book.reload();
     notifyListeners();
   }

@@ -108,10 +108,10 @@ void main() {
       expect(restored.synced, isFalse);
     });
 
-    test('survives a round trip through the cloud map', () {
+    test('survives a round trip through the backend payload', () {
       final movie = buildMovie(updatedAtUtc: 4242);
 
-      final restored = RecentMovie.fromCloudMap(movie.toCloudMap());
+      final restored = RecentMovie.fromLaravelMap(movie.toLaravelMap());
 
       expect(restored.id, 550);
       expect(restored.title, 'Fight Club');
@@ -121,17 +121,17 @@ void main() {
       expect(restored.deletedAtUtc, isNull);
     });
 
-    test('falls back to the document id when the payload lost its own', () {
-      final payload = buildMovie(updatedAtUtc: 4242).toCloudMap()
+    test('uses the backend media id when the legacy payload id is omitted', () {
+      final payload = buildMovie(updatedAtUtc: 4242).toLaravelMap()
         ..remove('id');
 
-      final restored = RecentMovie.fromCloudMap(payload, id: 550);
+      final restored = RecentMovie.fromLaravelMap(payload);
 
       expect(restored.id, 550);
     });
 
     test('treats a cloud row with no stamp as older than any local write', () {
-      final restored = RecentMovie.fromCloudMap(<String, dynamic>{'id': 550});
+      final restored = RecentMovie.fromLaravelMap(<String, dynamic>{'movie_id': 550});
 
       expect(restored.updatedAtUtc, 0);
     });
@@ -170,10 +170,10 @@ void main() {
       expect(restored.isDeleted, isTrue);
     });
 
-    test('survives a round trip through the cloud map', () {
+    test('survives a round trip through the backend payload', () {
       final episode = buildEpisode(updatedAtUtc: 909);
 
-      final restored = RecentEpisode.fromCloudMap(episode.toCloudMap());
+      final restored = RecentEpisode.fromLaravelMap(episode.toLaravelMap());
 
       expect(restored.id, 62085);
       expect(restored.seriesName, 'Breaking Bad');

@@ -1,3 +1,5 @@
+import '../data/sync/library_scope.dart';
+import '../data/sync/sync_runtime.dart';
 import '../presentation/session/auth_runtime.dart';
 import 'dart:async';
 import 'dart:math';
@@ -52,7 +54,7 @@ class WellnessProvider extends ChangeNotifier {
   String get activeOwnerId => _ownerId;
   String get deviceId => _deviceId;
   bool get shouldOfferGuestMerge =>
-      canSync && _hasGuestHistory && !_guestMergeDismissed;
+      !SyncRuntime.enabled && canSync && _hasGuestHistory && !_guestMergeDismissed;
 
   WellnessInsights get insights => WellnessInsights.fromSessions(
         _sessions,
@@ -69,7 +71,7 @@ class WellnessProvider extends ChangeNotifier {
     _deviceId = prefs.getString(_deviceIdKey) ?? _newDeviceId();
     await prefs.setString(_deviceIdKey, _deviceId);
     _syncService = WellnessSyncService(database: _database);
-    _syncService.status.addListener(notifyListeners);
+    _syncService.status.addListener(_onSyncStatusChanged);
     _syncService.lastSynced.addListener(notifyListeners);
     if (AuthRuntime.enabled) {
       await _applyUser(null, sync: false);
@@ -81,6 +83,22 @@ class WellnessProvider extends ChangeNotifier {
         );
     if (canSync) unawaited(_autoSync());
   }
+
+  void _onSyncStatusChanged() {
+    if (_syncService.status.value == WellnessSyncStatus.success) {
+      unawaited(reload());
+    } else {
+      notifyListeners();
+    }
+  }
+
+  Future<void> flushPending() async {
+    if (_syncDebounce == null || !canSync) return;
+    _syncDebounce?.cancel(); _syncDebounce = null; _pushDueAt = null;
+    await _syncService.pushPending();
+  }
+
+  Future<void> autoSyncIfSignedIn() => _autoSync();
 
   Future<void> bindLaravelOwner(ValueListenable<String?> owner) async {
     _laravelOwner?.removeListener(_onLaravelOwner);
@@ -95,6 +113,8 @@ class WellnessProvider extends ChangeNotifier {
     _syncDebounce?.cancel();
     _ownerId = _laravelOwner?.value ?? guestOwnerId;
     _guestMergeDismissed = false;
+    _sessions = [];
+    notifyListeners();
     await reload();
     _hasGuestHistory = await _database.ownerSessionCount(guestOwnerId) > 0;
     notifyListeners();
@@ -147,6 +167,7 @@ class WellnessProvider extends ChangeNotifier {
     _pushDueAt = dueAt;
     _syncDebounce = Timer(delay, () {
       _pushDueAt = null;
+      _syncDebounce = null;
       unawaited(_syncService.pushPending());
     });
   }
@@ -192,6 +213,10 @@ class WellnessProvider extends ChangeNotifier {
     int? networkBytes,
     bool syncImmediately = false,
   }) async {
+    if (SyncRuntime.enabled && tracker.libraryGeneration != null &&
+        tracker.libraryGeneration != LibraryScope.generation) {
+      return;
+    }
     final now = DateTime.now();
     final segments = tracker.snapshot(now);
     final watchedMs = segments.fold<int>(
@@ -229,7 +254,7 @@ class WellnessProvider extends ChangeNotifier {
       languages: languages,
       countries: countries,
       networkBytes: networkBytes,
-      updatedAtUtc: now.toUtc(),
+      updatedAtUtc: DateTime.fromMillisecondsSinceEpoch(LibraryScope.nowUtcMs(), isUtc: true),
       synced: false,
     );
     await _database.upsertSession(session);
@@ -288,7 +313,7 @@ class WellnessProvider extends ChangeNotifier {
 
   Future<void> deleteAccountData(String uid) async {
     await _syncService.deleteRemoteAccountData(uid);
-    await _database.permanentlyDeleteOwner('user:$uid');
+    if (!SyncRuntime.enabled) await _database.permanentlyDeleteOwner('user:$uid');
     if (_ownerId == 'user:$uid') await _applyUser(null, sync: false);
   }
 
@@ -297,7 +322,7 @@ class WellnessProvider extends ChangeNotifier {
     _syncDebounce?.cancel();
     _authSubscription?.cancel();
     _laravelOwner?.removeListener(_onLaravelOwner);
-    _syncService.status.removeListener(notifyListeners);
+    _syncService.status.removeListener(_onSyncStatusChanged);
     _syncService.lastSynced.removeListener(notifyListeners);
     super.dispose();
   }

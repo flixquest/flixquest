@@ -1,3 +1,5 @@
+import 'data/sync/sync_runtime.dart';
+import 'services/bookmark_sync_service.dart';
 import 'data/ads/ad_events_controller.dart';
 import 'dart:async';
 
@@ -107,6 +109,7 @@ class _FlixQuestState extends State<FlixQuest>
       // Leaving the app is the last chance to hand off progress saved by the
       // player, so push it now instead of waiting out the debounce.
       unawaited(RecentlyWatchedSyncService.instance.flushPending());
+      if (SyncRuntime.enabled) unawaited(WellnessProvider.instance.flushPending());
       return;
     }
     DeepLinkDispatcher.onAppReady();
@@ -114,6 +117,10 @@ class _FlixQuestState extends State<FlixQuest>
     unawaited(widget.adsController?.onResume());
     unawaited(_refreshHomeWidgets());
     unawaited(RecentlyWatchedSyncService.instance.autoSyncIfSignedIn());
+    if (SyncRuntime.enabled) {
+      unawaited(BookmarkSyncService.instance.autoSyncIfSignedIn());
+      unawaited(WellnessProvider.instance.autoSyncIfSignedIn());
+    }
   }
 
   @override

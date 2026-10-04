@@ -1,3 +1,4 @@
+import '../core/storage/kv_store.dart';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -154,14 +155,16 @@ class UpNext {
 
 /// Where [UpNext]s are kept between launches: on this device only.
 class UpNextStore {
-  UpNextStore(this._preferences);
+  UpNextStore(this._preferences, {this.storageKey = key, this.kvStore});
+  final String storageKey;
+  final KvStore? kvStore;
 
   static const key = 'up_next.v1';
 
   final SharedPreferences _preferences;
 
   Map<int, UpNext> load() {
-    final raw = _preferences.getString(key);
+    final raw = kvStore == null ? _preferences.getString(storageKey) : kvStore!.getString(storageKey);
     if (raw == null) return <int, UpNext>{};
     try {
       final decoded = jsonDecode(raw);
@@ -175,12 +178,10 @@ class UpNextStore {
     }
   }
 
-  Future<void> save(Map<int, UpNext> entries) => _preferences.setString(
-        key,
-        jsonEncode(
-          entries.values.map((entry) => entry.toJson()).toList(),
-        ),
-      );
+  Future<void> save(Map<int, UpNext> entries) {
+    final raw = jsonEncode(entries.values.map((entry) => entry.toJson()).toList());
+    return kvStore == null ? _preferences.setString(storageKey, raw) : kvStore!.setString(storageKey, raw);
+  }
 }
 
 /// The series' next episodes, as recently watched keeps them: one per

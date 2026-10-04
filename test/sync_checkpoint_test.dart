@@ -1,100 +1,69 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flixquest/services/sync_checkpoint.dart';
+import 'package:flixquest/data/sync/sync_cursor.dart';
 import 'package:flixquest/services/wellness_sync_service.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'support/fakes.dart';
 
 void main() {
-  final now = DateTime(2026, 9, 27, 12);
-
-  group('SyncCheckpoint.needsFullPull', () {
+  final now = DateTime.utc(2026, 9, 27, 12);
+  group('SyncCursor.needsFullPull', () {
     test('a device that has never pulled reads everything', () {
-      expect(const SyncCheckpoint().needsFullPull(now), isTrue);
+      expect(const SyncCursor().needsFullPull(now), isTrue);
     });
-
     test('a recent full pull allows a delta', () {
-      final checkpoint = SyncCheckpoint(
-        stampMicros: 10,
-        fullPullAt: now.subtract(const Duration(days: 1)),
-      );
+      final checkpoint = SyncCursor(serverRevision: 10,
+          lastFullPullAt: now.subtract(const Duration(days: 1)));
       expect(checkpoint.needsFullPull(now), isFalse);
     });
-
     test('reads everything again once the full pull is a week old', () {
-      final checkpoint = SyncCheckpoint(
-        stampMicros: 10,
-        fullPullAt: now.subtract(fullPullInterval),
-      );
+      final checkpoint = SyncCursor(serverRevision: 10,
+          lastFullPullAt: now.subtract(fullPullInterval));
       expect(checkpoint.needsFullPull(now), isTrue);
     });
-
     test('a clock that moved backwards forces a full read', () {
-      final checkpoint = SyncCheckpoint(
-        stampMicros: 10,
-        fullPullAt: now.add(const Duration(days: 1)),
-      );
+      final checkpoint = SyncCursor(serverRevision: 10,
+          lastFullPullAt: now.add(const Duration(days: 1)));
       expect(checkpoint.needsFullPull(now), isTrue);
     });
   });
-
-  group('SyncCheckpoint.advance', () {
-    Map<String, dynamic> stamped(int micros) => <String, dynamic>{
-          syncedAtField: Timestamp.fromMicrosecondsSinceEpoch(micros),
-        };
-
-    test('a full pull starts from the newest stamp it saw', () {
-      final next = const SyncCheckpoint(stampMicros: 900).advance(
-        <Map<String, dynamic>>[stamped(300), stamped(500), <String, dynamic>{}],
-        full: true,
-        now: now,
-      );
-      expect(next.stampMicros, 500);
-      expect(next.fullPullAt, now);
+  group('SyncCursor.advance', () {
+    test('a full pull resets to the server revision it saw', () {
+      final next = const SyncCursor(serverRevision: 900)
+          .advance(500, 1000, full: true, now: now);
+      expect(next.serverRevision, 500);
+      expect(next.lastFullPullAt, now);
+      expect(next.lastServerTimeUtc, 1000);
+      expect(next.lastSyncAt, now);
     });
-
-    test('a full pull of unstamped documents starts from zero', () {
-      final next = const SyncCheckpoint().advance(
-        <Map<String, dynamic>>[
-          <String, dynamic>{'id': 1}
-        ],
-        full: true,
-        now: now,
-      );
-      expect(next.stampMicros, 0);
+    test('a full pull of legacy rows starts from the returned server revision', () {
+      final next = const SyncCursor().advance(0, 1000, full: true, now: now);
+      expect(next.serverRevision, 0);
     });
-
     test('an empty delta keeps the cursor and the last full pull time', () {
       final fullAt = now.subtract(const Duration(days: 2));
-      final next = SyncCheckpoint(stampMicros: 700, fullPullAt: fullAt)
-          .advance(const <Map<String, dynamic>>[], full: false, now: now);
-      expect(next.stampMicros, 700);
-      expect(next.fullPullAt, fullAt);
+      final next = SyncCursor(serverRevision: 700, lastFullPullAt: fullAt)
+          .advance(700, 1000, full: false, now: now);
+      expect(next.serverRevision, 700);
+      expect(next.lastFullPullAt, fullAt);
     });
-
     test('a delta moves the cursor forward, never back', () {
-      final next = SyncCheckpoint(stampMicros: 700, fullPullAt: now).advance(
-        <Map<String, dynamic>>[stamped(650), stamped(800)],
-        full: false,
-        now: now,
-      );
-      expect(next.stampMicros, 800);
+      final original = SyncCursor(serverRevision: 700, lastFullPullAt: now);
+      expect(original.advance(650, 1000, full: false, now: now).serverRevision, 700);
+      expect(original.advance(800, 1000, full: false, now: now).serverRevision, 800);
     });
   });
-
-  group('SyncCheckpoint storage', () {
-    setUp(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
-
-    test('round-trips and clears by prefix', () async {
-      await SyncCheckpoint(stampMicros: 42, fullPullAt: now).save('a.uid.x');
-      await SyncCheckpoint(stampMicros: 7, fullPullAt: now).save('b.uid.x');
-
-      final loaded = await SyncCheckpoint.load('a.uid.x');
-      expect(loaded.stampMicros, 42);
-      expect(loaded.fullPullAt, now);
-
-      await SyncCheckpoint.clear('a.uid.');
-      expect((await SyncCheckpoint.load('a.uid.x')).stampMicros, isNull);
-      expect((await SyncCheckpoint.load('b.uid.x')).stampMicros, 7);
+  group('SyncCursor storage', () {
+    test('round-trips and clears by account prefix', () async {
+      final store = FakeKvStore();
+      await SyncCursor(serverRevision: 42, lastFullPullAt: now)
+          .save(store, 'user:a', 'recent');
+      await SyncCursor(serverRevision: 7, lastFullPullAt: now)
+          .save(store, 'user:b', 'recent');
+      final loaded = SyncCursor.load(store, 'user:a', 'recent');
+      expect(loaded.serverRevision, 42);
+      expect(loaded.lastFullPullAt, now);
+      await store.removePrefix('sync.user:a.');
+      expect(SyncCursor.load(store, 'user:a', 'recent').serverRevision, isNull);
+      expect(SyncCursor.load(store, 'user:b', 'recent').serverRevision, 7);
     });
   });
 

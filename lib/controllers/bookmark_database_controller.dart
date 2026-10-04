@@ -1,3 +1,4 @@
+import '../data/sync/library_scope.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -7,7 +8,7 @@ import '../models/tv.dart';
 
 class MovieDatabaseController {
   static MovieDatabaseController? _movieDatabaseController;
-  static Database? _database;
+  static final Map<String, Future<Database>> _databases = {};
   String tableName = 'movie_bookmark_table';
   String colId = 'id';
   String colAdult = 'adult';
@@ -31,9 +32,11 @@ class MovieDatabaseController {
     _movieDatabaseController ??= MovieDatabaseController._createInstance();
     return _movieDatabaseController!;
   }
-  Future<Database> initializeDatabase() async {
-    Directory directory = await getApplicationDocumentsDirectory();
-    String path = '${directory.path}movies.db';
+  Future<Database> initializeDatabase({String? owner, String? directoryPath}) async {
+    final capturedOwner = owner ?? LibraryScope.owner;
+    Directory directory = directoryPath == null
+        ? await getApplicationDocumentsDirectory() : Directory(directoryPath);
+    String path = LibraryScope.filename('${directory.path}movies.db', capturedOwner);
     var bookmarkDatabase =
         await openDatabase(
       path,
@@ -45,11 +48,15 @@ class MovieDatabaseController {
   }
 
   Future<Database> get database async {
-    _database ??= await initializeDatabase();
-    return _database!;
+    return databaseForOwner(LibraryScope.owner);
   }
 
-  void _createDb(Database db, int newVersion) async {
+  Future<Database> databaseForOwner(String owner) {
+    final key = LibraryScope.enabled ? owner : 'legacy';
+    return _databases.putIfAbsent(key, () => initializeDatabase(owner: owner));
+  }
+
+  Future<void> _createDb(Database db, int newVersion) async {
     await db.execute(
         'CREATE TABLE $tableName($colId INTEGER PRIMARY KEY, $colTitle TEXT, $colOriginalTitle TEXT, $colOriginalLanguage TEXT, $colOverview TEXT, $colReleaseDate TEXT, $colPopularity NUMERIC, $colBackdropPath TEXT, $colVoteAverage REAL, $colVoteCount INTEGER, $colPosterPath TEXT, $colDateAdded TEXT, $colGenreIds TEXT)');
   }
@@ -84,6 +91,7 @@ class MovieDatabaseController {
 
   // this method will be used to insert movies in the database.
   Future<int> insertMovie(Movie movie) async {
+    if (LibraryScope.enabled) LibraryScope.bookmarkRevision++;
     Database db = await database;
     // A bookmark may already have been saved by another screen or cloud sync.
     // Keep its original date_added when the same movie is saved again.
@@ -100,6 +108,7 @@ class MovieDatabaseController {
   // The stored row is refreshed from whatever the app is showing, but never restamped: date_added is
   // what orders this list, and opening a bookmarked title is not saving it again.
   Future<int> updateMovie(Movie movie, int id) async {
+    if (LibraryScope.enabled) LibraryScope.bookmarkRevision++;
     var db = await database;
     var result = await db.update(tableName, movie.toMap()..remove(colDateAdded),
         where: '$colId = $id');
@@ -108,6 +117,7 @@ class MovieDatabaseController {
 
   // this method will delete a movie
   Future<int> deleteMovie(int id) async {
+    if (LibraryScope.enabled) LibraryScope.bookmarkRevision++;
     var db = await database;
     int result =
         await db.rawDelete('DELETE FROM $tableName WHERE $colId = $id');
@@ -149,7 +159,7 @@ class MovieDatabaseController {
 
 class TVDatabaseController {
   static TVDatabaseController? _tvDatabaseController;
-  static Database? _database;
+  static final Map<String, Future<Database>> _databases = {};
   String tableName = 'tv_bookmark_table';
   String colId = 'id';
   String colBackdropPath = 'backdrop_path';
@@ -171,9 +181,11 @@ class TVDatabaseController {
     _tvDatabaseController ??= TVDatabaseController._createInstance();
     return _tvDatabaseController!;
   }
-  Future<Database> initializeDatabase() async {
-    Directory directory = await getApplicationDocumentsDirectory();
-    String path = '${directory.path}tv.db';
+  Future<Database> initializeDatabase({String? owner, String? directoryPath}) async {
+    final capturedOwner = owner ?? LibraryScope.owner;
+    Directory directory = directoryPath == null
+        ? await getApplicationDocumentsDirectory() : Directory(directoryPath);
+    String path = LibraryScope.filename('${directory.path}tv.db', capturedOwner);
     var notesDatabase =
         await openDatabase(
       path,
@@ -185,11 +197,15 @@ class TVDatabaseController {
   }
 
   Future<Database> get database async {
-    _database ??= await initializeDatabase();
-    return _database!;
+    return databaseForOwner(LibraryScope.owner);
   }
 
-  void _createDb(Database db, int newVersion) async {
+  Future<Database> databaseForOwner(String owner) {
+    final key = LibraryScope.enabled ? owner : 'legacy';
+    return _databases.putIfAbsent(key, () => initializeDatabase(owner: owner));
+  }
+
+  Future<void> _createDb(Database db, int newVersion) async {
     await db.execute(
         'CREATE TABLE $tableName($colId INTEGER PRIMARY KEY, $colTitle TEXT, $colOriginalTitle TEXT, $colOriginalLanguage TEXT, $colOverview TEXT, $colFirstAirDate TEXT, $colPopularity NUMERIC, $colBackdropPath TEXT, $colVoteAverage REAL, $colVoteCount INTEGER, $colPosterPath TEXT, $colDateAdded TEXT, $colGenreIds TEXT)');
   }
@@ -224,6 +240,7 @@ class TVDatabaseController {
 
   // this method will be used to insert tv in the database.
   Future<int> insertTV(TV tv) async {
+    if (LibraryScope.enabled) LibraryScope.bookmarkRevision++;
     Database db = await database;
     // A bookmark may already have been saved by another screen or cloud sync.
     // Keep its original date_added when the same show is saved again.
@@ -239,6 +256,7 @@ class TVDatabaseController {
   //
   // As with movies, refreshing a saved show's facts must not move it to the top of the list.
   Future<int> updateTV(TV tv, int id) async {
+    if (LibraryScope.enabled) LibraryScope.bookmarkRevision++;
     var db = await database;
     var result = await db.update(tableName, tv.toMap()..remove(colDateAdded),
         where: '$colId = $id');
@@ -247,6 +265,7 @@ class TVDatabaseController {
 
   // this method will delete a tv
   Future<int> deleteTV(int id) async {
+    if (LibraryScope.enabled) LibraryScope.bookmarkRevision++;
     var db = await database;
     int result =
         await db.rawDelete('DELETE FROM $tableName WHERE $colId = $id');

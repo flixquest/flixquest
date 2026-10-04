@@ -1,9 +1,16 @@
+import '../data/sync/library_scope.dart';
+import '../data/sync/local_library.dart';
 import '../controllers/bookmark_database_controller.dart';
 import '../controllers/recently_watched_database_controller.dart';
 import '../controllers/wellness_database_controller.dart';
 
 class LocalAccountData {
   static Future<void> delete(String owner) async {
+    if (LibraryScope.enabled) {
+      await (await LocalLibrary.open(owner)).clear();
+      await WellnessDatabaseController.instance.permanentlyDeleteOwner(owner);
+      return;
+    }
     final movies = MovieDatabaseController();
     final tv = TVDatabaseController();
     for (final movie in await movies.getMovieList()) {

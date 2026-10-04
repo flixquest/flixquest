@@ -1,3 +1,5 @@
+import '../data/sync/library_scope.dart';
+
 /// Local and cloud representations of the "recently watched" (continue
 /// watching) rows shown on the home screens.
 ///
@@ -6,7 +8,7 @@
 /// last-write-wins merges, a tombstone stamp so removals (dismissed or
 /// finished titles) propagate instead of being resurrected by another device,
 /// and a pending-push flag.
-int _nowUtcMillis() => DateTime.now().toUtc().millisecondsSinceEpoch;
+int _nowUtcMillis() => LibraryScope.nowUtcMs();
 
 int? _asInt(Object? value) => (value as num?)?.toInt();
 
@@ -28,6 +30,8 @@ class RecentMovie {
     int? updatedAtUtc,
     this.deletedAtUtc,
     this.synced = false,
+    this.syncRevision,
+    this.syncedAtUtc,
   }) : updatedAtUtc = updatedAtUtc ?? _nowUtcMillis();
 
   int? id;
@@ -46,8 +50,10 @@ class RecentMovie {
   /// stores until they are pruned so the removal can reach other devices.
   int? deletedAtUtc;
 
-  /// False while the row still has to be pushed to Firestore.
+  /// False while the row still has to be uploaded.
   bool synced;
+  int? syncRevision;
+  int? syncedAtUtc;
 
   bool get isDeleted => deletedAtUtc != null;
 
@@ -79,6 +85,19 @@ class RecentMovie {
     dateTime = map['date_watched'];
     posterPath = map['poster_path'];
     backdropPath = map['backdrop_path'];
+  }
+
+  Map<String, dynamic> toLaravelMap() => {...toMap()..remove('synced'),
+    'movie_id': id, 'elapsed': elapsed ?? 0, 'remaining': remaining ?? 0,
+    'updated_at_utc': updatedAtUtc > 0 ? updatedAtUtc : 1};
+
+  factory RecentMovie.fromLaravelMap(Map<String, dynamic> map) {
+    final row = RecentMovie.fromMapObject({...map, 'id': map['movie_id'] ?? map['id'],
+      'updated_at_utc': _asInt(map['updated_at_utc']) ?? 0});
+    row.syncRevision = _asInt(map['sync_revision']);
+    row.syncedAtUtc = _asInt(map['synced_at_utc']);
+    row.synced = true;
+    return row;
   }
 
   /// Firestore payload. Deleted rows keep their metadata so a tombstone still
@@ -127,6 +146,8 @@ class RecentEpisode {
     int? updatedAtUtc,
     this.deletedAtUtc,
     this.synced = false,
+    this.syncRevision,
+    this.syncedAtUtc,
   }) : updatedAtUtc = updatedAtUtc ?? _nowUtcMillis();
 
   int? id;
@@ -147,8 +168,10 @@ class RecentEpisode {
   /// Set when the episode was dismissed or finished.
   int? deletedAtUtc;
 
-  /// False while the row still has to be pushed to Firestore.
+  /// False while the row still has to be uploaded.
   bool synced;
+  int? syncRevision;
+  int? syncedAtUtc;
 
   bool get isDeleted => deletedAtUtc != null;
 
@@ -186,6 +209,20 @@ class RecentEpisode {
     remaining = map['remaining'];
     dateTime = map['date_added'];
     seriesId = map['series_id'];
+    backdropPath = map['backdrop_path'];
+  }
+
+  Map<String, dynamic> toLaravelMap() => {...toMap()..remove('synced'),
+    'episode_id': id, 'elapsed': elapsed ?? 0, 'remaining': remaining ?? 0,
+    'updated_at_utc': updatedAtUtc > 0 ? updatedAtUtc : 1, 'episode_num': episodeNum ?? 0, 'season_num': seasonNum ?? 0, 'series_id': seriesId ?? 0};
+
+  factory RecentEpisode.fromLaravelMap(Map<String, dynamic> map) {
+    final row = RecentEpisode.fromMapObject({...map, 'id': map['episode_id'] ?? map['id'],
+      'updated_at_utc': _asInt(map['updated_at_utc']) ?? 0});
+    row.syncRevision = _asInt(map['sync_revision']);
+    row.syncedAtUtc = _asInt(map['synced_at_utc']);
+    row.synced = true;
+    return row;
   }
 
   Map<String, dynamic> toCloudMap() => <String, dynamic>{

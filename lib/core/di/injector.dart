@@ -1,3 +1,8 @@
+import '../../data/repositories/bookmark_repository.dart';
+import '../../data/repositories/recently_watched_repository.dart';
+import '../../data/repositories/wellness_repository.dart';
+import '../../data/sync/laravel_sync_coordinator.dart';
+import '../../data/sync/library_scope.dart';
 import 'package:flixquest/data/repositories/ads_repository.dart';
 import 'package:flixquest/data/repositories/auth_repository.dart';
 import 'package:flixquest/data/repositories/config_repository.dart';
@@ -35,6 +40,7 @@ class AppInjector {
     required this.configRepository,
     required this.adsRepository,
     required this.session,
+    required this.syncCoordinator,
   });
 
   final AppEnvironment environment;
@@ -51,9 +57,11 @@ class AppInjector {
   final ConfigRepository configRepository;
   final AdsRepository adsRepository;
   final SessionViewModel session;
+  final LaravelSyncCoordinator syncCoordinator;
 
   Future<void> dispose() async {
     session.dispose();
+    syncCoordinator.dispose();
     await adsRepository.dispose();
     publicDio.close(force: true);
     laravelDio.close(force: true);
@@ -94,16 +102,35 @@ Future<AppInjector> buildInjector({
   final laravelClient = createLaravelDio(config, dio: laravelDio, httpCache: cache);
   final tokens = tokenStore ?? SecureTokenStore();
   final auth = AuthRepository(LaravelApi(laravelClient));
-  final session = SessionViewModel(repository: auth, tokens: tokens,
+  final flags = migrationFlags ?? MigrationFlags.fromRuntime();
+  final clock = serverClock ?? ServerClock(preferences);
+  final syncEnabled = flags.auth && flags.sync;
+  late final SessionViewModel session;
+  final sync = LaravelSyncCoordinator(
+    bookmarkRepository: BookmarkRepository(laravelClient, preferences),
+    recentRepository: RecentlyWatchedRepository(laravelClient, preferences, clock),
+    wellnessRepository: WellnessRepository(laravelClient, preferences, clock),
+    store: preferences, clock: clock, authenticatedOwner: () => session.token == null ? null : session.ownerId.value);
+  session = SessionViewModel(repository: auth, tokens: tokens,
       preferences: preferences, cache: cache, google: googleIdentity,
-      deleteLocalData: deleteLocalData ?? LocalAccountData.delete);
+      deleteLocalData: (owner) async {
+        if (syncEnabled) await sync.deleteLocal(owner);
+        await (deleteLocalData ?? LocalAccountData.delete)(owner);
+      },
+      onOwnerChanged: syncEnabled ? (owner) {
+        LibraryScope.enabled = true;
+        LibraryScope.clock = clock;
+        LibraryScope.store = preferences;
+        sync.activateOwner(owner);
+      } : null,
+      mergeGuestData: syncEnabled ? (user) => sync.mergeGuest('user:${user.id}') : null);
   laravelClient.interceptors.insert(0, AuthInterceptor(session, config.laravelApiUrl));
   return AppInjector._(
     environment: config,
-    migrationFlags: migrationFlags ?? MigrationFlags.fromRuntime(),
+    migrationFlags: flags,
     kvStore: preferences,
     tokenStore: tokens,
-    serverClock: serverClock ?? ServerClock(preferences),
+    serverClock: clock,
     publicDio: publicClient,
     laravelDio: laravelClient,
     httpCache: cache,
@@ -112,5 +139,6 @@ Future<AppInjector> buildInjector({
     configRepository: ConfigRepository(laravelClient, preferences),
     adsRepository: AdsRepository(laravelClient),
     session: session,
+    syncCoordinator: sync,
   );
 }

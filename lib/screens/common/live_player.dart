@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../data/sync/library_scope.dart';
 import 'dart:convert';
 
 import 'package:better_player_plus/better_player_plus.dart';
@@ -161,6 +162,7 @@ class _LivePlayerState extends State<LivePlayer> {
     _wellnessTracker = WellnessPlaybackTracker(
       id: _sessionId,
       createdAt: _sessionStartedAt,
+      libraryGeneration: LibraryScope.generation,
     );
     _currentChannelId =
         widget.initialChannelId ?? widget.channels.firstOrNull?.id;
