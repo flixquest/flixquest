@@ -8,7 +8,8 @@ import '../constants/api_constants.dart';
 import '../models/occasional_theme.dart';
 import '../models/banner_ad.dart';
 import '../preferences/app_dependency_preferences.dart';
-import '../services/start_io_ads_service.dart';
+import '../models/adsterra_ads_config.dart';
+import '../models/adsterra_playback_ads_config.dart';
 
 class AppDependencyProvider extends ChangeNotifier {
   final AppDependencies _preferences = AppDependencies();
@@ -64,17 +65,35 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _bannerAdNetwork = 'native';
+  String _bannerAdNetwork = 'adsterra';
   String get bannerAdNetwork => _bannerAdNetwork;
-  bool get isStartIoBannerActive =>
-      _startIoAds.bannerEnabled &&
-      const {'native', 'unity', 'startio'}.contains(_bannerAdNetwork);
+  AdsterraAdsConfig _adsterraAds = const AdsterraAdsConfig();
+  AdsterraAdsConfig get adsterraAds => _adsterraAds;
+
+  AdsterraPlaybackAdsConfig _adsterraPlaybackAds =
+      const AdsterraPlaybackAdsConfig();
+  AdsterraPlaybackAdsConfig get adsterraPlaybackAds => _adsterraPlaybackAds;
+
+  void setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig config) {
+    _adsterraPlaybackAds = config;
+    notifyListeners();
+  }
+
+  // Legacy network selectors continue to point at the banner surface, but
+  // only the new Adsterra switch and catalog can activate network requests.
+  bool get isAdsterraBannerActive =>
+      _adsterraAds.enabled &&
+      const {'adsterra', 'native', 'unity', 'startio'}
+          .contains(_bannerAdNetwork);
+
+  void setAdsterraAdsConfig(AdsterraAdsConfig config) {
+    if (_adsterraAds == config) return;
+    _adsterraAds = config;
+    notifyListeners();
+  }
 
   HostedBannerMode _hostedBannerMode = HostedBannerMode.stack;
   HostedBannerMode get hostedBannerMode => _hostedBannerMode;
-
-  /// Hosted `/ads` banners run beside Start.io; `banner_ad_network=none`
-  /// still hides every banner.
   bool get isHostedBannerActive =>
       _hostedBannerMode != HostedBannerMode.off && _bannerAdNetwork != 'none';
 
@@ -84,78 +103,10 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // These legacy values remain readable so existing Remote Config payloads
-  // and older clients can coexist while Unity itself is no longer linked.
-  String _unityGameIdAndroid = '5445375';
-  String get unityGameIdAndroid => _unityGameIdAndroid;
-
-  String _unityBannerPlacementId = 'Banner_Android';
-  String get unityBannerPlacementId => _unityBannerPlacementId;
-
-  bool _unityTestMode = false;
-  bool get unityTestMode => _unityTestMode;
-
-  StartIoAdsConfig _startIoAds = const StartIoAdsConfig();
-
-  /// Start.io behaviour, with the shared test-mode flag folded in.
-  StartIoAdsConfig get startIoAds =>
-      _startIoAds.copyWith(testMode: _unityTestMode);
-
-  bool get startIoBannerEnabled => _startIoAds.bannerEnabled;
-  bool get startIoInterstitialEnabled => _startIoAds.interstitialEnabled;
-
   void setBannerAdNetwork(String network) {
     final sanitized = network.trim().toLowerCase();
-    if (_bannerAdNetwork != sanitized) {
-      _bannerAdNetwork = sanitized;
-      notifyListeners();
-    }
-  }
-
-  /// Retains the old Unity-named values as compatibility inputs. Start.io uses
-  /// the existing test-mode flag; its application ID is supplied at build time
-  /// through the Android manifest.
-  void setUnityAdsConfig({
-    String? gameIdAndroid,
-    String? bannerPlacementId,
-    bool? testMode,
-  }) {
-    bool changed = false;
-    if (gameIdAndroid != null && gameIdAndroid.trim().isNotEmpty) {
-      final trimmed = gameIdAndroid.trim();
-      if (_unityGameIdAndroid != trimmed) {
-        _unityGameIdAndroid = trimmed;
-        changed = true;
-      }
-    }
-    if (bannerPlacementId != null && bannerPlacementId.trim().isNotEmpty) {
-      final trimmed = bannerPlacementId.trim();
-      if (_unityBannerPlacementId != trimmed) {
-        _unityBannerPlacementId = trimmed;
-        changed = true;
-      }
-    }
-    if (testMode != null && _unityTestMode != testMode) {
-      _unityTestMode = testMode;
-      changed = true;
-    }
-    if (changed) notifyListeners();
-  }
-
-  void setStartIoAdsConfig({
-    required bool bannerEnabled,
-    required bool interstitialEnabled,
-    Duration? interstitialInterval,
-    StartIoInterstitialMode? tvInterstitialMode,
-  }) {
-    final next = _startIoAds.copyWith(
-      bannerEnabled: bannerEnabled,
-      interstitialEnabled: interstitialEnabled,
-      interstitialInterval: interstitialInterval,
-      tvInterstitialMode: tvInterstitialMode,
-    );
-    if (next == _startIoAds) return;
-    _startIoAds = next;
+    if (_bannerAdNetwork == sanitized) return;
+    _bannerAdNetwork = sanitized;
     notifyListeners();
   }
 

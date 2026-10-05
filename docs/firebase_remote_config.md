@@ -60,50 +60,76 @@ splash remains bundled because it appears before Firebase initializes.
 
 | Parameter | Firebase type | Default | Purpose |
 | --- | --- | --- | --- |
-| `banner_ad_network` | String | `native` | Legacy banner selector. `native`, `unity`, and `startio` all render Start.io banners so existing published values remain compatible; `none` hides every banner, hosted ones included. |
-| `hosted_banner_mode` | String | `stack` | How the hosted `/ads` banner (announcements and calls to action) shares a slot with the Start.io banner. `stack`: both show, hosted above Start.io. `priority`: a slot with a live hosted ad shows only that ad; other slots keep Start.io. `off`: hosted banners never show. Unknown values behave as `stack`. |
-| `unity_game_id_android` | String | `5445375` | Legacy compatibility key retained for older app versions. New builds do not initialize Unity from it. |
-| `unity_banner_placement_id` | String | `Banner_Android` | Legacy compatibility key retained for older app versions. |
-| `unity_test_mode` | Boolean | `false` | Legacy-named test-mode switch now also controls Start.io test ads. |
-| `startio_banner_enabled` | Boolean | `false` | Enables Start.io banners on all existing banner surfaces only when remotely set to `true`. `banner_ad_network=none` remains the global banner kill switch. |
-| `startio_interstitial_enabled` | Boolean | `false` | Enables the preloaded Start.io interstitial on phones/tablets only when remotely set to `true`. It runs while the stream resolves and the player opens once it closes. Android TV never loads or shows interstitials. |
-| `startio_rewarded_enabled` | Boolean | `true` | Legacy. Only the first Start.io build reads it (a rewarded video before every stream). Current builds show no rewarded ads; set `false` to switch it off in that old build. |
-| `startio_interstitial_interval_seconds` | Number | `600` | Minimum gap between two playback interstitials, so replays, retries and channel surfing see one ad. Values below `60` are raised to `60`. |
-| `startio_tv_interstitial_mode` | String | `video` | Legacy compatibility setting for older builds with TV interstitials. Current builds never load or show interstitials on Android TV. |
-| `banners` | String | `{"banners":[]}` | Per-ad display overrides for hosted `/ads` banners, keyed by the ad's `key` (`enabled`, `placements`, `shape`, `width`, `height`, `aspectRatio`). |
+| `banner_ad_network` | String | `adsterra` | `adsterra` selects WebView banners; `none` hides all banners including hosted announcements. Published legacy values `native`, `unity`, and `startio` also select the Adsterra surface, but cannot enable requests without the new switch and valid codes. |
+| `adsterra_banner_enabled` | Boolean | `false` | Adsterra banner switch. Must be explicitly enabled remotely; no demo ads or hardcoded publisher codes ship in the app. |
+| `adsterra_tv_enabled` | Boolean | `false` | Additional gate for Android TV; the global switch must also be on. TV placements use `_tv` names and TV-specific defaults. |
+| `adsterra_banners` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | Central catalog of banner codes, sizes, default variants and placement overrides. See below. |
+| `hosted_banner_mode` | String | `stack` | How `/ads` announcements share a slot with Adsterra. `stack`: hosted above Adsterra. `priority`: an eligible hosted banner takes the slot and Adsterra loads only where no hosted ad exists. `off`: show only Adsterra. Unknown values use `stack`. |
+| `banners` | String (JSON) | `{"banners":[]}` | Existing per-announcement overrides for `/ads`, keyed by `key` (`enabled`, `placements`, `shape`, `width`, `height`, `aspectRatio`). Separate from Adsterra's catalog. |
 
-### Hosted `/ads` banners beside Start.io
+### Activate Adsterra banners
 
-The two sources are independent: `startio_banner_enabled` controls Start.io,
-`hosted_banner_mode` controls hosted banners, and either can run without the
-other. One `/ads` response is fetched and shared by every slot on screen
-(cached for 5 minutes, or 1 minute when empty).
+**Ready-to-publish catalog:** [adsterra_banners.json](adsterra_banners.json) contains the six active banner codes read from the FlixQuest publisher dashboard. Publish its contents as `adsterra_banners`; TV reuses the corresponding size codes until separate TV units are generated. The blank example remains available for other publisher accounts.
 
-Each ad's `placements` list picks where it shows. On phones and tablets an
-empty list means every slot; otherwise the placement name must be listed.
-Slot names: `home_{all|movies|series}_{hero|trending|genres}`, `new_and_hot`,
-`movie_detail`, `tv_detail`, `season_detail`, `episode_detail`,
-`collection_detail`, `person_detail`, `bookmarks`, `downloads`,
-`stream_loading`, `live_tv_top` and `live_tv_list_{a|b|c}`.
+1. Generate banner codes in the Adsterra publisher dashboard, using the sizes you want. Each size needs its matching code; changing dimensions does not turn one ad unit into a different size.
+2. Copy [adsterra_banners.example.json](adsterra_banners.example.json). For each unit you intend to use, fill `key` from the generated `atOptions.key`, and `script_url` with the exact HTTPS script URL from the generated code (the URL does not have to end in `invoke.js`). Empty units remain inactive. Protocol-relative URLs (`//...`) must be written as `https://...`.
+3. Publish the completed JSON as the **String** parameter `adsterra_banners` in Firebase Remote Config.
+4. Set `banner_ad_network=adsterra` and `adsterra_banner_enabled=true`. To activate television slots too, publish `adsterra_tv_enabled=true` and fill the TV units.
+5. Select `hosted_banner_mode=off`, `stack`, or `priority` depending on whether your own announcements should appear.
 
-Android TV only shows an ad that lists the `_tv` name (`title_detail_tv`,
-`live_tv_strip_tv`), so a phone announcement never reaches a television. TV
-banners are display-only (no focus, no tap), because Android TV's quality
-rules forbid an in-page ad that opens a web page; put the message in the
-image itself. Start.io banners use the existing top-right title-details slot
-(`title_detail_tv`) and the strip below the Live TV list (`live_tv_strip_tv`)
-when `startio_banner_enabled=true`. TV interstitials remain disabled regardless
-of `startio_interstitial_enabled`. TV Home has no banner slot.
+Remote Config's existing realtime listener applies switches and new codes while the app is running. A changed unit replaces its WebView; turning a switch off removes the view and stops its document. Unrelated rebuilds keep the same WebView. No automatic ad refresh is scheduled.
 
-For Start.io banners without interstitials on any device, publish
-`startio_banner_enabled=true` and `startio_interstitial_enabled=false`.
+The Start.io SDK, Android initialization/metadata, and playback interstitial paths have been removed from this build. Existing `startio_*` and `unity_*` parameters may remain in Firebase for older app versions; this build ignores them. There is no rewarded or fullscreen ad replacement.
 
-The Start.io application ID is build-time Android metadata, not a Remote Config
-value. Set `startapp.appId` in `android/local.properties` or provide the
-`STARTAPP_APP_ID` build environment variable. Return and splash ads are disabled;
-only banners and the playback interstitial are used. Local builds fall
-back to Start.io's demo application ID (`205489527`); production builds should
-always supply the FlixQuest Start.io application ID.
+### Catalog schema and sizes
+
+```json
+{
+  "units": {
+    "mobile_banner": {
+      "key": "YOUR_320X50_KEY",
+      "script_url": "https://YOUR_ADSTERRA_HOST/YOUR_320X50_KEY/invoke.js",
+      "size": "320x50"
+    },
+    "rectangle": {
+      "key": "YOUR_300X250_KEY",
+      "script_url": "https://YOUR_ADSTERRA_HOST/YOUR_300X250_KEY/invoke.js",
+      "size": "300x250"
+    }
+  },
+  "defaults": {
+    "standard": ["mobile_banner"],
+    "tall": ["rectangle"],
+    "tv_standard": ["mobile_banner"]
+  },
+  "placements": {
+    "movie_detail": {"units": ["rectangle"]},
+    "bookmarks": {"enabled": false},
+    "title_detail_tv": {"units": ["mobile_banner"]}
+  }
+}
+```
+
+Supported `size` values are `320x50`, `300x250`, `468x60`, `728x90`, `160x300`, and `160x600`, matching [Adsterra's banner formats](https://adsterra.com/banner-ads/). Dimensions are CSS pixels / Flutter logical pixels, without enlarging or shrinking the creative.
+
+`units` defines reusable named codes. A unit can also set `enabled=false`. `defaults` maps the existing thin (`standard`) and rectangle (`tall`) variants to unit IDs, with separate `tv_standard` and `tv_tall` variants. `placements` overrides those defaults for a particular slot. Both defaults and overrides accept an ordered `units` list (or a shorthand list/string). The first valid unit that fits the available width and height wins. For example, `["leaderboard", "mobile_banner"]` chooses 728x90 on a wide surface and 320x50 on a phone. A unit too large for the slot is skipped, so a 728x90 creative never gets cropped into the 360-wide TV details slot.
+
+A placement override replaces the default; missing/invalid unit IDs in an override hide that placement rather than silently displaying another code. Malformed JSON, missing codes, invalid sizes, and non-HTTPS script URLs are inactive. TV never borrows a phone placement override or phone variant default.
+
+Existing phone/tablet slot names:
+
+- `home_{all|movies|series}_{hero|trending|genres}`
+- `new_and_hot`, `movie_detail`, `tv_detail`, `season_detail`, `episode_detail`
+- `collection_detail`, `person_detail`, `bookmarks`, `downloads`
+- `stream_loading`, `live_tv_top`, `live_tv_list_a`, `live_tv_list_b`, `live_tv_list_c`
+
+TV slots: `title_detail_tv` (top-right details slot, maximum width 360) and `live_tv_strip_tv` (below the Live TV list). TV Home has no banner slot. TV banners remain display-only and cannot take D-pad focus or open an offer. Hidden details banners are removed while browsing the lower rows.
+
+### Loading and clicks
+
+The banner WebView loads a minimal local HTML document with the generated script, JavaScript enabled, an `AD` label, and the exact unit dimensions. The local document uses `https://appassets.androidplatform.net/adsterra/` as its HTTPS base URL, giving it an isolated app-content origin where `document.cookie` and storage work. Loading without a base URL creates an opaque origin and makes cookie-dependent scripts fail. This URL is not fetched and does not adopt the ad server or publisher website's origin. Ads use the actual system WebView user agent. Script load/runtime errors, main-document failures, or a script that fails to load within 20 seconds collapse the slot without blocking browsing or playback.
+
+HTTP(S) offer navigation opens the external browser only following a recent pointer interaction on a phone/tablet. Programmatic main-frame redirects and non-web schemes are blocked; iframe resource navigation stays in the WebView. There are no forced clicks or Smartlink countdowns. Confirm the WebView inventory with Adsterra before publishing real codes, and use Adsterra's reporting to verify monetization; a script-load signal is not a billable-impression callback.
 
 ## Ready-to-paste complete catalog
 
@@ -438,3 +464,121 @@ Older values still work and are migrated in memory:
 
 Legacy format does not expose user selection. Move to schema version 2 for
 overlaps, selection, priorities, and global effect controls.
+
+
+## Mobile playback ads
+
+Playback ads are controlled separately from banners. Android/iOS phones and
+tablets support them; television presentation, downloads, desktop and web skip
+both stages. No publisher code is compiled into the defaults.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `adsterra_playback_enabled` | Boolean | `false` | Explicitly published switch for both mobile playback stages. Turning it off closes an active playback ad and continues the flow. |
+| `adsterra_playback_ads` | String (JSON) | `{}` | Per-stage scripts or Smartlinks, enable flags and timeouts. |
+
+Copy [adsterra_playback_ads.json](adsterra_playback_ads.json) into the String
+parameter `adsterra_playback_ads`. It contains the exact Social Bar and Popunder
+scripts and Smartlink URL supplied for FlixQuest. Publish `adsterra_playback_enabled=true` to enable
+configured stages. Each stage also requires its own `enabled=true`. The supplied
+catalog enables both stages. There is no app cooldown: old `cooldown_seconds`
+fields are ignored by the updated app. Only overlapping active ads are blocked.
+
+- `interstitial`: shows Social Bar immediately before entering the movie/episode
+  media loader. The loader is not constructed or started until the ad closes or
+  fails. This includes Play Now, phone browse/detail/resume/episode entry points,
+  and player recommendation/episode transitions.
+- `stream_found_experiment`: alternates Popunder then Smartlink after a playable
+  stream is selected, before navigating to `player.dart`. The counter is saved
+  per experiment `id` on the device, so restarting continues the sequence. Each
+  eligible attempt consumes one variant, including failed loads. TV/download/
+  background skips and overlapping requests do not consume variants. No second
+  variant is loaded on the same attempt when the first fails.
+- `popunder`: the legacy single-placement key for this stage. It applies only
+  when the experiment is absent or disabled. A malformed enabled experiment
+  disables this stage instead of silently loading a different placement.
+
+In-app ads are visible full-page WebViews with an immediate native **Close ad**
+control and normal system Back handling. Smartlinks use one visible WebView for
+their redirect chain. Script popup advertiser URLs are presented in one separate
+visible WebView within that route. An Android/iOS application cannot
+place a browser tab behind its own activity, so this presentation is a foreground
+popup rather than a literal browser pop-under. Returning from or closing the ad
+continues the existing playback flow. With `browser: "external"`, Smartlinks
+launch directly in the system browser; scripts launch only the actual popup URL
+they emit, never their JavaScript source URL. Playback waits for FlixQuest to
+resume, even if the remote kill switch removes the ad while the browser is open.
+Failed launches or a cancelled chooser continue playback. The viewing-duration
+timer applies to in-app ads; it does not bring FlixQuest forward or close the
+external browser. Main-page popup/navigation handling uses the WebView plugin's native
+window support; the provider's `window.open` is not replaced.
+
+Per-stage fields:
+
+| Field | Default | Limits |
+| --- | --- | --- |
+| `enabled` | `false` | Must be the JSON Boolean `true`. |
+| `mode` | `script` | `script` or `smartlink`. |
+| `script_url` | Empty | In script mode, exact generated HTTPS `src`; numeric dashboard IDs are not script URLs. |
+| `url` | Empty | In Smartlink mode, exact HTTPS direct link. |
+| `browser` | `in_app` | `in_app` (WebView) or `external` (system browser). |
+| `sub_id` | Empty | Smartlink tracking label: 1–64 letters, digits, underscores or hyphens. Appends `psid` to the URL while preserving other query parameters. Prefer alphanumeric labels per Adsterra's guide. |
+| `auto_activate` | `false` | Script mode only. On the stream-found stage, activate the publisher's Continue control once after the script loads. This is a programmatic, untrusted click; no advertiser element is clicked. |
+| `load_timeout_ms` | `5000` | 500–10,000 milliseconds. Script/creative failure continues playback. |
+| `max_duration_seconds` | `30` | 5–120 seconds; in-app upper bound including offer viewing. User can close sooner. |
+
+For the original Popunder placement, use `mode: "script"` and its generated
+`script_url` instead of the Smartlink. The supplied experiment sets
+`auto_activate: true` for the Popunder arm: the app makes one programmatic click
+on its own **Continue to player** control. The browser may reject that activation
+because it is not a trusted user gesture. No trusted-event property is forged,
+no native touch is synthesized, and no advertiser links are clicked. If no popup
+URL arrives, the load timeout continues playback. A real tap remains available,
+and provider-configured delayed popups are handled automatically. Merely loading
+or activating the script does not guarantee a popup or paid impression.
+Adsterra reports statistics per placement; see its
+[publisher API guide](https://adsterra.com/blog/how-to-use-adsterra-publishers-api/).
+
+The experiment requires an `id` and 2–8 `variants`. Each variant includes a unique
+`id` (1–64 letters, digits, underscores or hyphens), `enabled: true`, and the
+placement fields above. Use a new experiment `id` when changing the order or
+meaning of its variants. The sample compares Popunder_1 against Smartlink_1 with
+both opened externally to avoid embedded-WebView rendering differences;
+Smartlink uses `psid=fqsmartexternalv1`. Logs identify each attempt
+as `variant=formats_v1/popunder_external` or `variant=formats_v1/smartlink_external`.
+Set both variants' `browser` to `in_app` to compare within WebViews instead,
+and use a new experiment ID and Smartlink sub-ID for that experiment.
+`variant=legacy` means the experiment catalog is not active on that client.
+
+To compare browser delivery separately, publish
+[adsterra_playback_browser_test.json](adsterra_playback_browser_test.json) instead.
+It alternates the same Smartlink between in-app and external delivery with distinct
+`psid` labels. Retrieve statistics grouped by `placement_sub_id` through Adsterra's
+Publisher API; Popunder has its own placement statistics. Keep API credentials on
+your server, outside the app and Remote Config. Compare CPM, revenue per 1,000
+eligible playback attempts, and playback completion. App logs and DOM readiness
+are diagnostics, not billable-impression counters.
+
+Android playback WebViews use Hybrid Composition to avoid the SurfaceTexture
+path when coming from video playback. A loading indicator remains until page
+content is present. Empty Smartlink/offer pages keep their load timeout; page
+started/finished, console messages, blocked schemes and errors are logged under
+`[AdsterraPage]`. This renderer change requires a rebuild/hot restart and still
+needs device validation. See the [WebView plugin's display-mode documentation](https://pub.dev/packages/webview_flutter_android).
+
+A script download is not an interstitial-ready callback: the Social Bar view
+waits for a visible creative element, otherwise the load timeout continues
+playback. Adsterra chooses the Social Bar subformat and has its own frequency
+limits; ask your Adsterra manager for interstitial-only delivery and approved
+in-app placement. Removing the app cooldown does not override network limits or guarantee
+fill/CPM. See [Adsterra's Social Bar publisher guide](https://adsterra.com/blog/publishers-guide-to-social-bar/)
+and [Popunder guide](https://adsterra.com/blog/popunder-traffic-monetization/).
+
+Script HTML uses the same isolated HTTPS app-content base origin as banners;
+Smartlinks load their actual URL directly. Neither claims requests originate from
+`flix.quest`. Closing, timing out, remote
+disabling, replacing the ad, or backgrounding the app prevents late callbacks from opening another ad
+over the player. There is no hidden preload, automatic refresh, fabricated
+advertiser click or app-reported paid impression. Provider script downloads from this
+workstation returned HTTP 403; native live fill and actual earnings still require
+validation on a mobile device with the remote switches enabled.

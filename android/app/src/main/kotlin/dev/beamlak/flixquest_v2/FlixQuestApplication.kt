@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.util.Log
-import com.startapp.sdk.adsbase.StartAppSDK
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterJNI
 import io.flutter.embedding.engine.loader.FlutterLoader
@@ -15,15 +14,6 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class FlixQuestApplication : Application() {
-    override fun onCreate() {
-        super.onCreate()
-        // Start.io shows its own consent/disclosure popup on first launch by
-        // default. Record the personalized-ads consent signal and turn that
-        // popup off, so the first open goes straight to the app.
-        StartAppSDK.setUserConsent(this, "pas", System.currentTimeMillis(), true)
-        StartAppSDK.enableConsent(this, false)
-    }
-
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
         val uiModeManager = base.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager

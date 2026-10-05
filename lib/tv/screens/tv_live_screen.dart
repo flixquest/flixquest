@@ -17,7 +17,6 @@ import '../../screens/common/live_player.dart';
 import '../../services/analytics_service.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/live_channel_focus.dart';
-import '../../services/start_io_ads_service.dart';
 import '../../widgets/hosted_ads_banner.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
@@ -389,9 +388,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
 
   Future<void> _play(Channel channel) async {
     setState(() => _resolvingId = channel.id);
-    // The interstitial runs while the stream resolves; the player opens only
-    // once it is gone.
-    unawaited(StartIoAdsService.instance.showPlaybackInterstitial());
     final stopwatch = Stopwatch()..start();
     try {
       final stream = await _api().getStream(channel.id);
@@ -409,7 +405,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         durationMs: stopwatch.elapsedMilliseconds,
         source: _mode.name,
       );
-      await StartIoAdsService.instance.whenFullScreenAdClosed();
       if (!mounted) return;
       final theme = Theme.of(context);
       await Navigator.of(context).push<void>(
@@ -619,12 +614,10 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
               child: isSchedule ? _buildSchedule() : _buildGrid(),
             ),
             // A thin strip under the list stays on screen while the viewer
-            // browses, so every refresh is a viewable impression, and it
-            // only takes one banner's height from the grid, never a column.
-            const StartIoAdSlot(
+            // browses and only takes one banner's height from the grid.
+            const AdsterraAdSlot(
               placement: 'live_tv_strip',
               variant: HostedBannerVariant.standard,
-              keywords: StartIoAdsService.liveKeywords,
               padding: EdgeInsets.only(top: 8, bottom: 12),
             ),
           ],

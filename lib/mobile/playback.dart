@@ -1,3 +1,4 @@
+import 'package:flixquest/services/adsterra_playback_ads_service.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -105,7 +106,11 @@ abstract final class MobilePlayback {
     BuildContext context,
     MediaItem item, {
     int? elapsed,
-  }) {
+  }) async {
+    if (!await AdsterraPlaybackAdsService.instance.beforeLoader(context) ||
+        !context.mounted) {
+      return;
+    }
     final movie = item.movie;
     debugPrint(
       '[MovieRecommendationsDebug][MOBILE_PLAYBACK_PLAY] '
@@ -118,9 +123,8 @@ abstract final class MobilePlayback {
       movieId: item.id,
       movieName: item.title,
       posterPath: item.posterPath,
-      releaseYear: int.tryParse(item.year ?? '') ??
-          item.recentMovie?.releaseYear ??
-          0,
+      releaseYear:
+          int.tryParse(item.year ?? '') ?? item.recentMovie?.releaseYear ?? 0,
       isAdult: movie?.adult,
       releaseDate: item.releaseDate ?? movie?.releaseDate,
     );
@@ -161,6 +165,10 @@ abstract final class MobilePlayback {
         ),
       );
       if (choice == null || !context.mounted) return;
+      if (!await AdsterraPlaybackAdsService.instance.beforeLoader(context) ||
+          !context.mounted) {
+        return;
+      }
       final episode = choice.episode;
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(

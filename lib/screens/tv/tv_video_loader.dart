@@ -1,3 +1,4 @@
+import 'package:flixquest/services/adsterra_playback_ads_service.dart';
 // ignore_for_file: use_build_context_synchronously
 import 'dart:async';
 import 'package:flixquest/functions/function.dart';
@@ -10,7 +11,6 @@ import 'package:flixquest/models/provider_video_source.dart';
 import 'package:flixquest/constants/app_constants.dart' show MediaType;
 import 'package:flixquest/models/provider_load_state.dart';
 import 'package:flixquest/services/globle_method.dart';
-import 'package:flixquest/services/start_io_ads_service.dart';
 import 'package:flixquest/widgets/playback_loading_screen.dart';
 import 'package:flixquest/services/stream_size_estimator.dart';
 import 'package:flixquest/video_providers/provider_loader.dart';
@@ -84,12 +84,6 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
   }
 
   Future<void> _startPlayback() async {
-    // The interstitial runs while the stream resolves, so its time on screen
-    // hides the wait instead of adding to it. [loadVideo] holds the player
-    // back until the ad is gone.
-    if (!widget.download) {
-      unawaited(StartIoAdsService.instance.showPlaybackInterstitial());
-    }
     await loadVideo();
   }
 
@@ -216,6 +210,13 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
         );
       }
 
+      if (selection != null) {
+        if (!await AdsterraPlaybackAdsService.instance.streamFound(context,
+                download: widget.download, television: widget.useTvPlayer) ||
+            !mounted) {
+          return;
+        }
+      }
       final firstWorkingProviderCode = selection?.provider.codeName;
       if (selection != null) {
         _showSelectedProvider(selection.provider);
@@ -268,8 +269,6 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
               );
         }
 
-        // Never start playback behind a full-screen ad.
-        await StartIoAdsService.instance.whenFullScreenAdClosed();
         await seasonEpisodesFetch;
         if (!mounted) return;
 

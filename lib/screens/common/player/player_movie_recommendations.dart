@@ -1,3 +1,4 @@
+import 'package:flixquest/widgets/adsterra_playback_gate.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -51,11 +52,13 @@ class PlayerMovieRecommendations {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => MovieVideoLoader(
-              download: false,
-              useTvPlayer: useTvPlayer,
-              metadata: newMetadata,
-            ),
+            builder: (context) => AdsterraPlaybackGate(
+                television: useTvPlayer,
+                builder: (context) => MovieVideoLoader(
+                      download: false,
+                      useTvPlayer: useTvPlayer,
+                      metadata: newMetadata,
+                    )),
           ),
         );
       }
@@ -251,8 +254,7 @@ class PlayerMovieRecommendations {
                           description: selected.overview,
                           selected: true,
                           thumbnail: _RecommendationThumbnail(
-                            path:
-                                selected.backdropPath ?? selected.posterPath,
+                            path: selected.backdropPath ?? selected.posterPath,
                             width: 128,
                             height: 76,
                           ),

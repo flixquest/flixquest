@@ -1,3 +1,4 @@
+import 'package:flixquest/services/adsterra_playback_ads_service.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
@@ -32,6 +33,11 @@ Future<bool> playEpisode(
     return false;
   }
   if (!context.mounted) return false;
+  if (!await AdsterraPlaybackAdsService.instance
+          .beforeLoader(context, download: download) ||
+      !context.mounted) {
+    return false;
+  }
   final queued = await Navigator.of(context).push<bool>(
     MaterialPageRoute<bool>(
       builder: (_) => TVVideoLoader(

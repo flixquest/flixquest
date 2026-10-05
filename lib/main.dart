@@ -22,7 +22,7 @@ import 'provider/wellness_provider.dart';
 import 'services/bookmark_sync_service.dart';
 import 'services/recently_watched_sync_service.dart';
 import 'services/media_link_navigation_service.dart';
-import 'services/start_io_ads_service.dart';
+import 'services/device_presentation_service.dart';
 import 'services/home_widget_navigation_service.dart';
 import 'singleton/sharedpreferences_singleton.dart';
 import 'tv/platform/device_presentation.dart';
@@ -111,8 +111,8 @@ Future<DevicePresentation> appInitialize({
   // matches the binary instead of a hardcoded string that drifts.
   currentAppVersion = (await PackageInfo.fromPlatform()).version;
   sharedPrefsSingleton = await SharedPreferencesSingleton.getInstance();
-  StartIoAdsService.instance
-      .setTelevision(devicePresentation == DevicePresentation.television);
+  DevicePresentationService.instance.isTelevision =
+      devicePresentation == DevicePresentation.television;
   await clearVideoPlaybackCache();
   FirebaseMessaging.onBackgroundMessage(_messageHandler);
   await FlutterDownloader.initialize(debug: true, ignoreSsl: true);

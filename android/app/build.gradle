@@ -24,12 +24,6 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
-// Set startapp.appId in android/local.properties (or STARTAPP_APP_ID in the
-// build environment) for production. The fallback is Start.io's documented
-// demo application ID so local builds never send impressions to a real app.
-def startAppId = localProperties.getProperty('startapp.appId') ?:
-        System.getenv('STARTAPP_APP_ID') ?: '205489527'
-
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
@@ -67,7 +61,6 @@ android {
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
-        manifestPlaceholders = [startAppAppId: startAppId]
     }
 
     signingConfigs {
@@ -95,16 +88,6 @@ flutter {
 dependencies {
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.14.1'
-    // Declared directly so the app can call the StartAppSDK consent APIs in
-    // FlixQuestApplication. The plugin's own dependency is runtime-only.
-    implementation 'com.startapp:inapp-sdk:5.3.1'
-    constraints {
-        // startapp_sdk declares a floating [5.0.0,6) range. 5.3.2 requires
-        // compileSdk 37; pin the newest 5.x release compatible with this app's 36.
-        implementation('com.startapp:inapp-sdk:5.3.1') {
-            version { strictly '5.3.1' }
-        }
-    }
     def media3Version = '1.8.0'
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
     implementation 'androidx.multidex:multidex:2.0.1'

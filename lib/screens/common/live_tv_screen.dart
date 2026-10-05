@@ -19,7 +19,6 @@ import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/media_link.dart';
-import '../../services/start_io_ads_service.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
 import '../../services/analytics_service.dart';
@@ -383,9 +382,6 @@ class _ChannelListState extends State<ChannelList> {
 
   Future<void> _play(Channel channel) async {
     setState(() => _resolvingId = channel.id);
-    // The interstitial runs while the stream resolves; the player opens only
-    // once it is gone.
-    unawaited(StartIoAdsService.instance.showPlaybackInterstitial());
     final stopwatch = Stopwatch()..start();
     try {
       final stream = await _api().getStream(channel.id);
@@ -403,7 +399,6 @@ class _ChannelListState extends State<ChannelList> {
         durationMs: stopwatch.elapsedMilliseconds,
         source: _mode.name,
       );
-      await StartIoAdsService.instance.whenFullScreenAdClosed();
       if (!mounted) return;
       final autoFullScreen = context.read<SettingsProvider>().defaultViewMode;
       await Navigator.of(context).push<void>(
@@ -631,8 +626,7 @@ class _ChannelListState extends State<ChannelList> {
     );
   }
 
-  /// Start.io ad tags must be letters only, so the slots are named, not
-  /// numbered.
+  /// Stable placement names for centrally configured Live TV banners.
   static const _headerPlacement = 'live_tv_top';
   static const _listPlacements = <String>[
     'live_tv_list_a',
@@ -640,13 +634,11 @@ class _ChannelListState extends State<ChannelList> {
     'live_tv_list_c',
   ];
 
-  /// Live TV ads use the larger MREC unit; it is the best-paying placement
-  /// the Start.io plugin exposes.
+  /// Live TV uses the larger rectangle variant by default.
   Widget _bannerSliver(String placement) => SliverToBoxAdapter(
         child: RemoteHostedAdsBanner(
           placement: placement,
           variant: HostedBannerVariant.tall,
-          keywords: StartIoAdsService.liveKeywords,
         ),
       );
 

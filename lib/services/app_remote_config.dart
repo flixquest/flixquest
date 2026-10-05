@@ -5,7 +5,8 @@ import 'package:firebase_remote_config/firebase_remote_config.dart';
 import '../constants/api_constants.dart';
 import '../models/banner_ad.dart';
 import '../provider/app_dependency_provider.dart';
-import 'start_io_ads_service.dart';
+import '../models/adsterra_ads_config.dart';
+import '../models/adsterra_playback_ads_config.dart';
 
 class AppRemoteConfig {
   const AppRemoteConfig._();
@@ -22,14 +23,11 @@ class AppRemoteConfig {
   static const bannersKey = 'banners';
   static const bannerAdNetworkKey = 'banner_ad_network';
   static const hostedBannerModeKey = 'hosted_banner_mode';
-  static const unityGameIdAndroidKey = 'unity_game_id_android';
-  static const unityBannerPlacementIdKey = 'unity_banner_placement_id';
-  static const unityTestModeKey = 'unity_test_mode';
-  static const startIoBannerEnabledKey = 'startio_banner_enabled';
-  static const startIoInterstitialEnabledKey = 'startio_interstitial_enabled';
-  static const startIoInterstitialIntervalKey =
-      'startio_interstitial_interval_seconds';
-  static const startIoTvInterstitialModeKey = 'startio_tv_interstitial_mode';
+  static const adsterraBannerEnabledKey = 'adsterra_banner_enabled';
+  static const adsterraTvEnabledKey = 'adsterra_tv_enabled';
+  static const adsterraBannersKey = 'adsterra_banners';
+  static const adsterraPlaybackEnabledKey = 'adsterra_playback_enabled';
+  static const adsterraPlaybackAdsKey = 'adsterra_playback_ads';
 
   /// Live TV used to ride on the OTT flag before it got a dedicated key.
   static const legacyEnableLiveTvKey = 'enable_ott';
@@ -61,15 +59,13 @@ class AppRemoteConfig {
       enableLiveTvKey: true,
       legacyEnableLiveTvKey: true,
       bannersKey: '{"banners":[]}',
-      bannerAdNetworkKey: 'native',
+      bannerAdNetworkKey: 'adsterra',
       hostedBannerModeKey: 'stack',
-      unityGameIdAndroidKey: '5445375',
-      unityBannerPlacementIdKey: 'Banner_Android',
-      unityTestModeKey: false,
-      startIoBannerEnabledKey: false,
-      startIoInterstitialEnabledKey: false,
-      startIoInterstitialIntervalKey: 600,
-      startIoTvInterstitialModeKey: 'video',
+      adsterraBannerEnabledKey: false,
+      adsterraTvEnabledKey: false,
+      adsterraBannersKey: '{"units":{},"defaults":{},"placements":{}}',
+      adsterraPlaybackEnabledKey: false,
+      adsterraPlaybackAdsKey: '{}',
     });
   }
 
@@ -126,45 +122,30 @@ class AppRemoteConfig {
 
     final bannerNetwork = remoteConfig.getString(bannerAdNetworkKey).trim();
     provider.setBannerAdNetwork(
-      bannerNetwork.isNotEmpty ? bannerNetwork : 'native',
+      bannerNetwork.isNotEmpty ? bannerNetwork : 'adsterra',
     );
 
     provider.setHostedBannerMode(
       HostedBannerMode.parse(remoteConfig.getString(hostedBannerModeKey)),
     );
 
-    final unityGameId = remoteConfig.getString(unityGameIdAndroidKey).trim();
-    final unityPlacement =
-        remoteConfig.getString(unityBannerPlacementIdKey).trim();
-    final unityTestMode = remoteConfig.getBool(unityTestModeKey);
-    provider.setUnityAdsConfig(
-      gameIdAndroid: unityGameId.isNotEmpty ? unityGameId : null,
-      bannerPlacementId: unityPlacement.isNotEmpty ? unityPlacement : null,
-      testMode: unityTestMode,
-    );
-    final bannerEnabled = remoteConfig.getValue(startIoBannerEnabledKey);
-    final interstitialEnabled =
-        remoteConfig.getValue(startIoInterstitialEnabledKey);
-    provider.setStartIoAdsConfig(
-      bannerEnabled: bannerEnabled.source == ValueSource.valueRemote &&
-          bannerEnabled.asBool(),
-      interstitialEnabled:
-          interstitialEnabled.source == ValueSource.valueRemote &&
-              interstitialEnabled.asBool(),
-      // Floors keep a mistyped value from turning pacing off entirely.
-      interstitialInterval: Duration(
-        seconds: remoteConfig.getInt(startIoInterstitialIntervalKey).clamp(
-              60,
-              86400,
-            ),
-      ),
-      tvInterstitialMode: StartIoInterstitialMode.parse(
-        remoteConfig.getString(startIoTvInterstitialModeKey),
-      ),
-    );
-    StartIoAdsService.instance.updateConfig(provider.startIoAds);
+    final adsterraEnabled = remoteConfig.getValue(adsterraBannerEnabledKey);
+    final tvEnabled = remoteConfig.getValue(adsterraTvEnabledKey);
+    provider.setAdsterraAdsConfig(AdsterraAdsConfig.parse(
+      remoteConfig.getString(adsterraBannersKey),
+      enabled: adsterraEnabled.source == ValueSource.valueRemote &&
+          adsterraEnabled.asBool(),
+      tvEnabled:
+          tvEnabled.source == ValueSource.valueRemote && tvEnabled.asBool(),
+    ));
 
     final instancesRaw = remoteConfig.getString(flixquestApiInstancesKey);
+    final playbackEnabled = remoteConfig.getValue(adsterraPlaybackEnabledKey);
+    provider.setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse(
+      remoteConfig.getString(adsterraPlaybackAdsKey),
+      enabled: playbackEnabled.source == ValueSource.valueRemote &&
+          playbackEnabled.asBool(),
+    ));
     final parsedInstances = parseApiInstances(instancesRaw);
     final legacyUrl = remoteConfig.getString(flixquestApiUrlKey).trim();
     provider.setFlixquestApiConfig(

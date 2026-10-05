@@ -1,3 +1,4 @@
+import 'package:flixquest/services/adsterra_playback_ads_service.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -102,6 +103,10 @@ class _ContinueSheet extends StatelessWidget {
     );
     if (picked == null || !host.mounted) return;
     if (!await checkConnection() || !host.mounted) return;
+    if (!await AdsterraPlaybackAdsService.instance.beforeLoader(host) ||
+        !host.mounted) {
+      return;
+    }
     await Navigator.of(host).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => TVVideoLoader(download: false, metadata: picked),

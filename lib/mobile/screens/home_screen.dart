@@ -723,7 +723,7 @@ String? _releaseBadge(BuildContext context, MediaItem item) {
 /// banner directly under the hero, a medium rectangle after Trending (the
 /// size advertisers bid on most) and a banner before the genre rows. Each
 /// Home tab reports its own placement ids (`home_all_*`, `home_movies_*`,
-/// `home_series_*`); Start.io tags are letters only, so slots are named.
+/// `home_series_*`), shared by the remote banner placement catalog.
 @visibleForTesting
 List<Widget> homeRows(
   BuildContext context, {

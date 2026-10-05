@@ -1,3 +1,4 @@
+import 'package:flixquest/widgets/adsterra_playback_gate.dart';
 // ignore_for_file: deprecated_member_use
 
 import 'dart:async';
@@ -2471,12 +2472,14 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     if (!mounted) return;
     await Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => TVVideoLoader(
-          download: false,
-          useTvPlayer: widget.useTvControls,
-          onTvPlayerExit: widget.onTvPlayerExit,
-          metadata: _metadataForTvEpisode(episode),
-        ),
+        builder: (_) => AdsterraPlaybackGate(
+            television: widget.useTvControls,
+            builder: (context) => TVVideoLoader(
+                  download: false,
+                  useTvPlayer: widget.useTvControls,
+                  onTvPlayerExit: widget.onTvPlayerExit,
+                  metadata: _metadataForTvEpisode(episode),
+                )),
       ),
     );
   }
@@ -2499,12 +2502,14 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     );
     await Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => MovieVideoLoader(
-          download: false,
-          useTvPlayer: widget.useTvControls,
-          onTvPlayerExit: widget.onTvPlayerExit,
-          metadata: metadata,
-        ),
+        builder: (_) => AdsterraPlaybackGate(
+            television: widget.useTvControls,
+            builder: (context) => MovieVideoLoader(
+                  download: false,
+                  useTvPlayer: widget.useTvControls,
+                  onTvPlayerExit: widget.onTvPlayerExit,
+                  metadata: metadata,
+                )),
       ),
     );
   }
@@ -3241,10 +3246,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     _closePlayer();
     await navigator.pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => TVVideoLoader(
-          download: false,
-          metadata: _metadataForTvEpisode(next),
-        ),
+        builder: (_) => AdsterraPlaybackGate(
+            television: widget.useTvControls,
+            builder: (context) => TVVideoLoader(
+                  download: false,
+                  metadata: _metadataForTvEpisode(next),
+                )),
       ),
     );
   }

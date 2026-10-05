@@ -32,20 +32,6 @@
         android:banner="@drawable/tv_banner"
         android:requestLegacyExternalStorage="true"
         android:usesCleartextTraffic="true">    
-        <meta-data
-            android:name="com.startapp.sdk.APPLICATION_ID"
-            android:value="${startAppAppId}" />
-        <meta-data
-            android:name="com.startapp.sdk.RETURN_ADS_ENABLED"
-            android:value="false" />
-        <provider
-            android:name="com.startapp.flutter.sdk.StartAppFlutterHelper"
-            android:authorities="com.startapp.flutter.sdk.${applicationId}"
-            android:exported="false">
-            <meta-data
-                android:name="com.startapp.sdk.SPLASH_ADS_ENABLED"
-                android:value="false" />
-        </provider>
         <!-- Replace the default receiver ID after registering cast_receiver/. -->
         <meta-data
             android:name="uz.shs.better_player_plus.CAST_RECEIVER_APPLICATION_ID"
