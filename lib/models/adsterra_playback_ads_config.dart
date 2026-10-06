@@ -2,8 +2,6 @@ import 'dart:convert';
 
 enum PlaybackAdStage { beforeLoader, streamFound }
 
-enum PlaybackAdBrowser { inApp, external }
-
 /// Independent of banner settings; missing or malformed remote values disable
 /// playback ads. Codes belong in Remote Config, never in compiled defaults.
 class AdsterraPlaybackAdsConfig {
@@ -93,9 +91,7 @@ class PlaybackAdPlacement {
     this.smartlinkUrl,
     this.loadTimeout = const Duration(seconds: 5),
     this.maxDuration = const Duration(seconds: 30),
-    this.browser = PlaybackAdBrowser.inApp,
     this.subId,
-    this.autoActivate = false,
   }) : assert((scriptUrl == null) != (smartlinkUrl == null));
 
   final Uri? scriptUrl;
@@ -103,12 +99,7 @@ class PlaybackAdPlacement {
   bool get isSmartlink => smartlinkUrl != null;
   final Duration loadTimeout;
   final Duration maxDuration;
-  final PlaybackAdBrowser browser;
   final String? subId;
-
-  /// Activates the publisher's control once, never the advertiser's content.
-  /// A programmatic click is not a trusted browser gesture.
-  final bool autoActivate;
 
   Uri? get trackedSmartlinkUrl => smartlinkUrl == null || subId == null
       ? smartlinkUrl
@@ -124,24 +115,17 @@ class PlaybackAdPlacement {
     final script = mode == 'script' ? _https(value['script_url']) : null;
     final smartlink = mode == 'smartlink' ? _https(value['url']) : null;
     if (script == null && smartlink == null) return null;
-    final browser = value['browser'] ?? 'in_app';
-    if (browser != 'in_app' && browser != 'external') return null;
     final subId = value['sub_id'];
     if (subId != null && (!_identifier(subId) || smartlink == null)) {
       return null;
     }
-    final autoActivate = value['auto_activate'] ?? false;
-    if (autoActivate is! bool || (autoActivate && smartlink != null)) {
-      return null;
-    }
+    // Legacy `auto_activate` is ignored: the Popunder tag only opens on a real
+    // touch, so a programmatic click never produced a popup. Legacy `browser`
+    // is ignored too: ad pages always open in FlixQuest's own ad page.
     return PlaybackAdPlacement(
       scriptUrl: script,
       smartlinkUrl: smartlink,
-      browser: browser == 'external'
-          ? PlaybackAdBrowser.external
-          : PlaybackAdBrowser.inApp,
       subId: subId as String?,
-      autoActivate: autoActivate,
       loadTimeout: Duration(
           milliseconds: _bounded(value['load_timeout_ms'], 5000, 500, 10000)),
       maxDuration: Duration(

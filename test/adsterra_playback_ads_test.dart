@@ -27,6 +27,9 @@ const catalog = '''{
 const smartlinkCatalog = '''{
   "popunder":{"enabled":true,"mode":"smartlink","url":"https://ads.example/smartlink","load_timeout_ms":1000,"max_duration_seconds":5,"cooldown_seconds":60}
 }''';
+const slowSmartlinkCatalog = '''{
+  "popunder":{"enabled":true,"mode":"smartlink","url":"https://ads.example/smartlink","load_timeout_ms":10000,"max_duration_seconds":30}
+}''';
 const experimentCatalog = '''{
   "stream_found_experiment": {
     "enabled":true,"id":"formats_v1","variants":[
@@ -41,6 +44,12 @@ void main() {
   late AppDependencyProvider provider;
   late AdsterraPlaybackAdsService service;
   late BuildContext host;
+  late List<Uri> storeLaunches;
+
+  Future<bool> recordStoreLaunch(Uri uri) async {
+    storeLaunches.add(uri);
+    return true;
+  }
 
   setUpAll(() async {
     dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://api.test');
@@ -55,7 +64,8 @@ void main() {
     provider = AppDependencyProvider()
       ..setAdsterraPlaybackAdsConfig(
           AdsterraPlaybackAdsConfig.parse(catalog, enabled: true));
-    service = AdsterraPlaybackAdsService();
+    storeLaunches = [];
+    service = AdsterraPlaybackAdsService(storeLauncher: recordStoreLaunch);
   });
   tearDown(() {
     DevicePresentationService.instance.isTelevision = false;
@@ -156,7 +166,7 @@ void main() {
     for (final corrupt in <void Function(Map<String, dynamic>)>[
       (experiment) =>
           experiment['variants'][1]['id'] = experiment['variants'][0]['id'],
-      (experiment) => experiment['variants'][1]['browser'] = 'unknown',
+      (experiment) => experiment['variants'][1]['mode'] = 'popup',
       (experiment) => experiment['variants'][1]['sub_id'] = '<bad>',
       (experiment) => experiment['id'] = '',
     ]) {
@@ -187,80 +197,21 @@ void main() {
         {'existing': '1', 'psid': 'fqsmartinapp'});
   });
 
-  test('publishable catalogs enable separate format and browser experiments',
-      () {
-    final formats = AdsterraPlaybackAdsConfig.parse(
+  test('the published catalog shows the Smartlink on stream found', () {
+    final supplied = AdsterraPlaybackAdsConfig.parse(
         File('docs/adsterra_playback_ads.json').readAsStringSync(),
         enabled: true);
-    final arms = formats.streamFoundExperiment!.variants;
-    expect(arms[0].placement.scriptUrl!.host, 'aarems.org');
-    expect(arms[0].placement.autoActivate, isTrue);
-    expect(arms[1].placement.smartlinkUrl!.host, 'directyp.org');
-    expect(arms.map((arm) => arm.placement.browser),
-        everyElement(PlaybackAdBrowser.external));
-    final browsers = AdsterraPlaybackAdsConfig.parse(
-        File('docs/adsterra_playback_browser_test.json').readAsStringSync(),
-        enabled: true);
-    final browserArms = browsers.streamFoundExperiment!.variants;
-    expect(browserArms.map((arm) => arm.placement.browser),
-        [PlaybackAdBrowser.inApp, PlaybackAdBrowser.external]);
-    expect(
-        browserArms[0].placement.subId, isNot(browserArms[1].placement.subId));
-    expect(browserArms[0].placement.smartlinkUrl,
-        browserArms[1].placement.smartlinkUrl);
+    expect(supplied.streamFoundExperiment, isNull);
+    final smartlink = supplied.forStage(PlaybackAdStage.streamFound)!;
+    expect(smartlink.smartlinkUrl!.host, 'directyp.org');
+    expect(smartlink.trackedSmartlinkUrl!.queryParameters['psid'],
+        'fqsmartpagev1');
   });
 
   testWidgets(
-      'blank redirect pages keep their load timeout after a prior ready page',
+      'loaded Popunder waits past the load timeout for the viewer\'s tap',
       (tester) async {
-    provider.setAdsterraPlaybackAdsConfig(
-        AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));
-    await pumpHost(tester);
-    final result = service.streamFound(host);
-    await pumpAd(tester);
-    final controller = platform.controllers.single;
-    controller.delegate!.onPageFinished!('https://ads.example/smartlink');
-    await tester.pump();
-    expect(find.text('Loading advertisement…'), findsNothing);
-    controller.pageHasContent = false;
-    controller.delegate!.onPageStarted!('https://offer.example/blank');
-    controller.delegate!.onPageFinished!('https://offer.example/blank');
-    await tester.pump();
-    expect(find.text('Loading advertisement…'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pumpAndSettle();
-    expect(await result, isTrue);
-    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
-  }, variant: android);
-
-  testWidgets(
-      'content arriving after page finished removes loading indicator without reloading',
-      (tester) async {
-    platform.pageHasContent = false;
-    provider.setAdsterraPlaybackAdsConfig(
-        AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));
-    await pumpHost(tester);
-    final result = service.streamFound(host);
-    await pumpAd(tester);
-    final controller = platform.controllers.single;
-    controller.delegate!.onPageFinished!('https://offer.example/slow');
-    await tester.pump();
-    expect(find.text('Loading advertisement…'), findsOneWidget);
-    controller.pageHasContent = true;
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.pump();
-    expect(find.text('Loading advertisement…'), findsNothing);
-    await tester.pump(const Duration(seconds: 2));
-    expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
-    expect(controller.requests, hasLength(1));
-    await tester.tap(find.byTooltip('Close ad'));
-    await tester.pumpAndSettle();
-    expect(await result, isTrue);
-  }, variant: android);
-
-  testWidgets(
-      'programmatic Popunder activation does not treat script loading as a popup',
-      (tester) async {
+    // Legacy remote values with auto_activate still parse; the key is ignored.
     provider.setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse(
         catalog.replaceFirst('"script_url":"https://ads.example/pop"',
             '"script_url":"https://ads.example/pop","auto_activate":true'),
@@ -269,9 +220,11 @@ void main() {
     final result = service.streamFound(host);
     await pumpAd(tester);
     final controller = platform.controllers.single;
+    expect(controller.htmlLoads.single, isNot(contains('.click()')));
     controller.send('{"event":"loaded"}');
-    controller.send('{"event":"activated"}');
-    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+    controller.send('{"event":"done"}');
     await tester.pumpAndSettle();
     expect(await result, isTrue);
     expect(platform.controllers, hasLength(1));
@@ -279,28 +232,27 @@ void main() {
   }, variant: android);
 
   testWidgets(
-      'external browser return before launch acknowledgement continues once',
+      'Popunder page ignores script reloads of about:blank or its base URL',
       (tester) async {
-    provider.setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse(
-        smartlinkCatalog.replaceFirst(
-            '"mode":"smartlink"', '"mode":"smartlink","browser":"external"'),
-        enabled: true));
-    final acknowledgement = Completer<bool>();
-    var requests = 0;
-    service = AdsterraPlaybackAdsService(externalLauncher: (_) {
-      requests++;
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-      return acknowledgement.future;
-    });
     await pumpHost(tester);
     final result = service.streamFound(host);
     await pumpAd(tester);
-    acknowledgement.complete(true);
+    final controller = platform.controllers.single;
+    final delegate = controller.delegate!;
+    for (final url in [
+      'about:blank',
+      'https://appassets.androidplatform.net/adsterra/'
+    ]) {
+      expect(
+          await delegate.onNavigationRequest!(
+              NavigationRequest(url: url, isMainFrame: true)),
+          NavigationDecision.prevent);
+    }
+    expect(controller.requests, isEmpty);
+    expect(platform.controllers, hasLength(1));
+    await tester.tap(find.byTooltip('Close ad'));
     await tester.pumpAndSettle();
     expect(await result, isTrue);
-    expect(requests, 1);
-    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
   }, variant: android);
 
   testWidgets(
@@ -317,7 +269,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(await first, isTrue);
 
-    service = AdsterraPlaybackAdsService();
+    service = AdsterraPlaybackAdsService(storeLauncher: recordStoreLaunch);
     final second = service.streamFound(host);
     await pumpAd(tester);
     expect(
@@ -327,7 +279,8 @@ void main() {
     provider.setAdsterraAdsConfig(testAdsterraConfig());
     await tester.pump();
     expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
-    await tester.tap(find.byTooltip('Close ad'));
+    // This arm's 1 s load timeout ends a page that never loads.
+    await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
     expect(await second, isTrue);
 
@@ -377,180 +330,6 @@ void main() {
     expect(platform.controllers, isEmpty);
   }, variant: android);
 
-  testWidgets(
-      'external Smartlink launches once and waits through background until return',
-      (tester) async {
-    provider.setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse(
-        smartlinkCatalog.replaceFirst(
-            '"mode":"smartlink"', '"mode":"smartlink","browser":"external"'),
-        enabled: true));
-    final requests = <Uri>[];
-    service = AdsterraPlaybackAdsService(externalLauncher: (uri) async {
-      requests.add(uri);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      return true;
-    });
-    await pumpHost(tester);
-    bool continued = false;
-    final result = service.streamFound(host).then((value) => continued = value);
-    await pumpAd(tester);
-    expect(requests, [Uri.parse('https://ads.example/smartlink')]);
-    expect(platform.controllers, isEmpty);
-    await tester.pump(const Duration(seconds: 10));
-    expect(continued, isFalse);
-    expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pumpAndSettle();
-    expect(await result, isTrue);
-  }, variant: android);
-
-  testWidgets(
-      'remote disable while external browser is open waits for foreground',
-      (tester) async {
-    provider.setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse(
-        smartlinkCatalog.replaceFirst(
-            '"mode":"smartlink"', '"mode":"smartlink","browser":"external"'),
-        enabled: true));
-    service = AdsterraPlaybackAdsService(externalLauncher: (_) async {
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      return true;
-    });
-    await pumpHost(tester);
-    bool continued = false;
-    final result = service.streamFound(host).then((value) => continued = value);
-    await pumpAd(tester);
-    provider.setAdsterraPlaybackAdsConfig(const AdsterraPlaybackAdsConfig());
-    await tester.pumpAndSettle();
-    expect(Navigator.of(host).canPop(), isFalse);
-    expect(continued, isFalse);
-    expect(await service.streamFound(host), isTrue);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pumpAndSettle();
-    expect(await result, isTrue);
-    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
-  }, variant: android);
-
-  testWidgets(
-      'external Popunder launches emitted advertiser URL instead of script',
-      (tester) async {
-    provider.setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse(
-        catalog.replaceFirst('"script_url":"https://ads.example/pop"',
-            '"script_url":"https://ads.example/pop","browser":"external"'),
-        enabled: true));
-    final requests = <Uri>[];
-    service = AdsterraPlaybackAdsService(externalLauncher: (uri) async {
-      requests.add(uri);
-      return true;
-    });
-    await pumpHost(tester);
-    final result = service.streamFound(host);
-    await pumpAd(tester);
-    final controller = platform.controllers.single;
-    expect(requests, isEmpty);
-    controller.send('{"event":"offer","url":"https://offer.example/ad"}');
-    controller
-        .send('{"event":"offer","url":"https://offer.example/duplicate"}');
-    await tester.pump();
-    await tester.pump();
-    expect(requests, [Uri.parse('https://offer.example/ad')]);
-    expect(controller.javaScriptMode, JavaScriptMode.disabled);
-    expect(platform.controllers, hasLength(1));
-    // A successful launch with no departure falls back instead of stranding playback.
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pumpAndSettle();
-    expect(await result, isTrue);
-  }, variant: android);
-
-  testWidgets(
-      'failed external browser launch continues without a second ad request',
-      (tester) async {
-    provider.setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse(
-        smartlinkCatalog.replaceFirst(
-            '"mode":"smartlink"', '"mode":"smartlink","browser":"external"'),
-        enabled: true));
-    var requests = 0;
-    service = AdsterraPlaybackAdsService(externalLauncher: (_) async {
-      requests++;
-      return false;
-    });
-    await pumpHost(tester);
-    final result = service.streamFound(host);
-    await pumpAd(tester);
-    await tester.pumpAndSettle();
-    expect(await result, isTrue);
-    expect(requests, 1);
-    expect(platform.controllers, isEmpty);
-  }, variant: android);
-
-  testWidgets(
-      'stream found automatically navigates Smartlink with one WebView and no tap',
-      (tester) async {
-    provider.setAdsterraPlaybackAdsConfig(
-        AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));
-    await pumpHost(tester);
-    final result = service.streamFound(host);
-    await pumpAd(tester);
-    final controller = platform.controllers.single;
-    expect(controller.requests, [Uri.parse('https://ads.example/smartlink')]);
-    expect(controller.htmlLoads, isEmpty);
-    expect(controller.channel, isNull);
-    expect(find.text('Continue to player'), findsNothing);
-    final delegate = controller.delegate!;
-    expect(
-        await delegate.onNavigationRequest!(NavigationRequest(
-            url: 'https://offer.example/redirect', isMainFrame: true)),
-        NavigationDecision.navigate);
-    expect(
-        await delegate.onNavigationRequest!(
-            NavigationRequest(url: 'intent://offer', isMainFrame: true)),
-        NavigationDecision.prevent);
-    delegate.onPageFinished!('https://offer.example/redirect');
-    await tester.pump(const Duration(seconds: 2));
-    expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
-    expect(platform.controllers, hasLength(1));
-    await tester.tap(find.byTooltip('Close ad'));
-    await tester.pumpAndSettle();
-    expect(await result, isTrue);
-    expect(controller.javaScriptMode, JavaScriptMode.disabled);
-    expect(controller.requests.last, Uri.parse('about:blank'));
-  }, variant: android);
-
-  testWidgets('a stalled Smartlink continues playback on the load timeout',
-      (tester) async {
-    provider.setAdsterraPlaybackAdsConfig(
-        AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));
-    await pumpHost(tester);
-    final result = service.streamFound(host);
-    await pumpAd(tester);
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pumpAndSettle();
-    expect(await result, isTrue);
-    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
-    expect(platform.controllers, hasLength(1));
-  }, variant: android);
-
-  testWidgets(
-      'a redirected Smartlink HTTP error fails without waiting for the ad duration',
-      (tester) async {
-    provider.setAdsterraPlaybackAdsConfig(
-        AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));
-    await pumpHost(tester);
-    final result = service.streamFound(host);
-    await pumpAd(tester);
-    final delegate = platform.controllers.single.delegate!;
-    await delegate.onNavigationRequest!(NavigationRequest(
-        url: 'https://offer.example/redirect', isMainFrame: true));
-    delegate.onHttpError!(HttpResponseError(
-      request:
-          WebResourceRequest(uri: Uri.parse('https://offer.example/redirect')),
-      response: WebResourceResponse(
-          uri: Uri.parse('https://offer.example/redirect'), statusCode: 403),
-    ));
-    await tester.pumpAndSettle();
-    expect(await result, isTrue);
-    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
-  }, variant: android);
-
   test('published kill switch is required and applies independently of banners',
       () async {
     final remote = FakeFirebaseRemoteConfig();
@@ -580,21 +359,18 @@ void main() {
     expect(html, isNot(contains('dispatchEvent')));
     expect(html, isNot(contains('window.open=')));
     expect(html, contains('data-cfasync="false"'));
+    expect(html, contains('<script defer data-cfasync="false"'));
   });
 
-  test(
-      'optional programmatic activation targets only the publisher control once',
-      () {
-    final placement = PlaybackAdPlacement(
-        scriptUrl: Uri.parse('https://ads.example/pop'), autoActivate: true);
+  test('Continue stays disabled until the Popunder tag has loaded', () {
+    final placement =
+        PlaybackAdPlacement(scriptUrl: Uri.parse('https://ads.example/pop'));
     final html = playbackAdHtml(placement, PlaybackAdStage.streamFound);
-    expect(html, contains('document.getElementById("fq-continue").click()'));
-    expect(
-        html, contains('if(!fqPopReady||fqActivated)return;fqActivated=true;'));
-    expect(html, isNot(contains('dispatchEvent')));
-    expect(html, isNot(contains('isTrusted=')));
-    expect(playbackAdHtml(placement, PlaybackAdStage.beforeLoader),
-        isNot(contains('.click()')));
+    expect(html, contains('<button id="fq-continue" type="button" disabled>'));
+    expect(html, contains('b.disabled=false'));
+    expect(html, contains('Sponsored: an ad may open'));
+    expect(html, isNot(contains('.click()')));
+    expect(html, isNot(contains('isTrusted')));
   });
 
   testWidgets('TV and downloads issue no requests at either stage',
@@ -622,13 +398,18 @@ void main() {
     await pumpHost(tester);
     final result = service.streamFound(host);
     await pumpAd(tester);
+    var continued = false;
+    unawaited(result.then((value) => continued = value));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await tester.pumpAndSettle();
-    expect(await result, isTrue);
     expect(platform.controllers.single.javaScriptMode, JavaScriptMode.disabled);
     expect(await service.beforeLoader(host), isTrue);
     expect(platform.controllers, hasLength(1));
+    // Playback is not handed off while FlixQuest is in the background.
+    expect(continued, isFalse);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
   }, variant: android);
 
   testWidgets('blank interstitial times out even when its script loaded',
@@ -686,28 +467,6 @@ void main() {
   }, variant: android);
 
   testWidgets(
-      'Smartlink retries immediately after a failed load despite legacy cooldown',
-      (tester) async {
-    provider.setAdsterraPlaybackAdsConfig(
-        AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));
-    await pumpHost(tester);
-    final first = service.streamFound(host);
-    await pumpAd(tester);
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pumpAndSettle();
-    expect(await first, isTrue);
-
-    final second = service.streamFound(host);
-    await pumpAd(tester);
-    expect(platform.controllers, hasLength(2));
-    expect(platform.controllers.last.requests,
-        [Uri.parse('https://ads.example/smartlink')]);
-    await tester.tap(find.byTooltip('Close ad'));
-    await tester.pumpAndSettle();
-    expect(await second, isTrue);
-  }, variant: android);
-
-  testWidgets(
       'remote disable closes active ad and late popup messages do nothing',
       (tester) async {
     await pumpHost(tester);
@@ -724,7 +483,180 @@ void main() {
   }, variant: android);
 
   testWidgets(
-      'popup opens one visible advertiser page and keeps playback waiting',
+      'Smartlink close and Back wait until the final redirect is served',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final result = service.streamFound(host);
+    await pumpAd(tester);
+    final page = platform.controllers.single;
+    expect(page.requests, [Uri.parse('https://ads.example/smartlink')]);
+    expect(page.htmlLoads, isEmpty);
+    expect(find.byTooltip('Close ad'), findsNothing);
+    final delegate = page.delegate!;
+    expect(
+        await delegate.onNavigationRequest!(NavigationRequest(
+            url: 'https://offer.example/redirect', isMainFrame: true)),
+        NavigationDecision.navigate);
+    // An intermediate page with content is not the final ad if it redirects.
+    delegate.onPageStarted!('https://offer.example/redirect');
+    delegate.onPageFinished!('https://offer.example/redirect');
+    await tester.pump(const Duration(milliseconds: 400));
+    delegate.onPageStarted!('https://offer.example/final');
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byTooltip('Close ad'), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+    delegate.onPageFinished!('https://offer.example/final');
+    await tester.pump();
+    expect(find.text('Loading advertisement…'), findsNothing);
+    expect(find.byTooltip('Close ad'), findsNothing);
+    await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+    expect(find.byTooltip('Close ad'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+    expect(page.javaScriptMode, JavaScriptMode.disabled);
+    expect(page.requests.last, Uri.parse('about:blank'));
+  }, variant: android);
+
+  testWidgets('close appears at the cap when the ad never settles',
+      (tester) async {
+    platform.pageHasContent = false;
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final result = service.streamFound(host);
+    await pumpAd(tester);
+    platform.controllers.single.delegate!
+        .onPageFinished!('https://offer.example/blank');
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.byTooltip('Close ad'), findsNothing);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byTooltip('Close ad'), findsOneWidget);
+    expect(find.text('Loading advertisement…'), findsOneWidget);
+    await tester.tap(find.byTooltip('Close ad'));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+  }, variant: android);
+
+  testWidgets('a stalled ad page continues playback on the load timeout',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final result = service.streamFound(host);
+    await pumpAd(tester);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+    expect(platform.controllers, hasLength(1));
+  }, variant: android);
+
+  testWidgets('a redirected Smartlink HTTP error continues playback',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final result = service.streamFound(host);
+    await pumpAd(tester);
+    final delegate = platform.controllers.single.delegate!;
+    await delegate.onNavigationRequest!(NavigationRequest(
+        url: 'https://offer.example/redirect', isMainFrame: true));
+    delegate.onHttpError!(HttpResponseError(
+      request:
+          WebResourceRequest(uri: Uri.parse('https://offer.example/redirect')),
+      response: WebResourceResponse(
+          uri: Uri.parse('https://offer.example/redirect'), statusCode: 403),
+    ));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+  }, variant: android);
+
+  test('app-store offer links map to the store app and a web page', () {
+    final market =
+        offerAppLink(Uri.parse('market://details?id=com.game&referrer=x'))!;
+    expect(market.app, Uri.parse('market://details?id=com.game&referrer=x'));
+    expect(
+        market.web,
+        Uri.parse('https://play.google.com/store/apps/details'
+            '?id=com.game&referrer=x'));
+    final intent = offerAppLink(Uri.parse('intent://open#Intent;'
+        'package=com.game;S.browser_fallback_url='
+        'https%3A%2F%2Foffer.example%2Flp;end'))!;
+    expect(intent.app, Uri.parse('market://details?id=com.game'));
+    expect(intent.web, Uri.parse('https://offer.example/lp'));
+    expect(
+        offerAppLink(Uri.parse('intent://offer.example/lp?a=1#Intent;'
+                'scheme=https;end'))!
+            .web,
+        Uri.parse('https://offer.example/lp?a=1'));
+    expect(
+        offerAppLink(Uri.parse('intent://x#Intent;package=com.game;end'))!.web,
+        Uri.parse('https://play.google.com/store/apps/details?id=com.game'));
+    expect(offerAppLink(Uri.parse('tel:123')), isNull);
+    expect(offerAppLink(Uri.parse('market://search?q=x')), isNull);
+  });
+
+  testWidgets('an automatic Play Store redirect shows the web listing in place',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final result = service.streamFound(host);
+    await pumpAd(tester);
+    final page = platform.controllers.single;
+    expect(
+        await page.delegate!.onNavigationRequest!(NavigationRequest(
+            url: 'market://details?id=com.game', isMainFrame: true)),
+        NavigationDecision.prevent);
+    await tester.pump();
+    expect(storeLaunches, isEmpty);
+    expect(page.requests.last,
+        Uri.parse('https://play.google.com/store/apps/details?id=com.game'));
+    await tester.pump(AdsterraPlaybackAdScreen.closeDelayCap);
+    await tester.tap(find.byTooltip('Close ad'));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+  }, variant: android);
+
+  testWidgets(
+      'tapping Install hands off to the store app and resumes playback on return',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    service = AdsterraPlaybackAdsService(storeLauncher: (uri) async {
+      storeLaunches.add(uri);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      return true;
+    });
+    await pumpHost(tester);
+    var continued = false;
+    final result = service.streamFound(host).then((value) => continued = value);
+    await pumpAd(tester);
+    final page = platform.controllers.single;
+    await tester.tap(find.byKey(const ValueKey('fake-webview')),
+        warnIfMissed: false);
+    await page.delegate!.onNavigationRequest!(NavigationRequest(
+        url: 'market://details?id=com.game', isMainFrame: true));
+    await tester.pump();
+    expect(storeLaunches, [Uri.parse('market://details?id=com.game')]);
+    // Leaving for the store closes the ad; no web listing is loaded instead.
+    expect(page.requests, [
+      Uri.parse('https://ads.example/smartlink'),
+      Uri.parse('about:blank')
+    ]);
+    expect(continued, isFalse);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+  }, variant: android);
+
+  testWidgets('a script popup opens once in the ad page and stops the tag',
       (tester) async {
     await pumpHost(tester);
     var continued = false;
@@ -733,22 +665,30 @@ void main() {
     });
     await pumpAd(tester);
     final opener = platform.controllers.single;
-    opener.send('{"event":"offer","url":"https://offer.example/ad"}');
+    expect(find.byTooltip('Close ad'), findsOneWidget);
+    expect(
+        await opener.delegate!.onNavigationRequest!(NavigationRequest(
+            url: 'https://offer.example/ad', isMainFrame: true)),
+        NavigationDecision.prevent);
     opener.send('{"event":"offer","url":"https://offer.example/duplicate"}');
     await tester.pump();
     await tester.pump();
     expect(platform.controllers, hasLength(2));
-    final offer = platform.controllers.last;
-    expect(offer.requests, [Uri.parse('https://offer.example/ad')]);
+    final page = platform.controllers.last;
+    expect(page.requests, [Uri.parse('https://offer.example/ad')]);
     expect(opener.javaScriptMode, JavaScriptMode.disabled);
+    expect(find.byTooltip('Close ad'), findsNothing);
     opener.send('{"event":"done"}');
     await tester.pump();
     expect(continued, isFalse);
+    page.delegate!.onPageFinished!('https://offer.example/ad');
+    await tester.pump();
+    await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
     await tester.tap(find.byTooltip('Close ad'));
     await tester.pumpAndSettle();
     await result;
     expect(continued, isTrue);
-    expect(offer.javaScriptMode, JavaScriptMode.disabled);
+    expect(page.javaScriptMode, JavaScriptMode.disabled);
   }, variant: android);
 
   testWidgets('Social Bar cannot open unsolicited advertiser redirects',

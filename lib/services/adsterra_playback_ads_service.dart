@@ -15,12 +15,12 @@ import 'device_presentation_service.dart';
 class AdsterraPlaybackAdsService {
   AdsterraPlaybackAdsService({
     Future<SharedPreferences> Function()? preferences,
-    this.externalLauncher,
+    this.storeLauncher,
   }) : _preferences = preferences ?? SharedPreferences.getInstance;
   static final instance = AdsterraPlaybackAdsService();
 
   final Future<SharedPreferences> Function() _preferences;
-  final Future<bool> Function(Uri)? externalLauncher;
+  final StoreLauncher? storeLauncher;
   final Map<String, int> _rotation = {};
   bool _busy = false;
 
@@ -94,7 +94,7 @@ class AdsterraPlaybackAdsService {
         builder: (_) => AdsterraPlaybackAdScreen(
           placement: selectedPlacement,
           stage: stage,
-          externalLauncher: externalLauncher,
+          storeLauncher: storeLauncher,
         ),
       );
       // Compare the catalog, not its first arm: unrelated provider updates must
@@ -106,19 +106,16 @@ class AdsterraPlaybackAdsService {
       }
 
       debugPrint(
-          '[AdsterraPlayback] ${stage.name}: presenting ${selectedPlacement.isSmartlink ? 'smartlink' : 'script'} browser=${selectedPlacement.browser.name} variant=${variantId ?? 'legacy'}');
+          '[AdsterraPlayback] ${stage.name}: presenting ${selectedPlacement.isSmartlink ? 'smartlink' : 'script'} variant=${variantId ?? 'legacy'}');
       provider.addListener(onConfigChanged);
       try {
         await navigator.push(route);
       } finally {
         provider.removeListener(onConfigChanged);
       }
-      // Remote disable can remove the ad while its external browser is still
-      // foreground. Do not hand off to the player until FlixQuest resumes.
-      if (selectedPlacement.browser == PlaybackAdBrowser.external &&
-          !await _waitForForeground()) {
-        return false;
-      }
+      // The ad closes when FlixQuest is backgrounded (for example by a Play
+      // Store hand-off). Do not hand off to the player until it resumes.
+      if (!await _waitForForeground()) return false;
       return context.mounted && (host == null || host.isCurrent);
     } catch (error) {
       debugPrint('[AdsterraPlayback] ${stage.name}: unavailable ($error)');

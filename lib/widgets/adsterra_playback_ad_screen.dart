@@ -9,18 +9,39 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 import '../models/adsterra_playback_ads_config.dart';
 import 'adsterra_banner_widget.dart';
 
+/// Hands a Play Store link to a store app and reports whether one opened.
+typedef StoreLauncher = Future<bool> Function(Uri uri);
+
+/// Never a browser: `externalNonBrowserApplication` fails instead of falling
+/// back to one.
+Future<bool> openStoreApp(Uri uri) =>
+    launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
+
+enum _Phase { script, page }
+
 /// A visible, disposable ad surface with no hidden preloading or refresh.
-/// A WebView popup is presented as a separate visible page;
-/// native apps cannot put browser windows behind their own activity.
+///
+/// Script tags (Social Bar, Popunder) run in one WebView. Advertiser pages
+/// (Smartlinks and the popups a script emits) open in FlixQuest's own ad page,
+/// never in an external browser. On that page the close control and Back stay
+/// hidden until the final redirect has served visible content, capped at
+/// [closeDelayCap].
 class AdsterraPlaybackAdScreen extends StatefulWidget {
   const AdsterraPlaybackAdScreen(
       {required this.placement,
       required this.stage,
-      this.externalLauncher,
+      this.storeLauncher,
       super.key});
   final PlaybackAdPlacement placement;
   final PlaybackAdStage stage;
-  final Future<bool> Function(Uri)? externalLauncher;
+  final StoreLauncher? storeLauncher;
+
+  /// The longest the viewer waits for a way out, whatever the ad does.
+  static const closeDelayCap = Duration(seconds: 5);
+
+  /// How long a page with visible content must go without another navigation
+  /// before it counts as the final redirect.
+  static const redirectSettle = Duration(milliseconds: 800);
 
   @override
   State<AdsterraPlaybackAdScreen> createState() =>
@@ -29,111 +50,78 @@ class AdsterraPlaybackAdScreen extends StatefulWidget {
 
 class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     with WidgetsBindingObserver {
-  WebViewController? _controller;
-  WebViewController? _offer;
+  WebViewController? _script;
+  WebViewController? _page;
   Timer? _loadTimer;
   Timer? _durationTimer;
   Timer? _contentTimer;
-  bool _pageLoading = false;
+  Timer? _settleTimer;
+  Timer? _closeCapTimer;
+  _Phase _phase = _Phase.script;
+  bool _pageReady = false;
+  bool _closeAllowed = false;
   bool _checkingContent = false;
   int _documentGeneration = 0;
   DateTime? _lastPointer;
   bool _finished = false;
-  bool _offerOpening = false;
-  bool _externalOpening = false;
-  bool _externalDeparted = false;
-  bool _externalReturned = false;
-  bool _externalLaunchComplete = false;
+
+  // The script page keeps an immediate close; the ad page waits.
+  bool get _closable => _phase == _Phase.script || _closeAllowed;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadTimer = Timer(widget.placement.loadTimeout, _finish);
-    _durationTimer = Timer(widget.placement.maxDuration, _finish);
-    unawaited(_load());
+    _durationTimer =
+        Timer(widget.placement.maxDuration, () => _finish('max_duration'));
+    final smartlink = widget.placement.trackedSmartlinkUrl;
+    _log(
+        'starting mode=${smartlink != null ? 'smartlink' : 'script'} loadTimeoutMs=${widget.placement.loadTimeout.inMilliseconds}');
+    if (smartlink != null) {
+      unawaited(_openPage(smartlink));
+    } else {
+      _loadTimer =
+          Timer(widget.placement.loadTimeout, () => _finish('load_timeout'));
+      unawaited(_loadScript());
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_externalOpening) {
-      if (state == AppLifecycleState.paused ||
-          state == AppLifecycleState.hidden) {
-        _externalDeparted = true;
-        _loadTimer?.cancel();
-      } else if (state == AppLifecycleState.resumed && _externalDeparted) {
-        _externalReturned = true;
-        if (_externalLaunchComplete) _finish();
-      } else if (state == AppLifecycleState.detached) {
-        _finish();
-      }
-      return;
-    }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
-      _finish();
+      _finish('app_lifecycle_${state.name}');
     }
   }
 
-  Future<void> _load() async {
-    final smartlink = widget.placement.trackedSmartlinkUrl;
-    if (smartlink != null) {
-      if (widget.placement.browser == PlaybackAdBrowser.external) {
-        await _openExternal(smartlink);
-      } else {
-        await _loadSmartlink(smartlink);
-      }
-      return;
-    }
+  Future<void> _loadScript() async {
     try {
+      _log(
+          'loading script ${widget.placement.scriptUrl} base=${AdsterraBannerWidget.documentBaseUrl}');
       final controller = WebViewController();
-      _controller = controller;
+      _script = controller;
       await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
       await controller.setBackgroundColor(Colors.black);
       await controller.addJavaScriptChannel('PlaybackAd',
-          onMessageReceived: (message) {
-        if (!mounted || _finished) return;
-        try {
-          final payload = jsonDecode(message.message);
-          switch (payload['event']) {
-            case 'failed':
-            case 'done':
-              if (!_offerOpening) _finish();
-            case 'loaded':
-              // A loaded script is not proof of an interstitial impression.
-              if (widget.stage == PlaybackAdStage.streamFound &&
-                  !widget.placement.autoActivate) {
-                _loadTimer?.cancel();
-              }
-              _log('script loaded');
-            case 'rendered':
-              _loadTimer?.cancel();
-            case 'offer':
-              final uri = Uri.tryParse(payload['url'] as String);
-              if (uri != null) unawaited(_openOffer(uri));
-            case 'activated':
-              _log(
-                  'publisher control activated programmatically; awaiting popup URL');
-          }
-        } catch (_) {
-          // Ignore malformed messages from third-party content.
-        }
-      });
+          onMessageReceived: _onScriptMessage);
+      await controller.setOnConsoleMessage((message) =>
+          _log('script console ${message.level.name}: ${message.message}'));
       await controller.setNavigationDelegate(NavigationDelegate(
-        onNavigationRequest: (request) {
-          if (request.url == 'about:blank' ||
-              request.url == AdsterraBannerWidget.documentBaseUrl) {
-            return NavigationDecision.navigate;
-          }
-          final uri = Uri.tryParse(request.url);
-          if (!_webUrl(uri)) return NavigationDecision.prevent;
-          if (!request.isMainFrame) return NavigationDecision.navigate;
-          unawaited(_openOffer(uri!));
-          return NavigationDecision.prevent;
-        },
+        onNavigationRequest: _onScriptNavigation,
+        onPageStarted: (url) => _log('script document started ${_origin(url)}'),
+        onPageFinished: (url) =>
+            _log('script document finished ${_origin(url)}'),
         onWebResourceError: (error) {
-          if (error.isForMainFrame == true) _finish();
+          _log(
+              'script resource error code=${error.errorCode} ${error.description} origin=${_origin(error.url ?? '')} mainFrame=${error.isForMainFrame}');
+          if (error.isForMainFrame == true) _finish('script_main_frame_error');
+        },
+        onHttpError: (error) {
+          if ((error.response?.statusCode ?? 0) >= 400) {
+            _log(
+                'script HTTP ${error.response?.statusCode} ${_origin((error.request?.uri ?? error.response?.uri).toString())}');
+          }
         },
       ));
       if (!mounted || _finished) return;
@@ -142,151 +130,164 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         playbackAdHtml(widget.placement, widget.stage),
         baseUrl: AdsterraBannerWidget.documentBaseUrl,
       );
-    } catch (_) {
-      _finish();
+    } catch (error) {
+      _log('script unavailable ($error)');
+      _finish('script_setup_error');
     }
   }
 
-  bool _webUrl(Uri? uri) =>
-      uri != null &&
-      const {'https', 'http'}.contains(uri.scheme) &&
-      uri.host.isNotEmpty;
+  void _onScriptMessage(JavaScriptMessage message) {
+    if (!mounted || _finished || _phase != _Phase.script) return;
+    try {
+      final payload = jsonDecode(message.message);
+      switch (payload['event']) {
+        case 'failed':
+          _log('script failure: ${payload['detail'] ?? 'script or page error'}');
+          _finish('script_failed');
+        case 'done':
+          _finish('continue_control');
+        case 'loaded':
+          // A loaded script is not proof of an impression. The Popunder is
+          // armed now and waits for the viewer's tap on Continue; the maximum
+          // duration still bounds the wait.
+          if (widget.stage == PlaybackAdStage.streamFound) _loadTimer?.cancel();
+          _log('script loaded');
+        case 'rendered':
+          _loadTimer?.cancel();
+        case 'offer':
+          final uri = Uri.tryParse(payload['url'] as String);
+          if (uri != null) _openPopup(uri);
+      }
+    } catch (_) {
+      // Ignore malformed messages from third-party content.
+    }
+  }
 
-  /// Direct navigation needs no DOM click or intermediary script. Use one
-  /// visible WebView and preserve the network's HTTP redirect chain.
-  Future<void> _loadSmartlink(Uri uri) async {
-    _offerOpening = true;
+  NavigationDecision _onScriptNavigation(NavigationRequest request) {
+    final uri = Uri.tryParse(request.url);
+    // The document is loaded from a string, so any main-frame request comes
+    // from page script or a popup window. Never navigate this WebView itself:
+    // about:blank or the unresolvable base URL would replace the armed tag.
+    if (!request.isMainFrame) {
+      return _webUrl(uri)
+          ? NavigationDecision.navigate
+          : NavigationDecision.prevent;
+    }
+    _log(
+        'script main-frame navigation scheme=${uri?.scheme} origin=${_origin(request.url)}');
+    if (_webUrl(uri) && request.url != AdsterraBannerWidget.documentBaseUrl) {
+      _openPopup(uri!);
+    }
+    return NavigationDecision.prevent;
+  }
+
+  bool get _tappedRecently =>
+      _lastPointer != null &&
+      DateTime.now().difference(_lastPointer!) <= const Duration(seconds: 2);
+
+  void _openPopup(Uri uri) {
+    // Social Bar advertiser links require a real touch. Popunder URLs may
+    // arrive from the tag's delayed trigger after the Continue tap.
+    if (widget.stage == PlaybackAdStage.beforeLoader && !_tappedRecently) {
+      _log('popup ignored without a recent tap ${_origin(uri.toString())}');
+      return;
+    }
+    _log('popup URL received ${_origin(uri.toString())}');
+    unawaited(_openPage(uri));
+  }
+
+  /// Shows one advertiser URL in the ad page and follows its redirect chain
+  /// there. Later popups are ignored.
+  Future<void> _openPage(Uri uri) async {
+    if (!mounted || _finished || _page != null) return;
+    _log(
+        'opening ad page ${_origin(uri.toString())} subId=${widget.placement.subId ?? 'none'}');
+    final page = WebViewController();
+    _page = page;
+    _loadTimer?.cancel();
+    _loadTimer =
+        Timer(widget.placement.loadTimeout, () => _finish('page_load_timeout'));
+    _closeCapTimer = Timer(AdsterraPlaybackAdScreen.closeDelayCap,
+        () => _allowClose('cap_reached'));
+    // Deactivate the tag so it cannot open a second page.
+    unawaited(_stop(_script));
     var mainUrl = uri;
     try {
-      final controller = WebViewController();
-      _offer = controller;
-      _pageLoading = true;
-      await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
-      await controller.setBackgroundColor(Colors.white);
-      await controller.setOnConsoleMessage((message) =>
-          _log('console ${message.level.name}: ${message.message}'));
-      await controller.setNavigationDelegate(NavigationDelegate(
+      await page.setJavaScriptMode(JavaScriptMode.unrestricted);
+      await page.setBackgroundColor(Colors.white);
+      await page.setOnConsoleMessage((message) =>
+          _log('page console ${message.level.name}: ${message.message}'));
+      await page.setNavigationDelegate(NavigationDelegate(
         onNavigationRequest: (request) {
           if (request.url == 'about:blank') return NavigationDecision.navigate;
           final target = Uri.tryParse(request.url);
-          if (!_webUrl(target)) {
-            _log('blocked navigation scheme=${target?.scheme}');
-            return NavigationDecision.prevent;
+          if (_webUrl(target)) {
+            if (request.isMainFrame) mainUrl = target!;
+            return NavigationDecision.navigate;
           }
-          if (request.isMainFrame) mainUrl = target!;
-          return NavigationDecision.navigate;
+          if (request.isMainFrame && target != null) {
+            unawaited(_openAppLink(page, target));
+          } else {
+            _log('blocked navigation scheme=${target?.scheme}');
+          }
+          return NavigationDecision.prevent;
         },
-        onPageStarted: (url) {
-          if (url == 'about:blank' || _finished) return;
-          _log('page started ${_origin(url)}');
-          _documentGeneration++;
-          _contentTimer?.cancel();
-          _loadTimer?.cancel();
-          _loadTimer = Timer(widget.placement.loadTimeout, _finish);
-          if (mounted) setState(() => _pageLoading = true);
-        },
-        onPageFinished: (url) {
-          _inspectPage(controller, url);
-        },
+        onPageStarted: _onPageStarted,
+        onPageFinished: (url) => _inspectPage(page, url),
         onWebResourceError: (error) {
           if (error.isForMainFrame == true) {
-            _log('page error code=${error.errorCode} ${error.description}');
-            _finish();
+            _log(
+                'page error code=${error.errorCode} ${error.description} origin=${_origin(error.url ?? '')}');
+            _finish('page_main_frame_error');
           }
         },
         onHttpError: (error) {
           final failedUrl = error.request?.uri ?? error.response?.uri;
-          if (failedUrl == mainUrl &&
-              (error.response?.statusCode ?? 0) >= 400) {
-            _finish();
-            _log(
-                'HTTP ${error.response?.statusCode} ${_origin(failedUrl.toString())}');
+          final status = error.response?.statusCode ?? 0;
+          if (failedUrl == mainUrl && status >= 400) {
+            _log('page HTTP $status ${_origin(failedUrl.toString())}');
+            _finish('page_http_error');
           }
         },
       ));
       if (!mounted || _finished) return;
-      setState(() {});
-      await controller.loadRequest(uri);
+      setState(() => _phase = _Phase.page);
+      await page.loadRequest(uri);
     } catch (error) {
-      _log('Smartlink unavailable ($error)');
-      _finish();
+      _log('ad page unavailable ($error)');
+      _finish('page_setup_error');
     }
   }
 
-  Future<void> _openOffer(Uri uri) async {
-    if (!mounted || _finished || _offerOpening || !_webUrl(uri)) return;
-    // Social Bar advertiser links require a real touch. Popunder URLs may arrive
-    // from a delayed trigger or the optional publisher-control activation.
-    if (widget.stage == PlaybackAdStage.beforeLoader &&
-        (_lastPointer == null ||
-            DateTime.now().difference(_lastPointer!) >
-                const Duration(seconds: 2))) {
-      return;
-    }
-    _offerOpening = true;
-    _log(
-        'popup URL received ${_origin(uri.toString())} browser=${widget.placement.browser.name}');
+  void _onPageStarted(String url) {
+    if (url == 'about:blank' || _finished) return;
+    _log('page started ${_origin(url)}');
+    // A new document means the redirect chain is still moving.
+    _documentGeneration++;
+    _contentTimer?.cancel();
+    _settleTimer?.cancel();
     _loadTimer?.cancel();
-    if (widget.placement.browser == PlaybackAdBrowser.external) {
-      await _stop(_controller);
-      if (mounted && !_finished) await _openExternal(uri);
-      return;
-    }
-    try {
-      final offer = WebViewController();
-      _offer = offer;
-      _pageLoading = true;
-      _loadTimer = Timer(widget.placement.loadTimeout, _finish);
-      await offer.setJavaScriptMode(JavaScriptMode.unrestricted);
-      await offer.setBackgroundColor(Colors.white);
-      await offer.setOnConsoleMessage((message) =>
-          _log('console ${message.level.name}: ${message.message}'));
-      await offer.setNavigationDelegate(NavigationDelegate(
-        onNavigationRequest: (request) =>
-            request.url == 'about:blank' || _webUrl(Uri.tryParse(request.url))
-                ? NavigationDecision.navigate
-                : NavigationDecision.prevent,
-        onWebResourceError: (error) {
-          if (error.isForMainFrame == true) _finish();
-        },
-        onPageFinished: (url) => _inspectPage(offer, url),
-        onHttpError: (error) {
-          if ((error.response?.statusCode ?? 0) >= 400) {
-            _log('popup HTTP ${error.response?.statusCode}');
-          }
-        },
-      ));
-      if (!mounted || _finished) return;
-      await _stop(_controller);
-      if (!mounted || _finished) return;
-      setState(() {});
-      await offer.loadRequest(uri);
-    } catch (_) {
-      _finish();
-    }
+    _loadTimer =
+        Timer(widget.placement.loadTimeout, () => _finish('page_load_timeout'));
+    if (mounted) setState(() => _pageReady = false);
   }
 
-  void _inspectPage(WebViewController controller, String url) {
+  void _inspectPage(WebViewController page, String url) {
     if (_finished || url == 'about:blank') return;
     _log('page finished ${_origin(url)}; checking content');
-    final generation = ++_documentGeneration;
-    if (mounted) setState(() => _pageLoading = true);
-    _loadTimer?.cancel();
-    _loadTimer = Timer(widget.placement.loadTimeout, _finish);
-    unawaited(_checkContent(controller, generation));
+    final generation = _documentGeneration;
+    unawaited(_checkContent(page, generation));
     _contentTimer?.cancel();
-    _contentTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      unawaited(_checkContent(controller, generation));
-    });
+    _contentTimer = Timer.periodic(const Duration(milliseconds: 500),
+        (_) => unawaited(_checkContent(page, generation)));
   }
 
-  Future<void> _checkContent(
-      WebViewController controller, int generation) async {
+  Future<void> _checkContent(WebViewController page, int generation) async {
     if (!mounted || _finished || _checkingContent) return;
     _checkingContent = true;
     try {
       // DOM presence is a loading diagnostic, never a paid-impression signal.
-      final result = await controller.runJavaScriptReturningResult('''
+      final result = await page.runJavaScriptReturningResult('''
 (function(){var b=document.body;
 function visible(el){var r=el.getBoundingClientRect(),s=getComputedStyle(el);
 return r.width>=40&&r.height>=24&&r.bottom>0&&r.right>0&&r.top<innerHeight&&r.left<innerWidth&&
@@ -304,23 +305,72 @@ textLength:text,visibleElements:media,title:document.title.substring(0,80)});})(
         _log(report is Map
             ? 'visible page content text=${report['textLength']} elements=${report['visibleElements']} title=${report['title']}'
             : 'page content present');
-        _contentTimer?.cancel();
-        _loadTimer?.cancel();
-        setState(() => _pageLoading = false);
+        _onContentVisible(generation);
       }
     } catch (error) {
-      // Some landing pages can disable script inspection. Keep the normal
-      // page-finished behavior rather than rejecting a potentially valid page.
+      // Some landing pages disable script inspection. Treat the finished
+      // document as shown rather than rejecting a potentially valid page.
       if (mounted && !_finished && generation == _documentGeneration) {
         _log('content inspection unavailable ($error)');
-        _contentTimer?.cancel();
-        _loadTimer?.cancel();
-        setState(() => _pageLoading = false);
+        _onContentVisible(generation);
       }
     } finally {
       _checkingContent = false;
     }
   }
+
+  void _onContentVisible(int generation) {
+    _contentTimer?.cancel();
+    _loadTimer?.cancel();
+    setState(() => _pageReady = true);
+    // Allow closing only if no further redirect starts in the settle window.
+    _settleTimer?.cancel();
+    _settleTimer = Timer(AdsterraPlaybackAdScreen.redirectSettle, () {
+      if (generation == _documentGeneration) _allowClose('ad_served');
+    });
+  }
+
+  void _allowClose(String reason) {
+    if (!mounted || _finished || _closeAllowed) return;
+    _closeCapTimer?.cancel();
+    _log('close enabled reason=$reason');
+    setState(() => _closeAllowed = true);
+  }
+
+  /// App-install offers often end in a market:// or intent:// link, which a
+  /// WebView cannot load; blocking it alone leaves an empty redirect page.
+  /// Show the offer's web page in place. Only the viewer's own tap (such as
+  /// Install) may hand the link to a store app, never to a browser.
+  Future<void> _openAppLink(WebViewController page, Uri target) async {
+    if (!mounted || _finished) return;
+    final link = offerAppLink(target);
+    if (link == null) {
+      _log('blocked navigation scheme=${target.scheme}');
+      return;
+    }
+    if (_tappedRecently && link.app != null) {
+      _log('opening store app scheme=${link.app!.scheme} after tap');
+      var opened = false;
+      try {
+        opened = await (widget.storeLauncher ?? openStoreApp)(link.app!);
+      } catch (error) {
+        _log('store app launch error ($error)');
+      }
+      if (opened || !mounted || _finished) return;
+    }
+    if (link.web != null) {
+      _log(
+          'loading web fallback ${_origin(link.web.toString())} for scheme=${target.scheme}');
+      await page.loadRequest(link.web!);
+    } else {
+      _log('blocked navigation scheme=${target.scheme}; no web fallback');
+    }
+  }
+
+  bool _webUrl(Uri? uri) =>
+      uri != null &&
+      const {'https', 'http'}.contains(uri.scheme) &&
+      uri.host.isNotEmpty;
 
   String _origin(String url) {
     final uri = Uri.tryParse(url);
@@ -330,50 +380,30 @@ textLength:text,visibleElements:media,title:document.title.substring(0,80)});})(
   void _log(String message) =>
       debugPrint('[AdsterraPage] ${widget.stage.name}: $message');
 
-  Future<void> _openExternal(Uri uri) async {
-    if (!mounted || _finished || _externalOpening) return;
-    _externalOpening = true;
-    _offerOpening = true;
-    _loadTimer?.cancel();
-    _durationTimer?.cancel();
-    _contentTimer?.cancel();
-    _log('opening external browser ${_origin(uri.toString())}');
-    setState(() {});
-    try {
-      final launched = await (widget.externalLauncher?.call(uri) ??
-              launchUrl(uri, mode: LaunchMode.externalApplication))
-          .timeout(widget.placement.loadTimeout, onTimeout: () => false);
-      if (!mounted || _finished) return;
-      _externalLaunchComplete = true;
-      if (!launched || _externalReturned) {
-        _finish();
-      } else if (!_externalDeparted) {
-        // A launch can succeed without leaving the app (or a chooser can be
-        // cancelled). Never strand playback on an empty route in that case.
-        _loadTimer = Timer(widget.placement.loadTimeout, _finish);
-      }
-    } catch (_) {
-      _finish();
-    }
-  }
-
-  void _finish() {
+  void _finish([String reason = 'completed']) {
     if (!mounted || _finished) return;
     _finished = true;
-    _loadTimer?.cancel();
-    _durationTimer?.cancel();
-    _contentTimer?.cancel();
-    _log(_pageLoading ? 'closing: page never became ready' : 'closing ad');
+    _cancelTimers();
+    _log(
+        'closing reason=$reason phase=${_phase.name} pageReady=$_pageReady closeAllowed=$_closeAllowed');
     // Deactivate before navigation; late messages cannot open an advertiser
     // over the loader/player after this screen is dismissed.
-    unawaited(_stop(_controller));
-    unawaited(_stop(_offer));
+    unawaited(_stop(_script));
+    unawaited(_stop(_page));
     final route = ModalRoute.of(context);
     if (route?.isCurrent == true) {
       Navigator.of(context).pop();
     } else if (route?.isActive == true) {
       Navigator.of(context).removeRoute(route!);
     }
+  }
+
+  void _cancelTimers() {
+    _loadTimer?.cancel();
+    _durationTimer?.cancel();
+    _contentTimer?.cancel();
+    _settleTimer?.cancel();
+    _closeCapTimer?.cancel();
   }
 
   Future<void> _stop(WebViewController? controller) async {
@@ -385,64 +415,74 @@ textLength:text,visibleElements:media,title:document.title.substring(0,80)});})(
 
   @override
   void dispose() {
+    if (!_finished) {
+      _log(
+          'disposed before completion (remote config or route removal) phase=${_phase.name}');
+    }
     WidgetsBinding.instance.removeObserver(this);
     _finished = true;
-    _loadTimer?.cancel();
-    _durationTimer?.cancel();
-    _contentTimer?.cancel();
-    unawaited(_stop(_controller));
-    unawaited(_stop(_offer));
+    _cancelTimers();
+    unawaited(_stop(_script));
+    unawaited(_stop(_page));
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = _offer ?? _controller;
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
+    final controller = _phase == _Phase.page ? _page : _script;
+    final loadingPage = _phase == _Phase.page && !_pageReady;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_closable) {
+          _finish('system_back');
+        } else {
+          _log('back ignored until the ad is served');
+        }
+      },
+      child: Scaffold(
         backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        automaticallyImplyLeading: false,
-        title: const Text('Advertisement', style: TextStyle(fontSize: 14)),
-        actions: [
-          IconButton(
-              tooltip: 'Close ad',
-              onPressed: _finish,
-              icon: const Icon(Icons.close))
-        ],
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          automaticallyImplyLeading: false,
+          title: const Text('Advertisement', style: TextStyle(fontSize: 14)),
+          actions: [
+            if (_closable)
+              IconButton(
+                  tooltip: 'Close ad',
+                  onPressed: () => _finish('user_close'),
+                  icon: const Icon(Icons.close))
+          ],
+          bottom: loadingPage
+              ? const PreferredSize(
+                  preferredSize: Size.fromHeight(2),
+                  child: LinearProgressIndicator(minHeight: 2))
+              : null,
+        ),
+        body: SafeArea(
+          child: controller == null
+              ? const Center(child: CircularProgressIndicator())
+              : Listener(
+                  onPointerDown: (_) => _lastPointer = DateTime.now(),
+                  child: Stack(children: [
+                    Positioned.fill(child: _webView(controller)),
+                    if (loadingPage)
+                      const Center(
+                          child: Card(
+                              child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 12),
+                          Text('Loading advertisement…'),
+                        ]),
+                      ))),
+                  ]),
+                ),
+        ),
       ),
-      body: SafeArea(
-          child: _externalOpening
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text('Return to FlixQuest to continue playback.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white)),
-                  ),
-                )
-              : controller == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : Listener(
-                      onPointerDown: (_) => _lastPointer = DateTime.now(),
-                      child: Stack(children: [
-                        Positioned.fill(child: _webView(controller)),
-                        if (_pageLoading)
-                          const Center(
-                              child: Card(
-                                  child: Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  CircularProgressIndicator(),
-                                  SizedBox(height: 12),
-                                  Text('Loading advertisement…'),
-                                ]),
-                          ))),
-                      ]),
-                    )),
     );
   }
 
@@ -455,14 +495,71 @@ textLength:text,visibleElements:media,title:document.title.substring(0,80)});})(
           .fromPlatformWebViewWidgetCreationParams(params,
               displayWithHybridComposition: true);
     }
-    return WebViewWidget.fromPlatformCreationParams(params: params);
+    // A fresh key per controller: the script and ad pages are separate views.
+    return WebViewWidget.fromPlatformCreationParams(
+        key: ObjectKey(controller), params: params);
   }
+}
+
+/// The Play Store and web pages behind a market:// or intent:// offer link.
+/// `app` opens the store app; `web` is what the ad page can show instead.
+/// Returns null for any other scheme.
+({Uri? app, Uri? web})? offerAppLink(Uri link) {
+  Uri? web(String? value) {
+    final uri = value == null ? null : Uri.tryParse(value);
+    return uri != null &&
+            const {'https', 'http'}.contains(uri.scheme) &&
+            uri.host.isNotEmpty
+        ? uri
+        : null;
+  }
+
+  Uri? listing(String? package) => package == null || package.isEmpty
+      ? null
+      : Uri.https('play.google.com', '/store/apps/details', {'id': package});
+
+  switch (link.scheme) {
+    case 'market':
+      final package = link.queryParameters['id'];
+      if (package == null || package.isEmpty) return null;
+      return (
+        app: link,
+        web: Uri.https(
+            'play.google.com', '/store/apps/details', link.queryParameters),
+      );
+    case 'intent':
+      // intent://host/path#Intent;scheme=https;package=x;S.browser_fallback_url=...;end
+      final extras = <String, String>{};
+      for (final part in link.fragment.split(';')) {
+        final at = part.indexOf('=');
+        if (at > 0) extras[part.substring(0, at)] = part.substring(at + 1);
+      }
+      final package = extras['package'];
+      final fallback = extras['S.browser_fallback_url'];
+      final scheme = extras['scheme'];
+      final page =
+          web(fallback == null ? null : Uri.decodeComponent(fallback)) ??
+          (scheme == 'https' || scheme == 'http'
+              ? web('$scheme://${link.host}${link.path}'
+                  '${link.hasQuery ? '?${link.query}' : ''}')
+              : null) ??
+          listing(package);
+      final app = package == null || package.isEmpty
+          ? null
+          : Uri(scheme: 'market', host: 'details', queryParameters: {
+              'id': package,
+            });
+      return app == null && page == null ? null : (app: app, web: page);
+  }
+  return null;
 }
 
 /// Reports rendering only
 /// when a creative occupies visible space. The Continue control is a real DOM
-/// button. Optional activation is one programmatic click on that publisher
-/// control; it does not forge a trusted gesture or click an advertiser element.
+/// button that stays disabled until the Popunder tag has loaded, so the
+/// viewer's tap is the gesture the tag opens its popup from. Nothing clicks it
+/// programmatically. Defer the head script so document.body and the controls
+/// exist when it runs.
 String playbackAdHtml(PlaybackAdPlacement placement, PlaybackAdStage stage) {
   if (placement.isSmartlink) {
     throw ArgumentError('Smartlinks use direct WebView navigation.');
@@ -470,27 +567,23 @@ String playbackAdHtml(PlaybackAdPlacement placement, PlaybackAdStage stage) {
   final script = const HtmlEscape(HtmlEscapeMode.attribute)
       .convert(placement.scriptUrl.toString());
   final popunder = stage == PlaybackAdStage.streamFound;
-  final autoActivate = popunder && placement.autoActivate;
   return '''<!doctype html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:sans-serif}
-#fq-controls{height:100%;display:flex;align-items:center;justify-content:center}
-#fq-continue{padding:16px 24px;background:#fff;color:#000;border:0;border-radius:24px;font-size:16px}</style>
+#fq-controls{height:100%;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center}
+#fq-continue{padding:16px 24px;background:#fff;color:#000;border:0;border-radius:24px;font-size:16px}
+#fq-continue:disabled{opacity:.5}
+#fq-note{font-size:12px;color:#aaa}</style>
 <script>
-var fqPopReady=false;
-function fqSignal(event,url){if(event==='loaded'){fqPopReady=true;if(window.fqActivatePopunder)window.fqActivatePopunder();}PlaybackAd.postMessage(JSON.stringify({event:event,url:url}));}
-window.addEventListener('error',function(){fqSignal('failed');});
+function fqSignal(event,url,detail){if(event==='loaded'){var b=document.getElementById("fq-continue");if(b){b.disabled=false;b.textContent="Continue to player";}}PlaybackAd.postMessage(JSON.stringify({event:event,url:url,detail:detail}));}
+window.addEventListener('error',function(event){fqSignal('failed',null,event.message||'script resource failed');});
 </script>
-${popunder ? '<script data-cfasync="false" src="$script" onload="fqSignal(\'loaded\')" onerror="fqSignal(\'failed\')"></script>' : ''}
+${popunder ? '<script defer data-cfasync="false" src="$script" onload="fqSignal(\'loaded\')" onerror="fqSignal(\'failed\')"></script>' : ''}
 </head><body>
-${popunder ? '''<main id="fq-controls"><button id="fq-continue" type="button">Continue to player</button></main><script>
-document.getElementById("fq-continue").addEventListener("click",function(event){
- if(event.isTrusted || ${!autoActivate})setTimeout(function(){fqSignal("done");},750);
+${popunder ? '''<main id="fq-controls"><button id="fq-continue" type="button" disabled>Loading…</button><div id="fq-note">Sponsored: an ad may open</div></main><script>
+document.getElementById("fq-continue").addEventListener("click",function(){
+ setTimeout(function(){fqSignal("done");},750);
 });
-${autoActivate ? '''var fqActivated=false;
-window.fqActivatePopunder=function(){if(!fqPopReady||fqActivated)return;fqActivated=true;
- fqSignal("activated");document.getElementById("fq-continue").click();};
-window.fqActivatePopunder();''' : ''}
 </script>''' : '''<script>
 var fqVisible=false,fqAbsent=0;
 setInterval(function(){

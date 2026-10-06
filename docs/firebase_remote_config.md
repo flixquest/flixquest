@@ -478,10 +478,12 @@ both stages. No publisher code is compiled into the defaults.
 | `adsterra_playback_ads` | String (JSON) | `{}` | Per-stage scripts or Smartlinks, enable flags and timeouts. |
 
 Copy [adsterra_playback_ads.json](adsterra_playback_ads.json) into the String
-parameter `adsterra_playback_ads`. It contains the exact Social Bar and Popunder
-scripts and Smartlink URL supplied for FlixQuest. Publish `adsterra_playback_enabled=true` to enable
-configured stages. Each stage also requires its own `enabled=true`. The supplied
-catalog enables both stages. There is no app cooldown: old `cooldown_seconds`
+parameter `adsterra_playback_ads`. It contains the Social Bar script and the
+Smartlink supplied for FlixQuest. Publish `adsterra_playback_enabled=true` to
+enable configured stages. Each stage also requires its own `enabled=true`. The
+supplied catalog enables both stages. It opens the Smartlink in FlixQuest's
+ad page on every stream-found attempt, with `psid=fqsmartpagev1`. It has no
+experiment. There is no app cooldown: old `cooldown_seconds`
 fields are ignored by the updated app. Only overlapping active ads are blocked.
 
 - `interstitial`: shows Social Bar immediately before entering the movie/episode
@@ -494,24 +496,39 @@ fields are ignored by the updated app. Only overlapping active ads are blocked.
   eligible attempt consumes one variant, including failed loads. TV/download/
   background skips and overlapping requests do not consume variants. No second
   variant is loaded on the same attempt when the first fails.
-- `popunder`: the legacy single-placement key for this stage. It applies only
+- `popunder`: the single-placement key for this stage, whatever the format.
+  The supplied catalog uses it for the Smartlink. It applies only
   when the experiment is absent or disabled. A malformed enabled experiment
   disables this stage instead of silently loading a different placement.
 
-In-app ads are visible full-page WebViews with an immediate native **Close ad**
-control and normal system Back handling. Smartlinks use one visible WebView for
-their redirect chain. Script popup advertiser URLs are presented in one separate
-visible WebView within that route. An Android/iOS application cannot
-place a browser tab behind its own activity, so this presentation is a foreground
-popup rather than a literal browser pop-under. Returning from or closing the ad
-continues the existing playback flow. With `browser: "external"`, Smartlinks
-launch directly in the system browser; scripts launch only the actual popup URL
-they emit, never their JavaScript source URL. Playback waits for FlixQuest to
-resume, even if the remote kill switch removes the ad while the browser is open.
-Failed launches or a cancelled chooser continue playback. The viewing-duration
-timer applies to in-app ads; it does not bring FlixQuest forward or close the
-external browser. Main-page popup/navigation handling uses the WebView plugin's native
-window support; the provider's `window.open` is not replaced.
+Ads never open an external browser. Script tags (Social Bar, or a Popunder
+tag) run in one WebView whose main frame never navigates. Script-initiated
+navigations to `about:blank` or the app's base URL are dropped, and any other
+web URL is treated as the popup. Advertiser pages (Smartlinks, and the popup
+URLs that scripts emit) open in FlixQuest's **ad page**, a second full-screen
+WebView that follows the network's redirect chain:
+
+- The **Close ad** control and system Back stay hidden until the final redirect
+  is served. That means the page has finished loading, shows visible content,
+  and has started no new navigation for 800 ms. They appear after 5 seconds at
+  most, whatever the ad does, as Google Play's ad policy requires. A loading bar
+  and "Loading advertisement…" show until the page has visible content.
+- App-install offers often end in a `market://` or `intent://` link that a
+  WebView cannot load. The ad page loads the link's web page in place: the
+  intent's `browser_fallback_url`, its https target, or the Play Store listing.
+  Only a tap inside the ad in the previous two seconds, such as Install, hands
+  the link to the Play Store app, using a launch mode that never opens a
+  browser.
+- A main-frame load error, an HTTP error on the main page, or a page that shows
+  no content within `load_timeout_ms` continues playback.
+
+The script page keeps its **Close ad** control from the start. Backgrounding
+FlixQuest closes any ad, including the hand-off to the Play Store. Playback is
+never handed to the player while FlixQuest is in the background; it continues
+when the app resumes. An Android/iOS app cannot place a page behind its own
+activity, so a Popunder's page opens in front, not as a literal pop-under.
+Scripts open only the popup URL they emit, never their JavaScript source URL.
+The tag's `window.open` is not replaced.
 
 Per-stage fields:
 
@@ -521,50 +538,43 @@ Per-stage fields:
 | `mode` | `script` | `script` or `smartlink`. |
 | `script_url` | Empty | In script mode, exact generated HTTPS `src`; numeric dashboard IDs are not script URLs. |
 | `url` | Empty | In Smartlink mode, exact HTTPS direct link. |
-| `browser` | `in_app` | `in_app` (WebView) or `external` (system browser). |
 | `sub_id` | Empty | Smartlink tracking label: 1–64 letters, digits, underscores or hyphens. Appends `psid` to the URL while preserving other query parameters. Prefer alphanumeric labels per Adsterra's guide. |
-| `auto_activate` | `false` | Script mode only. On the stream-found stage, activate the publisher's Continue control once after the script loads. This is a programmatic, untrusted click; no advertiser element is clicked. |
-| `load_timeout_ms` | `5000` | 500–10,000 milliseconds. Script/creative failure continues playback. |
-| `max_duration_seconds` | `30` | 5–120 seconds; in-app upper bound including offer viewing. User can close sooner. |
+| `load_timeout_ms` | `5000` | 500–10,000 milliseconds. Bounds script loading and each ad-page document until it shows content. Failure continues playback. |
+| `max_duration_seconds` | `30` | 5–120 seconds; upper bound for the whole ad, including the ad page. The viewer can close sooner once **Close ad** appears. |
 
 For the original Popunder placement, use `mode: "script"` and its generated
-`script_url` instead of the Smartlink. The supplied experiment sets
-`auto_activate: true` for the Popunder arm: the app makes one programmatic click
-on its own **Continue to player** control. The browser may reject that activation
-because it is not a trusted user gesture. No trusted-event property is forged,
-no native touch is synthesized, and no advertiser links are clicked. If no popup
-URL arrives, the load timeout continues playback. A real tap remains available,
-and provider-configured delayed popups are handled automatically. Merely loading
-or activating the script does not guarantee a popup or paid impression.
+`script_url` instead of the Smartlink. The page shows a **Continue to player**
+button with a "Sponsored" note. The button stays disabled until the tag has
+loaded, then waits for the viewer's tap. The `max_duration_seconds` limit still
+applies. The tag opens its popup from that tap, and the app sends the popup URL
+to the ad page. The head script uses `defer` so the body and control
+exist before the tag runs. A tap that opens nothing continues to the player after
+750 ms. This happens when the tag's own frequency cap is reached; the cap is kept
+in the WebView's cookies. The old `auto_activate` key is ignored. The tag listens
+for real touch events and never opened a popup from a programmatic click.
+Loading the script does not guarantee a popup or a paid impression.
 Adsterra reports statistics per placement; see its
 [publisher API guide](https://adsterra.com/blog/how-to-use-adsterra-publishers-api/).
 
 The experiment requires an `id` and 2–8 `variants`. Each variant includes a unique
 `id` (1–64 letters, digits, underscores or hyphens), `enabled: true`, and the
 placement fields above. Use a new experiment `id` when changing the order or
-meaning of its variants. The sample compares Popunder_1 against Smartlink_1 with
-both opened externally to avoid embedded-WebView rendering differences;
-Smartlink uses `psid=fqsmartexternalv1`. Logs identify each attempt
-as `variant=formats_v1/popunder_external` or `variant=formats_v1/smartlink_external`.
-Set both variants' `browser` to `in_app` to compare within WebViews instead,
-and use a new experiment ID and Smartlink sub-ID for that experiment.
-`variant=legacy` means the experiment catalog is not active on that client.
+meaning of its variants. Logs identify each attempt as
+`variant=<experiment id>/<variant id>`. `variant=legacy` means no experiment is
+active on that client, which is expected with the supplied catalog.
 
-To compare browser delivery separately, publish
-[adsterra_playback_browser_test.json](adsterra_playback_browser_test.json) instead.
-It alternates the same Smartlink between in-app and external delivery with distinct
-`psid` labels. Retrieve statistics grouped by `placement_sub_id` through Adsterra's
-Publisher API; Popunder has its own placement statistics. Keep API credentials on
-your server, outside the app and Remote Config. Compare CPM, revenue per 1,000
+Retrieve statistics grouped by `placement_sub_id` through Adsterra's Publisher
+API; Popunder has its own placement statistics. Keep API credentials on your
+server, outside the app and Remote Config. Compare CPM, revenue per 1,000
 eligible playback attempts, and playback completion. App logs and DOM readiness
-are diagnostics, not billable-impression counters.
+are diagnostics, not billable-impression counters. The old `browser` field is
+ignored, so catalogs that still set it keep working.
 
-Android playback WebViews use Hybrid Composition to avoid the SurfaceTexture
-path when coming from video playback. A loading indicator remains until page
-content is present. Empty Smartlink/offer pages keep their load timeout; page
-started/finished, console messages, blocked schemes and errors are logged under
-`[AdsterraPage]`. This renderer change requires a rebuild/hot restart and still
-needs device validation. See the [WebView plugin's display-mode documentation](https://pub.dev/packages/webview_flutter_android).
+Both WebViews use Hybrid Composition on Android to avoid the SurfaceTexture
+path when coming from video playback. Script loading, popup URLs, page
+starts/finishes, visible content, `close enabled reason=ad_served` or
+`cap_reached`, store hand-offs and the closing reason are logged under
+`[AdsterraPage]`.
 
 A script download is not an interstitial-ready callback: the Social Bar view
 waits for a visible creative element, otherwise the load timeout continues

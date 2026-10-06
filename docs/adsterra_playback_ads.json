@@ -5,30 +5,12 @@
     "load_timeout_ms": 5000,
     "max_duration_seconds": 30
   },
-  "stream_found_experiment": {
+  "popunder": {
     "enabled": true,
-    "id": "formats_v1",
-    "variants": [
-      {
-        "id": "popunder_external",
-        "enabled": true,
-        "mode": "script",
-        "script_url": "https://aarems.org/1/c8663c127c0d570b075fc4dfcbb112e8",
-        "auto_activate": true,
-        "browser": "external",
-        "load_timeout_ms": 8000,
-        "max_duration_seconds": 30
-      },
-      {
-        "id": "smartlink_external",
-        "enabled": true,
-        "mode": "smartlink",
-        "url": "https://directyp.org/4/d85eb7a00a73c8de8a3252dbd9b19411",
-        "sub_id": "fqsmartexternalv1",
-        "browser": "external",
-        "load_timeout_ms": 8000,
-        "max_duration_seconds": 30
-      }
-    ]
+    "mode": "smartlink",
+    "url": "https://directyp.org/4/d85eb7a00a73c8de8a3252dbd9b19411",
+    "sub_id": "fqsmartpagev1",
+    "load_timeout_ms": 10000,
+    "max_duration_seconds": 30
   }
 }
