@@ -592,3 +592,67 @@ over the player. There is no hidden preload, automatic refresh, fabricated
 advertiser click or app-reported paid impression. Provider script downloads from this
 workstation returned HTTP 403; native live fill and actual earnings still require
 validation on a mobile device with the remote switches enabled.
+
+## Video pre-roll (VAST)
+
+A VAST video ad can play inside the player before a movie or episode. It is
+independent of the Adsterra playback ads above. If both are enabled, the
+stream-found Smartlink still runs before the player opens, so a viewer would see
+two ads. Disable one of them unless that is intended.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `vast_preroll_enabled` | Boolean | `false` | Explicitly published switch. Turning it off stops new pre-rolls; an ad already playing finishes. |
+| `vast_preroll` | String (JSON) | `{}` | The tag and its limits. |
+
+Copy [vast_preroll.json](vast_preroll.json) into `vast_preroll` and publish
+`vast_preroll_enabled=true`. It holds the Clickadu video zone's tag.
+
+| Field | Default | Limits |
+| --- | --- | --- |
+| `tag_url` | Empty | Required. The HTTPS VAST tag from the ad network. |
+| `request_timeout_ms` | `5000` | 1,000–15,000. Budget for the tag and all wrapper redirects. The content starts without an ad when it runs out. |
+| `start_timeout_ms` | `8000` | 2,000–20,000. How long the ad's video may take to start before the content plays (VAST error 402). |
+| `max_wrappers` | `5` | 0–10 wrapper redirects (VAST error 302 beyond). |
+| `tv_enabled` | `false` | Also play on Android TV. Confirm with the network that TV traffic is accepted first. |
+
+How it plays:
+
+- The tag is requested while the player opens, alongside the branded intro
+  lookup. When an ad is returned it replaces the branded intro for that session.
+- The ad and the content play as one native ExoPlayer/AVPlayer sequence on the
+  same video surface, without a new player or route. The content starts at its
+  resume position, as it would without an ad. Resuming mid-title may still
+  buffer briefly at that position.
+- While the ad plays, the player's controls are replaced by the ad overlay:
+  an "Ad · 0:25" countdown, "Skip in N" then **Skip ad** at the tag's
+  `skipoffset`, an amber ad progress line, and on phones **Visit advertiser**
+  and a back button. On TV, Skip takes focus as soon as it appears and Back
+  leaves the player. Seeking, gestures and the content menus are unavailable,
+  because the timeline belongs to the ad.
+- Subtitles are hidden until the content starts; their cues are timed to the
+  content. Watch progress, resume points, IntroDB lookup, completion detection
+  and wellness time all ignore the ad. A "recently watched" save requested
+  during the ad runs once the content starts, so leaving mid-ad keeps the old
+  resume point.
+- **Visit advertiser** pauses the ad and opens the click-through URL in
+  FlixQuest's ad page with its close control visible. The ad resumes on return.
+- Only linear MP4/WebM/HLS media is played. VPAID and other interactive
+  creatives are skipped. On phones the largest rendition up to 720p and
+  2.5 Mbps is used; on TV up to 1080p and 8 Mbps.
+
+Tracking follows VAST 3: impression and `creativeView`/`start` on the first
+frame; `firstQuartile`, `midpoint`, `thirdQuartile`, `progress` offsets;
+`complete`, `skip`, `pause`/`resume`, `closeLinear` when the viewer leaves
+mid-ad, and `ClickTracking`. Errors are reported through `[ERRORCODE]`: 100 bad
+XML, 301/302 wrapper timeout/limit, 303 no ad, 402 media timeout or stall, 403
+no playable media, 405 playback error. Tag requests and tracking use the
+system WebView's user agent, the same browser the click-through opens in, so
+the request, impression and click share one identity. Without a WebView they
+fall back to `Mozilla/5.0 (Linux; Android <version>; <model>) FlixQuest/<version>`.
+Logs use the `[VAST]` prefix. An advertiser link that answers with XML, JSON or
+text instead of a page closes the ad page immediately and the video ad resumes.
+
+Ask Clickadu for a tag that returns linear MP4 only (no VPAID), which macros
+they expect from an app (there is no page URL), and confirmation that in-app
+requests are accepted and counted.

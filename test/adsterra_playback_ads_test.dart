@@ -542,6 +542,21 @@ void main() {
     expect(await result, isTrue);
   }, variant: android);
 
+  testWidgets('a link that answers with XML closes the ad page at once',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final result = service.streamFound(host);
+    await pumpAd(tester);
+    final page = platform.controllers.single
+      ..contentReport = '{"ready":false,"textLength":180,"type":"text/xml"}';
+    page.delegate!.onPageFinished!('https://ads.example/click');
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+  }, variant: android);
+
   testWidgets('a stalled ad page continues playback on the load timeout',
       (tester) async {
     provider.setAdsterraPlaybackAdsConfig(

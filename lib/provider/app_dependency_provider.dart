@@ -10,6 +10,7 @@ import '../models/banner_ad.dart';
 import '../preferences/app_dependency_preferences.dart';
 import '../models/adsterra_ads_config.dart';
 import '../models/adsterra_playback_ads_config.dart';
+import '../models/vast_preroll_config.dart';
 
 class AppDependencyProvider extends ChangeNotifier {
   final AppDependencies _preferences = AppDependencies();
@@ -76,6 +77,15 @@ class AppDependencyProvider extends ChangeNotifier {
 
   void setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig config) {
     _adsterraPlaybackAds = config;
+    notifyListeners();
+  }
+
+  VastPrerollConfig _vastPreroll = const VastPrerollConfig();
+  VastPrerollConfig get vastPreroll => _vastPreroll;
+
+  void setVastPrerollConfig(VastPrerollConfig config) {
+    if (config == _vastPreroll) return;
+    _vastPreroll = config;
     notifyListeners();
   }
 

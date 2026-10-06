@@ -7,6 +7,7 @@ import '../models/banner_ad.dart';
 import '../provider/app_dependency_provider.dart';
 import '../models/adsterra_ads_config.dart';
 import '../models/adsterra_playback_ads_config.dart';
+import '../models/vast_preroll_config.dart';
 
 class AppRemoteConfig {
   const AppRemoteConfig._();
@@ -28,6 +29,8 @@ class AppRemoteConfig {
   static const adsterraBannersKey = 'adsterra_banners';
   static const adsterraPlaybackEnabledKey = 'adsterra_playback_enabled';
   static const adsterraPlaybackAdsKey = 'adsterra_playback_ads';
+  static const vastPrerollEnabledKey = 'vast_preroll_enabled';
+  static const vastPrerollKey = 'vast_preroll';
 
   /// Live TV used to ride on the OTT flag before it got a dedicated key.
   static const legacyEnableLiveTvKey = 'enable_ott';
@@ -66,6 +69,8 @@ class AppRemoteConfig {
       adsterraBannersKey: '{"units":{},"defaults":{},"placements":{}}',
       adsterraPlaybackEnabledKey: false,
       adsterraPlaybackAdsKey: '{}',
+      vastPrerollEnabledKey: false,
+      vastPrerollKey: '{}',
     });
   }
 
@@ -145,6 +150,12 @@ class AppRemoteConfig {
       remoteConfig.getString(adsterraPlaybackAdsKey),
       enabled: playbackEnabled.source == ValueSource.valueRemote &&
           playbackEnabled.asBool(),
+    ));
+    final prerollEnabled = remoteConfig.getValue(vastPrerollEnabledKey);
+    provider.setVastPrerollConfig(VastPrerollConfig.parse(
+      remoteConfig.getString(vastPrerollKey),
+      enabled: prerollEnabled.source == ValueSource.valueRemote &&
+          prerollEnabled.asBool(),
     ));
     final parsedInstances = parseApiInstances(instancesRaw);
     final legacyUrl = remoteConfig.getString(flixquestApiUrlKey).trim();

@@ -36,6 +36,12 @@ import '../../constants/api_constants.dart';
 import '../../api/endpoints.dart';
 import '../../ui_components/app_ui_components.dart';
 import '../../services/stream_intro_service.dart';
+import '../../services/vast/vast.dart';
+import '../../services/vast/vast_ad_session.dart';
+import '../../services/vast/vast_client.dart';
+import '../../models/adsterra_playback_ads_config.dart';
+import '../../widgets/adsterra_playback_ad_screen.dart';
+import '../../widgets/vast_ad_overlay.dart';
 import '../../services/introdb_service.dart';
 import '../../services/stream_size_estimator.dart';
 import '../movie/movie_video_loader.dart';
@@ -135,6 +141,21 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   bool _showNextEpisodeButton = false;
   bool _nextEpisodeButtonDismissed = false;
   bool _preRollActive = false;
+
+  /// The video ad playing as the pre-roll, if any. Its timeline is separate
+  /// from the content's: progress, subtitles and resume points ignore it.
+  VastAdSession? _adSession;
+  VastClient? _vastClient;
+  Timer? _adPositionTimer;
+
+  /// A recently-watched save requested during the pre-roll, when the player's
+  /// position belongs to the ad. It runs once the content starts.
+  bool _recentInsertPending = false;
+
+  /// Between the end of a pre-roll and the content's own initialized event.
+  /// The content's duration is unknown until then; nothing may measure the
+  /// content's position against a duration in the meantime.
+  bool _awaitingContentAfterPreRoll = false;
   IntroDbTimings _introDbTimings = IntroDbTimings.empty;
   IntroDbSegment? _activeIntroDbSegment;
   final Set<String> _skippedIntroDbSegments = <String>{};
@@ -318,6 +339,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         enableNextEpisodeButton: widget.mediaType == MediaType.tvShow &&
             widget.settings.enableNextEpisodeButton,
         introDbSkipButtonBuilder: _buildIntroDbSkipButton,
+        preRollOverlayBuilder: _buildPrerollOverlay,
         introDbSkipAvailable: _canSkipIntroDbSegment,
         onIntroDbSkip: _skipActiveIntroDbSegment,
         // The native MediaRouteButton currently crashes on some Android
@@ -519,14 +541,29 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final initialPosition =
         requestedPosition < Duration.zero ? Duration.zero : requestedPosition;
     try {
+      // The ad request runs alongside the intro lookup; neither waits on the
+      // other, and a missing ad never delays the content.
+      final adFuture = _loadPrerollAd();
       StreamIntroConfig intro = const StreamIntroConfig.disabled();
       try {
         intro = await _introService.fetch(_resolveScraperApiUrl());
       } catch (error) {
         debugPrint('[Player] Branded intro unavailable: $error');
       }
+      final prerollAd = await adFuture;
+      if (!mounted) return;
 
-      if (intro.enabled && intro.url != null) {
+      if (prerollAd != null) {
+        // The ad replaces the branded intro for this session: one pre-roll
+        // keeps the wait before the content short.
+        _preRollActive = true;
+        _startAdSession(prerollAd.ad, prerollAd.media);
+        await _betterPlayerController.setupDataSourceWithPreRoll(
+          preRollDataSource: _buildAdDataSource(prerollAd.media),
+          betterPlayerDataSource: dataSource,
+          contentStartPosition: initialPosition,
+        );
+      } else if (intro.enabled && intro.url != null) {
         _preRollActive = true;
         await _betterPlayerController.setupDataSourceWithPreRoll(
           preRollDataSource: _buildIntroDataSource(intro.url!),
@@ -552,11 +589,132 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       if (!_preRollActive) unawaited(_loadIntroDbTimings());
     } catch (error) {
       _preRollActive = false;
+      _finishAdSession('error');
       debugPrint('[Player] Initial stream setup failed: $error');
     } finally {
       if (!_initialDataSourceReady.isCompleted) {
         _initialDataSourceReady.complete();
       }
+    }
+  }
+
+  Future<({VastAd ad, VastMediaFile media})?> _loadPrerollAd() async {
+    final config = _appDependencies.vastPreroll;
+    if (!config.appliesTo(television: widget.useTvControls)) return null;
+    try {
+      final client = _vastClient ??= VastClient();
+      final ad = await client.load(
+        config.tagUrl!,
+        timeout: config.requestTimeout,
+        maxWrappers: config.maxWrappers,
+      );
+      if (ad == null) return null;
+      final media = ad.pickMediaFile(
+        maxHeight: widget.useTvControls ? 1080 : 720,
+        maxBitrate: widget.useTvControls ? 8000 : 2500,
+      );
+      return media == null ? null : (ad: ad, media: media);
+    } catch (error) {
+      debugPrint('[VAST] pre-roll unavailable: $error');
+      return null;
+    }
+  }
+
+  BetterPlayerDataSource _buildAdDataSource(VastMediaFile media) {
+    final type = media.type.toLowerCase();
+    return BetterPlayerDataSource(
+      BetterPlayerDataSourceType.network,
+      media.url.toString(),
+      videoFormat:
+          type.contains('mpegurl') ? BetterPlayerVideoFormat.hls : null,
+    );
+  }
+
+  void _startAdSession(VastAd ad, VastMediaFile media) {
+    final session = VastAdSession(
+      ad: ad,
+      media: media,
+      ping: _vastClient!.send,
+      startTimeout: _appDependencies.vastPreroll.startTimeout,
+    );
+    // Failure or Skip: the native sequence moves to the content at its start
+    // position, exactly as when the ad ends on its own.
+    session.onAbandon = () => unawaited(_betterPlayerController.skipPreRoll());
+    _adSession = session;
+    session.begin();
+    _adPositionTimer?.cancel();
+    _adPositionTimer = Timer.periodic(
+      const Duration(milliseconds: 250),
+      (_) => _sampleAdPosition(),
+    );
+  }
+
+  void _sampleAdPosition() {
+    final session = _adSession;
+    if (session == null || !_betterPlayerController.isPreRollActive) return;
+    final value = _betterPlayerController.videoPlayerController?.value;
+    if (value == null || !value.initialized) {
+      session.onPosition(
+          position: Duration.zero, playing: false, buffering: true);
+      return;
+    }
+    session.onPosition(
+      position: value.position,
+      duration: value.duration,
+      playing: value.isPlaying,
+      buffering: value.isBuffering,
+    );
+  }
+
+  /// Ends the ad's bookkeeping. [reason] is the sequence's `completed`,
+  /// `skipped` or `error`, or `closed` when the player leaves the ad.
+  void _finishAdSession(String reason) {
+    final session = _adSession;
+    if (session == null) return;
+    _adSession = null;
+    _adPositionTimer?.cancel();
+    _adPositionTimer = null;
+    reason == 'closed' ? session.onClosed() : session.onEnded(reason);
+    // The overlay listens until the frame that removes it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => session.dispose());
+  }
+
+  Widget? _buildPrerollOverlay(
+    BuildContext context,
+    BetterPlayerController controller,
+  ) {
+    final session = _adSession;
+    if (session == null) return null;
+    return VastAdOverlay(
+      session: session,
+      television: widget.useTvControls,
+      onVisitAdvertiser: widget.useTvControls
+          ? null
+          : (url) => unawaited(_openAdvertiser(url)),
+      onExit: _exitPlayer,
+    );
+  }
+
+  /// The ad pauses while its advertiser page is open and resumes after.
+  Future<void> _openAdvertiser(Uri url) async {
+    final controller = _betterPlayerController;
+    final wasPlaying = controller.isPlaying() ?? false;
+    await controller.pause();
+    if (!mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      settings: const RouteSettings(name: '/vast/click-through'),
+      builder: (_) => AdsterraPlaybackAdScreen(
+        placement: PlaybackAdPlacement(
+          smartlinkUrl: url,
+          loadTimeout: const Duration(seconds: 10),
+          maxDuration: const Duration(minutes: 2),
+        ),
+        stage: PlaybackAdStage.streamFound,
+        holdClose: false,
+      ),
+    ));
+    if (mounted && wasPlaying && _adSession?.isEnded == false) {
+      await controller.play();
     }
   }
 
@@ -600,12 +758,27 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         duration = _betterPlayerController
                 .videoPlayerController?.value.duration?.inSeconds ??
             duration;
-        _analyticsInitializationCount++;
+        final contentAfterPreRoll = _awaitingContentAfterPreRoll;
+        _awaitingContentAfterPreRoll = false;
         debugPrint(
           '[Player][IntroDB] player initialized '
-          'preRoll=$_preRollActive durationSeconds=$duration',
+          'preRoll=$_preRollActive afterPreRoll=$contentAfterPreRoll '
+          'durationSeconds=$duration',
         );
         if (!_preRollActive) unawaited(_loadIntroDbTimings());
+        if (contentAfterPreRoll) {
+          // The content behind a pre-roll is its first initialization, not a
+          // provider switch or recovery.
+          _trackPlaybackEvent('content_initialized');
+          if (_recentInsertPending) {
+            _recentInsertPending = false;
+            widget.mediaType == MediaType.movie
+                ? unawaited(insertRecentMovieData())
+                : unawaited(insertRecentEpisodeData());
+          }
+          break;
+        }
+        _analyticsInitializationCount++;
         _trackPlaybackEvent(
           _analyticsInitializationCount == 1 ? 'initialized' : 'reinitialized',
           startupMs:
@@ -613,25 +786,33 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         );
         break;
       case BetterPlayerEventType.preRollEnded:
+        _finishAdSession(
+          event.parameters?[BetterPlayerController.preRollEndReasonParameter]
+                  as String? ??
+              'completed',
+        );
         _preRollActive = false;
         _completionDetector.reset();
         _playbackCompletionHandled = false;
-        duration = _betterPlayerController
-                .videoPlayerController?.value.duration?.inSeconds ??
-            duration;
+        // The content's duration, IntroDB lookup and any deferred
+        // recently-watched save wait for its initialized event: after a Skip
+        // the content has not been prepared yet.
+        _awaitingContentAfterPreRoll = true;
+        duration = 0;
         _trackPlaybackEvent('pre_roll_ended');
         if (_betterPlayerController.videoPlayerController?.value.isPlaying ==
             true) {
           _wellnessTracker.play();
         }
-        unawaited(_loadIntroDbTimings());
         break;
       case BetterPlayerEventType.play:
+        if (_preRollActive) _adSession?.onResumed();
         _analyticsPlayingStartedAt ??= DateTime.now();
         if (!_preRollActive) _wellnessTracker.play();
         _trackPlaybackEvent('play');
         break;
       case BetterPlayerEventType.pause:
+        if (_preRollActive) _adSession?.onPaused();
         _analyticsWasPlayingBeforeBuffering = false;
         _stopAnalyticsWatchClock();
         _wellnessTracker.pause();
@@ -677,6 +858,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         _handlePlaybackCompleted(source: 'native');
         break;
       case BetterPlayerEventType.setupDataSource:
+        // A provider switch replaces the sequence while the ad is showing.
+        if (!_betterPlayerController.isPreRollActive) {
+          _finishAdSession('closed');
+        }
         _completionDetector.reset();
         _playbackCompletionHandled = false;
         _introDbRequestId++;
@@ -1674,7 +1859,16 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     });
   }
 
+  /// During the pre-roll the player's position and duration are the ad's, so
+  /// saving now would overwrite the resume point. Save once the content runs.
+  bool _deferRecentInsertDuringPreRoll() {
+    if (!_preRollActive && !_awaitingContentAfterPreRoll) return false;
+    _recentInsertPending = true;
+    return true;
+  }
+
   Future<void> insertRecentMovieData() async {
+    if (_deferRecentInsertDuringPreRoll()) return;
     await _dataManagement.insertRecentMovieData(
       context: context,
       betterPlayerController: _betterPlayerController,
@@ -1684,6 +1878,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   Future<void> insertRecentEpisodeData() async {
+    if (_deferRecentInsertDuringPreRoll()) return;
     await _dataManagement.insertRecentEpisodeData(
       context: context,
       betterPlayerController: _betterPlayerController,
@@ -1949,6 +2144,19 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   @override
   void dispose() {
     _betterPlayerControllerInitialized = false;
+    final adSession = _adSession;
+    _adSession = null;
+    _adPositionTimer?.cancel();
+    if (adSession != null) {
+      adSession.onClosed();
+      adSession.dispose();
+    }
+    // Let the last tracking pings leave before the client closes.
+    final vastClient = _vastClient;
+    if (vastClient != null) {
+      unawaited(Future<void>.delayed(
+          const Duration(seconds: 15), vastClient.close));
+    }
     settings.removeListener(_syncAmbientGlowSetting);
     final suppressionId = _occasionalEffectsSuppressionId;
     if (suppressionId != null) {

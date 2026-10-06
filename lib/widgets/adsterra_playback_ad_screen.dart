@@ -31,10 +31,16 @@ class AdsterraPlaybackAdScreen extends StatefulWidget {
       {required this.placement,
       required this.stage,
       this.storeLauncher,
+      this.holdClose = true,
       super.key});
   final PlaybackAdPlacement placement;
   final PlaybackAdStage stage;
   final StoreLauncher? storeLauncher;
+
+  /// Whether the ad page hides its close control until the ad is served.
+  /// False for a page the viewer opened themselves, such as a video ad's
+  /// "Visit advertiser".
+  final bool holdClose;
 
   /// The longest the viewer waits for a way out, whatever the ad does.
   static const closeDelayCap = Duration(seconds: 5);
@@ -66,7 +72,8 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   bool _finished = false;
 
   // The script page keeps an immediate close; the ad page waits.
-  bool get _closable => _phase == _Phase.script || _closeAllowed;
+  bool get _closable =>
+      !widget.holdClose || _phase == _Phase.script || _closeAllowed;
 
   @override
   void initState() {
@@ -296,10 +303,22 @@ var text=b?b.innerText.trim().length:0;
 var media=b?Array.from(b.querySelectorAll('img,iframe,video,canvas,svg,object,embed,input,button')).filter(visible).length:0;
 var background=b&&visible(b)&&getComputedStyle(b).backgroundImage!=='none';
 return JSON.stringify({ready:!!(b&&((text>20&&visible(b))||media>0||background)),
-textLength:text,visibleElements:media,title:document.title.substring(0,80)});})()
+textLength:text,visibleElements:media,title:document.title.substring(0,80),
+type:document.contentType});})()
 ''');
       if (!mounted || _finished || generation != _documentGeneration) return;
       final report = result is String ? jsonDecode(result) : result;
+      // A link that answers with XML, JSON or text (such as an ad server's
+      // empty VAST response) has no page to show; leave instead of waiting.
+      final type = report is Map ? report['type'] : null;
+      if (type is String &&
+          type.isNotEmpty &&
+          type != 'text/html' &&
+          type != 'application/xhtml+xml') {
+        _log('page is $type, not a web page');
+        _finish('page_not_html');
+        return;
+      }
       final ready = report is Map ? report['ready'] == true : report == true;
       if (ready) {
         _log(report is Map

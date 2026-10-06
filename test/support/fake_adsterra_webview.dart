@@ -61,6 +61,9 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
   JavaScriptChannelParams? channel;
   FakeAdsterraNavigationDelegate? delegate;
   bool pageHasContent = true;
+
+  /// The page inspection's JSON report; when null, [pageHasContent] answers.
+  String? contentReport;
   final evaluatedScripts = <String>[];
 
   @override
@@ -70,7 +73,7 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
   @override
   Future<Object> runJavaScriptReturningResult(String javaScript) async {
     evaluatedScripts.add(javaScript);
-    return pageHasContent;
+    return contentReport ?? pageHasContent;
   }
 
   @override
