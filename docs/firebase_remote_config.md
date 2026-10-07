@@ -593,6 +593,50 @@ advertiser click or app-reported paid impression. Provider script downloads from
 workstation returned HTTP 403; native live fill and actual earnings still require
 validation on a mobile device with the remote switches enabled.
 
+### Choosing the popup network (Adsterra or Clickadu)
+
+`playback_popunder_network` picks which network serves the stream-found popup.
+The Social Bar before the loader is Adsterra-only and stays controlled by
+`adsterra_playback_ads`.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `playback_popunder_network` | String | `adsterra` | `adsterra` uses `adsterra_playback_ads` (its `popunder` or experiment). `clickadu` uses `clickadu_playback_ads`. `none`, or any other value, shows no stream-found popup. Case-insensitive. |
+| `clickadu_playback_enabled` | Boolean | `false` | Clickadu's own switch. Must be published remotely. |
+| `clickadu_playback_ads` | String (JSON) | `{}` | Clickadu's `popunder` placement. |
+
+Changing any of these while a popup is open closes it and continues playback.
+
+To switch to Clickadu, copy [clickadu_playback_ads.json](clickadu_playback_ads.json)
+into `clickadu_playback_ads`, publish `clickadu_playback_enabled=true`, then set
+`playback_popunder_network=clickadu`. Switching back is just
+`playback_popunder_network=adsterra`.
+
+The supplied catalog runs Clickadu's onclick tag (zone 2150355) like the
+Adsterra Popunder script above. The page shows **Continue to player**. Unlike
+Adsterra's, it stays disabled until the tag has fetched its ad (its `/adx/get/`
+request), usually 1–3 seconds after the script loads: a tap before that opens
+nothing. If the tag hasn't fetched an ad within `load_timeout_ms`, playback
+continues without one. The viewer's tap lets the tag open its window, and the app
+loads that URL in the ad page, with the same held **Close ad** and redirect
+handling as the Smartlink. It never opens an external browser. A tap that
+opens nothing continues to the player after 750 ms.
+
+`popunder` takes the per-stage fields above, with two differences:
+
+- `zone_id` is required in script mode: the zone from Clickadu's tag
+  (`data-clocid`), as digits. The app adds it to the script element, where the
+  tag looks for it.
+- `sub_id` is rejected, because `psid` is Adsterra's parameter. A Clickadu
+  Direct Link from your manager works with `mode: "smartlink"` and `url`, with
+  any tracking parameters already in the URL.
+
+Clickadu's tag snippet uses a protocol-relative `src` (`//driverhugoverblown.com/on.js`);
+`script_url` must spell out `https://`. The tag runs on the app's placeholder
+origin (`appassets.androidplatform.net`), not the site the zone was approved
+for; confirm with Clickadu that the zone accepts in-app WebView traffic. Logs
+show the network, for example `[AdsterraPage] clickadu/streamFound: popup URL received`.
+
 ## Video pre-roll (VAST)
 
 A VAST video ad can play inside the player before a movie or episode. It is

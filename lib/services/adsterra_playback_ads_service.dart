@@ -60,18 +60,27 @@ class AdsterraPlaybackAdsService {
       return false;
     }
     final provider = context.read<AppDependencyProvider?>();
-    final config = provider?.adsterraPlaybackAds;
-    var placement = config?.forStage(stage);
+    final selection = provider?.playbackAdsSelection;
+    final network = stage == PlaybackAdStage.beforeLoader
+        ? PlaybackAdNetwork.adsterra
+        : selection?.network;
+    final config = selection?.adsterra;
+    var placement = switch (network) {
+      PlaybackAdNetwork.adsterra => config?.forStage(stage),
+      PlaybackAdNetwork.clickadu => selection?.clickadu.activePopunder,
+      null => null,
+    };
     if (provider == null || placement == null) {
       _logSkip(stage,
-          'remote enabled=${provider?.adsterraPlaybackAds.enabled ?? false}; stage disabled or invalid/missing config');
+          'network=${network?.name ?? 'none'} adsterraEnabled=${config?.enabled ?? false} clickaduEnabled=${selection?.clickadu.enabled ?? false}; stage disabled or invalid/missing config');
       return true;
     }
     _busy = true;
     final host = ModalRoute.of(context);
     try {
       String? variantId;
-      final experiment = stage == PlaybackAdStage.streamFound
+      final experiment = stage == PlaybackAdStage.streamFound &&
+              network == PlaybackAdNetwork.adsterra
           ? config?.streamFoundExperiment
           : null;
       if (experiment != null) {
@@ -81,7 +90,7 @@ class AdsterraPlaybackAdsService {
       }
       // Preference writes may yield to a disable, a navigation, or backgrounding.
       if (!context.mounted) return false;
-      if (provider.adsterraPlaybackAds != config ||
+      if (provider.playbackAdsSelection != selection ||
           (host != null && !host.isCurrent)) {
         return false;
       }
@@ -90,23 +99,24 @@ class AdsterraPlaybackAdsService {
       final selectedPlacement = placement;
       final navigator = Navigator.of(context);
       final route = MaterialPageRoute<void>(
-        settings: RouteSettings(name: '/adsterra/${stage.name}'),
+        settings: RouteSettings(
+            name: '/${selectedPlacement.network.name}/${stage.name}'),
         builder: (_) => AdsterraPlaybackAdScreen(
           placement: selectedPlacement,
           stage: stage,
           storeLauncher: storeLauncher,
         ),
       );
-      // Compare the catalog, not its first arm: unrelated provider updates must
-      // not close a selected B/C variant.
+      // Compare the catalogs and network, not the chosen arm: unrelated
+      // provider updates must not close a selected B/C variant.
       void onConfigChanged() {
-        if (provider.adsterraPlaybackAds != config && route.isActive) {
+        if (provider.playbackAdsSelection != selection && route.isActive) {
           navigator.removeRoute(route);
         }
       }
 
       debugPrint(
-          '[AdsterraPlayback] ${stage.name}: presenting ${selectedPlacement.isSmartlink ? 'smartlink' : 'script'} variant=${variantId ?? 'legacy'}');
+          '[AdsterraPlayback] ${stage.name}: presenting ${selectedPlacement.network.name} ${selectedPlacement.isSmartlink ? 'smartlink' : 'script'} variant=${variantId ?? 'legacy'}');
       provider.addListener(onConfigChanged);
       try {
         await navigator.push(route);

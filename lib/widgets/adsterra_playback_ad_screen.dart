@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -21,8 +22,9 @@ enum _Phase { script, page }
 
 /// A visible, disposable ad surface with no hidden preloading or refresh.
 ///
-/// Script tags (Social Bar, Popunder) run in one WebView. Advertiser pages
-/// (Smartlinks and the popups a script emits) open in FlixQuest's own ad page,
+/// Script tags (Adsterra's Social Bar and Popunder, Clickadu's onclick tag) run
+/// in one WebView. Advertiser pages (Smartlinks, Direct Links and the popups a
+/// script emits) open in FlixQuest's own ad page,
 /// never in an external browser. On that page the close control and Back stay
 /// hidden until the final redirect has served visible content, capped at
 /// [closeDelayCap].
@@ -109,6 +111,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       final controller = WebViewController();
       _script = controller;
       await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+      await _prepareAndroid(controller);
       await controller.setBackgroundColor(Colors.black);
       await controller.addJavaScriptChannel('PlaybackAd',
           onMessageReceived: _onScriptMessage);
@@ -121,7 +124,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
             _log('script document finished ${_origin(url)}'),
         onWebResourceError: (error) {
           _log(
-              'script resource error code=${error.errorCode} ${error.description} origin=${_origin(error.url ?? '')} mainFrame=${error.isForMainFrame}');
+              'script resource error code=${error.errorCode} ${error.description} origin=${_origin(error.url ?? '')} path=${Uri.tryParse(error.url ?? '')?.path ?? ''} mainFrame=${error.isForMainFrame}');
           if (error.isForMainFrame == true) _finish('script_main_frame_error');
         },
         onHttpError: (error) {
@@ -153,12 +156,19 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           _finish('script_failed');
         case 'done':
           _finish('continue_control');
+        case 'script':
+          _log('tag script loaded; waiting for the tag to fetch its ad');
+        case 'request':
+          // The tag's own requests, to see where it stops before arming.
+          _log('tag request ${payload['url']} ${payload['detail']}');
         case 'loaded':
           // A loaded script is not proof of an impression. The Popunder is
           // armed now and waits for the viewer's tap on Continue; the maximum
           // duration still bounds the wait.
           if (widget.stage == PlaybackAdStage.streamFound) _loadTimer?.cancel();
-          _log('script loaded');
+          _log(widget.placement.network == PlaybackAdNetwork.clickadu
+              ? 'tag fetched its ad; Continue enabled'
+              : 'script loaded');
         case 'rendered':
           _loadTimer?.cancel();
         case 'offer':
@@ -221,6 +231,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     var mainUrl = uri;
     try {
       await page.setJavaScriptMode(JavaScriptMode.unrestricted);
+      await _prepareAndroid(page);
       await page.setBackgroundColor(Colors.white);
       await page.setOnConsoleMessage((message) =>
           _log('page console ${message.level.name}: ${message.message}'));
@@ -386,6 +397,28 @@ type:document.contentType});})()
     }
   }
 
+  static bool _debuggingEnabled = false;
+
+  /// Ad tags set cookies from their own domains inside a page loaded from the
+  /// app's placeholder origin; Android WebView blocks those third-party
+  /// cookies by default. Debug builds can also be inspected from
+  /// chrome://inspect.
+  Future<void> _prepareAndroid(WebViewController controller) async {
+    final platform = controller.platform;
+    if (platform is! AndroidWebViewController) return;
+    try {
+      if (kDebugMode && !_debuggingEnabled) {
+        _debuggingEnabled = true;
+        await AndroidWebViewController.enableDebugging(true);
+      }
+      await AndroidWebViewCookieManager(
+              const PlatformWebViewCookieManagerCreationParams())
+          .setAcceptThirdPartyCookies(platform, true);
+    } catch (error) {
+      _log('third-party cookies unavailable ($error)');
+    }
+  }
+
   bool _webUrl(Uri? uri) =>
       uri != null &&
       const {'https', 'http'}.contains(uri.scheme) &&
@@ -396,8 +429,8 @@ type:document.contentType});})()
     return _webUrl(uri) ? uri!.origin : 'unknown';
   }
 
-  void _log(String message) =>
-      debugPrint('[AdsterraPage] ${widget.stage.name}: $message');
+  void _log(String message) => debugPrint(
+      '[AdsterraPage] ${widget.placement.network.name}/${widget.stage.name}: $message');
 
   void _finish([String reason = 'completed']) {
     if (!mounted || _finished) return;
@@ -583,9 +616,26 @@ String playbackAdHtml(PlaybackAdPlacement placement, PlaybackAdStage stage) {
   if (placement.isSmartlink) {
     throw ArgumentError('Smartlinks use direct WebView navigation.');
   }
-  final script = const HtmlEscape(HtmlEscapeMode.attribute)
-      .convert(placement.scriptUrl.toString());
+  final escape = const HtmlEscape(HtmlEscapeMode.attribute);
+  final script = escape.convert(placement.scriptUrl.toString());
+  // Clickadu's onclick tag finds its zone on its own script element.
+  final zone = placement.zoneId == null
+      ? ''
+      : ' data-clocid="${escape.convert(placement.zoneId!)}"';
   final popunder = stage == PlaybackAdStage.streamFound;
+  // Clickadu's tag fetches its ad (`/adx/get/`) a few seconds after its script
+  // loads, and a tap before that opens nothing. Enable Continue only once
+  // that request has finished; the load timeout covers a tag that never arms.
+  final armed = placement.network == PlaybackAdNetwork.clickadu
+      ? '''<script>(function(){var done=false;function arm(){if(done)return;done=true;setTimeout(function(){fqSignal('loaded');},300);}
+window.fqTagLoaded=function(){fqSignal('script');};
+var host=new URL('$script'.replace(/&amp;/g,'&')).host;
+try{new PerformanceObserver(function(list){list.getEntries().forEach(function(e){var u=new URL(e.name);if(u.host===host)fqSignal('request',u.pathname,Math.round(e.duration)+'ms status='+(e.responseStatus===undefined?'?':e.responseStatus));if(e.name.indexOf('/adx/get/')>=0)arm();});}).observe({type:'resource',buffered:true});}
+catch(e){window.fqTagLoaded=function(){fqSignal('script');arm();};}})();</script>'''
+      : '';
+  final onLoad = placement.network == PlaybackAdNetwork.clickadu
+      ? 'fqTagLoaded()'
+      : "fqSignal('loaded')";
   return '''<!doctype html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:sans-serif}
@@ -597,7 +647,7 @@ String playbackAdHtml(PlaybackAdPlacement placement, PlaybackAdStage stage) {
 function fqSignal(event,url,detail){if(event==='loaded'){var b=document.getElementById("fq-continue");if(b){b.disabled=false;b.textContent="Continue to player";}}PlaybackAd.postMessage(JSON.stringify({event:event,url:url,detail:detail}));}
 window.addEventListener('error',function(event){fqSignal('failed',null,event.message||'script resource failed');});
 </script>
-${popunder ? '<script defer data-cfasync="false" src="$script" onload="fqSignal(\'loaded\')" onerror="fqSignal(\'failed\')"></script>' : ''}
+${popunder ? '$armed<script defer data-cfasync="false"$zone src="$script" onload="$onLoad" onerror="fqSignal(\'failed\')"></script>' : ''}
 </head><body>
 ${popunder ? '''<main id="fq-controls"><button id="fq-continue" type="button" disabled>Loading…</button><div id="fq-note">Sponsored: an ad may open</div></main><script>
 document.getElementById("fq-continue").addEventListener("click",function(){

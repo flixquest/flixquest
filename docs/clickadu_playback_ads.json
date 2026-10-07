@@ -1,0 +1,10 @@
+{
+  "popunder": {
+    "enabled": true,
+    "mode": "script",
+    "script_url": "https://driverhugoverblown.com/on.js",
+    "zone_id": "2150355",
+    "load_timeout_ms": 10000,
+    "max_duration_seconds": 30
+  }
+}

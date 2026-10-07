@@ -755,4 +755,208 @@ void main() {
     await tester.pumpAndSettle();
     await route;
   }, variant: android);
+
+  group('Clickadu popup', () {
+    final clickadu = File('docs/clickadu_playback_ads.json').readAsStringSync();
+
+    void selectClickadu() => provider
+      ..setClickaduPlaybackAdsConfig(
+          ClickaduPlaybackAdsConfig.parse(clickadu, enabled: true))
+      ..setPlaybackPopunderNetwork(PlaybackAdNetwork.clickadu);
+
+    test('the published catalog runs the onclick tag for zone 2150355', () {
+      final config = ClickaduPlaybackAdsConfig.parse(clickadu, enabled: true);
+      final popunder = config.activePopunder!;
+      expect(popunder.network, PlaybackAdNetwork.clickadu);
+      expect(popunder.scriptUrl,
+          Uri.parse('https://driverhugoverblown.com/on.js'));
+      expect(popunder.zoneId, '2150355');
+      expect(popunder.loadTimeout, const Duration(seconds: 10));
+      expect(
+          ClickaduPlaybackAdsConfig.parse(clickadu, enabled: false)
+              .activePopunder,
+          isNull);
+    });
+
+    test('config rejects a tag without a zone and Adsterra sub IDs', () {
+      for (final popunder in [
+        {'enabled': true, 'script_url': 'https://driverhugoverblown.com/on.js'},
+        {
+          'enabled': true,
+          'script_url': 'https://driverhugoverblown.com/on.js',
+          'zone_id': '21503"55'
+        },
+        {
+          'enabled': true,
+          'mode': 'smartlink',
+          'url': 'https://clickadu.example/direct',
+          'sub_id': 'fq'
+        },
+      ]) {
+        expect(
+            ClickaduPlaybackAdsConfig.parse(jsonEncode({'popunder': popunder}),
+                    enabled: true)
+                .activePopunder,
+            isNull);
+      }
+      final direct = ClickaduPlaybackAdsConfig.parse(
+              jsonEncode({
+                'popunder': {
+                  'enabled': true,
+                  'mode': 'smartlink',
+                  'url': 'https://clickadu.example/direct'
+                }
+              }),
+              enabled: true)
+          .activePopunder!;
+      expect(direct.trackedSmartlinkUrl,
+          Uri.parse('https://clickadu.example/direct'));
+      expect(
+          ClickaduPlaybackAdsConfig.parse(
+                  jsonEncode({
+                    'popunder': {
+                      'enabled': true,
+                      'script_url': 'https://driverhugoverblown.com/on.js',
+                      'zone_id': 2150355
+                    }
+                  }),
+                  enabled: true)
+              .activePopunder
+              ?.zoneId,
+          '2150355');
+    });
+
+    test('the tag finds its zone on its own script element', () {
+      final html = playbackAdHtml(
+          ClickaduPlaybackAdsConfig.parse(clickadu, enabled: true).popunder!,
+          PlaybackAdStage.streamFound);
+      expect(
+          html,
+          contains('<script defer data-cfasync="false" data-clocid="2150355" '
+              'src="https://driverhugoverblown.com/on.js"'));
+      expect(html, contains('Continue to player'));
+      // Continue waits for the tag's own ad request, not its script load.
+      expect(html, contains('onload="fqTagLoaded()"'));
+      expect(html, contains("indexOf('/adx/get/')"));
+      final adsterra = playbackAdHtml(
+          AdsterraPlaybackAdsConfig.parse(catalog, enabled: true).popunder!,
+          PlaybackAdStage.streamFound);
+      expect(adsterra, isNot(contains('data-clocid')));
+      expect(adsterra, isNot(contains('fqTagLoaded')));
+      expect(adsterra, contains('onload="fqSignal(\'loaded\')"'));
+    });
+
+    testWidgets('a tag that never fetches its ad continues on the load timeout',
+        (tester) async {
+      selectClickadu();
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      platform.controllers.single.send('{"event":"script"}');
+      await tester.pump(const Duration(seconds: 9));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+      expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+    }, variant: android);
+
+    testWidgets('an armed tag waits for the viewer past the load timeout',
+        (tester) async {
+      selectClickadu();
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single
+        ..send('{"event":"script"}')
+        ..send('{"event":"loaded"}');
+      await tester.pump(const Duration(seconds: 12));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      opener.send('{"event":"done"}');
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }, variant: android);
+
+    test('Remote Config picks the network and needs Clickadu\'s own switch',
+        () async {
+      final remote = FakeFirebaseRemoteConfig();
+      await AppRemoteConfig.configure(remote);
+      remote.setMockString(AppRemoteConfig.clickaduPlaybackAdsKey, clickadu);
+      AppRemoteConfig.apply(remote, provider);
+      expect(provider.playbackPopunderNetwork, PlaybackAdNetwork.adsterra);
+      expect(provider.clickaduPlaybackAds.activePopunder, isNull);
+      remote
+        ..setMockBool(AppRemoteConfig.clickaduPlaybackEnabledKey, true)
+        ..setMockString(AppRemoteConfig.playbackPopunderNetworkKey, 'Clickadu');
+      AppRemoteConfig.apply(remote, provider);
+      expect(provider.playbackPopunderNetwork, PlaybackAdNetwork.clickadu);
+      expect(provider.clickaduPlaybackAds.activePopunder?.zoneId, '2150355');
+      for (final value in ['none', 'popads']) {
+        remote.setMockString(AppRemoteConfig.playbackPopunderNetworkKey, value);
+        AppRemoteConfig.apply(remote, provider);
+        expect(provider.playbackPopunderNetwork, isNull);
+      }
+    });
+
+    testWidgets('its popup opens in the ad page with the held close',
+        (tester) async {
+      selectClickadu();
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      expect(opener.htmlLoads.single, contains('data-clocid="2150355"'));
+      // The tag opens its window from the viewer's tap on Continue.
+      expect(
+          await opener.delegate!.onNavigationRequest!(NavigationRequest(
+              url: 'https://driverhugoverblown.com/click', isMainFrame: true)),
+          NavigationDecision.prevent);
+      await tester.pump();
+      await tester.pump();
+      final page = platform.controllers.last;
+      expect(
+          page.requests, [Uri.parse('https://driverhugoverblown.com/click')]);
+      expect(opener.javaScriptMode, JavaScriptMode.disabled);
+      expect(find.byTooltip('Close ad'), findsNothing);
+      page.delegate!.onPageFinished!('https://advertiser.example/');
+      await tester.pump();
+      await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }, variant: android);
+
+    testWidgets('the Social Bar stays with Adsterra', (tester) async {
+      selectClickadu();
+      await pumpHost(tester);
+      final result = service.beforeLoader(host);
+      await pumpAd(tester);
+      final html = platform.controllers.single.htmlLoads.single;
+      expect(html, contains('https://ads.example/social'));
+      expect(html, isNot(contains('data-clocid')));
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }, variant: android);
+
+    testWidgets('switching networks closes an active popup', (tester) async {
+      selectClickadu();
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      provider.setPlaybackPopunderNetwork(PlaybackAdNetwork.adsterra);
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+      expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+    }, variant: android);
+
+    testWidgets('no network shows no popup', (tester) async {
+      selectClickadu();
+      provider.setPlaybackPopunderNetwork(null);
+      await pumpHost(tester);
+      expect(await service.streamFound(host), isTrue);
+      expect(platform.controllers, isEmpty);
+    }, variant: android);
+  });
 }

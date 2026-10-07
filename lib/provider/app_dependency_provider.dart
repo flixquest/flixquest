@@ -80,6 +80,37 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  ClickaduPlaybackAdsConfig _clickaduPlaybackAds =
+      const ClickaduPlaybackAdsConfig();
+  ClickaduPlaybackAdsConfig get clickaduPlaybackAds => _clickaduPlaybackAds;
+
+  void setClickaduPlaybackAdsConfig(ClickaduPlaybackAdsConfig config) {
+    _clickaduPlaybackAds = config;
+    notifyListeners();
+  }
+
+  /// Which network serves the stream-found popup; null serves none. The
+  /// Social Bar before the loader stays with Adsterra.
+  PlaybackAdNetwork? _playbackPopunderNetwork = PlaybackAdNetwork.adsterra;
+  PlaybackAdNetwork? get playbackPopunderNetwork => _playbackPopunderNetwork;
+
+  void setPlaybackPopunderNetwork(PlaybackAdNetwork? network) {
+    if (_playbackPopunderNetwork == network) return;
+    _playbackPopunderNetwork = network;
+    notifyListeners();
+  }
+
+  /// Everything that decides a playback ad. A change closes an active one.
+  ({
+    PlaybackAdNetwork? network,
+    AdsterraPlaybackAdsConfig adsterra,
+    ClickaduPlaybackAdsConfig clickadu,
+  }) get playbackAdsSelection => (
+        network: _playbackPopunderNetwork,
+        adsterra: _adsterraPlaybackAds,
+        clickadu: _clickaduPlaybackAds,
+      );
+
   VastPrerollConfig _vastPreroll = const VastPrerollConfig();
   VastPrerollConfig get vastPreroll => _vastPreroll;
 
