@@ -36,6 +36,7 @@ import '../../api/endpoints.dart';
 import '../../ui_components/app_ui_components.dart';
 import '../../services/stream_intro_service.dart';
 import '../../services/introdb_service.dart';
+import '../../services/offline_download_service.dart';
 import '../../services/stream_size_estimator.dart';
 import '../movie/movie_video_loader.dart';
 import '../tv/tv_video_loader.dart';
@@ -3435,14 +3436,23 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       settings.analytics.trackDownload(
         action: 'enqueue_from_player',
         mediaType: _analyticsMediaType,
-        outcome: 'error',
+        outcome: isAlreadyDownloaded(error) ? 'already_downloaded' : 'error',
         provider: providerName,
         quality: resolution,
         error: error.toString(),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not start download: $error')),
+        SnackBar(
+          content: Text(
+            offlineEnqueueErrorMessage(
+              error,
+              title: isMovie
+                  ? movie?.movieName ?? 'This movie'
+                  : 'This episode',
+            ),
+          ),
+        ),
       );
     }
   }

@@ -36,6 +36,24 @@ class OfflineExportProgress {
   }
 }
 
+/// Whether a failed [OfflineDownloadGateway.enqueue] means the title is
+/// already saved, which is not an error from the user's point of view.
+bool isAlreadyDownloaded(Object error) =>
+    error is PlatformException && error.code == 'ALREADY_DOWNLOADED';
+
+/// A user-facing message for a failed [OfflineDownloadGateway.enqueue] of
+/// [title].
+String offlineEnqueueErrorMessage(Object error, {required String title}) {
+  if (isAlreadyDownloaded(error)) {
+    return '$title is already in your downloads. Open Downloads to watch it.';
+  }
+  if (error is PlatformException && error.code == 'PREPARE_FAILED') {
+    return 'Could not reach this stream to download it. '
+        'Try another quality or provider.';
+  }
+  return 'Could not start the download. Please try again.';
+}
+
 class OfflineDownloadService implements OfflineDownloadGateway {
   OfflineDownloadService._();
 

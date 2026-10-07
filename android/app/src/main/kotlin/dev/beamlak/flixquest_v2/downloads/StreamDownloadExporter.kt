@@ -1,7 +1,10 @@
 package dev.beamlak.flixquest_v2.downloads
 
 import android.content.Context
+import android.os.Handler
 import android.os.Looper
+import android.text.format.Formatter
+import android.util.Log
 import androidx.media3.common.Format
 import androidx.media3.common.util.Clock
 import androidx.media3.common.util.UnstableApi
@@ -14,6 +17,7 @@ import androidx.media3.transformer.DefaultAssetLoaderFactory
 import androidx.media3.transformer.DefaultDecoderFactory
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.InAppMp4Muxer
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import java.io.File
@@ -31,6 +35,7 @@ class StreamDownloadExporter(
     private val exportDirectory = File(appContext.filesDir, "offline_exports")
     private var activeExportId: String? = null
     private var activeTransformer: Transformer? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val callbacks = mutableListOf<(Result<File>) -> Unit>()
 
     fun export(downloadId: String, callback: (Result<File>) -> Unit) {
@@ -58,8 +63,23 @@ class StreamDownloadExporter(
             return
         }
 
+        if (!hasSpaceFor(download)) {
+            callback(Result.failure(notEnoughStorage(download, cause = null)))
+            return
+        }
+
         activeExportId = downloadId
         callbacks.add(callback)
+        startTransformer(download, output, inAppMuxer = false)
+    }
+
+    /**
+     * Remuxes [download] into [output]. Android's MediaMuxer rejects some
+     * HLS/DASH sample streams (it fails while writing or finalising the file),
+     * so a muxing failure is retried once with Media3's own MP4 muxer.
+     */
+    private fun startTransformer(download: Download, output: File, inAppMuxer: Boolean) {
+        val downloadId = download.request.id
         val mediaSourceFactory = DefaultMediaSourceFactory(store.readOnlyCacheFactory())
         val assetLoaderFactory = DefaultAssetLoaderFactory(
             appContext,
@@ -79,7 +99,23 @@ class StreamDownloadExporter(
                 exportException: ExportException,
             ) {
                 output.delete()
-                finish(Result.failure(exportException))
+                Log.e(
+                    TAG,
+                    "Export of $downloadId failed with the " +
+                        "${if (inAppMuxer) "in-app" else "framework"} muxer " +
+                        "(${exportException.errorCodeName})",
+                    exportException,
+                )
+                if (!inAppMuxer && exportException.isMuxingError() && hasSpaceFor(download)) {
+                    // Start the retry outside the failed Transformer's callback.
+                    mainHandler.post {
+                        if (activeExportId == downloadId) {
+                            startTransformer(download, output, inAppMuxer = true)
+                        }
+                    }
+                    return
+                }
+                finish(Result.failure(describeFailure(download, exportException)))
             }
         }
         try {
@@ -87,12 +123,13 @@ class StreamDownloadExporter(
                 .setAssetLoaderFactory(
                     SquarePixelAspectAssetLoaderFactory(assetLoaderFactory),
                 )
+                .apply { if (inAppMuxer) setMuxerFactory(InAppMp4Muxer.Factory()) }
                 .addListener(listener)
                 .build()
                 .also { it.start(download.request.toMediaItem(), output.absolutePath) }
         } catch (error: Exception) {
             output.delete()
-            finish(Result.failure(error))
+            finish(Result.failure(describeFailure(download, error)))
         }
     }
 
@@ -135,6 +172,50 @@ class StreamDownloadExporter(
         completedCallbacks.forEach { it(result) }
     }
 
+    /** The remuxed MP4 is about the size of the cached segments, plus headroom. */
+    private fun requiredBytes(download: Download): Long =
+        download.bytesDownloaded + EXPORT_HEADROOM_BYTES
+
+    private fun hasSpaceFor(download: Download): Boolean =
+        exportDirectory.usableSpace >= requiredBytes(download)
+
+    private fun notEnoughStorage(download: Download, cause: Throwable?): Exception {
+        val shortfall = (requiredBytes(download) - exportDirectory.usableSpace)
+            .coerceAtLeast(EXPORT_HEADROOM_BYTES)
+        return StreamDownloadExportException(
+            code = "EXPORT_NO_SPACE",
+            message = "There isn't enough free storage to prepare this video. " +
+                "Free up about ${Formatter.formatShortFileSize(appContext, shortfall)} " +
+                "and try again.",
+            cause = cause,
+        )
+    }
+
+    private fun describeFailure(download: Download, error: Throwable): Exception {
+        val outOfSpace = error.causes().any {
+            val message = it.message.orEmpty()
+            message.contains("ENOSPC") || message.contains("No space left", ignoreCase = true)
+        }
+        if (outOfSpace) return notEnoughStorage(download, error)
+        if (error is ExportException && error.isMuxingError()) {
+            return StreamDownloadExportException(
+                code = "EXPORT_UNSUPPORTED",
+                message = "This video can't be converted for other players. " +
+                    "You can still watch it in FlixQuest.",
+                cause = error,
+            )
+        }
+        return StreamDownloadExportException(
+            code = "EXPORT_FAILED",
+            message = "Could not prepare this video. You can still watch it in FlixQuest.",
+            cause = error,
+        )
+    }
+
+    private fun ExportException.isMuxingError(): Boolean =
+        errorCode == ExportException.ERROR_CODE_MUXING_FAILED ||
+            errorCode == ExportException.ERROR_CODE_MUXING_TIMEOUT
+
     private fun outputFile(download: Download): File {
         val metadata = StreamDownloadStore.requestMetadata(download.request)
         val title = metadata.optString("title", "FlixQuest video")
@@ -145,7 +226,23 @@ class StreamDownloadExporter(
         val suffix = Integer.toHexString(download.request.id.hashCode())
         return File(exportDirectory, "$title-$suffix.mp4")
     }
+
+    private companion object {
+        const val TAG = "StreamDownloadExporter"
+        const val EXPORT_HEADROOM_BYTES = 64L * 1024 * 1024
+    }
 }
+
+/** An export failure carrying the method-channel error code Dart receives. */
+class StreamDownloadExportException(
+    val code: String,
+    message: String,
+    cause: Throwable?,
+) : Exception(message, cause)
+
+/** This throwable and its causes, outermost first. */
+internal fun Throwable.causes(): Sequence<Throwable> =
+    generateSequence(this) { it.cause?.takeIf { cause -> cause !== it } }.take(8)
 
 /**
  * Some HLS/DASH manifests report a negligible non-square pixel ratio (for
