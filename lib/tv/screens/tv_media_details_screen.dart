@@ -649,7 +649,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                           .toDouble(),
                       child: Visibility(
                         visible: !browsing,
-                        child: const AdsterraAdSlot(
+                        child: const BannerAdSlot(
                           placement: 'title_detail',
                           variant: HostedBannerVariant.standard,
                         ),

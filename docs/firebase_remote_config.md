@@ -56,16 +56,44 @@ splash remains bundled because it appears before Firebase initializes.
 | `flixquest_api_instances` | String | Empty | JSON array or `{"instances": [...]}` defining load-balanced FlixQuest scraper endpoints. |
 | `flixquest_api_url_v2` | String | Empty | Legacy single fallback URL for the scraper API. |
 
+## Ad networks at a glance
+
+FlixQuest serves three ad formats, and each one picks its network with its own
+selector. Every network keeps its codes in its own catalog and has its own
+switch, so both catalogs can stay published and swapping providers is a change
+of the selector alone. A selector value of `none`, or any unknown value, turns
+the format off. Selectors are case-insensitive and apply while the app runs.
+
+| Format | Selector (default) | Adsterra | Clickadu |
+| --- | --- | --- | --- |
+| Banners | `banner_ad_network` (`adsterra`) | `adsterra_banner_enabled`, `adsterra_tv_enabled`, `adsterra_banners` | `clickadu_banner_enabled`, `clickadu_tv_enabled`, `clickadu_banners` |
+| Stream-found popup (Popunder / Smartlink / Direct Link) | `playback_popunder_network` (`adsterra`) | `adsterra_playback_enabled`, `adsterra_playback_ads` | `clickadu_playback_enabled`, `clickadu_playback_ads` |
+| Video pre-roll (VAST) | `vast_preroll_network` (`clickadu`) | `vast_preroll_enabled`, `vast_preroll.adsterra` | `vast_preroll_enabled`, `vast_preroll.clickadu` |
+
+The Social Bar before the media loader is Adsterra-only (`adsterra_playback_ads`
+`interstitial`). Switching a selector closes an active popup and replaces live
+banners on the next frame; a pre-roll already playing finishes.
+
+To add another network in code: add it to `AdNetwork`
+(`lib/models/ad_network.dart`). The compiler then points at each place that
+needs its formats: a `BannerAdUnit` subclass and its catalog parse in
+`lib/models/banner_ads_config.dart`, its keys in `AppRemoteConfig`, and the
+popup placement in `AdsterraPlaybackAdsService`. VAST tags need no code: any
+network's tag goes in its own `vast_preroll` section.
+
 ## Ad network and banner configuration
 
 | Parameter | Firebase type | Default | Purpose |
 | --- | --- | --- | --- |
-| `banner_ad_network` | String | `adsterra` | `adsterra` selects WebView banners; `none` hides all banners including hosted announcements. Published legacy values `native`, `unity`, and `startio` also select the Adsterra surface, but cannot enable requests without the new switch and valid codes. |
+| `banner_ad_network` | String | `adsterra` | Which network's WebView banners fill the slots: `adsterra` or `clickadu`. `none` hides all banners including hosted announcements. Published legacy values `native`, `unity`, and `startio` select Adsterra, but cannot enable requests without its switch and valid codes. Unknown values show no network banner but keep hosted announcements. |
 | `adsterra_banner_enabled` | Boolean | `false` | Adsterra banner switch. Must be explicitly enabled remotely; no demo ads or hardcoded publisher codes ship in the app. |
 | `adsterra_tv_enabled` | Boolean | `false` | Additional gate for Android TV; the global switch must also be on. TV placements use `_tv` names and TV-specific defaults. |
 | `adsterra_banners` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | Central catalog of banner codes, sizes, default variants and placement overrides. See below. |
-| `hosted_banner_mode` | String | `stack` | How `/ads` announcements share a slot with Adsterra. `stack`: hosted above Adsterra. `priority`: an eligible hosted banner takes the slot and Adsterra loads only where no hosted ad exists. `off`: show only Adsterra. Unknown values use `stack`. |
-| `banners` | String (JSON) | `{"banners":[]}` | Existing per-announcement overrides for `/ads`, keyed by `key` (`enabled`, `placements`, `shape`, `width`, `height`, `aspectRatio`). Separate from Adsterra's catalog. |
+| `clickadu_banner_enabled` | Boolean | `false` | Clickadu banner switch. Must be published remotely. |
+| `clickadu_tv_enabled` | Boolean | `false` | Android TV gate for Clickadu banners, like `adsterra_tv_enabled`. |
+| `clickadu_banners` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | Clickadu's catalog: the same `units` / `defaults` / `placements` schema as Adsterra's, with Clickadu unit fields. See [Clickadu banners](#clickadu-banners). |
+| `hosted_banner_mode` | String | `stack` | How `/ads` announcements share a slot with the network banner. `stack`: hosted above the network banner. `priority`: an eligible hosted banner takes the slot and the network banner loads only where no hosted ad exists. `off`: show only the network banner. Unknown values use `stack`. |
+| `banners` | String (JSON) | `{"banners":[]}` | Existing per-announcement overrides for `/ads`, keyed by `key` (`enabled`, `placements`, `shape`, `width`, `height`, `aspectRatio`). Separate from the network catalogs. |
 
 ### Activate Adsterra banners
 
@@ -125,9 +153,53 @@ Existing phone/tablet slot names:
 
 TV slots: `title_detail_tv` (top-right details slot, maximum width 360) and `live_tv_strip_tv` (below the Live TV list). TV Home has no banner slot. TV banners remain display-only and cannot take D-pad focus or open an offer. Hidden details banners are removed while browsing the lower rows.
 
+### Clickadu banners
+
+**Ready-to-publish catalog:** [clickadu_banners.json](clickadu_banners.json)
+holds spot `2150724`. Publish it as `clickadu_banners`, publish
+`clickadu_banner_enabled=true`, then set `banner_ad_network=clickadu`.
+Switching back is `banner_ad_network=adsterra`.
+
+Clickadu's code is a Main Tag (`bn.js`) plus one Ad Spot per banner
+(`<div data-cl-spot="…">`). Every banner is its own WebView document, so the
+app writes the Main Tag and the unit's spot into each one, which is the
+one-spot-per-page case of Clickadu's guide.
+
+```json
+{
+  "script_url": "https://guidepaparazzisurface.com/bn.js",
+  "units": {
+    "rectangle": {"spot_id": "2150724", "size": "300x250"}
+  },
+  "defaults": {"tall": ["rectangle"], "tv_tall": ["rectangle"]},
+  "placements": {}
+}
+```
+
+| Field | Where | Rules |
+| --- | --- | --- |
+| `script_url` | Catalog | The Main Tag's `src` with `https://` spelled out (the dashboard gives `//guidepaparazzisurface.com/bn.js`). |
+| `spot_id` | Unit | The `data-cl-spot` value, digits only (string or number). |
+| `size` | Unit | `WxH`, exactly the size the spot was created with in the Clickadu dashboard (the WebView is sized to it). Each side 20–1000. |
+| `script_url` | Unit, optional | Overrides the catalog's Main Tag for that unit. |
+| `enabled` | Unit, optional | `false` turns the unit off. |
+
+`defaults` and `placements` work exactly as in Adsterra's catalog below. The
+supplied catalog only fills the rectangle (`tall`) slots; thin (`standard`)
+slots stay empty on Clickadu until you add a 320x50 or 728x90 spot and list
+it under `standard` / `tv_standard`.
+
+Clickadu's script fills the spot a moment after it loads, or not at all when
+it has no ad. The slot counts as loaded only once a creative of visible size
+appears; a spot still empty after 20 seconds collapses. The spot runs on the
+app's placeholder origin (`appassets.androidplatform.net`), not the site it was
+approved for. A desktop test page on `localhost` loaded `bn.js` but got no
+creative, so confirm with Clickadu that the spot accepts in-app WebView
+traffic.
+
 ### Loading and clicks
 
-The banner WebView loads a minimal local HTML document with the generated script, JavaScript enabled, an `AD` label, and the exact unit dimensions. The local document uses `https://appassets.androidplatform.net/adsterra/` as its HTTPS base URL, giving it an isolated app-content origin where `document.cookie` and storage work. Loading without a base URL creates an opaque origin and makes cookie-dependent scripts fail. This URL is not fetched and does not adopt the ad server or publisher website's origin. Ads use the actual system WebView user agent. Script load/runtime errors, main-document failures, or a script that fails to load within 20 seconds collapse the slot without blocking browsing or playback.
+The banner WebView loads a minimal local HTML document with the network's generated code, JavaScript enabled, an `AD` label, and the exact unit dimensions. Adsterra and Clickadu banners share this view. The local document uses `https://appassets.androidplatform.net/adsterra/` as its HTTPS base URL, giving it an isolated app-content origin where `document.cookie` and storage work. Loading without a base URL creates an opaque origin and makes cookie-dependent scripts fail. This URL is not fetched and does not adopt the ad server or publisher website's origin. Ads use the actual system WebView user agent. Script load/runtime errors, main-document failures, or a script that fails to load within 20 seconds collapse the slot without blocking browsing or playback.
 
 HTTP(S) offer navigation opens the external browser only following a recent pointer interaction on a phone/tablet. Programmatic main-frame redirects and non-web schemes are blocked; iframe resource navigation stays in the WebView. There are no forced clicks or Smartlink countdowns. Confirm the WebView inventory with Adsterra before publishing real codes, and use Adsterra's reporting to verify monetization; a script-load signal is not a billable-impression callback.
 
@@ -640,17 +712,34 @@ show the network, for example `[AdsterraPage] clickadu/streamFound: popup URL re
 ## Video pre-roll (VAST)
 
 A VAST video ad can play inside the player before a movie or episode. It is
-independent of the Adsterra playback ads above. If both are enabled, the
-stream-found Smartlink still runs before the player opens, so a viewer would see
+independent of the playback popups above. If both are enabled, the
+stream-found popup still runs before the player opens, so a viewer would see
 two ads. Disable one of them unless that is intended.
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `vast_preroll_enabled` | Boolean | `false` | Explicitly published switch. Turning it off stops new pre-rolls; an ad already playing finishes. |
-| `vast_preroll` | String (JSON) | `{}` | The tag and its limits. |
+| `vast_preroll_network` | String | `clickadu` | Which network's section of `vast_preroll` plays: `clickadu` or `adsterra`. `none` or any other value plays no pre-roll. |
+| `vast_preroll` | String (JSON) | `{}` | Each network's tag and limits, under the network's name. |
 
 Copy [vast_preroll.json](vast_preroll.json) into `vast_preroll` and publish
-`vast_preroll_enabled=true`. It holds the Clickadu video zone's tag.
+`vast_preroll_enabled=true`. It holds the Clickadu video zone's tag (zone
+2150357) under `clickadu`:
+
+```json
+{
+  "clickadu": {"tag_url": "https://detoxifylagoonsnugness.com/ceef/gdt3g0/tbt/2150357/tlk.xml"},
+  "adsterra": {"tag_url": "https://…/your-adsterra-vast-tag.xml"}
+}
+```
+
+To swap networks, add the other network's section and publish
+`vast_preroll_network` with its name. A selected network without a section
+plays nothing. A flat object with `tag_url` at the top level (the format
+before `vast_preroll_network`) still works and serves whichever network is
+selected.
+
+Each section takes these fields:
 
 | Field | Default | Limits |
 | --- | --- | --- |
@@ -697,6 +786,14 @@ fall back to `Mozilla/5.0 (Linux; Android <version>; <model>) FlixQuest/<version
 Logs use the `[VAST]` prefix. An advertiser link that answers with XML, JSON or
 text instead of a page closes the ad page immediately and the video ad resumes.
 
-Ask Clickadu for a tag that returns linear MP4 only (no VPAID), which macros
-they expect from an app (there is no page URL), and confirmation that in-app
-requests are accepted and counted.
+Clickadu's video zone 2150357 was checked on 2026-10-07: it answers with a
+VAST 3.0 InLine ad (no wrapper), a 30-second linear creative skippable after
+5 seconds, and four progressive MP4 renditions from 180p to 720p, with no VPAID.
+The video.js / VPAID plugin in Clickadu's integration guide is for websites;
+the app plays the tag natively and does not need it. Clickadu states
+`bitrate` in bits per second (`2000000`) instead of VAST's Kbps; the app reads
+values of 100000 or more as bps, so phones get the 720p rendition rather than
+falling back to 180p.
+
+Ask Clickadu which macros they expect from an app (there is no page URL) and
+for confirmation that in-app requests are accepted and counted.

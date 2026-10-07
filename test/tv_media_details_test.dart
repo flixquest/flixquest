@@ -9,7 +9,7 @@ import 'package:flixquest/services/device_presentation_service.dart';
 import 'package:flixquest/tv/controllers/tv_media_details_controller.dart';
 import 'package:flixquest/tv/models/tv_media_item.dart';
 import 'package:flixquest/tv/screens/tv_media_details_screen.dart';
-import 'package:flixquest/widgets/adsterra_banner_widget.dart';
+import 'package:flixquest/widgets/network_banner_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -196,13 +196,13 @@ void main() {
         HostedAdsRepository.instance.useFetcherForTesting((_) async => []);
       });
       final dependencies = AppDependencyProvider()
-        ..setAdsterraAdsConfig(testAdsterraConfig());
+        ..setBannerAdsConfig(testAdsterraConfig());
       await _pumpDetails(tester, dependencies: dependencies);
 
-      final banner = find.byType(AdsterraBannerWidget);
+      final banner = find.byType(NetworkBannerWidget);
       expect(banner, findsOneWidget);
-      expect(tester.widget<AdsterraBannerWidget>(banner).placement,
-          'title_detail');
+      expect(
+          tester.widget<NetworkBannerWidget>(banner).placement, 'title_detail');
       final slot = tester.widget<Positioned>(
         find.ancestor(of: banner, matching: find.byType(Positioned)).first,
       );

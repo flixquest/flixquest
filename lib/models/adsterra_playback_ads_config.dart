@@ -1,21 +1,10 @@
 import 'dart:convert';
 
+import 'ad_network.dart';
+
+export 'ad_network.dart';
+
 enum PlaybackAdStage { beforeLoader, streamFound }
-
-/// The ad network behind a playback placement. Remote Config selects which
-/// one serves the stream-found popup (`playback_popunder_network`).
-enum PlaybackAdNetwork {
-  adsterra,
-  clickadu;
-
-  /// `none` and unknown values select no network.
-  static PlaybackAdNetwork? parse(String value) =>
-      switch (value.trim().toLowerCase()) {
-        'adsterra' => adsterra,
-        'clickadu' => clickadu,
-        _ => null,
-      };
-}
 
 /// Independent of banner settings; missing or malformed remote values disable
 /// playback ads. Codes belong in Remote Config, never in compiled defaults.
@@ -107,7 +96,7 @@ class PlaybackAdPlacement {
     this.loadTimeout = const Duration(seconds: 5),
     this.maxDuration = const Duration(seconds: 30),
     this.subId,
-    this.network = PlaybackAdNetwork.adsterra,
+    this.network = AdNetwork.adsterra,
     this.zoneId,
   }) : assert((scriptUrl == null) != (smartlinkUrl == null));
 
@@ -117,7 +106,7 @@ class PlaybackAdPlacement {
   final Duration loadTimeout;
   final Duration maxDuration;
   final String? subId;
-  final PlaybackAdNetwork network;
+  final AdNetwork network;
 
   /// Clickadu's zone, passed to its onclick tag as `data-clocid`.
   final String? zoneId;
@@ -130,7 +119,7 @@ class PlaybackAdPlacement {
         });
 
   static PlaybackAdPlacement? parse(Object? value,
-      {PlaybackAdNetwork network = PlaybackAdNetwork.adsterra}) {
+      {AdNetwork network = AdNetwork.adsterra}) {
     if (value is! Map || value['enabled'] != true) return null;
     final mode = value['mode'] ?? 'script';
     if (mode != 'script' && mode != 'smartlink') return null;
@@ -142,7 +131,7 @@ class PlaybackAdPlacement {
         (!_identifier(subId) ||
             smartlink == null ||
             // `psid` is Adsterra's parameter; Clickadu's differs.
-            network != PlaybackAdNetwork.adsterra)) {
+            network != AdNetwork.adsterra)) {
       return null;
     }
     // Clickadu's onclick tag reads its zone from the script element.
@@ -152,9 +141,7 @@ class PlaybackAdPlacement {
         : zone is String && RegExp(r'^[0-9]{1,12}$').hasMatch(zone)
             ? zone
             : null;
-    if (network == PlaybackAdNetwork.clickadu &&
-        script != null &&
-        zoneId == null) {
+    if (network == AdNetwork.clickadu && script != null && zoneId == null) {
       return null;
     }
     // Legacy `auto_activate` is ignored: the Popunder tag only opens on a real
@@ -165,7 +152,7 @@ class PlaybackAdPlacement {
       smartlinkUrl: smartlink,
       subId: subId as String?,
       network: network,
-      zoneId: network == PlaybackAdNetwork.clickadu ? zoneId : null,
+      zoneId: network == AdNetwork.clickadu ? zoneId : null,
       loadTimeout: Duration(
           milliseconds: _bounded(value['load_timeout_ms'], 5000, 500, 10000)),
       maxDuration: Duration(
@@ -208,7 +195,7 @@ class ClickaduPlaybackAdsConfig {
       return ClickaduPlaybackAdsConfig(
         enabled: enabled,
         popunder: PlaybackAdPlacement.parse(json['popunder'],
-            network: PlaybackAdNetwork.clickadu),
+            network: AdNetwork.clickadu),
       );
     } catch (_) {
       return const ClickaduPlaybackAdsConfig();

@@ -293,7 +293,7 @@ class _LoadingAds extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      const AdsterraAdSlot(placement: 'stream_loading');
+      const BannerAdSlot(placement: 'stream_loading');
 }
 
 class _PlaybackArtwork extends StatelessWidget {

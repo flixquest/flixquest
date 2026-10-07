@@ -313,8 +313,8 @@ class VastDocument {
                 delivery: file.getAttribute('delivery'),
                 width: int.tryParse(file.getAttribute('width') ?? ''),
                 height: int.tryParse(file.getAttribute('height') ?? ''),
-                bitrate: int.tryParse(file.getAttribute('bitrate') ?? '') ??
-                    int.tryParse(file.getAttribute('maxBitrate') ?? ''),
+                bitrate: _kbps(file.getAttribute('bitrate') ??
+                    file.getAttribute('maxBitrate')),
                 apiFramework: file.getAttribute('apiFramework'),
               ),
         ];
@@ -367,6 +367,15 @@ class VastDocument {
   static String? _text(XmlElement? element) {
     final text = element?.innerText.trim();
     return text == null || text.isEmpty ? null : text;
+  }
+
+  /// VAST states bitrates in Kbps, but some servers (Clickadu among them)
+  /// send bits per second, such as `2000000`. No ad rendition reaches
+  /// 100 Mbps, so 100000 or more is read as bps.
+  static int? _kbps(String? value) {
+    final bitrate = int.tryParse(value?.trim() ?? '');
+    if (bitrate == null || bitrate <= 0) return null;
+    return bitrate >= 100000 ? bitrate ~/ 1000 : bitrate;
   }
 
   static Uri? _url(String? value) {

@@ -5,7 +5,7 @@ import 'package:firebase_remote_config/firebase_remote_config.dart';
 import '../constants/api_constants.dart';
 import '../models/banner_ad.dart';
 import '../provider/app_dependency_provider.dart';
-import '../models/adsterra_ads_config.dart';
+import '../models/banner_ads_config.dart';
 import '../models/adsterra_playback_ads_config.dart';
 import '../models/vast_preroll_config.dart';
 
@@ -27,6 +27,9 @@ class AppRemoteConfig {
   static const adsterraBannerEnabledKey = 'adsterra_banner_enabled';
   static const adsterraTvEnabledKey = 'adsterra_tv_enabled';
   static const adsterraBannersKey = 'adsterra_banners';
+  static const clickaduBannerEnabledKey = 'clickadu_banner_enabled';
+  static const clickaduTvEnabledKey = 'clickadu_tv_enabled';
+  static const clickaduBannersKey = 'clickadu_banners';
   static const adsterraPlaybackEnabledKey = 'adsterra_playback_enabled';
   static const adsterraPlaybackAdsKey = 'adsterra_playback_ads';
   static const playbackPopunderNetworkKey = 'playback_popunder_network';
@@ -34,6 +37,7 @@ class AppRemoteConfig {
   static const clickaduPlaybackAdsKey = 'clickadu_playback_ads';
   static const vastPrerollEnabledKey = 'vast_preroll_enabled';
   static const vastPrerollKey = 'vast_preroll';
+  static const vastPrerollNetworkKey = 'vast_preroll_network';
 
   /// Live TV used to ride on the OTT flag before it got a dedicated key.
   static const legacyEnableLiveTvKey = 'enable_ott';
@@ -70,6 +74,9 @@ class AppRemoteConfig {
       adsterraBannerEnabledKey: false,
       adsterraTvEnabledKey: false,
       adsterraBannersKey: '{"units":{},"defaults":{},"placements":{}}',
+      clickaduBannerEnabledKey: false,
+      clickaduTvEnabledKey: false,
+      clickaduBannersKey: '{"units":{},"defaults":{},"placements":{}}',
       adsterraPlaybackEnabledKey: false,
       adsterraPlaybackAdsKey: '{}',
       playbackPopunderNetworkKey: 'adsterra',
@@ -77,6 +84,7 @@ class AppRemoteConfig {
       clickaduPlaybackAdsKey: '{}',
       vastPrerollEnabledKey: false,
       vastPrerollKey: '{}',
+      vastPrerollNetworkKey: 'clickadu',
     });
   }
 
@@ -140,15 +148,28 @@ class AppRemoteConfig {
       HostedBannerMode.parse(remoteConfig.getString(hostedBannerModeKey)),
     );
 
-    final adsterraEnabled = remoteConfig.getValue(adsterraBannerEnabledKey);
-    final tvEnabled = remoteConfig.getValue(adsterraTvEnabledKey);
-    provider.setAdsterraAdsConfig(AdsterraAdsConfig.parse(
-      remoteConfig.getString(adsterraBannersKey),
-      enabled: adsterraEnabled.source == ValueSource.valueRemote &&
-          adsterraEnabled.asBool(),
-      tvEnabled:
-          tvEnabled.source == ValueSource.valueRemote && tvEnabled.asBool(),
-    ));
+    // Every network's catalog is kept; `banner_ad_network` picks the live one.
+    for (final (network, enabledKey, tvKey, catalogKey) in [
+      (
+        AdNetwork.adsterra,
+        adsterraBannerEnabledKey,
+        adsterraTvEnabledKey,
+        adsterraBannersKey
+      ),
+      (
+        AdNetwork.clickadu,
+        clickaduBannerEnabledKey,
+        clickaduTvEnabledKey,
+        clickaduBannersKey
+      ),
+    ]) {
+      provider.setBannerAdsConfig(BannerAdsConfig.parse(
+        remoteConfig.getString(catalogKey),
+        network: network,
+        enabled: _remoteBool(remoteConfig, enabledKey),
+        tvEnabled: _remoteBool(remoteConfig, tvKey),
+      ));
+    }
 
     final instancesRaw = remoteConfig.getString(flixquestApiInstancesKey);
     final playbackEnabled = remoteConfig.getValue(adsterraPlaybackEnabledKey);
@@ -163,13 +184,12 @@ class AppRemoteConfig {
       enabled: clickaduEnabled.source == ValueSource.valueRemote &&
           clickaduEnabled.asBool(),
     ));
-    provider.setPlaybackPopunderNetwork(PlaybackAdNetwork.parse(
-        remoteConfig.getString(playbackPopunderNetworkKey)));
-    final prerollEnabled = remoteConfig.getValue(vastPrerollEnabledKey);
+    provider.setPlaybackPopunderNetwork(
+        AdNetwork.parse(remoteConfig.getString(playbackPopunderNetworkKey)));
     provider.setVastPrerollConfig(VastPrerollConfig.parse(
       remoteConfig.getString(vastPrerollKey),
-      enabled: prerollEnabled.source == ValueSource.valueRemote &&
-          prerollEnabled.asBool(),
+      enabled: _remoteBool(remoteConfig, vastPrerollEnabledKey),
+      network: AdNetwork.parse(remoteConfig.getString(vastPrerollNetworkKey)),
     ));
     final parsedInstances = parseApiInstances(instancesRaw);
     final legacyUrl = remoteConfig.getString(flixquestApiUrlKey).trim();
@@ -226,6 +246,12 @@ class AppRemoteConfig {
     } catch (_) {
       return const {};
     }
+  }
+
+  /// Ad switches count only when published: no default turns an ad on.
+  static bool _remoteBool(FirebaseRemoteConfig remoteConfig, String key) {
+    final value = remoteConfig.getValue(key);
+    return value.source == ValueSource.valueRemote && value.asBool();
   }
 
   /// Resolves the Live TV toggle, preferring [enableLiveTvKey] and falling back

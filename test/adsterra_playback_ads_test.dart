@@ -276,7 +276,7 @@ void main() {
         platform.controllers.last.requests.single,
         Uri.parse(
             'https://ads.example/smartlink?existing=1&psid=fqsmartinapp'));
-    provider.setAdsterraAdsConfig(testAdsterraConfig());
+    provider.setBannerAdsConfig(testAdsterraConfig());
     await tester.pump();
     expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
     // This arm's 1 s load timeout ends a page that never loads.
@@ -342,7 +342,7 @@ void main() {
     AppRemoteConfig.apply(remote, provider);
     expect(provider.adsterraPlaybackAds.interstitial?.scriptUrl.toString(),
         'https://ads.example/social');
-    expect(provider.isAdsterraBannerActive, isFalse);
+    expect(provider.isNetworkBannerActive, isFalse);
     remote.setMockBool(AppRemoteConfig.adsterraPlaybackEnabledKey, false);
     AppRemoteConfig.apply(remote, provider);
     expect(provider.adsterraPlaybackAds.forStage(PlaybackAdStage.streamFound),
@@ -762,12 +762,12 @@ void main() {
     void selectClickadu() => provider
       ..setClickaduPlaybackAdsConfig(
           ClickaduPlaybackAdsConfig.parse(clickadu, enabled: true))
-      ..setPlaybackPopunderNetwork(PlaybackAdNetwork.clickadu);
+      ..setPlaybackPopunderNetwork(AdNetwork.clickadu);
 
     test('the published catalog runs the onclick tag for zone 2150355', () {
       final config = ClickaduPlaybackAdsConfig.parse(clickadu, enabled: true);
       final popunder = config.activePopunder!;
-      expect(popunder.network, PlaybackAdNetwork.clickadu);
+      expect(popunder.network, AdNetwork.clickadu);
       expect(popunder.scriptUrl,
           Uri.parse('https://driverhugoverblown.com/on.js'));
       expect(popunder.zoneId, '2150355');
@@ -883,13 +883,13 @@ void main() {
       await AppRemoteConfig.configure(remote);
       remote.setMockString(AppRemoteConfig.clickaduPlaybackAdsKey, clickadu);
       AppRemoteConfig.apply(remote, provider);
-      expect(provider.playbackPopunderNetwork, PlaybackAdNetwork.adsterra);
+      expect(provider.playbackPopunderNetwork, AdNetwork.adsterra);
       expect(provider.clickaduPlaybackAds.activePopunder, isNull);
       remote
         ..setMockBool(AppRemoteConfig.clickaduPlaybackEnabledKey, true)
         ..setMockString(AppRemoteConfig.playbackPopunderNetworkKey, 'Clickadu');
       AppRemoteConfig.apply(remote, provider);
-      expect(provider.playbackPopunderNetwork, PlaybackAdNetwork.clickadu);
+      expect(provider.playbackPopunderNetwork, AdNetwork.clickadu);
       expect(provider.clickaduPlaybackAds.activePopunder?.zoneId, '2150355');
       for (final value in ['none', 'popads']) {
         remote.setMockString(AppRemoteConfig.playbackPopunderNetworkKey, value);
@@ -945,7 +945,7 @@ void main() {
       final result = service.streamFound(host);
       await pumpAd(tester);
       expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
-      provider.setPlaybackPopunderNetwork(PlaybackAdNetwork.adsterra);
+      provider.setPlaybackPopunderNetwork(AdNetwork.adsterra);
       await tester.pumpAndSettle();
       expect(await result, isTrue);
       expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);

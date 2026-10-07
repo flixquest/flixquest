@@ -8,7 +8,7 @@ import '../constants/api_constants.dart';
 import '../models/occasional_theme.dart';
 import '../models/banner_ad.dart';
 import '../preferences/app_dependency_preferences.dart';
-import '../models/adsterra_ads_config.dart';
+import '../models/banner_ads_config.dart';
 import '../models/adsterra_playback_ads_config.dart';
 import '../models/vast_preroll_config.dart';
 
@@ -68,8 +68,28 @@ class AppDependencyProvider extends ChangeNotifier {
 
   String _bannerAdNetwork = 'adsterra';
   String get bannerAdNetwork => _bannerAdNetwork;
-  AdsterraAdsConfig _adsterraAds = const AdsterraAdsConfig();
-  AdsterraAdsConfig get adsterraAds => _adsterraAds;
+
+  /// The network `banner_ad_network` selects; null for `none` and unknown
+  /// values. Names published before Adsterra (`native`, `unity`, `startio`)
+  /// still select Adsterra.
+  AdNetwork? get bannerNetwork =>
+      const {'native', 'unity', 'startio'}.contains(_bannerAdNetwork)
+          ? AdNetwork.adsterra
+          : AdNetwork.parse(_bannerAdNetwork);
+
+  /// Every network's banner catalog, whichever one is selected.
+  Map<AdNetwork, BannerAdsConfig> _bannerAds = const {};
+
+  BannerAdsConfig bannerAdsFor(AdNetwork network) =>
+      _bannerAds[network] ?? BannerAdsConfig(network: network);
+
+  /// The selected network's catalog, once its own switch is on.
+  BannerAdsConfig? get activeBannerAds {
+    final network = bannerNetwork;
+    if (network == null) return null;
+    final config = bannerAdsFor(network);
+    return config.enabled ? config : null;
+  }
 
   AdsterraPlaybackAdsConfig _adsterraPlaybackAds =
       const AdsterraPlaybackAdsConfig();
@@ -91,10 +111,10 @@ class AppDependencyProvider extends ChangeNotifier {
 
   /// Which network serves the stream-found popup; null serves none. The
   /// Social Bar before the loader stays with Adsterra.
-  PlaybackAdNetwork? _playbackPopunderNetwork = PlaybackAdNetwork.adsterra;
-  PlaybackAdNetwork? get playbackPopunderNetwork => _playbackPopunderNetwork;
+  AdNetwork? _playbackPopunderNetwork = AdNetwork.adsterra;
+  AdNetwork? get playbackPopunderNetwork => _playbackPopunderNetwork;
 
-  void setPlaybackPopunderNetwork(PlaybackAdNetwork? network) {
+  void setPlaybackPopunderNetwork(AdNetwork? network) {
     if (_playbackPopunderNetwork == network) return;
     _playbackPopunderNetwork = network;
     notifyListeners();
@@ -102,7 +122,7 @@ class AppDependencyProvider extends ChangeNotifier {
 
   /// Everything that decides a playback ad. A change closes an active one.
   ({
-    PlaybackAdNetwork? network,
+    AdNetwork? network,
     AdsterraPlaybackAdsConfig adsterra,
     ClickaduPlaybackAdsConfig clickadu,
   }) get playbackAdsSelection => (
@@ -120,16 +140,13 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Legacy network selectors continue to point at the banner surface, but
-  // only the new Adsterra switch and catalog can activate network requests.
-  bool get isAdsterraBannerActive =>
-      _adsterraAds.enabled &&
-      const {'adsterra', 'native', 'unity', 'startio'}
-          .contains(_bannerAdNetwork);
+  // Only the selected network's own switch and catalog can activate network
+  // requests.
+  bool get isNetworkBannerActive => activeBannerAds != null;
 
-  void setAdsterraAdsConfig(AdsterraAdsConfig config) {
-    if (_adsterraAds == config) return;
-    _adsterraAds = config;
+  void setBannerAdsConfig(BannerAdsConfig config) {
+    if (bannerAdsFor(config.network) == config) return;
+    _bannerAds = Map.unmodifiable({..._bannerAds, config.network: config});
     notifyListeners();
   }
 

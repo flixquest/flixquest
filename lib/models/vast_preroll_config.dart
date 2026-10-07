@@ -1,10 +1,13 @@
 import 'dart:convert';
 
+import 'ad_network.dart';
+
 /// A VAST video ad played inside the player before the content. Missing or
 /// malformed remote values disable it; the tag belongs in Remote Config.
 class VastPrerollConfig {
   const VastPrerollConfig({
     this.enabled = false,
+    this.network,
     this.tagUrl,
     this.requestTimeout = const Duration(seconds: 5),
     this.startTimeout = const Duration(seconds: 8),
@@ -13,6 +16,9 @@ class VastPrerollConfig {
   });
 
   final bool enabled;
+
+  /// The network `vast_preroll_network` selected.
+  final AdNetwork? network;
 
   /// The VAST tag the ad server issued, for example a Clickadu video zone.
   final Uri? tagUrl;
@@ -35,14 +41,23 @@ class VastPrerollConfig {
   bool appliesTo({required bool television}) =>
       isActive && (!television || tvEnabled);
 
-  static VastPrerollConfig parse(String raw, {required bool enabled}) {
+  /// Each network keeps its tag and limits under its own name, for example
+  /// `{"clickadu": {"tag_url": ...}}`, and [network] picks one. A flat
+  /// catalog without sections serves whichever network is selected. A null
+  /// [network] (`none`) plays no pre-roll.
+  static VastPrerollConfig parse(String raw,
+      {required bool enabled, required AdNetwork? network}) {
     try {
-      final json = jsonDecode(raw);
-      if (json is! Map<String, dynamic>) return const VastPrerollConfig();
+      if (network == null) return const VastPrerollConfig();
+      final catalog = jsonDecode(raw);
+      if (catalog is! Map<String, dynamic>) return const VastPrerollConfig();
+      final section = catalog[network.name];
+      final json = section is Map ? section : catalog;
       final tag = _https(json['tag_url']);
       if (tag == null) return const VastPrerollConfig();
       return VastPrerollConfig(
         enabled: enabled,
+        network: network,
         tagUrl: tag,
         requestTimeout: Duration(
             milliseconds:
@@ -76,6 +91,7 @@ class VastPrerollConfig {
   bool operator ==(Object other) =>
       other is VastPrerollConfig &&
       other.enabled == enabled &&
+      other.network == network &&
       other.tagUrl == tagUrl &&
       other.requestTimeout == requestTimeout &&
       other.startTimeout == startTimeout &&
@@ -83,6 +99,6 @@ class VastPrerollConfig {
       other.tvEnabled == tvEnabled;
 
   @override
-  int get hashCode => Object.hash(
-      enabled, tagUrl, requestTimeout, startTimeout, maxWrappers, tvEnabled);
+  int get hashCode => Object.hash(enabled, network, tagUrl, requestTimeout,
+      startTimeout, maxWrappers, tvEnabled);
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flixquest/models/ad_network.dart';
 import 'package:flixquest/models/vast_preroll_config.dart';
 import 'package:flixquest/services/vast/vast.dart';
 import 'package:flixquest/services/vast/vast_ad_session.dart';
@@ -75,6 +76,20 @@ void main() {
       expect(ad.pickMediaFile(maxHeight: 400)!.height, 360);
       // Nothing small enough: the smallest file still plays.
       expect(ad.pickMediaFile(maxHeight: 100)!.height, 180);
+    });
+
+    test('reads bitrates sent in bits per second as Kbps', () {
+      // Clickadu's live tag states `bitrate="2000000"` for its 720p file.
+      final bps = inlineVast
+          .replaceFirst('bitrate="2400"', 'bitrate="2000000"')
+          .replaceFirst('bitrate="1200"', 'bitrate="1800000"')
+          .replaceFirst('bitrate="720"', 'bitrate="1100000"')
+          .replaceFirst('bitrate="300"', 'bitrate="500000"');
+      final ad = VastDocument.parse(bps).ads.single.toAd(const []);
+      expect(
+          ad.mediaFiles.map((file) => file.bitrate), [2000, 1800, 1100, 500]);
+      expect(ad.pickMediaFile(maxHeight: 720, maxBitrate: 2500)!.height, 720);
+      expect(ad.pickMediaFile(maxHeight: 720, maxBitrate: 1500)!.height, 360);
     });
 
     test('ignores VPAID and other interactive creatives', () {
@@ -342,30 +357,71 @@ void main() {
 
   group('config', () {
     test('requires an HTTPS tag and keeps values in range', () {
-      expect(VastPrerollConfig.parse('{}', enabled: true).isActive, isFalse);
+      expect(
+          VastPrerollConfig.parse('{}',
+                  enabled: true, network: AdNetwork.clickadu)
+              .isActive,
+          isFalse);
       expect(
           VastPrerollConfig.parse('{"tag_url":"http://a.example/t.xml"}',
-                  enabled: true)
+                  enabled: true, network: AdNetwork.clickadu)
               .isActive,
           isFalse);
       final config = VastPrerollConfig.parse(
           '{"tag_url":"https://a.example/t.xml","request_timeout_ms":999999,'
           '"max_wrappers":-3,"tv_enabled":true}',
-          enabled: true);
+          enabled: true,
+          network: AdNetwork.clickadu);
       expect(config.isActive, isTrue);
       expect(config.requestTimeout, const Duration(seconds: 15));
       expect(config.maxWrappers, 0);
       expect(config.appliesTo(television: true), isTrue);
       final phoneOnly = VastPrerollConfig.parse(
           '{"tag_url":"https://a.example/t.xml"}',
-          enabled: true);
+          enabled: true,
+          network: AdNetwork.clickadu);
       expect(phoneOnly.appliesTo(television: false), isTrue);
       expect(phoneOnly.appliesTo(television: true), isFalse);
       expect(
           VastPrerollConfig.parse('{"tag_url":"https://a.example/t.xml"}',
-                  enabled: false)
+                  enabled: false, network: AdNetwork.clickadu)
               .isActive,
           isFalse);
+    });
+
+    test('vast_preroll_network picks that network\'s section', () {
+      const catalog = '{"clickadu":{"tag_url":"https://cl.example/t.xml",'
+          '"tv_enabled":true},'
+          '"adsterra":{"tag_url":"https://at.example/t.xml",'
+          '"request_timeout_ms":2000}}';
+      final clickadu = VastPrerollConfig.parse(catalog,
+          enabled: true, network: AdNetwork.clickadu);
+      expect(clickadu.network, AdNetwork.clickadu);
+      expect(clickadu.tagUrl, Uri.parse('https://cl.example/t.xml'));
+      expect(clickadu.tvEnabled, isTrue);
+      final adsterra = VastPrerollConfig.parse(catalog,
+          enabled: true, network: AdNetwork.adsterra);
+      expect(adsterra.tagUrl, Uri.parse('https://at.example/t.xml'));
+      expect(adsterra.requestTimeout, const Duration(seconds: 2));
+      expect(adsterra.tvEnabled, isFalse);
+      expect(
+          VastPrerollConfig.parse(catalog, enabled: true, network: null)
+              .isActive,
+          isFalse);
+      // A network without a section plays nothing.
+      expect(
+          VastPrerollConfig.parse(
+                  '{"clickadu":{"tag_url":"https://cl.example/t.xml"}}',
+                  enabled: true,
+                  network: AdNetwork.adsterra)
+              .isActive,
+          isFalse);
+      // A flat catalog from before the selector serves the selected network.
+      expect(
+          VastPrerollConfig.parse('{"tag_url":"https://a.example/t.xml"}',
+                  enabled: true, network: AdNetwork.adsterra)
+              .tagUrl,
+          Uri.parse('https://a.example/t.xml'));
     });
   });
 

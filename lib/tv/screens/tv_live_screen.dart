@@ -615,7 +615,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
             ),
             // A thin strip under the list stays on screen while the viewer
             // browses and only takes one banner's height from the grid.
-            const AdsterraAdSlot(
+            const BannerAdSlot(
               placement: 'live_tv_strip',
               variant: HostedBannerVariant.standard,
               padding: EdgeInsets.only(top: 8, bottom: 12),

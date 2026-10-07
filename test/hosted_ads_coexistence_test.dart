@@ -5,7 +5,7 @@ import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/services/hosted_ads_repository.dart';
 import 'package:flixquest/services/device_presentation_service.dart';
 import 'package:flixquest/widgets/hosted_ads_banner.dart';
-import 'package:flixquest/widgets/adsterra_banner_widget.dart';
+import 'package:flixquest/widgets/network_banner_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -113,7 +113,7 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
 
     setUp(() {
       provider = AppDependencyProvider();
-      provider.setAdsterraAdsConfig(testAdsterraConfig());
+      provider.setBannerAdsConfig(testAdsterraConfig());
     });
 
     tearDown(() => DevicePresentationService.instance.isTelevision = false);
@@ -148,7 +148,7 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
         await pumpSlot(tester, ads: <BannerAd>[_ad()]);
 
         expect(find.byType(HostedAdsBanner), findsOneWidget);
-        expect(find.byType(AdsterraBannerWidget), findsOneWidget);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
       },
       variant: const TargetPlatformVariant({TargetPlatform.android}),
     );
@@ -164,7 +164,7 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
         );
 
         expect(find.byType(HostedAdsBanner), findsNothing);
-        expect(find.byType(AdsterraBannerWidget), findsOneWidget);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
       },
       variant: const TargetPlatformVariant({TargetPlatform.android}),
     );
@@ -176,7 +176,7 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
         await pumpSlot(tester, ads: <BannerAd>[_ad()]);
 
         expect(find.byType(HostedAdsBanner), findsOneWidget);
-        expect(find.byType(AdsterraBannerWidget), findsNothing);
+        expect(find.byType(NetworkBannerWidget), findsNothing);
       },
       variant: const TargetPlatformVariant({TargetPlatform.android}),
     );
@@ -188,7 +188,7 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
         await pumpSlot(tester, ads: const <BannerAd>[]);
 
         expect(find.byType(HostedAdsBanner), findsNothing);
-        expect(find.byType(AdsterraBannerWidget), findsOneWidget);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
       },
       variant: const TargetPlatformVariant({TargetPlatform.android}),
     );
@@ -213,13 +213,13 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
         );
         await tester.pump();
 
-        expect(find.byType(AdsterraBannerWidget), findsNothing);
+        expect(find.byType(NetworkBannerWidget), findsNothing);
 
         pending.complete(const <BannerAd>[]);
         await tester.pump();
         await tester.pump();
 
-        expect(find.byType(AdsterraBannerWidget), findsOneWidget);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
       },
       variant: const TargetPlatformVariant({TargetPlatform.android}),
     );
@@ -231,7 +231,7 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
         await pumpSlot(tester, ads: <BannerAd>[_ad()]);
 
         expect(find.byType(HostedAdsBanner), findsNothing);
-        expect(find.byType(AdsterraBannerWidget), findsOneWidget);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
       },
       variant: const TargetPlatformVariant({TargetPlatform.android}),
     );
@@ -239,11 +239,11 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
     testWidgets(
       'hosted still shows when Adsterra is switched off',
       (tester) async {
-        provider.setAdsterraAdsConfig(testAdsterraConfig(enabled: false));
+        provider.setBannerAdsConfig(testAdsterraConfig(enabled: false));
         await pumpSlot(tester, ads: <BannerAd>[_ad()]);
 
         expect(find.byType(HostedAdsBanner), findsOneWidget);
-        expect(find.byType(AdsterraBannerWidget), findsNothing);
+        expect(find.byType(NetworkBannerWidget), findsNothing);
       },
       variant: const TargetPlatformVariant({TargetPlatform.android}),
     );
@@ -255,7 +255,7 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
         await pumpSlot(tester, ads: <BannerAd>[_ad()]);
 
         expect(find.byType(HostedAdsBanner), findsNothing);
-        expect(find.byType(AdsterraBannerWidget), findsNothing);
+        expect(find.byType(NetworkBannerWidget), findsNothing);
       },
       variant: const TargetPlatformVariant({TargetPlatform.android}),
     );
@@ -290,7 +290,7 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
           find.byType(HostedAdsBanner),
         );
         expect(banner.interactive, isFalse);
-        expect(find.byType(AdsterraBannerWidget), findsOneWidget);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
       },
       variant: const TargetPlatformVariant({TargetPlatform.android}),
     );
@@ -304,7 +304,7 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
             placement: 'title_detail', ads: <BannerAd>[_ad()]);
 
         expect(find.byType(HostedAdsBanner), findsNothing);
-        expect(find.byType(AdsterraBannerWidget), findsOneWidget);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
       },
       variant: const TargetPlatformVariant({TargetPlatform.android}),
     );
@@ -320,7 +320,7 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
         );
 
         expect(find.byType(HostedAdsBanner), findsNothing);
-        expect(find.byType(AdsterraBannerWidget), findsOneWidget);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
       },
       variant: const TargetPlatformVariant({TargetPlatform.android}),
     );

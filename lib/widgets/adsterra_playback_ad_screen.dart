@@ -8,7 +8,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../models/adsterra_playback_ads_config.dart';
-import 'adsterra_banner_widget.dart';
+import 'network_banner_widget.dart';
 
 /// Hands a Play Store link to a store app and reports whether one opened.
 typedef StoreLauncher = Future<bool> Function(Uri uri);
@@ -107,7 +107,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   Future<void> _loadScript() async {
     try {
       _log(
-          'loading script ${widget.placement.scriptUrl} base=${AdsterraBannerWidget.documentBaseUrl}');
+          'loading script ${widget.placement.scriptUrl} base=${NetworkBannerWidget.documentBaseUrl}');
       final controller = WebViewController();
       _script = controller;
       await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
@@ -138,7 +138,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       setState(() {});
       await controller.loadHtmlString(
         playbackAdHtml(widget.placement, widget.stage),
-        baseUrl: AdsterraBannerWidget.documentBaseUrl,
+        baseUrl: NetworkBannerWidget.documentBaseUrl,
       );
     } catch (error) {
       _log('script unavailable ($error)');
@@ -166,7 +166,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           // armed now and waits for the viewer's tap on Continue; the maximum
           // duration still bounds the wait.
           if (widget.stage == PlaybackAdStage.streamFound) _loadTimer?.cancel();
-          _log(widget.placement.network == PlaybackAdNetwork.clickadu
+          _log(widget.placement.network == AdNetwork.clickadu
               ? 'tag fetched its ad; Continue enabled'
               : 'script loaded');
         case 'rendered':
@@ -192,7 +192,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     }
     _log(
         'script main-frame navigation scheme=${uri?.scheme} origin=${_origin(request.url)}');
-    if (_webUrl(uri) && request.url != AdsterraBannerWidget.documentBaseUrl) {
+    if (_webUrl(uri) && request.url != NetworkBannerWidget.documentBaseUrl) {
       _openPopup(uri!);
     }
     return NavigationDecision.prevent;
@@ -626,14 +626,14 @@ String playbackAdHtml(PlaybackAdPlacement placement, PlaybackAdStage stage) {
   // Clickadu's tag fetches its ad (`/adx/get/`) a few seconds after its script
   // loads, and a tap before that opens nothing. Enable Continue only once
   // that request has finished; the load timeout covers a tag that never arms.
-  final armed = placement.network == PlaybackAdNetwork.clickadu
+  final armed = placement.network == AdNetwork.clickadu
       ? '''<script>(function(){var done=false;function arm(){if(done)return;done=true;setTimeout(function(){fqSignal('loaded');},300);}
 window.fqTagLoaded=function(){fqSignal('script');};
 var host=new URL('$script'.replace(/&amp;/g,'&')).host;
 try{new PerformanceObserver(function(list){list.getEntries().forEach(function(e){var u=new URL(e.name);if(u.host===host)fqSignal('request',u.pathname,Math.round(e.duration)+'ms status='+(e.responseStatus===undefined?'?':e.responseStatus));if(e.name.indexOf('/adx/get/')>=0)arm();});}).observe({type:'resource',buffered:true});}
 catch(e){window.fqTagLoaded=function(){fqSignal('script');arm();};}})();</script>'''
       : '';
-  final onLoad = placement.network == PlaybackAdNetwork.clickadu
+  final onLoad = placement.network == AdNetwork.clickadu
       ? 'fqTagLoaded()'
       : "fqSignal('loaded')";
   return '''<!doctype html><html><head>

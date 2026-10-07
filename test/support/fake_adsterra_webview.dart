@@ -1,4 +1,4 @@
-import 'package:flixquest/models/adsterra_ads_config.dart';
+import 'package:flixquest/models/banner_ads_config.dart';
 import 'package:flutter/widgets.dart';
 // The fake exercises the actual public WebView controller/widget boundary.
 // ignore: depend_on_referenced_packages
@@ -16,10 +16,28 @@ const testAdsterraCatalog = '''{
   }
 }''';
 
-AdsterraAdsConfig testAdsterraConfig(
+BannerAdsConfig testAdsterraConfig(
         {bool enabled = true, bool tvEnabled = true}) =>
-    AdsterraAdsConfig.parse(testAdsterraCatalog,
-        enabled: enabled, tvEnabled: tvEnabled);
+    BannerAdsConfig.parse(testAdsterraCatalog,
+        network: AdNetwork.adsterra, enabled: enabled, tvEnabled: tvEnabled);
+
+const testClickaduCatalog = '''{
+  "script_url": "https://cl.example/bn.js",
+  "units": {
+    "mobile": {"spot_id":"1001","size":"320x50"},
+    "rectangle": {"spot_id":2002,"size":"300x250"},
+    "wide": {"spot_id":"3003","size":"728x90","script_url":"https://cl2.example/bn.js"}
+  },
+  "defaults": {
+    "standard": ["mobile"], "tall": ["rectangle"],
+    "tv_standard": ["mobile"], "tv_tall": ["rectangle"]
+  }
+}''';
+
+BannerAdsConfig testClickaduConfig(
+        {bool enabled = true, bool tvEnabled = true}) =>
+    BannerAdsConfig.parse(testClickaduCatalog,
+        network: AdNetwork.clickadu, enabled: enabled, tvEnabled: tvEnabled);
 
 class FakeAdsterraWebViewPlatform extends WebViewPlatform {
   final controllers = <FakeAdsterraWebViewController>[];

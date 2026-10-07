@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flixquest/models/adsterra_ads_config.dart';
+import 'package:flixquest/models/banner_ads_config.dart';
 import 'package:flixquest/models/banner_ad.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/services/device_presentation_service.dart';
@@ -26,7 +26,7 @@ void main() {
     WebViewPlatform.instance = platform;
     provider = AppDependencyProvider()
       ..setHostedBannerMode(HostedBannerMode.off)
-      ..setAdsterraAdsConfig(testAdsterraConfig());
+      ..setBannerAdsConfig(testAdsterraConfig());
   });
   tearDown(() {
     DevicePresentationService.instance.isTelevision = false;
@@ -84,8 +84,8 @@ void main() {
       final first = platform.controllers.single;
       final json = jsonDecode(testAdsterraCatalog) as Map<String, dynamic>;
       json['defaults']['standard'] = ['rectangle'];
-      provider.setAdsterraAdsConfig(
-          AdsterraAdsConfig.parse(jsonEncode(json), enabled: true));
+      provider.setBannerAdsConfig(BannerAdsConfig.parse(jsonEncode(json),
+          network: AdNetwork.adsterra, enabled: true));
       await tester.pump();
       await tester.pump();
       expect(platform.controllers, hasLength(2));
@@ -99,13 +99,13 @@ void main() {
     'kill switches remove existing WebViews and disabled slots load none',
     (tester) async {
       await pump(tester);
-      provider.setAdsterraAdsConfig(testAdsterraConfig(enabled: false));
+      provider.setBannerAdsConfig(testAdsterraConfig(enabled: false));
       await tester.pump();
       await tester.pump();
       expect(find.byType(WebViewWidget), findsNothing);
       expect(
           platform.controllers.single.requests.last, Uri.parse('about:blank'));
-      provider.setAdsterraAdsConfig(testAdsterraConfig());
+      provider.setBannerAdsConfig(testAdsterraConfig());
       provider.setBannerAdNetwork('none');
       await tester.pump();
       expect(platform.controllers, hasLength(1));
@@ -193,6 +193,68 @@ void main() {
       expect(launcher.urls, ['https://offer.example']);
       await navigate(offer);
       expect(launcher.urls, hasLength(1));
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.android}),
+  );
+
+  testWidgets(
+    'a Clickadu spot loads its Main Tag and spot at the unit size',
+    (tester) async {
+      provider
+        ..setBannerAdsConfig(testClickaduConfig())
+        ..setBannerAdNetwork('clickadu');
+      await pump(tester, tall: true);
+      final controller = platform.controllers.single;
+      final html = controller.htmlLoads.single;
+      expect(html, contains('<div data-cl-spot="2002"></div>'));
+      expect(html, contains('src="https://cl.example/bn.js"'));
+      expect(controller.channel?.name, 'BannerStatus');
+      expect(controller.baseUrls.single,
+          'https://appassets.androidplatform.net/adsterra/');
+      expect(tester.getSize(find.byType(WebViewWidget)), const Size(300, 250));
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.android}),
+  );
+
+  testWidgets(
+    'switching the banner network replaces the view with the other code',
+    (tester) async {
+      provider.setBannerAdsConfig(testClickaduConfig());
+      await pump(tester);
+      expect(platform.controllers.single.htmlLoads.single,
+          contains('mobile_key/invoke.js'));
+      provider.setBannerAdNetwork('clickadu');
+      await tester.pump();
+      await tester.pump();
+      expect(platform.controllers, hasLength(2));
+      expect(
+          platform.controllers.first.requests.last, Uri.parse('about:blank'));
+      expect(platform.controllers.last.htmlLoads.single,
+          contains('data-cl-spot="1001"'));
+      provider.setBannerAdNetwork('adsterra');
+      await tester.pump();
+      await tester.pump();
+      expect(platform.controllers, hasLength(3));
+      expect(platform.controllers.last.htmlLoads.single,
+          contains('mobile_key/invoke.js'));
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.android}),
+  );
+
+  testWidgets(
+    'an unfilled Clickadu spot collapses at the timeout',
+    (tester) async {
+      platform.signalLoaded = false;
+      provider
+        ..setBannerAdsConfig(testClickaduConfig())
+        ..setBannerAdNetwork('clickadu');
+      await pump(tester);
+      expect(find.byType(WebViewWidget), findsOneWidget);
+      await tester.pump(const Duration(seconds: 21));
+      await tester.pump();
+      expect(find.byType(WebViewWidget), findsNothing);
     },
     variant: const TargetPlatformVariant({TargetPlatform.android}),
   );

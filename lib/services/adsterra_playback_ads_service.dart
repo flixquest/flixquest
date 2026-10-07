@@ -62,12 +62,12 @@ class AdsterraPlaybackAdsService {
     final provider = context.read<AppDependencyProvider?>();
     final selection = provider?.playbackAdsSelection;
     final network = stage == PlaybackAdStage.beforeLoader
-        ? PlaybackAdNetwork.adsterra
+        ? AdNetwork.adsterra
         : selection?.network;
     final config = selection?.adsterra;
     var placement = switch (network) {
-      PlaybackAdNetwork.adsterra => config?.forStage(stage),
-      PlaybackAdNetwork.clickadu => selection?.clickadu.activePopunder,
+      AdNetwork.adsterra => config?.forStage(stage),
+      AdNetwork.clickadu => selection?.clickadu.activePopunder,
       null => null,
     };
     if (provider == null || placement == null) {
@@ -79,10 +79,10 @@ class AdsterraPlaybackAdsService {
     final host = ModalRoute.of(context);
     try {
       String? variantId;
-      final experiment = stage == PlaybackAdStage.streamFound &&
-              network == PlaybackAdNetwork.adsterra
-          ? config?.streamFoundExperiment
-          : null;
+      final experiment =
+          stage == PlaybackAdStage.streamFound && network == AdNetwork.adsterra
+              ? config?.streamFoundExperiment
+              : null;
       if (experiment != null) {
         final selected = await _nextVariant(experiment);
         placement = selected.placement;

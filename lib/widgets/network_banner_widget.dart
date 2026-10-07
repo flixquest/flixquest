@@ -5,18 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../models/adsterra_ads_config.dart';
+import '../models/banner_ads_config.dart';
 
-/// One WebView per visible banner. Config/size changes replace the view, while
-/// ordinary parent rebuilds keep it loaded. There is no automatic refresh.
-class AdsterraBannerWidget extends StatefulWidget {
+/// One WebView per visible banner, from whichever network serves the slot.
+/// Config/size changes replace the view, while ordinary parent rebuilds keep
+/// it loaded. There is no automatic refresh.
+class NetworkBannerWidget extends StatefulWidget {
   // Android's reserved app-content host gives local HTML a non-opaque origin
   // so scripts can use document.cookie/storage without adopting an ad server
   // or publisher website's origin. No request is made to this base URL.
   static const documentBaseUrl =
       'https://appassets.androidplatform.net/adsterra/';
 
-  const AdsterraBannerWidget({
+  const NetworkBannerWidget({
     required this.placement,
     required this.unit,
     this.television = false,
@@ -25,7 +26,7 @@ class AdsterraBannerWidget extends StatefulWidget {
   });
 
   final String placement;
-  final AdsterraBannerUnit unit;
+  final BannerAdUnit unit;
   final bool television;
   final EdgeInsetsGeometry padding;
 
@@ -35,10 +36,10 @@ class AdsterraBannerWidget extends StatefulWidget {
           defaultTargetPlatform == TargetPlatform.iOS);
 
   @override
-  State<AdsterraBannerWidget> createState() => _AdsterraBannerWidgetState();
+  State<NetworkBannerWidget> createState() => _NetworkBannerWidgetState();
 }
 
-class _AdsterraBannerWidgetState extends State<AdsterraBannerWidget> {
+class _NetworkBannerWidgetState extends State<NetworkBannerWidget> {
   WebViewController? _controller;
   Timer? _timeout;
   bool _failed = false;
@@ -56,7 +57,7 @@ class _AdsterraBannerWidgetState extends State<AdsterraBannerWidget> {
       _controller = controller;
       await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
       await controller.setBackgroundColor(Colors.transparent);
-      await controller.addJavaScriptChannel('AdsterraStatus',
+      await controller.addJavaScriptChannel(BannerAdUnit.statusChannel,
           onMessageReceived: (message) {
         if (message.message == 'failed') _fail();
         if (message.message == 'loaded') _timeout?.cancel();
@@ -70,7 +71,7 @@ class _AdsterraBannerWidgetState extends State<AdsterraBannerWidget> {
       if (!mounted) return;
       _timeout = Timer(const Duration(seconds: 20), _fail);
       await controller.loadHtmlString(widget.unit.html,
-          baseUrl: AdsterraBannerWidget.documentBaseUrl);
+          baseUrl: NetworkBannerWidget.documentBaseUrl);
       if (mounted && !_failed) setState(() {});
     } catch (_) {
       // A missing system WebView or an ad request failure must not break a
