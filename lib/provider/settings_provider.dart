@@ -109,6 +109,9 @@ class SettingsProvider with ChangeNotifier {
   bool _playerAmbientGlowEnabled = false;
   bool get playerAmbientGlowEnabled => _playerAmbientGlowEnabled;
 
+  bool _autoPipOnLeave = true;
+  bool get autoPipOnLeave => _autoPipOnLeave;
+
   bool _autoLoadSources = true;
   bool get autoLoadSources => _autoLoadSources;
 
@@ -442,6 +445,18 @@ class SettingsProvider with ChangeNotifier {
     _playerAmbientGlowEnabled = value;
     _settingsPreferences.setPlayerAmbientGlowEnabled(value);
     _trackSetting('Player Ambient Glow', value);
+    notifyListeners();
+  }
+
+  Future<void> getAutoPipOnLeave() async {
+    autoPipOnLeave = await _settingsPreferences.getAutoPipOnLeave();
+  }
+
+  set autoPipOnLeave(bool value) {
+    if (_autoPipOnLeave == value) return;
+    _autoPipOnLeave = value;
+    _settingsPreferences.setAutoPipOnLeave(value);
+    _trackSetting('Auto Picture in Picture', value);
     notifyListeners();
   }
 

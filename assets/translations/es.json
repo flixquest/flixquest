@@ -1127,5 +1127,21 @@
   "ins_data_coverage": "Medido en el {share} de la reproducción · {rate} por hora medida. Incluye datos descargados registrados por el reproductor; excluye lecturas de caché. No se estima la reproducción sin medición.",
   "ins_data_unmeasured": "No se midió el uso de red en este período. Los registros antiguos y algunos reproductores no lo informan.",
   "ins_show_all": "Mostrar todos ({n})",
-  "ins_show_less": "Mostrar menos"
+  "ins_show_less": "Mostrar menos",
+  "auto_pip_on_leave": "Imagen en imagen al salir",
+  "auto_pip_on_leave_description": "Sigue viendo en una ventana pequeña al ir a la pantalla de inicio",
+  "streaming_from": "Reproduciendo desde {provider}",
+  "update_new_version_kicker": "Nueva versión disponible",
+  "update_installed": "Instalada",
+  "update_latest": "Última",
+  "update_required_note": "Esta actualización es necesaria para seguir usando FlixQuest.",
+  "update_link_unavailable": "El enlace de descarga aún no está disponible. Inténtalo más tarde.",
+  "update_whats_new": "Novedades",
+  "update_up_to_date": "Estás al día",
+  "update_up_to_date_message": "FlixQuest {v} es la última versión.",
+  "update_download": "Descargar actualización",
+  "update_install_hint": "Si Android lo pide, permite que FlixQuest instale aplicaciones y vuelve a tocar Instalar.",
+  "update_download_failed": "La descarga no terminó. Revisa tu conexión e inténtalo de nuevo.",
+  "update_downloading": "Descargando…",
+  "update_paused": "En pausa"
 }

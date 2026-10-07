@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import '../api/endpoints.dart';
 import '../constants/api_constants.dart';
+import '../design/app_palette.dart';
 import '../functions/network.dart';
 import '../models/movie.dart';
 import '../models/tv.dart';
@@ -229,12 +230,14 @@ class HomeWidgetService {
   }
 
   /// The single writer of the widget palette, fed the theme the app actually resolved rather than a
-  /// second reconstruction of it from settings.
+  /// second reconstruction of it from settings. The roles are [AppPalette]'s, so a widget without
+  /// artwork looks like one of the app's own panels.
   Future<void> _syncResolvedTheme(ThemeData theme) async {
-    final surface = theme.cardTheme.color ?? theme.colorScheme.surface;
+    final palette = AppPalette.fromTheme(theme);
+    final surface = palette.surface;
     final primary = theme.colorScheme.primary;
-    final foreground = theme.colorScheme.onSurface;
-    final muted = theme.colorScheme.onSurfaceVariant;
+    final foreground = palette.foreground;
+    final muted = palette.mutedText;
     final signature = <int>[
       surface.toARGB32(),
       primary.toARGB32(),

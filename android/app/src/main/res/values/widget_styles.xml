@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      A line of widget text, drawn to a bitmap by the provider. It keeps the bitmap's own size, or
+      shrinks it evenly if the launcher hands the widget less room than it reported.
+    -->
+    <style name="FlixQuestWidgetText">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:adjustViewBounds">true</item>
+        <item name="android:scaleType">fitStart</item>
+        <item name="android:visibility">gone</item>
+    </style>
+
+    <!--
+      Picker previews. The launcher renders these with no code behind them, so they cannot be drawn
+      in Figtree; these are the nearest system weights, in the app's Dark palette.
+    -->
+    <style name="FlixQuestWidgetPreviewText">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+    </style>
+
+    <style name="FlixQuestWidgetPreviewText.Kicker">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:letterSpacing">0.2</item>
+        <item name="android:textColor">#FFA7A8A8</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="FlixQuestWidgetPreviewText.Title">
+        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:letterSpacing">-0.02</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:textColor">#FFF7F7F7</item>
+        <item name="android:textSize">19sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="FlixQuestWidgetPreviewText.Subtitle">
+        <item name="android:layout_marginTop">5dp</item>
+        <item name="android:textColor">#D9F7F7F7</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="FlixQuestWidgetPreviewText.Meta">
+        <item name="android:layout_marginTop">4dp</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:textColor">#FFA7A8A8</item>
+        <item name="android:textSize">11sp</item>
+    </style>
+</resources>

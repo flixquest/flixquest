@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- TMDB poster ratio: 2:3. Keep these dimensions paired. -->
-    <dimen name="widget_poster_width">96dp</dimen>
-    <dimen name="widget_poster_height">144dp</dimen>
+    <dimen name="widget_poster_width">88dp</dimen>
+    <dimen name="widget_poster_height">132dp</dimen>
+
+    <!-- The app's card radius (AppRadii.card); the widget's own corners follow the launcher. -->
+    <dimen name="widget_poster_radius">6dp</dimen>
+    <dimen name="widget_radius">16dp</dimen>
+
+    <!-- The provider measures the text against these, so the layouts must use them too. -->
+    <dimen name="widget_margin">4dp</dimen>
+    <dimen name="widget_padding">14dp</dimen>
+    <dimen name="widget_padding_compact">12dp</dimen>
+    <dimen name="widget_mark_width">9dp</dimen>
+    <dimen name="widget_mark_gap">5dp</dimen>
 </resources>

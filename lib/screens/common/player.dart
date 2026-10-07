@@ -395,7 +395,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         quickActions: [
           if (widget.availableProviders?.isNotEmpty == true)
             BetterPlayerOverflowMenuItem(
-              PhosphorIcons.arrowsLeftRight(),
+              PhosphorIcons.hardDrives(),
               tr('switch_provider'),
               widget.useTvControls
                   ? _showTvProviderMenu
@@ -469,6 +469,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     }
     settings.addListener(_syncAmbientGlowSetting);
     _syncAmbientGlowSetting();
+    settings.addListener(_syncAutoPipSetting);
+    _syncAutoPipSetting();
     _betterPlayerController.setBetterPlayerGlobalKey(_betterPlayerKey);
     _betterPlayerController.addEventsListener(_onAnalyticsPlayerEvent);
     // Attach listeners before setup so native initialization and pre-roll
@@ -505,6 +507,16 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   void _syncAmbientGlowSetting() {
     _betterPlayerController.setAmbientGlowEnabled(
       !widget.useTvControls && settings.playerAmbientGlowEnabled,
+    );
+  }
+
+  // Leaving the app (home button) moves a playing video into picture in
+  // picture, whether or not the player is full screen.
+  void _syncAutoPipSetting() {
+    unawaited(
+      _betterPlayerController.setAutoPictureInPicture(
+        !widget.useTvControls && settings.autoPipOnLeave,
+      ),
     );
   }
 
@@ -1949,6 +1961,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   void dispose() {
     _betterPlayerControllerInitialized = false;
     settings.removeListener(_syncAmbientGlowSetting);
+    settings.removeListener(_syncAutoPipSetting);
     final suppressionId = _occasionalEffectsSuppressionId;
     if (suppressionId != null) {
       _occasionalEffectsSuppressionId = null;
@@ -2961,6 +2974,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                       fontFamily: 'FigtreeSB',
                     ),
                   ),
+                if (widget.availableProviders?.isNotEmpty == true) ...[
+                  const SizedBox(height: 12),
+                  _buildPortraitSourceRow(context),
+                ],
                 if (isTv && episodes.isNotEmpty) ...[
                   const SizedBox(height: 20),
                   _buildPortraitSectionHeader(
@@ -2979,19 +2996,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                     ),
                     action: (widget.tvMetadata?.allSeasons == null ||
                             (widget.tvMetadata?.allSeasons?.length ?? 0) > 1)
-                        ? IconButton(
+                        ? _PortraitPillButton(
+                            label: tr('seasons'),
                             tooltip: tr('select_season'),
-                            onPressed: _portraitSeasonLoading
-                                ? null
-                                : _showPortraitSeasonPicker,
-                            icon: _portraitSeasonLoading
-                                ? const SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Icon(PhosphorIcons.stack()),
+                            trailingIcon: PhosphorIcons.caretDown(),
+                            loading: _portraitSeasonLoading,
+                            onPressed: _showPortraitSeasonPicker,
                           )
                         : null,
                   ),
@@ -3063,21 +3073,56 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         Icon(icon, size: 20, color: colors.secondary),
         const SizedBox(width: 9),
         Expanded(
-          child: Text(
-            title,
-            style: TextStyle(
-              color: colors.foreground,
-              fontFamily: 'FigtreeSB',
-              fontSize: 16,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: colors.foreground,
+                  fontFamily: 'FigtreeSB',
+                  fontSize: 16,
+                ),
+              ),
+              if (subtitle != null)
+                Text(
+                  subtitle,
+                  style: TextStyle(color: colors.muted, fontSize: 13),
+                ),
+            ],
           ),
         ),
-        if (subtitle != null)
-          Text(
-            subtitle,
+        if (action != null) ...[const SizedBox(width: 12), action],
+      ],
+    );
+  }
+
+  /// The inline player's controls are icons alone, so the source being
+  /// played and the way to change it are spelled out under the title.
+  Widget _buildPortraitSourceRow(BuildContext context) {
+    final colors = BetterPlayerPanelColors.of(context);
+    return Row(
+      children: [
+        Icon(PhosphorIcons.hardDrives(), size: 18, color: colors.secondary),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Text(
+            tr(
+              'streaming_from',
+              namedArgs: {'provider': _currentProviderName()},
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(color: colors.muted, fontSize: 13),
           ),
-        if (action != null) action,
+        ),
+        const SizedBox(width: 12),
+        _PortraitPillButton(
+          label: tr('switch_provider'),
+          trailingIcon: PhosphorIcons.caretRight(),
+          loading: _isSwitchingProvider,
+          onPressed: _showProviderSwitcher,
+        ),
       ],
     );
   }
@@ -3635,7 +3680,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                             }
                           },
                           icon:
-                              Icon(PhosphorIcons.arrowsLeftRight(), size: 18),
+                              Icon(PhosphorIcons.hardDrives(), size: 18),
                           label: Text(tr('switch_provider')),
                         ),
                       OutlinedButton.icon(
@@ -4480,6 +4525,69 @@ String _subtitleOffsetLabel(Duration offset) {
     offset.isNegative ? 'subtitle_offset_earlier' : 'subtitle_offset_later',
     namedArgs: {'offset': compactSeconds},
   );
+}
+
+/// A labelled pill for the inline player's actions; an icon alone did not
+/// read as something to tap.
+class _PortraitPillButton extends StatelessWidget {
+  const _PortraitPillButton({
+    required this.label,
+    required this.trailingIcon,
+    required this.onPressed,
+    this.tooltip,
+    this.loading = false,
+  });
+
+  final String label;
+  final IconData trailingIcon;
+  final VoidCallback onPressed;
+  final String? tooltip;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = BetterPlayerPanelColors.of(context);
+    final button = Material(
+      color: colors.raised,
+      shape: StadiumBorder(side: BorderSide(color: colors.hairline)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: loading ? null : onPressed,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 36),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 6, 10, 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: colors.foreground,
+                    fontFamily: 'FigtreeSB',
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                if (loading)
+                  SizedBox.square(
+                    dimension: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: colors.secondary,
+                    ),
+                  )
+                else
+                  Icon(trailingIcon, size: 14, color: colors.secondary),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    final message = tooltip;
+    return message == null ? button : Tooltip(message: message, child: button);
+  }
 }
 
 class _PortraitMediaThumbnail extends StatelessWidget {

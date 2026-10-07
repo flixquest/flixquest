@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Rounded track and fill; both layers are tinted from the layout and from the provider. -->
+<!--
+  The Continue Watching card's bar: a flat 3dp strip across the foot of the card. The fill is
+  tinted to the accent from the provider.
+-->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:id="@android:id/background">
         <shape android:shape="rectangle">
-            <solid android:color="#FFFFFFFF" />
-            <corners android:radius="2dp" />
+            <solid android:color="#3DFFFFFF" />
         </shape>
     </item>
     <item android:id="@android:id/progress">
-        <clip android:clipOrientation="horizontal" android:gravity="left">
+        <clip android:clipOrientation="horizontal" android:gravity="start">
             <shape android:shape="rectangle">
                 <solid android:color="#FFFFFFFF" />
-                <corners android:radius="2dp" />
             </shape>
         </clip>
     </item>
