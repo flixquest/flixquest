@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../tv/app/tv_design.dart';
 import '../../tv/focus/tv_focusable.dart';
 import '../../tv/focus/tv_keymap.dart';
 import '../../video_providers/names.dart';
@@ -53,22 +54,28 @@ class _TvProviderPickerDialogState extends State<_TvProviderPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    // TvDialog's frame, with a list of rows in place of its pill buttons.
+    final palette = TvPalette.of(context);
     return Dialog(
-      backgroundColor: colors.surface,
-      insetPadding: const EdgeInsets.all(72),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      backgroundColor: palette.surface,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 28),
+      elevation: 24,
+      shadowColor: Colors.black.withValues(alpha: 0.54),
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: palette.hairline),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 720,
-          maxHeight: MediaQuery.sizeOf(context).height * .78,
+          maxHeight: MediaQuery.sizeOf(context).height * .82,
         ),
         child: FocusScope(
           node: _focusScopeNode,
           child: TvKeymap(
             onBack: () => Navigator.of(context).pop(),
             child: Padding(
-              padding: const EdgeInsets.all(36),
+              padding: const EdgeInsets.fromLTRB(36, 32, 36, 24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,26 +83,28 @@ class _TvProviderPickerDialogState extends State<_TvProviderPickerDialog> {
                   Text(
                     tr('choose_playback_provider'),
                     style: TextStyle(
-                      color: colors.onSurface,
-                      fontFamily: 'FigtreeSB',
-                      fontSize: 30,
-                      fontWeight: FontWeight.w700,
+                      color: palette.foreground,
+                      fontFamily: 'FigtreeBold',
+                      fontSize: 32,
+                      letterSpacing: -0.45,
                     ),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     tr('choose_playback_provider_description'),
                     style: TextStyle(
-                      color: colors.onSurfaceVariant,
+                      color: palette.mutedText,
                       fontFamily: 'Figtree',
-                      fontSize: 21,
+                      fontSize: 20,
                       height: 1.35,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   Flexible(
                     child: SingleChildScrollView(
                       clipBehavior: Clip.hardEdge,
+                      // Room for the focused row's lift at the edges.
+                      padding: const EdgeInsets.symmetric(vertical: 4),
                       child: FocusTraversalGroup(
                         policy: ReadingOrderTraversalPolicy(),
                         child: Column(
@@ -105,11 +114,12 @@ class _TvProviderPickerDialogState extends State<_TvProviderPickerDialog> {
                                 index < widget.providers.length;
                                 index++)
                               Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _buildProviderRow(
-                                  colors,
-                                  widget.providers[index],
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: _TvProviderRow(
+                                  provider: widget.providers[index],
                                   autofocus: index == 0,
+                                  onActivate: () => Navigator.of(context)
+                                      .pop(widget.providers[index]),
                                 ),
                               ),
                           ],
@@ -125,75 +135,91 @@ class _TvProviderPickerDialogState extends State<_TvProviderPickerDialog> {
       ),
     );
   }
+}
 
-  Widget _buildProviderRow(
-    ColorScheme colors,
-    VideoProvider provider, {
-    required bool autofocus,
-  }) {
+/// A provider in the TV picker: its name and what it carries, turning white
+/// under focus like the TV's other list rows.
+class _TvProviderRow extends StatefulWidget {
+  const _TvProviderRow({
+    required this.provider,
+    required this.onActivate,
+    this.autofocus = false,
+  });
+
+  final VideoProvider provider;
+  final VoidCallback onActivate;
+  final bool autofocus;
+
+  @override
+  State<_TvProviderRow> createState() => _TvProviderRowState();
+}
+
+class _TvProviderRowState extends State<_TvProviderRow> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
+    final foreground = _focused ? palette.onFocus : palette.foreground;
+    final secondary = _focused ? palette.onFocusMuted : palette.mutedText;
+    final description = widget.provider.contentDescription;
     return TvFocusable(
-      semanticLabel: provider.displayName,
-      autofocus: autofocus,
-      focusScale: 1.02,
-      onActivate: () => Navigator.of(context).pop(provider),
-      child: Container(
+      semanticLabel: widget.provider.displayName,
+      autofocus: widget.autofocus,
+      onActivate: widget.onActivate,
+      onFocusChanged: (hasFocus) {
+        if (hasFocus != _focused) setState(() => _focused = hasFocus);
+      },
+      focusScale: 1,
+      focusColor: Colors.transparent,
+      borderRadius: BorderRadius.circular(TvDesign.cardRadius),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+        constraints: const BoxConstraints(minHeight: 64),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
-          color: colors.surfaceContainerHighest.withValues(alpha: .55),
-          borderRadius: BorderRadius.circular(8),
+          color: _focused ? palette.focusFill : palette.idleFillFaint,
+          borderRadius: BorderRadius.circular(TvDesign.cardRadius),
         ),
         child: Row(
           children: <Widget>[
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: colors.primary.withValues(alpha: .11),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                PhosphorIcons.playCircle(),
-                size: 22,
-                color: colors.primary,
-              ),
-            ),
-            const SizedBox(width: 14),
+            Icon(PhosphorIcons.playCircle(), size: 24, color: secondary),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    provider.displayName,
+                    widget.provider.displayName,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: colors.onSurface,
+                      color: foreground,
                       fontFamily: 'FigtreeSB',
-                      fontSize: 21,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 19,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    provider.contentDescription,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: colors.onSurfaceVariant,
-                      fontFamily: 'Figtree',
-                      fontSize: 17,
-                      height: 1.3,
+                  if (description.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 2),
+                    Text(
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: secondary,
+                        fontFamily: 'Figtree',
+                        fontSize: 16,
+                        height: 1.3,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            Icon(
-              PhosphorIcons.caretRight(),
-              size: 20,
-              color: colors.onSurfaceVariant,
-            ),
+            const SizedBox(width: 12),
+            Icon(PhosphorIcons.caretRight(), size: 18, color: secondary),
           ],
         ),
       ),

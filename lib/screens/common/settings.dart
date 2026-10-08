@@ -225,35 +225,20 @@ class _SettingsState extends State<Settings> {
                   value: settingsValues.enableProxy,
                   icon: PhosphorIcons.globe(),
                   label: tr('use_proxy'),
-                  onChanged: (bool value) {
+                  onChanged: (bool value) async {
                     if (value) {
-                      showDialog(
-                          context: context,
-                          builder: (BuildContext ctx) {
-                            return AlertDialog(
-                              title: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Text(tr('use_proxy_title')),
-                              ),
-                              content: Text(tr('use_proxy_detail')),
-                              actions: <Widget>[
-                                PillButton(
-                                  label: tr('cancel'),
-                                  onPressed: () => Navigator.pop(ctx),
-                                ),
-                                PillButton(
-                                  label: tr('enable'),
-                                  primary: true,
-                                  onPressed: () {
-                                    setState(() {
-                                      settingsValues.enableProxy = value;
-                                    });
-                                    Navigator.pop(ctx);
-                                  },
-                                ),
-                              ],
-                            );
-                          });
+                      final enable = await showConfirmDialog(
+                        context,
+                        icon: PhosphorIcons.globe(),
+                        title: tr('use_proxy_title'),
+                        message: tr('use_proxy_detail'),
+                        confirmLabel: tr('enable'),
+                      );
+                      if (enable == true && mounted) {
+                        setState(() {
+                          settingsValues.enableProxy = value;
+                        });
+                      }
                     } else {
                       setState(() {
                         settingsValues.enableProxy = value;

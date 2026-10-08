@@ -1127,5 +1127,10 @@
   "ins_data_coverage": "Measured for {share} of playback · {rate} per measured hour. Includes downloaded data reported by the player; excludes cache reads. Unmeasured playback is not estimated.",
   "ins_data_unmeasured": "Network usage was not measured for this range. Older records and some players do not report it.",
   "ins_show_all": "Show all {n}",
-  "ins_show_less": "Show less"
+  "ins_show_less": "Show less",
+  "offline_play_failed": "This download couldn't be played",
+  "offline_play_failed_hint": "The file may be incomplete or damaged. Delete it and download it again.",
+  "up_next": "Up next",
+  "player_next_up": "Next: {title}",
+  "player_reload": "Reload"
 }

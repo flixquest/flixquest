@@ -89,7 +89,8 @@ void main() {
       Text('TV home'),
     ]))));
     await tester.pumpAndSettle();
-    expect(find.text('Update available • FlixQuest 4.2.0'), findsOneWidget);
+    expect(find.text('UPDATE AVAILABLE'), findsOneWidget);
+    expect(find.text('FlixQuest 4.2.0'), findsOneWidget);
     expect(find.text('Not now'), findsNothing);
     await select(tester, 'Update');
     expect(tester.widget<UpdateScreen>(find.byType(UpdateScreen)).television,

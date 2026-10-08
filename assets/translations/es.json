@@ -1127,5 +1127,10 @@
   "ins_data_coverage": "Medido en el {share} de la reproducción · {rate} por hora medida. Incluye datos descargados registrados por el reproductor; excluye lecturas de caché. No se estima la reproducción sin medición.",
   "ins_data_unmeasured": "No se midió el uso de red en este período. Los registros antiguos y algunos reproductores no lo informan.",
   "ins_show_all": "Mostrar todos ({n})",
-  "ins_show_less": "Mostrar menos"
+  "ins_show_less": "Mostrar menos",
+  "offline_play_failed": "No se pudo reproducir esta descarga",
+  "offline_play_failed_hint": "Es posible que el archivo esté incompleto o dañado. Bórralo y vuelve a descargarlo.",
+  "up_next": "A continuación",
+  "player_next_up": "Después: {title}",
+  "player_reload": "Recargar"
 }

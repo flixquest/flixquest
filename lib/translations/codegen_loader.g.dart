@@ -1143,7 +1143,12 @@ class CodegenLoader extends AssetLoader{
   "ins_data_coverage": "Measured for {share} of playback · {rate} per measured hour. Includes downloaded data reported by the player; excludes cache reads. Unmeasured playback is not estimated.",
   "ins_data_unmeasured": "Network usage was not measured for this range. Older records and some players do not report it.",
   "ins_show_all": "Show all {n}",
-  "ins_show_less": "Show less"
+  "ins_show_less": "Show less",
+  "offline_play_failed": "This download couldn't be played",
+  "offline_play_failed_hint": "The file may be incomplete or damaged. Delete it and download it again.",
+  "up_next": "Up next",
+  "player_next_up": "Next: {title}",
+  "player_reload": "Reload"
 };
 static const Map<String,dynamic> _hi = {
   "popularity_descending": "लोकप्रियता घटती",
@@ -2274,7 +2279,12 @@ static const Map<String,dynamic> _hi = {
   "ins_data_coverage": "{share} प्लेबैक मापा गया · हर मापी गई घंटे में {rate}। प्लेयर द्वारा रिपोर्ट किया गया डाउनलोड डेटा शामिल है; कैश रीड शामिल नहीं है। बिना माप वाले प्लेबैक का अनुमान नहीं लगाया जाता।",
   "ins_data_unmeasured": "इस अवधि में नेटवर्क उपयोग नहीं मापा गया। पुराने रिकॉर्ड और कुछ प्लेयर यह जानकारी नहीं देते।",
   "ins_show_all": "सभी {n} दिखाएँ",
-  "ins_show_less": "कम दिखाएँ"
+  "ins_show_less": "कम दिखाएँ",
+  "offline_play_failed": "यह डाउनलोड चलाया नहीं जा सका",
+  "offline_play_failed_hint": "फ़ाइल अधूरी या खराब हो सकती है। इसे हटाकर फिर से डाउनलोड करें।",
+  "up_next": "आगे",
+  "player_next_up": "अगला: {title}",
+  "player_reload": "फिर से लोड करें"
 };
 static const Map<String,dynamic> _es = {
   "popularity_descending": "Popularidad descendiente",
@@ -3405,7 +3415,12 @@ static const Map<String,dynamic> _es = {
   "ins_data_coverage": "Medido en el {share} de la reproducción · {rate} por hora medida. Incluye datos descargados registrados por el reproductor; excluye lecturas de caché. No se estima la reproducción sin medición.",
   "ins_data_unmeasured": "No se midió el uso de red en este período. Los registros antiguos y algunos reproductores no lo informan.",
   "ins_show_all": "Mostrar todos ({n})",
-  "ins_show_less": "Mostrar menos"
+  "ins_show_less": "Mostrar menos",
+  "offline_play_failed": "No se pudo reproducir esta descarga",
+  "offline_play_failed_hint": "Es posible que el archivo esté incompleto o dañado. Bórralo y vuelve a descargarlo.",
+  "up_next": "A continuación",
+  "player_next_up": "Después: {title}",
+  "player_reload": "Recargar"
 };
 static const Map<String,dynamic> _ar = {
   "popularity_descending": "ترتيب تنازلي حسب الشعبية",
@@ -4568,7 +4583,12 @@ static const Map<String,dynamic> _ar = {
   "ins_data_coverage": "تم قياس {share} من وقت التشغيل · {rate} لكل ساعة مقاسة. يشمل البيانات المنزلة التي أبلغ عنها المشغل ويستثني القراءة من ذاكرة التخزين المؤقت. لا نقدّر التشغيل غير المقاس.",
   "ins_data_unmeasured": "لم يُقَس استخدام الشبكة خلال هذه الفترة. السجلات القديمة وبعض المشغلات لا توفر هذه البيانات.",
   "ins_show_all": "عرض الكل ({n})",
-  "ins_show_less": "عرض أقل"
+  "ins_show_less": "عرض أقل",
+  "offline_play_failed": "تعذّر تشغيل هذا التنزيل",
+  "offline_play_failed_hint": "قد يكون الملف غير مكتمل أو تالفًا. احذفه ثم نزّله مرة أخرى.",
+  "up_next": "التالي",
+  "player_next_up": "التالي: {title}",
+  "player_reload": "إعادة التحميل"
 };
 static const Map<String, Map<String,dynamic>> mapLocales = {"en": _en, "hi": _hi, "es": _es, "ar": _ar};
 }

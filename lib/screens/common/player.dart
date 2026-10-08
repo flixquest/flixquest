@@ -50,6 +50,7 @@ import 'player/player_episode_selection.dart';
 import 'player/player_movie_recommendations.dart';
 import 'player/player_next_episode_policy.dart';
 import 'player/player_sheet_ui.dart';
+import 'player/player_watch_page.dart';
 import 'player/player_strings.dart';
 import 'download_selection_sheets.dart';
 
@@ -3007,161 +3008,241 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   Widget _buildPortraitInlineLayout(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final episodes = widget.tvMetadata?.seasonEpisodes ?? _contentMenuEpisodes;
-    final recommendations =
-        widget.movieMetadata?.recommendations ?? const <MovieRecommendation>[];
-    final isTv = widget.mediaType == MediaType.tvShow;
-    final title = isTv
-        ? widget.tvMetadata?.seriesName ?? ''
-        : widget.movieMetadata?.movieName ?? '';
-
-    return SafeArea(
-      bottom: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: BetterPlayer(
-              controller: _betterPlayerController,
-              key: _betterPlayerKey,
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-              children: [
-                if (title.isNotEmpty)
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: colors.onSurface,
-                      fontFamily: 'FigtreeSB',
-                    ),
-                  ),
-                if (isTv && episodes.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  _buildPortraitSectionHeader(
-                    context,
-                    icon: PhosphorIcons.playlist(),
-                    title: tr(
-                      'season_episodes',
-                      namedArgs: {
-                        'season':
-                            '${widget.tvMetadata?.seasonNumber ?? episodes.first.seasonNumber}',
-                      },
-                    ),
-                    subtitle: tr(
-                      'episodes_count',
-                      namedArgs: {'count': '${episodes.length}'},
-                    ),
-                    action: (widget.tvMetadata?.allSeasons == null ||
-                            (widget.tvMetadata?.allSeasons?.length ?? 0) > 1)
-                        ? IconButton(
-                            tooltip: tr('select_season'),
-                            onPressed: _portraitSeasonLoading
-                                ? null
-                                : _showPortraitSeasonPicker,
-                            icon: _portraitSeasonLoading
-                                ? const SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Icon(PhosphorIcons.stack()),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(height: 8),
-                  ...episodes.map((episode) {
-                    final current = episode.episodeNumber ==
-                            widget.tvMetadata?.episodeNumber &&
-                        episode.seasonNumber == widget.tvMetadata?.seasonNumber;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: PlayerChoiceCard(
-                        title:
-                            '${episode.episodeNumber}. ${episode.episodeName}',
-                        subtitle: _portraitEpisodeSubtitle(episode),
-                        description: episode.overview,
-                        selected: current,
-                        thumbnail: _PortraitMediaThumbnail(
-                          path: episode.stillPath,
-                          width: 124,
-                          height: 76,
-                          fallbackIcon: PhosphorIcons.filmStrip(),
-                        ),
-                        onTap: current ? null : () => _playTvEpisode(episode),
-                      ),
-                    );
-                  }),
-                ] else if (!isTv && recommendations.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  _buildPortraitSectionHeader(
-                    context,
-                    icon: PhosphorIcons.sparkle(),
-                    title: tr('recommended_movies'),
-                  ),
-                  const SizedBox(height: 8),
-                  ...recommendations.map((movie) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: PlayerChoiceCard(
-                          title: movie.title,
-                          subtitle: _portraitMovieSubtitle(movie),
-                          description: movie.overview,
-                          thumbnail: _PortraitMediaThumbnail(
-                            path: movie.backdropPath ?? movie.posterPath,
-                            width: 124,
-                            height: 76,
-                            fallbackIcon: PhosphorIcons.filmStrip(),
-                          ),
-                          onTap: () => _playTvMovie(movie),
-                        ),
-                      )),
-                ],
-              ],
-            ),
-          ),
-        ],
+    return PlayerWatchLayout(
+      video: BetterPlayer(
+        controller: _betterPlayerController,
+        key: _betterPlayerKey,
       ),
+      slivers: widget.mediaType == MediaType.tvShow
+          ? _seriesWatchSlivers()
+          : _movieWatchSlivers(),
     );
   }
 
-  Widget _buildPortraitSectionHeader(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    String? subtitle,
-    Widget? action,
-  }) {
-    final colors = BetterPlayerPanelColors.of(context);
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: colors.secondary),
-        const SizedBox(width: 9),
-        Expanded(
-          child: Text(
-            title,
-            style: TextStyle(
-              color: colors.foreground,
-              fontFamily: 'FigtreeSB',
-              fontSize: 16,
-            ),
+  /// The watch page's actions, the ones the controls also offer, so they
+  /// can be found without bringing the controls up.
+  List<WatchAction> get _watchActions {
+    final providers = widget.availableProviders ?? const <VideoProvider>[];
+    String? providerName;
+    for (final provider in providers) {
+      if (provider.codeName == _currentProviderCode) {
+        providerName = provider.displayName;
+      }
+    }
+    return <WatchAction>[
+      if (providers.isNotEmpty)
+        WatchAction(
+          icon: PhosphorIcons.arrowsLeftRight(),
+          label: providerName ?? tr('switch_provider'),
+          busy: _isSwitchingProvider,
+          onTap: _showProviderSwitcher,
+        ),
+      WatchAction(
+        icon: PhosphorIcons.closedCaptioning(),
+        label: tr('player_subtitles'),
+        onTap: _showSubtitleSwitcher,
+      ),
+      WatchAction(
+        icon: PhosphorIcons.downloadSimple(),
+        label: tr('download_action'),
+        onTap: () => unawaited(_downloadFromCurrentProvider()),
+      ),
+      WatchAction(
+        icon: PhosphorIcons.arrowSquareOut(),
+        label: tr('open_external'),
+        onTap: _showExternalPlayerSheet,
+      ),
+    ];
+  }
+
+  List<Widget> _movieWatchSlivers() {
+    final metadata = widget.movieMetadata;
+    final recommendations =
+        metadata?.recommendations ?? const <MovieRecommendation>[];
+    final meta = <String>[
+      if (metadata?.releaseYear != null) '${metadata!.releaseYear}',
+      ...?metadata?.genres.take(3),
+    ].join(' · ');
+    return <Widget>[
+      SliverToBoxAdapter(
+        child: WatchHeader(
+          title: metadata?.movieName ?? '',
+          meta: meta,
+          washImageUrl: tmdbImage(
+            metadata?.backdropPath ?? metadata?.posterPath,
+            'w300',
+          ),
+          actions: _watchActions,
+        ),
+      ),
+      if (recommendations.isNotEmpty) ...<Widget>[
+        SliverToBoxAdapter(
+          child: WatchSectionHeader(title: tr('more_like_this')),
+        ),
+        WatchPosterGrid(
+          itemCount: recommendations.length,
+          itemBuilder: (context, index) {
+            final movie = recommendations[index];
+            final facts = _movieFacts(movie);
+            return WatchPosterTile(
+              title: movie.title,
+              posterUrl: tmdbImage(movie.posterPath, 'w342'),
+              semanticLabel:
+                  facts.isEmpty ? movie.title : '${movie.title}, $facts',
+              onTap: () => unawaited(_previewRecommendation(movie)),
+            );
+          },
+        ),
+      ],
+    ];
+  }
+
+  /// A recommendation's backdrop and synopsis first, then Play: a poster
+  /// alone is too little to leave this movie for.
+  Future<void> _previewRecommendation(MovieRecommendation movie) async {
+    final play = await showWatchPreview(
+      context,
+      title: movie.title,
+      meta: _movieFacts(movie),
+      overview: movie.overview,
+      backdropUrl: tmdbImage(movie.backdropPath ?? movie.posterPath, 'w780'),
+    );
+    if (play == true && mounted) await _playTvMovie(movie);
+  }
+
+  List<Widget> _seriesWatchSlivers() {
+    final metadata = widget.tvMetadata;
+    // The season on screen, which the season button can change, and the one
+    // playing, which Up Next follows whatever is being browsed.
+    final episodes = metadata?.seasonEpisodes ?? _contentMenuEpisodes;
+    final playingSeason =
+        _contentMenuEpisodes.isNotEmpty ? _contentMenuEpisodes : episodes;
+    bool isPlaying(EpisodeMetadata episode) =>
+        episode.episodeNumber == metadata?.episodeNumber &&
+        episode.seasonNumber == metadata?.seasonNumber;
+    final playingIndex = playingSeason.indexWhere(isPlaying);
+    final playing = playingIndex < 0 ? null : playingSeason[playingIndex];
+    final candidate =
+        playingIndex < 0 || playingIndex + 1 >= playingSeason.length
+            ? null
+            : playingSeason[playingIndex + 1];
+    final upNext =
+        candidate == null || _hasNotAired(candidate) ? null : candidate;
+
+    final seasons = metadata?.allSeasons;
+    final browsedSeason = _portraitBrowsedSeasonNumber ??
+        episodes.firstOrNull?.seasonNumber ??
+        metadata?.seasonNumber;
+    String? seasonName;
+    for (final season in seasons ?? const <SeasonMetadata>[]) {
+      if (season.seasonNumber == browsedSeason) seasonName = season.seasonName;
+    }
+    final seasonLabel = seasonName ??
+        tr('season_number', namedArgs: {'number': '${browsedSeason ?? 1}'});
+    final canBrowseSeasons =
+        metadata?.tvId != null && (seasons == null || seasons.length > 1);
+
+    final airYear = DateTime.tryParse(
+      metadata?.airDate ?? playing?.airDate ?? '',
+    )?.year;
+    final meta = <String>[
+      if (playing?.runtime != null) '${playing!.runtime}m',
+      if (airYear != null) '$airYear',
+      ...?metadata?.genres.take(2),
+    ].join(' · ');
+
+    return <Widget>[
+      SliverToBoxAdapter(
+        child: WatchHeader(
+          kicker: WatchKicker(
+            'S${metadata?.seasonNumber ?? '-'} · E${metadata?.episodeNumber ?? '-'}',
+          ),
+          title: metadata?.seriesName ?? '',
+          subtitle: metadata?.episodeName ?? playing?.episodeName,
+          meta: meta,
+          synopsis: playing?.overview,
+          washImageUrl: tmdbImage(
+            metadata?.posterPath ?? metadata?.backdropPath,
+            'w300',
+          ),
+          actions: _watchActions,
+        ),
+      ),
+      if (upNext != null)
+        SliverToBoxAdapter(
+          child: WatchUpNextCard(
+            title: 'E${upNext.episodeNumber} · ${upNext.episodeName}',
+            meta: upNext.runtime == null ? null : '${upNext.runtime}m',
+            imageUrl: tmdbImage(upNext.stillPath, 'w300'),
+            onPlay: () => unawaited(_playUpNext(upNext)),
           ),
         ),
-        if (subtitle != null)
-          Text(
-            subtitle,
-            style: TextStyle(color: colors.muted, fontSize: 13),
+      if (episodes.isNotEmpty) ...<Widget>[
+        SliverToBoxAdapter(
+          child: WatchSectionHeader(
+            title: tr('episodes'),
+            trailing: canBrowseSeasons
+                ? WatchSeasonButton(
+                    label: seasonLabel,
+                    loading: _portraitSeasonLoading,
+                    onTap: _showPortraitSeasonPicker,
+                  )
+                : WatchCount(seasonLabel),
           ),
-        if (action != null) action,
+        ),
+        SliverList.builder(
+          itemCount: episodes.length,
+          itemBuilder: (context, index) {
+            final episode = episodes[index];
+            final current = isPlaying(episode);
+            final unaired = _hasNotAired(episode);
+            return WatchEpisodeTile(
+              key: ValueKey<String>(
+                '${episode.seasonNumber}-${episode.episodeNumber}',
+              ),
+              number: episode.episodeNumber,
+              title: episode.episodeName,
+              meta: _episodeFacts(episode, unaired: unaired),
+              synopsis: episode.overview,
+              stillUrl: tmdbImage(episode.stillPath, 'w300'),
+              current: current,
+              upNext: upNext != null &&
+                  episode.seasonNumber == upNext.seasonNumber &&
+                  episode.episodeNumber == upNext.episodeNumber,
+              unaired: unaired,
+              progress:
+                  current ? WatchLiveProgress(read: _contentProgress) : null,
+              onTap: () => unawaited(_playTvEpisode(episode)),
+            );
+          },
+        ),
       ],
-    );
+    ];
+  }
+
+  /// Up Next follows the season playing. If another season is on screen,
+  /// the next player gets the playing season's list back, so its own Up
+  /// Next and next-episode prompt follow on from here.
+  Future<void> _playUpNext(EpisodeMetadata episode) async {
+    final metadata = widget.tvMetadata;
+    if (metadata != null && _contentMenuEpisodes.isNotEmpty) {
+      metadata.seasonEpisodes = List<EpisodeMetadata>.of(_contentMenuEpisodes);
+    }
+    await _playTvEpisode(episode);
+  }
+
+  /// How far into the content playback is, or null during a pre-roll, whose
+  /// position isn't the content's.
+  double? _contentProgress() {
+    if (!mounted || _preRollActive || _awaitingContentAfterPreRoll) {
+      return null;
+    }
+    final value = _betterPlayerController.videoPlayerController?.value;
+    final duration = value?.duration;
+    if (value == null || duration == null || duration.inMilliseconds <= 0) {
+      return null;
+    }
+    return value.position.inMilliseconds / duration.inMilliseconds;
   }
 
   Future<void> _showPortraitSeasonPicker() async {
@@ -3211,7 +3292,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
           expand: false,
           builder: (context, scrollController) => PlayerSheetScaffold(
             title: tr('select_season'),
-            subtitle: '${seasons.length} ${tr('select_season')}',
+            subtitle: tr(
+              'seasons_count',
+              namedArgs: {'count': '${seasons.length}'},
+            ),
             actions: [
               PlayerSheetAction(
                 icon: PhosphorIcons.x(),
@@ -3288,16 +3372,34 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     }
   }
 
-  String? _portraitEpisodeSubtitle(EpisodeMetadata episode) {
-    final details = <String>[];
-    if (episode.runtime != null) details.add('${episode.runtime}m');
-    if (episode.voteAverage != null && episode.voteAverage! > 0) {
-      details.add('★ ${episode.voteAverage!.toStringAsFixed(1)}');
-    }
-    return details.isEmpty ? null : details.join('  •  ');
+  bool _hasNotAired(EpisodeMetadata episode) {
+    final airDate = DateTime.tryParse(episode.airDate ?? '');
+    return airDate != null && airDate.isAfter(DateTime.now());
   }
 
-  String? _portraitMovieSubtitle(MovieRecommendation movie) {
+  String? _episodeFacts(EpisodeMetadata episode, {required bool unaired}) {
+    final airDate = DateTime.tryParse(episode.airDate ?? '');
+    final locale = Localizations.localeOf(context).toString();
+    String? date;
+    if (airDate != null) {
+      try {
+        date = DateFormat.yMMMd(locale).format(airDate);
+      } catch (_) {
+        // A locale without date symbols loaded.
+        date = DateFormat.yMMMd().format(airDate);
+      }
+    }
+    if (unaired) {
+      return date == null ? null : tr('coming_date', namedArgs: {'date': date});
+    }
+    final details = <String>[
+      if (episode.runtime != null) '${episode.runtime}m',
+      if (date != null) date,
+    ];
+    return details.isEmpty ? null : details.join(' · ');
+  }
+
+  String _movieFacts(MovieRecommendation movie) {
     final details = <String>[];
     if (movie.releaseDate?.isNotEmpty == true) {
       details.add(movie.releaseDate!.split('-').first);
@@ -3305,7 +3407,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     if (movie.voteAverage != null && movie.voteAverage! > 0) {
       details.add('★ ${movie.voteAverage!.toStringAsFixed(1)}');
     }
-    return details.isEmpty ? null : details.join('  •  ');
+    return details.join(' · ');
   }
 
   /// The Next episode control. Fullscreen playback is its own route, so it
@@ -4564,35 +4666,4 @@ String _subtitleOffsetLabel(Duration offset) {
     offset.isNegative ? 'subtitle_offset_earlier' : 'subtitle_offset_later',
     namedArgs: {'offset': compactSeconds},
   );
-}
-
-class _PortraitMediaThumbnail extends StatelessWidget {
-  const _PortraitMediaThumbnail({
-    required this.path,
-    required this.width,
-    required this.height,
-    required this.fallbackIcon,
-  });
-
-  final String? path;
-  final double width;
-  final double height;
-  final IconData fallbackIcon;
-
-  @override
-  Widget build(BuildContext context) {
-    return PlayerThumbnail(
-      width: width,
-      height: height,
-      child: path == null
-          ? Icon(fallbackIcon)
-          : CachedNetworkImage(
-              cacheManager: cacheProp(),
-              imageUrl: 'https://image.tmdb.org/t/p/w300$path',
-              fit: BoxFit.cover,
-              placeholder: (_, __) => const AppCachedImagePlaceholder(),
-              errorWidget: (_, __, ___) => Icon(fallbackIcon),
-            ),
-    );
-  }
 }

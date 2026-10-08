@@ -15,6 +15,8 @@ import '../../design/app_tokens.dart';
 import '../../design/skeleton.dart';
 import '../../mobile/widgets/page_kit.dart';
 import '../../mobile/widgets/pill_button.dart';
+import '../../mobile/widgets/settings_kit.dart' show SheetTitle;
+import '../../tv/app/tv_design.dart' show TvDesign, TvPalette;
 import '../../tv/focus/tv_keymap.dart';
 import '../../tv/widgets/tv_dialog.dart';
 import '../../tv/widgets/tv_loading_skeletons.dart';
@@ -104,26 +106,20 @@ class _UpdateScreenState extends State<UpdateScreen> {
       }
       return;
     }
-    return showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: Icon(PhosphorIcons.warningCircle()),
-        title: Text(tr('must_update')),
-        actions: [
-          TextButton(
-            onPressed: SystemNavigator.pop,
-            child: Text(
-              tr('exit'),
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(tr('update')),
-          ),
-        ],
-      ),
-    );
+    _showingMandatoryDialog = true;
+    try {
+      final update = await showConfirmDialog(
+        context,
+        icon: PhosphorIcons.rocketLaunch(),
+        title: tr('update_available'),
+        message: tr('must_update'),
+        cancelLabel: tr('exit'),
+        confirmLabel: tr('update'),
+      );
+      if (update == false) await SystemNavigator.pop();
+    } finally {
+      _showingMandatoryDialog = false;
+    }
   }
 
   @override
@@ -199,9 +195,10 @@ class _UpdateScreenState extends State<UpdateScreen> {
                 onOpen: _openDownload,
                 onDelete: _deleteDownload)
           else ...[
-            const Text(
+            Text(
                 'The download link is not available yet. Please try again later.',
-                style: TextStyle(color: Colors.white70, fontSize: 20)),
+                style: TextStyle(
+                    color: TvPalette.of(context).mutedText, fontSize: 20)),
             const SizedBox(height: 16),
           ],
           if (config.changeLog.isNotEmpty) ...[
@@ -329,7 +326,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
       ));
       return;
     }
-    showChangelogDialog(context, changeLog);
+    showChangelogSheet(context, changeLog);
   }
 
   Future<void> _toggleDownload(String url) async {
@@ -427,10 +424,11 @@ class _DownloadCard extends StatelessWidget {
     };
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (status == DownloadStatus.failed)
-        const Padding(
-            padding: EdgeInsets.only(bottom: 12),
+        Padding(
+            padding: const EdgeInsets.only(bottom: 12),
             child: Text('Download failed. Check your connection and retry.',
-                style: TextStyle(fontSize: 20, color: Colors.white70))),
+                style: TextStyle(
+                    fontSize: 20, color: Theme.of(context).colorScheme.error))),
       TvUpdateAction(
           label: label,
           autofocus: true,
@@ -459,20 +457,40 @@ class _DownloadCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (television) {
+      final palette = TvPalette.of(context);
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (task != null) ...[
           ValueListenableBuilder<double>(
               valueListenable: task!.progress,
-              builder: (_, progress, __) => Column(children: [
-                    LinearProgressIndicator(
-                        value: progress.isFinite ? progress.clamp(0, 1) : null),
-                    const SizedBox(height: 8),
-                    Text(
-                        '${progress.isFinite ? (progress.clamp(0, 1) * 100).round() : 0}%',
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 18)),
-                  ])),
-          const SizedBox(height: 12),
+              builder: (_, progress, __) {
+                final value = progress.isFinite ? progress.clamp(0.0, 1.0) : 0.0;
+                return Row(children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: progress.isFinite ? value : null,
+                        minHeight: 6,
+                        backgroundColor: palette.idleFill,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  SizedBox(
+                    width: 56,
+                    child: Text('${(value * 100).round()}%',
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                            color: palette.mutedText,
+                            fontFamily: 'FigtreeSB',
+                            fontSize: 18,
+                            fontFeatures: const [
+                              FontFeature.tabularFigures()
+                            ])),
+                  ),
+                ]);
+              }),
+          const SizedBox(height: 18),
           ValueListenableBuilder<DownloadStatus>(
               valueListenable: task!.status,
               builder: (_, status, __) => _tvActions(context, status)),
@@ -498,7 +516,10 @@ class _DownloadCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'FlixQuest v$appVersion',
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: AppType.cardTitle.copyWith(
+                      fontSize: 15,
+                      color: palette.foreground,
+                    ),
                   ),
                 ),
               ],
@@ -576,29 +597,87 @@ class _DownloadCard extends StatelessWidget {
   }
 }
 
-/// The changelog as one entry per line, list markers stripped, so a long
-/// remote string can be previewed a few lines at a time.
-List<String> changelogItems(String changeLog) => changeLog
-    .split('\n')
-    .map((line) =>
-        line.trim().replaceFirst(RegExp(r'^(?:#+|[-*•·]|\d+[.)])\s+'), ''))
-    .where((line) => line.isNotEmpty)
-    .toList(growable: false);
+/// The release notes in a sheet, one bulleted entry per line, with the
+/// version under the title when it's known.
+Future<void> showChangelogSheet(
+  BuildContext context,
+  String changeLog, {
+  String? version,
+}) =>
+    showAppSheet<void>(
+      context,
+      builder: (_) => _ChangelogSheet(changeLog: changeLog, version: version),
+    );
 
-void showChangelogDialog(BuildContext context, String changeLog) {
-  showDialog<void>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(tr('changelogs')),
-      content: SingleChildScrollView(child: Text(changeLog)),
-      actions: [
-        FilledButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(tr('confirm')),
+class _ChangelogSheet extends StatelessWidget {
+  const _ChangelogSheet({required this.changeLog, this.version});
+
+  final String changeLog;
+  final String? version;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
+    final items = AppUpdateService.changelogItems(changeLog);
+    final version = this.version;
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .75,
+      ),
+      child: ListView(
+        shrinkWrap: true,
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.paddingOf(context).bottom + AppSpace.xxl,
         ),
-      ],
-    ),
-  );
+        children: [
+          SheetTitle(tr('changelogs')),
+          if (version != null)
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(
+                gutter,
+                0,
+                gutter,
+                AppSpace.md,
+              ),
+              child: Text(
+                tr('new_version', namedArgs: {'v': version}),
+                style: AppType.body.copyWith(color: palette.mutedText),
+              ),
+            ),
+          for (final item in items.isEmpty ? [changeLog.trim()] : items)
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(gutter, 7, gutter, 7),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    // Sits on the first line's x-height.
+                    margin: const EdgeInsetsDirectional.only(top: 7, end: 12),
+                    decoration: BoxDecoration(
+                      color: palette.mutedText,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: AppType.body.copyWith(
+                        fontSize: 15,
+                        height: 1.4,
+                        color: palette.secondaryText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class UpdateBottom extends StatefulWidget {
@@ -660,54 +739,105 @@ class _UpdateBottomState extends State<UpdateBottom> {
       remoteBuild,
     );
     final colors = Theme.of(context).colorScheme;
-    final items = changelogItems(config.changeLog);
+    final items = AppUpdateService.changelogItems(config.changeLog);
     if (widget.television) {
+      // The TV's panel: the page's surface with a hairline, the accent only
+      // on the kicker (as on the page headers), the notes muted.
+      final palette = TvPalette.of(context);
       return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-                color: colors.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-                border:
-                    Border.all(color: colors.primary.withValues(alpha: 0.5))),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(
-                    child: Text('Update available • FlixQuest $version',
-                        style: TextStyle(
-                            color: colors.onSurface,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700))),
-                const SizedBox(width: 16),
-                TvUpdateAction(
-                    label: 'Update',
-                    primary: true,
-                    onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                            builder: (_) => const UpdateScreen(
-                                isForced: false, television: true)))),
-              ]),
-              if (items.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                for (final item in items.take(2))
-                  Text('•  $item',
+        padding: const EdgeInsets.all(16),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
+          decoration: BoxDecoration(
+            color: palette.surface,
+            borderRadius: BorderRadius.circular(TvDesign.cardRadius),
+            border: Border.all(color: palette.hairline),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: palette.idleFill,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  PhosphorIcons.rocketLaunch(),
+                  size: 22,
+                  color: palette.foreground,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'UPDATE AVAILABLE',
+                      style: TextStyle(
+                        color: colors.primary,
+                        fontFamily: 'FigtreeSB',
+                        fontSize: 12,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'FlixQuest $version',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: colors.onSurfaceVariant,
-                          fontSize: 17,
-                          height: 1.4)),
-                if (items.length > 2)
-                  Text('+${items.length - 2} more in the update',
-                      style: TextStyle(
-                          color: colors.onSurfaceVariant,
-                          fontSize: 15,
-                          height: 1.4)),
-              ],
-            ]),
-          ));
+                        color: palette.foreground,
+                        fontFamily: 'FigtreeBold',
+                        fontSize: 21,
+                        letterSpacing: -0.25,
+                      ),
+                    ),
+                    if (items.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      DefaultTextStyle.merge(
+                        style: TextStyle(
+                          color: palette.mutedText,
+                          fontSize: 16,
+                          height: 1.35,
+                        ),
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                items.take(2).join('  ·  '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            // Kept whole however long the notes before it.
+                            if (items.length > 2)
+                              Text('  ·  +${items.length - 2} more'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              TvUpdateAction(
+                label: 'Update',
+                primary: true,
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        const UpdateScreen(isForced: false, television: true),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     // A quiet panel in the page's own tones: the accent only on the small
@@ -773,7 +903,11 @@ class _UpdateBottomState extends State<UpdateBottom> {
               if (items.isNotEmpty)
                 _ChangelogPreview(
                   items: items,
-                  onTap: () => showChangelogDialog(context, config.changeLog),
+                  onTap: () => showChangelogSheet(
+                    context,
+                    config.changeLog,
+                    version: version,
+                  ),
                 ),
             ],
           ),

@@ -726,6 +726,107 @@ Future<T?> showAppSheet<T>(
   );
 }
 
+/// Asks before doing something: the title, one line on what happens, and two
+/// pills, [cancelLabel] soft and [confirmLabel] in ink (or the error colour
+/// when [destructive]). True when confirmed, false when cancelled, null when
+/// dismissed.
+Future<bool?> showConfirmDialog(
+  BuildContext context, {
+  required String title,
+  required String confirmLabel,
+  String? message,
+  String? cancelLabel,
+  IconData? icon,
+  bool destructive = false,
+  bool barrierDismissible = true,
+}) {
+  return showDialog<bool>(
+    context: context,
+    barrierDismissible: barrierDismissible,
+    builder: (dialogContext) {
+      final palette = AppPalette.of(dialogContext);
+      final colors = Theme.of(dialogContext).colorScheme;
+      return Dialog(
+        backgroundColor: palette.surface,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.hero),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpace.xl,
+              AppSpace.xxl,
+              AppSpace.xl,
+              AppSpace.xl,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                if (icon != null) ...<Widget>[
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: destructive
+                          ? colors.error.withValues(alpha: .12)
+                          : palette.idleFill,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      size: 22,
+                      color: destructive ? colors.error : palette.foreground,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpace.lg),
+                ],
+                Text(
+                  title,
+                  style: AppType.sectionHeader.copyWith(
+                    fontFamily: AppType.bold,
+                    color: palette.foreground,
+                  ),
+                ),
+                if (message != null) ...<Widget>[
+                  const SizedBox(height: AppSpace.sm),
+                  Text(
+                    message,
+                    style: AppType.body.copyWith(color: palette.mutedText),
+                  ),
+                ],
+                const SizedBox(height: AppSpace.xxl),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: PillButton(
+                        label: cancelLabel ?? tr('cancel'),
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpace.md),
+                    Expanded(
+                      child: PillButton(
+                        label: confirmLabel,
+                        primary: true,
+                        destructive: destructive,
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
 /// A list's shape while it loads: [rows] rows, each a leading block and two
 /// lines of text.
 class ListSkeleton extends StatelessWidget {

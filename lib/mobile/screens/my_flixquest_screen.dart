@@ -234,22 +234,13 @@ class _MyFlixQuestScreenState extends State<MyFlixQuestScreen> {
   }
 
   Future<void> _confirmSignOut() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(tr('sign_out')),
-        content: Text(tr('want_to_sign_out')),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(tr('cancel')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(tr('ok')),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      icon: PhosphorIcons.signOut(),
+      title: tr('sign_out'),
+      message: tr('want_to_sign_out'),
+      confirmLabel: tr('sign_out'),
+      destructive: true,
     );
     if (confirmed != true || !mounted) return;
     final analytics = context.read<SettingsProvider>().analytics;
