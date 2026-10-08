@@ -21,6 +21,7 @@ import '../../services/daddylive_service.dart';
 import '../../services/media_link.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
+import '../../services/adsterra_playback_ads_service.dart';
 import '../../services/analytics_service.dart';
 import '../../mobile/widgets/filter_chips.dart';
 import '../../mobile/widgets/page_kit.dart';
@@ -400,6 +401,11 @@ class _ChannelListState extends State<ChannelList> {
         source: _mode.name,
       );
       if (!mounted) return;
+      // The channel works: the same stream-found popup as movies, first.
+      if (!await AdsterraPlaybackAdsService.instance.streamFound(context) ||
+          !mounted) {
+        return;
+      }
       final autoFullScreen = context.read<SettingsProvider>().defaultViewMode;
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(

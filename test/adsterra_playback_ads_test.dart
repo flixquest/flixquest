@@ -11,6 +11,7 @@ import 'package:flixquest/services/device_presentation_service.dart';
 import 'package:flixquest/widgets/adsterra_playback_ad_screen.dart';
 import 'package:flixquest/widgets/adsterra_playback_gate.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -29,6 +30,16 @@ const smartlinkCatalog = '''{
 }''';
 const slowSmartlinkCatalog = '''{
   "popunder":{"enabled":true,"mode":"smartlink","url":"https://ads.example/smartlink","load_timeout_ms":10000,"max_duration_seconds":30}
+}''';
+const tvCatalog = '''{
+  "popunder":{"enabled":true,"script_url":"https://ads.example/pop","load_timeout_ms":10000,"max_duration_seconds":30},
+  "tv_popunder":{"enabled":true,"mode":"smartlink","url":"https://ads.example/smartlink","sub_id":"fqtv","load_timeout_ms":10000,"max_duration_seconds":30}
+}''';
+
+/// The default `close_fallback_seconds`.
+const closeFallback = Duration(seconds: 15);
+const slowPopunderCatalog = '''{
+  "popunder":{"enabled":true,"script_url":"https://ads.example/pop","load_timeout_ms":10000,"max_duration_seconds":30}
 }''';
 const experimentCatalog = '''{
   "stream_found_experiment": {
@@ -263,7 +274,7 @@ void main() {
     }
     expect(controller.requests, isEmpty);
     expect(platform.controllers, hasLength(1));
-    await tester.tap(find.byTooltip('Close ad'));
+    controller.send('{"event":"done"}');
     await tester.pumpAndSettle();
     expect(await result, isTrue);
   }, variant: android);
@@ -278,7 +289,7 @@ void main() {
     await pumpAd(tester);
     expect(platform.controllers.single.htmlLoads.single,
         contains('https://ads.example/pop'));
-    await tester.tap(find.byTooltip('Close ad'));
+    platform.controllers.single.send('{"event":"done"}');
     await tester.pumpAndSettle();
     expect(await first, isTrue);
 
@@ -301,7 +312,7 @@ void main() {
     await pumpAd(tester);
     expect(platform.controllers.last.htmlLoads.single,
         contains('https://ads.example/pop'));
-    await tester.tap(find.byTooltip('Close ad'));
+    platform.controllers.last.send('{"event":"done"}');
     await tester.pumpAndSettle();
     expect(await third, isTrue);
   }, variant: android);
@@ -323,7 +334,7 @@ void main() {
     await pumpAd(tester);
     expect(platform.controllers.single.htmlLoads.single,
         contains('https://ads.example/pop'));
-    await tester.tap(find.byTooltip('Close ad'));
+    platform.controllers.single.send('{"event":"done"}');
     await tester.pumpAndSettle();
     expect(await result, isTrue);
   }, variant: android);
@@ -366,7 +377,7 @@ void main() {
     final config = AdsterraPlaybackAdsConfig.parse(catalog, enabled: true);
     final html = playbackAdHtml(config.popunder!, PlaybackAdStage.streamFound);
     expect(html, contains('https://ads.example/pop'));
-    expect(html, contains('Continue to player'));
+    expect(html, contains('Play now'));
     expect(html, contains('addEventListener("click"'));
     expect(html, isNot(contains('.click()')));
     expect(html, isNot(contains('dispatchEvent')));
@@ -385,6 +396,71 @@ void main() {
     expect(html, isNot(contains('.click()')));
     expect(html, isNot(contains('isTrusted')));
   });
+
+  test('placements bound the fallback and TV takes only touch-free formats',
+      () {
+    PlaybackAdPlacement? placement(Object? fallback) =>
+        PlaybackAdPlacement.parse({
+          'enabled': true,
+          'mode': 'smartlink',
+          'url': 'https://ads.example/smartlink',
+          if (fallback != null) 'close_fallback_seconds': fallback,
+        });
+    expect(placement(null)!.closeFallback, const Duration(seconds: 15));
+    expect(placement(8)!.closeFallback, const Duration(seconds: 8));
+    // Google Play allows at most 15 seconds without a way out.
+    expect(placement(60)!.closeFallback, const Duration(seconds: 15));
+    expect(placement(1)!.closeFallback, const Duration(seconds: 5));
+
+    final config = AdsterraPlaybackAdsConfig.parse(tvCatalog, enabled: true);
+    expect(config.forStage(PlaybackAdStage.streamFound, television: true)?.mode,
+        'smartlink');
+    expect(config.forStage(PlaybackAdStage.beforeLoader, television: true),
+        isNull);
+    expect(config.forStage(PlaybackAdStage.streamFound)?.scriptUrl,
+        Uri.parse('https://ads.example/pop'));
+    // A tag that opens its popup only from a touch cannot run on a remote.
+    expect(
+        AdsterraPlaybackAdsConfig.parse(
+                '{"tv_popunder":{"enabled":true,'
+                '"script_url":"https://ads.example/pop"}}',
+                enabled: true)
+            .tvPopunder,
+        isNull);
+    final monetag = PopunderAdsConfig.parse(
+        '{"tv_popunder":{"enabled":true,"script_url":"https://m.example/tag.js",'
+        '"zone_id":"1"}}',
+        network: AdNetwork.monetag,
+        enabled: true);
+    expect(monetag.activeFor(television: true)?.zoneId, '1');
+    expect(monetag.activeFor(television: false), isNull);
+  });
+
+  testWidgets('the TV popup is driven by the remote', (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(tvCatalog, enabled: true));
+    await pumpHost(tester);
+    final result = service.streamFound(host, television: true);
+    await pumpAd(tester);
+    final page = platform.controllers.single;
+    expect(
+        page.requests, [Uri.parse('https://ads.example/smartlink?psid=fqtv')]);
+    // Before the ad is seen, OK and the arrows stay on FlixQuest's screen.
+    expect(await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown), isTrue);
+    expect(await tester.sendKeyEvent(LogicalKeyboardKey.select), isTrue);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+    page.delegate!.onPageFinished!('https://offer.example/tv');
+    await tester.pump();
+    await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+    await tester.pump();
+    // The way on takes focus as it appears; OK plays.
+    expect(FocusManager.instance.primaryFocus?.debugLabel, 'ad continue');
+    expect(find.text('Play now'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+  }, variant: android);
 
   testWidgets('TV and downloads issue no requests at either stage',
       (tester) async {
@@ -519,15 +595,27 @@ void main() {
     delegate.onPageStarted!('https://offer.example/final');
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byTooltip('Close ad'), findsNothing);
+    expect(find.text('Ad loading'), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pump();
     expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+    // The final ad shows: its minimum view is counted from now.
     delegate.onPageFinished!('https://offer.example/final');
     await tester.pump();
-    expect(find.text('Loading advertisement…'), findsNothing);
     expect(find.byTooltip('Close ad'), findsNothing);
+    expect(find.text('Continue in 3'), findsOneWidget);
     await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+    // Final, but seen for less than the minimum view: the countdown runs on.
+    expect(find.text('Your video is ready'), findsNothing);
+    expect(find.byTooltip('Close ad'), findsNothing);
+    await tester.pump(AdsterraPlaybackAdScreen.minimumView -
+        AdsterraPlaybackAdScreen.redirectSettle -
+        const Duration(milliseconds: 1));
+    expect(find.byTooltip('Close ad'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 1));
     expect(find.byTooltip('Close ad'), findsOneWidget);
+    expect(find.text('Play now'), findsOneWidget);
+    expect(find.text('Sponsored · offer.example'), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(await result, isTrue);
@@ -535,7 +623,7 @@ void main() {
     expect(page.requests.last, Uri.parse('about:blank'));
   }, variant: android);
 
-  testWidgets('close appears at the cap when the ad never settles',
+  testWidgets('the way on appears at the fallback when the ad never settles',
       (tester) async {
     platform.pageHasContent = false;
     provider.setAdsterraPlaybackAdsConfig(
@@ -543,13 +631,117 @@ void main() {
     await pumpHost(tester);
     final result = service.streamFound(host);
     await pumpAd(tester);
-    platform.controllers.single.delegate!
-        .onPageFinished!('https://offer.example/blank');
-    await tester.pump(const Duration(seconds: 4));
+    final delegate = platform.controllers.single.delegate!;
+    // A chain that keeps redirecting never serves its final ad.
+    var elapsed = const Duration(milliseconds: 350);
+    var hop = 0;
+    while (elapsed < closeFallback - const Duration(seconds: 1)) {
+      delegate.onPageStarted!('https://offer.example/hop$hop');
+      delegate.onPageFinished!('https://offer.example/hop$hop');
+      hop++;
+      await tester.pump(const Duration(milliseconds: 500));
+      elapsed += const Duration(milliseconds: 500);
+    }
+    expect(find.byTooltip('Close ad'), findsNothing);
+    expect(find.text('Your video is ready'), findsOneWidget);
+    expect(find.text('Ad loading'), findsOneWidget);
+    await tester.pump(closeFallback - elapsed);
+    expect(find.byTooltip('Close ad'), findsOneWidget);
+    // The placeholder gives way to whatever the page has.
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    expect(find.text('Your video is ready'), findsNothing);
+    await tester.tap(find.byTooltip('Close ad'));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+  }, variant: android);
+
+  test('only a search home page counts as an ad chain with no ad', () {
+    for (final url in [
+      'https://www.google.com',
+      'https://www.google.com/',
+      'https://google.co.uk/?gws_rd=ssl',
+      'http://www.bing.com/',
+    ]) {
+      expect(isNoAdFallback(Uri.parse(url)), isTrue, reason: url);
+    }
+    for (final url in [
+      'https://play.google.com/store/apps/details?id=com.game',
+      'https://www.google.com/search?q=offer',
+      'https://google.example.com/',
+      'https://offer.example/',
+      'market://details?id=com.game',
+    ]) {
+      expect(isNoAdFallback(Uri.parse(url)), isFalse, reason: url);
+    }
+    expect(isNoAdFallback(null), isFalse);
+  });
+
+  testWidgets('a redirect chain that ends on google.com continues at once',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    // Caught as the redirect is requested...
+    var result = service.streamFound(host);
+    await pumpAd(tester);
+    expect(
+        await platform.controllers.last.delegate!.onNavigationRequest!(
+            NavigationRequest(
+                url: 'https://www.google.com/', isMainFrame: true)),
+        NavigationDecision.prevent);
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+    // ...or once it starts loading, for redirects the WebView never asked about.
+    result = service.streamFound(host);
+    await pumpAd(tester);
+    platform
+        .controllers.last.delegate!.onPageStarted!('https://www.google.co.uk/');
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+  }, variant: android);
+
+  testWidgets('a content check that never answers is asked again',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final result = service.streamFound(host);
+    await pumpAd(tester);
+    final page = platform.controllers.single..hangingChecks = 1;
+    page.delegate!.onPageFinished!('https://offer.example/ad');
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Your video is ready'), findsOneWidget);
+    // The lost check times out and the next tick finds the ad.
+    await tester.pump(AdsterraPlaybackAdScreen.contentCheckTimeout);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    expect(find.text('Your video is ready'), findsNothing);
+    expect(find.text('Sponsored · offer.example'), findsOneWidget);
+    await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+    await tester.tap(find.byTooltip('Close ad'));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+  }, variant: android);
+
+  testWidgets('the tag page offers Skip only at the fallback', (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowPopunderCatalog, enabled: true));
+    await pumpHost(tester);
+    final result = service.streamFound(host);
+    await pumpAd(tester);
+    platform.controllers.single.send('{"event":"loaded"}');
+    // Its own Play button leads on; Back waits like the ad page's close.
+    expect(find.byTooltip('Close ad'), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+    await tester.pump(closeFallback - const Duration(seconds: 1));
     expect(find.byTooltip('Close ad'), findsNothing);
     await tester.pump(const Duration(seconds: 1));
-    expect(find.byTooltip('Close ad'), findsOneWidget);
-    expect(find.text('Loading advertisement…'), findsOneWidget);
+    expect(find.text('Skip'), findsOneWidget);
     await tester.tap(find.byTooltip('Close ad'));
     await tester.pumpAndSettle();
     expect(await result, isTrue);
@@ -646,7 +838,9 @@ void main() {
     expect(storeLaunches, isEmpty);
     expect(page.requests.last,
         Uri.parse('https://play.google.com/store/apps/details?id=com.game'));
-    await tester.pump(AdsterraPlaybackAdScreen.closeDelayCap);
+    page.delegate!.onPageFinished!(page.requests.last.toString());
+    await tester.pump();
+    await tester.pump(AdsterraPlaybackAdScreen.minimumView);
     await tester.tap(find.byTooltip('Close ad'));
     await tester.pumpAndSettle();
     expect(await result, isTrue);
@@ -667,6 +861,9 @@ void main() {
     final result = service.streamFound(host).then((value) => continued = value);
     await pumpAd(tester);
     final page = platform.controllers.single;
+    page.delegate!.onPageFinished!('https://ads.example/smartlink');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byKey(const ValueKey('fake-webview')),
         warnIfMissed: false);
     await page.delegate!.onNavigationRequest!(NavigationRequest(
@@ -691,7 +888,7 @@ void main() {
     });
     await pumpAd(tester);
     final opener = platform.controllers.single;
-    expect(find.byTooltip('Close ad'), findsOneWidget);
+    expect(find.byTooltip('Close ad'), findsNothing);
     expect(
         await opener.delegate!.onNavigationRequest!(NavigationRequest(
             url: 'https://offer.example/ad', isMainFrame: true)),
@@ -709,7 +906,7 @@ void main() {
     expect(continued, isFalse);
     page.delegate!.onPageFinished!('https://offer.example/ad');
     await tester.pump();
-    await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+    await tester.pump(AdsterraPlaybackAdScreen.minimumView);
     await tester.tap(find.byTooltip('Close ad'));
     await tester.pumpAndSettle();
     await result;
@@ -749,7 +946,7 @@ void main() {
     expect(page.documentUserAgents.first, expectedAgent);
     page.delegate!.onPageFinished!('https://offer.example/ad');
     await tester.pump();
-    await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+    await tester.pump(AdsterraPlaybackAdScreen.minimumView);
     await tester.tap(find.byTooltip('Close ad'));
     await tester.pumpAndSettle();
     expect(await result, isTrue);
@@ -765,7 +962,7 @@ void main() {
     expect(page.assignedUserAgents, isEmpty);
     page.delegate!.onPageFinished!('https://ads.example/smartlink');
     await tester.pump();
-    await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+    await tester.pump(AdsterraPlaybackAdScreen.minimumView);
     await tester.tap(find.byTooltip('Close ad'));
     await tester.pumpAndSettle();
     expect(await result, isTrue);
@@ -941,7 +1138,7 @@ void main() {
           html,
           contains('<script defer data-cfasync="false" data-clocid="2150355" '
               'src="https://driverhugoverblown.com/on.js"'));
-      expect(html, contains('Continue to player'));
+      expect(html, contains('Play now'));
       // Continue waits for the tag's own ad request, not its script load.
       expect(html, contains('onload="fqTagLoaded()"'));
       expect(html, contains("indexOf('/adx/get/')"));
@@ -1029,7 +1226,7 @@ void main() {
       expect(find.byTooltip('Close ad'), findsNothing);
       page.delegate!.onPageFinished!('https://advertiser.example/');
       await tester.pump();
-      await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
       await tester.tap(find.byTooltip('Close ad'));
       await tester.pumpAndSettle();
       expect(await result, isTrue);
@@ -1173,7 +1370,7 @@ void main() {
       opener.send('{"event":"loaded"}');
       await tester.pump();
       expect(opener.evaluatedScripts, [monetagAutomaticPlaybackScript]);
-      expect(find.text('Loading advertisement…'), findsOneWidget);
+      expect(find.text('Your video is ready'), findsOneWidget);
       // Duplicate finish callbacks must not install another trigger.
       opener.delegate!.onPageFinished!('https://flix.quest/a/3ad05c8e4d');
       await tester.pump(const Duration(seconds: 1));
@@ -1188,7 +1385,10 @@ void main() {
       await tester.pump();
       expect(platform.controllers.last.requests,
           [Uri.parse('https://ads.example/offer')]);
-      await tester.pump(AdsterraPlaybackAdScreen.closeDelayCap);
+      platform.controllers.last.delegate!
+          .onPageFinished!('https://ads.example/offer');
+      await tester.pump();
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
       await tester.tap(find.byTooltip('Close ad'));
       await tester.pumpAndSettle();
       expect(await result, isTrue);
@@ -1263,7 +1463,7 @@ void main() {
       expect(page.requests, [url]);
       expect(page.htmlLoads, isEmpty);
       expect(page.channel, isNull);
-      expect(find.text('Loading advertisement…'), findsOneWidget);
+      expect(find.text('Your video is ready'), findsOneWidget);
       expect(find.byTooltip('Close ad'), findsNothing);
       // A browser intent in the automatic redirect chain stays in this view.
       expect(
@@ -1279,7 +1479,7 @@ void main() {
       expect(storeLaunches, isEmpty);
       page.delegate!.onPageFinished!(page.requests.last.toString());
       await tester.pump();
-      await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
       await tester.tap(find.byTooltip('Close ad'));
       await tester.pumpAndSettle();
       expect(await result, isTrue);
@@ -1320,7 +1520,7 @@ void main() {
       expect(find.byTooltip('Close ad'), findsNothing);
       page.delegate!.onPageFinished!('https://advertiser.example/');
       await tester.pump();
-      await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
       await tester.tap(find.byTooltip('Close ad'));
       await tester.pumpAndSettle();
       expect(await result, isTrue);
@@ -1349,7 +1549,7 @@ void main() {
       expect(storeLaunches, isEmpty);
       page.delegate!.onPageFinished!(page.requests.single.toString());
       await tester.pump();
-      await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
       await tester.tap(find.byTooltip('Close ad'));
       await tester.pumpAndSettle();
       expect(await result, isTrue);
@@ -1382,7 +1582,10 @@ void main() {
       await tester.pump();
       expect(platform.controllers.last.requests,
           [Uri.parse('https://monetag.example/r?z=1')]);
-      await tester.pump(AdsterraPlaybackAdScreen.closeDelayCap);
+      platform.controllers.last.delegate!
+          .onPageFinished!('https://monetag.example/r?z=1');
+      await tester.pump();
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
       await tester.tap(find.byTooltip('Close ad'));
       await tester.pumpAndSettle();
       expect(await result, isTrue);

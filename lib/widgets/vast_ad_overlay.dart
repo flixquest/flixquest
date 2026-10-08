@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/vast/vast_ad_session.dart';
 
@@ -32,6 +35,10 @@ class _VastAdOverlayState extends State<VastAdOverlay> {
   final FocusNode _skipFocus = FocusNode(debugLabel: 'vast-skip');
   bool _skipWasAvailable = false;
 
+  /// OK was pressed before Skip appeared: the countdown is highlighted.
+  bool _waitHint = false;
+  Timer? _waitHintTimer;
+
   @override
   void initState() {
     super.initState();
@@ -61,8 +68,48 @@ class _VastAdOverlayState extends State<VastAdOverlay> {
   @override
   void dispose() {
     widget.session.removeListener(_onSession);
+    _waitHintTimer?.cancel();
     _skipFocus.dispose();
     super.dispose();
+  }
+
+  static final _arrowKeys = {
+    LogicalKeyboardKey.arrowUp,
+    LogicalKeyboardKey.arrowDown,
+    LogicalKeyboardKey.arrowLeft,
+    LogicalKeyboardKey.arrowRight,
+  };
+
+  static final _selectKeys = {
+    LogicalKeyboardKey.select,
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+    LogicalKeyboardKey.gameButtonA,
+  };
+
+  /// The remote has one control here, Skip. Arrows and OK find it once it is
+  /// there; before that OK highlights the countdown instead of doing nothing.
+  /// Back stays with the player, which leaves.
+  KeyEventResult _onRemoteKey(FocusNode node, KeyEvent event) {
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    final arrow = _arrowKeys.contains(key);
+    if (!arrow && !_selectKeys.contains(key)) return KeyEventResult.ignored;
+    if (widget.session.value.canSkip) {
+      if (_skipFocus.hasPrimaryFocus) {
+        return arrow ? KeyEventResult.handled : KeyEventResult.ignored;
+      }
+      _skipFocus.requestFocus();
+      return KeyEventResult.handled;
+    }
+    if (!arrow && event is KeyDownEvent) {
+      _waitHintTimer?.cancel();
+      setState(() => _waitHint = true);
+      _waitHintTimer = Timer(const Duration(milliseconds: 1200), () {
+        if (mounted) setState(() => _waitHint = false);
+      });
+    }
+    return KeyEventResult.handled;
   }
 
   @override
@@ -70,7 +117,7 @@ class _VastAdOverlayState extends State<VastAdOverlay> {
     final scale = widget.television ? 1.25 : 1.0;
     final inset = widget.television ? 32.0 : 12.0;
     final clickThrough = widget.session.ad.clickThrough;
-    return ValueListenableBuilder<VastAdState>(
+    final overlay = ValueListenableBuilder<VastAdState>(
       valueListenable: widget.session,
       builder: (context, state, _) => Stack(
         fit: StackFit.expand,
@@ -121,6 +168,7 @@ class _VastAdOverlayState extends State<VastAdOverlay> {
                 bottom: 12,
                 child: _Pill(
                   scale: scale,
+                  emphasized: _waitHint && !state.skippable,
                   child: Text(
                     state.started ? 'Ad · ${_clock(state.remaining)}' : 'Ad',
                     style: const TextStyle(
@@ -149,6 +197,7 @@ class _VastAdOverlayState extends State<VastAdOverlay> {
                         )
                       : _Pill(
                           scale: scale,
+                          emphasized: _waitHint,
                           child: Text(
                             'Skip in ${state.skipCountdown}',
                             style: const TextStyle(
@@ -170,6 +219,8 @@ class _VastAdOverlayState extends State<VastAdOverlay> {
         ],
       ),
     );
+    if (!widget.television) return overlay;
+    return Focus(autofocus: true, onKeyEvent: _onRemoteKey, child: overlay);
   }
 
   void _visit() {

@@ -12,5 +12,13 @@
     "sub_id": "fqsmartpagev1",
     "load_timeout_ms": 10000,
     "max_duration_seconds": 30
+  },
+  "tv_popunder": {
+    "enabled": true,
+    "mode": "smartlink",
+    "url": "https://directyp.org/4/d85eb7a00a73c8de8a3252dbd9b19411",
+    "sub_id": "fqsmarttvv1",
+    "load_timeout_ms": 10000,
+    "max_duration_seconds": 30
   }
 }

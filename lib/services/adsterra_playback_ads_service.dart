@@ -10,8 +10,9 @@ import '../provider/app_dependency_provider.dart';
 import '../widgets/adsterra_playback_ad_screen.dart';
 import 'device_presentation_service.dart';
 
-/// One coordinator for every phone playback entry point. Skipped/failed ads
-/// continue immediately; an overlapping request never starts another loader.
+/// One coordinator for every playback entry point, phone and TV. Skipped or
+/// failed ads continue immediately; an overlapping request never starts
+/// another loader. TV shows only a stream-found `tv_popunder`.
 class AdsterraPlaybackAdsService {
   AdsterraPlaybackAdsService({
     Future<SharedPreferences> Function()? preferences,
@@ -67,14 +68,14 @@ class AdsterraPlaybackAdsService {
       _logSkip(stage, 'app lifecycle=${lifecycle.name}');
       return true;
     }
+    final tv = television || DevicePresentationService.instance.isTelevision;
     if (download ||
-        television ||
-        DevicePresentationService.instance.isTelevision ||
+        (tv && stage == PlaybackAdStage.beforeLoader) ||
         kIsWeb ||
         !const {TargetPlatform.android, TargetPlatform.iOS}
             .contains(defaultTargetPlatform)) {
       _logSkip(stage,
-          'download=$download television=${television || DevicePresentationService.instance.isTelevision} platform=${defaultTargetPlatform.name} web=$kIsWeb');
+          'download=$download television=$tv platform=${defaultTargetPlatform.name} web=$kIsWeb');
       return true;
     }
     if (_busy) {
@@ -88,25 +89,26 @@ class AdsterraPlaybackAdsService {
         : selection?.network;
     final config = selection?.adsterra;
     var placement = switch (network) {
-      AdNetwork.adsterra => config?.forStage(stage),
+      AdNetwork.adsterra => config?.forStage(stage, television: tv),
       AdNetwork.clickadu ||
       AdNetwork.monetag =>
-        selection?.popunders[network]?.activePopunder,
+        selection?.popunders[network]?.activeFor(television: tv),
       AdNetwork.exoclick || null => null,
     };
     if (provider == null || placement == null) {
       _logSkip(stage,
-          'network=${network?.name ?? 'none'} adsterraEnabled=${config?.enabled ?? false} popupEnabled=${selection?.popunders[network]?.enabled ?? false}; stage disabled or invalid/missing config');
+          'network=${network?.name ?? 'none'} television=$tv adsterraEnabled=${config?.enabled ?? false} popupEnabled=${selection?.popunders[network]?.enabled ?? false}; stage disabled or invalid/missing ${tv ? 'tv_popunder' : 'config'}');
       return true;
     }
     _busy = true;
     final host = ModalRoute.of(context);
     try {
       String? variantId;
-      final experiment =
-          stage == PlaybackAdStage.streamFound && network == AdNetwork.adsterra
-              ? config?.streamFoundExperiment
-              : null;
+      final experiment = stage == PlaybackAdStage.streamFound &&
+              network == AdNetwork.adsterra &&
+              !tv
+          ? config?.streamFoundExperiment
+          : null;
       if (experiment != null) {
         final selected = await _nextVariant(experiment);
         placement = selected.placement;
@@ -129,6 +131,7 @@ class AdsterraPlaybackAdsService {
           placement: selectedPlacement,
           stage: stage,
           storeLauncher: storeLauncher,
+          television: tv,
         ),
       );
       // Compare the catalogs and network, not the chosen arm: unrelated
@@ -140,7 +143,7 @@ class AdsterraPlaybackAdsService {
       }
 
       debugPrint(
-          '[AdsterraPlayback] ${stage.name}: presenting ${selectedPlacement.network.name} ${selectedPlacement.mode} variant=${variantId ?? 'legacy'}');
+          '[AdsterraPlayback] ${stage.name}: presenting ${selectedPlacement.network.name} ${selectedPlacement.mode} variant=${variantId ?? 'legacy'} television=$tv');
       provider.addListener(onConfigChanged);
       try {
         await navigator.push(route);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flixquest/models/banner_ads_config.dart';
 import 'package:flutter/widgets.dart';
 // The fake exercises the actual public WebView controller/widget boundary.
@@ -87,6 +89,10 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
 
   /// The page inspection's JSON report; when null, [pageHasContent] answers.
   String? contentReport;
+
+  /// The next inspections that never answer, as when the document is
+  /// replaced while one runs.
+  int hangingChecks = 0;
   final evaluatedScripts = <String>[];
 
   @override
@@ -99,9 +105,13 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
       void Function(JavaScriptConsoleMessage) onConsoleMessage) async {}
 
   @override
-  Future<Object> runJavaScriptReturningResult(String javaScript) async {
+  Future<Object> runJavaScriptReturningResult(String javaScript) {
     evaluatedScripts.add(javaScript);
-    return contentReport ?? pageHasContent;
+    if (hangingChecks > 0) {
+      hangingChecks--;
+      return Completer<Object>().future;
+    }
+    return Future.value(contentReport ?? pageHasContent);
   }
 
   @override

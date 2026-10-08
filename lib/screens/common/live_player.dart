@@ -21,6 +21,7 @@ import '../../provider/wellness_provider.dart';
 import '../../services/analytics_service.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/stream_intro_service.dart';
+import 'player/player_preroll_ad.dart';
 import 'player/player_sheet_ui.dart';
 import 'player/player_strings.dart';
 
@@ -94,6 +95,8 @@ class _LivePlayerState extends State<LivePlayer> {
   final BetterPlayerTvControlsController _tvControlsController =
       BetterPlayerTvControlsController();
   final StreamIntroService _introService = StreamIntroService();
+  late final PlayerPrerollAd _prerollAd =
+      PlayerPrerollAd(television: widget.useTvControls);
   late BetterPlayerControlsConfiguration betterPlayerControlsConfiguration;
   late BetterPlayerBufferingConfiguration betterPlayerBufferingConfiguration;
 
@@ -286,17 +289,31 @@ class _LivePlayerState extends State<LivePlayer> {
     );
   }
 
+  /// The channel the viewer opened gets the same video ad as movies, asked
+  /// for alongside the branded intro; it replaces the intro when one plays.
+  /// Channel switches and reconnects inside the player play no ad.
   Future<bool> _setupStreamWithIntro(
     BetterPlayerDataSource dataSource,
     int operation,
   ) async {
+    final adFuture = _prerollAd.load(_appDependencies.vastPreroll,
+        cancelled: () => !_isActiveSourceOperation(operation));
     StreamIntroConfig intro = const StreamIntroConfig.disabled();
     try {
       intro = await _introService.fetch(widget.scraperApiUrl);
     } catch (error) {
       debugPrint('[LivePlayer] Branded intro unavailable: $error');
     }
+    final preroll = await adFuture;
     if (!_isActiveSourceOperation(operation)) return false;
+    if (preroll != null) {
+      _prerollAd.start(preroll, _betterPlayerController);
+      return _setupDataSourceForOperation(
+        operation,
+        dataSource,
+        preRollDataSource: PlayerPrerollAd.dataSource(preroll.media),
+      );
+    }
     return _setupDataSourceForOperation(
       operation,
       dataSource,
@@ -362,6 +379,9 @@ class _LivePlayerState extends State<LivePlayer> {
                 onExit: _exitPlayer,
               )
           : null,
+      // The video ad's own controls replace the player's while it plays.
+      preRollOverlayBuilder: (context, _) =>
+          _prerollAd.overlay(context, onExit: _exitPlayer),
       // White controls; the accent belongs to the timeline, which a live
       // stream does not have.
       loadingColor: Colors.white,
@@ -716,6 +736,8 @@ class _LivePlayerState extends State<LivePlayer> {
   }) async {
     if (!_isActiveSourceOperation(operation)) return false;
     _pendingSourceUrl = dataSource.url;
+    // A switch or reconnect replaces the sequence, ad included.
+    if (preRollDataSource == null) _prerollAd.finish('closed');
     if (preRollDataSource != null) {
       await _betterPlayerController
           .setupDataSourceWithPreRoll(
@@ -794,6 +816,15 @@ class _LivePlayerState extends State<LivePlayer> {
   }
 
   void _onPlayerEvent(BetterPlayerEvent event) {
+    // The ad's tracking must end however the sequence reports it.
+    if (event.betterPlayerEventType == BetterPlayerEventType.preRollEnded) {
+      _prerollAd.finish(
+        event.parameters?[BetterPlayerController.preRollEndReasonParameter]
+                as String? ??
+            'completed',
+      );
+      return;
+    }
     if (!_isRelevantPlayerEvent(event)) return;
     switch (event.betterPlayerEventType) {
       case BetterPlayerEventType.initialized:
@@ -806,11 +837,13 @@ class _LivePlayerState extends State<LivePlayer> {
         }
         break;
       case BetterPlayerEventType.play:
+        if (_betterPlayerController.isPreRollActive) _prerollAd.onPlay();
         _startWatchClock();
         _wellnessTracker.play();
         _trackPlayerEvent('play');
         break;
       case BetterPlayerEventType.pause:
+        if (_betterPlayerController.isPreRollActive) _prerollAd.onPause();
         _wasPlayingBeforeBuffering = false;
         _stopWatchClock();
         _wellnessTracker.pause();
@@ -1201,6 +1234,7 @@ class _LivePlayerState extends State<LivePlayer> {
       channelSwitchCount: _channelSwitchCount,
     );
     unawaited(_persistWellnessSession());
+    _prerollAd.dispose();
     _betterPlayerController.dispose();
     _introService.close();
     SystemChrome.setPreferredOrientations([

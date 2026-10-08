@@ -36,17 +36,12 @@ import '../../constants/api_constants.dart';
 import '../../api/endpoints.dart';
 import '../../ui_components/app_ui_components.dart';
 import '../../services/stream_intro_service.dart';
-import '../../services/vast/vast.dart';
-import '../../services/vast/vast_ad_session.dart';
-import '../../services/vast/vast_client.dart';
-import '../../models/adsterra_playback_ads_config.dart';
-import '../../widgets/adsterra_playback_ad_screen.dart';
-import '../../widgets/vast_ad_overlay.dart';
 import '../../services/introdb_service.dart';
 import '../../services/stream_size_estimator.dart';
 import '../movie/movie_video_loader.dart';
 import '../tv/tv_video_loader.dart';
 import 'player/player_data_management.dart';
+import 'player/player_preroll_ad.dart';
 import 'player/player_completion_detector.dart';
 import 'player/tv_subtitle_timing_panel.dart';
 import 'player/player_external_subtitles.dart';
@@ -144,9 +139,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
 
   /// The video ad playing as the pre-roll, if any. Its timeline is separate
   /// from the content's: progress, subtitles and resume points ignore it.
-  VastAdSession? _adSession;
-  VastClient? _vastClient;
-  Timer? _adPositionTimer;
+  late final PlayerPrerollAd _prerollAd =
+      PlayerPrerollAd(television: widget.useTvControls);
 
   /// A recently-watched save requested during the pre-roll, when the player's
   /// position belongs to the ad. It runs once the content starts.
@@ -543,7 +537,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     try {
       // The ad request runs alongside the intro lookup; neither waits on the
       // other, and a missing ad never delays the content.
-      final adFuture = _loadPrerollAd();
+      final adFuture = _prerollAd.load(_appDependencies.vastPreroll,
+          cancelled: () => !mounted);
       StreamIntroConfig intro = const StreamIntroConfig.disabled();
       try {
         intro = await _introService.fetch(_resolveScraperApiUrl());
@@ -557,9 +552,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         // The ad replaces the branded intro for this session: one pre-roll
         // keeps the wait before the content short.
         _preRollActive = true;
-        _startAdSession(prerollAd);
+        _prerollAd.start(prerollAd, _betterPlayerController);
         await _betterPlayerController.setupDataSourceWithPreRoll(
-          preRollDataSource: _buildAdDataSource(prerollAd.media),
+          preRollDataSource: PlayerPrerollAd.dataSource(prerollAd.media),
           betterPlayerDataSource: dataSource,
           contentStartPosition: initialPosition,
         );
@@ -589,7 +584,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       if (!_preRollActive) unawaited(_loadIntroDbTimings());
     } catch (error) {
       _preRollActive = false;
-      _finishAdSession('error');
+      _prerollAd.finish('error');
       debugPrint('[Player] Initial stream setup failed: $error');
     } finally {
       if (!_initialDataSourceReady.isCompleted) {
@@ -598,123 +593,11 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     }
   }
 
-  /// The first ad from the networks `vast_preroll_network` lists, asked in
-  /// order.
-  Future<VastPreroll?> _loadPrerollAd() async {
-    final sources = _appDependencies.vastPreroll
-        .sourcesFor(television: widget.useTvControls);
-    if (sources.isEmpty) return null;
-    try {
-      final client = _vastClient ??= VastClient();
-      return await client.loadPreroll(
-        sources,
-        maxHeight: widget.useTvControls ? 1080 : 720,
-        maxBitrate: widget.useTvControls ? 8000 : 2500,
-        cancelled: () => !mounted,
-      );
-    } catch (error) {
-      debugPrint('[VAST] pre-roll unavailable: $error');
-      return null;
-    }
-  }
-
-  BetterPlayerDataSource _buildAdDataSource(VastMediaFile media) {
-    final type = media.type.toLowerCase();
-    return BetterPlayerDataSource(
-      BetterPlayerDataSourceType.network,
-      media.url.toString(),
-      videoFormat:
-          type.contains('mpegurl') ? BetterPlayerVideoFormat.hls : null,
-    );
-  }
-
-  void _startAdSession(VastPreroll preroll) {
-    final session = VastAdSession(
-      ad: preroll.ad,
-      media: preroll.media,
-      ping: _vastClient!.send,
-      startTimeout: preroll.source.startTimeout,
-    );
-    // Failure or Skip: the native sequence moves to the content at its start
-    // position, exactly as when the ad ends on its own.
-    session.onAbandon = () => unawaited(_betterPlayerController.skipPreRoll());
-    _adSession = session;
-    session.begin();
-    _adPositionTimer?.cancel();
-    _adPositionTimer = Timer.periodic(
-      const Duration(milliseconds: 250),
-      (_) => _sampleAdPosition(),
-    );
-  }
-
-  void _sampleAdPosition() {
-    final session = _adSession;
-    if (session == null || !_betterPlayerController.isPreRollActive) return;
-    final value = _betterPlayerController.videoPlayerController?.value;
-    if (value == null || !value.initialized) {
-      session.onPosition(
-          position: Duration.zero, playing: false, buffering: true);
-      return;
-    }
-    session.onPosition(
-      position: value.position,
-      duration: value.duration,
-      playing: value.isPlaying,
-      buffering: value.isBuffering,
-    );
-  }
-
-  /// Ends the ad's bookkeeping. [reason] is the sequence's `completed`,
-  /// `skipped` or `error`, or `closed` when the player leaves the ad.
-  void _finishAdSession(String reason) {
-    final session = _adSession;
-    if (session == null) return;
-    _adSession = null;
-    _adPositionTimer?.cancel();
-    _adPositionTimer = null;
-    reason == 'closed' ? session.onClosed() : session.onEnded(reason);
-    // The overlay listens until the frame that removes it.
-    WidgetsBinding.instance.addPostFrameCallback((_) => session.dispose());
-  }
-
   Widget? _buildPrerollOverlay(
     BuildContext context,
     BetterPlayerController controller,
-  ) {
-    final session = _adSession;
-    if (session == null) return null;
-    return VastAdOverlay(
-      session: session,
-      television: widget.useTvControls,
-      onVisitAdvertiser: widget.useTvControls
-          ? null
-          : (url) => unawaited(_openAdvertiser(url)),
-      onExit: _exitPlayer,
-    );
-  }
-
-  /// The ad pauses while its advertiser page is open and resumes after.
-  Future<void> _openAdvertiser(Uri url) async {
-    final controller = _betterPlayerController;
-    final wasPlaying = controller.isPlaying() ?? false;
-    await controller.pause();
-    if (!mounted) return;
-    await Navigator.of(context).push(MaterialPageRoute<void>(
-      settings: const RouteSettings(name: '/vast/click-through'),
-      builder: (_) => AdsterraPlaybackAdScreen(
-        placement: PlaybackAdPlacement(
-          smartlinkUrl: url,
-          loadTimeout: const Duration(seconds: 10),
-          maxDuration: const Duration(minutes: 2),
-        ),
-        stage: PlaybackAdStage.streamFound,
-        holdClose: false,
-      ),
-    ));
-    if (mounted && wasPlaying && _adSession?.isEnded == false) {
-      await controller.play();
-    }
-  }
+  ) =>
+      _prerollAd.overlay(context, onExit: _exitPlayer);
 
   BetterPlayerDataSource _buildIntroDataSource(Uri url) {
     return BetterPlayerDataSource(
@@ -784,7 +667,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         );
         break;
       case BetterPlayerEventType.preRollEnded:
-        _finishAdSession(
+        _prerollAd.finish(
           event.parameters?[BetterPlayerController.preRollEndReasonParameter]
                   as String? ??
               'completed',
@@ -804,13 +687,13 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         }
         break;
       case BetterPlayerEventType.play:
-        if (_preRollActive) _adSession?.onResumed();
+        if (_preRollActive) _prerollAd.onPlay();
         _analyticsPlayingStartedAt ??= DateTime.now();
         if (!_preRollActive) _wellnessTracker.play();
         _trackPlaybackEvent('play');
         break;
       case BetterPlayerEventType.pause:
-        if (_preRollActive) _adSession?.onPaused();
+        if (_preRollActive) _prerollAd.onPause();
         _analyticsWasPlayingBeforeBuffering = false;
         _stopAnalyticsWatchClock();
         _wellnessTracker.pause();
@@ -858,7 +741,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       case BetterPlayerEventType.setupDataSource:
         // A provider switch replaces the sequence while the ad is showing.
         if (!_betterPlayerController.isPreRollActive) {
-          _finishAdSession('closed');
+          _prerollAd.finish('closed');
         }
         _completionDetector.reset();
         _playbackCompletionHandled = false;
@@ -2142,19 +2025,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   @override
   void dispose() {
     _betterPlayerControllerInitialized = false;
-    final adSession = _adSession;
-    _adSession = null;
-    _adPositionTimer?.cancel();
-    if (adSession != null) {
-      adSession.onClosed();
-      adSession.dispose();
-    }
-    // Let the last tracking pings leave before the client closes.
-    final vastClient = _vastClient;
-    if (vastClient != null) {
-      unawaited(Future<void>.delayed(
-          const Duration(seconds: 15), vastClient.close));
-    }
+    _prerollAd.dispose();
     settings.removeListener(_syncAmbientGlowSetting);
     final suppressionId = _occasionalEffectsSuppressionId;
     if (suppressionId != null) {

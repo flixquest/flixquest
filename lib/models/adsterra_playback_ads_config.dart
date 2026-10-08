@@ -13,19 +13,31 @@ class AdsterraPlaybackAdsConfig {
     this.enabled = false,
     this.interstitial,
     this.popunder,
+    this.tvPopunder,
     this.streamFoundExperiment,
   });
 
   final bool enabled;
   final PlaybackAdPlacement? interstitial;
   final PlaybackAdPlacement? popunder;
+
+  /// The stream-found popup on Android TV (`tv_popunder`). A remote has no
+  /// touch, so only formats that open without one qualify.
+  final PlaybackAdPlacement? tvPopunder;
   final PlaybackAdExperiment? streamFoundExperiment;
 
-  PlaybackAdPlacement? forStage(PlaybackAdStage stage) => !enabled
-      ? null
-      : stage == PlaybackAdStage.beforeLoader
-          ? interstitial
-          : streamFoundExperiment?.variants.first.placement ?? popunder;
+  /// TV has no Social Bar and no experiment: only [tvPopunder].
+  PlaybackAdPlacement? forStage(PlaybackAdStage stage,
+          {bool television = false}) =>
+      !enabled
+          ? null
+          : television
+              ? stage == PlaybackAdStage.streamFound
+                  ? tvPopunder
+                  : null
+              : stage == PlaybackAdStage.beforeLoader
+                  ? interstitial
+                  : streamFoundExperiment?.variants.first.placement ?? popunder;
 
   static AdsterraPlaybackAdsConfig parse(String raw, {required bool enabled}) {
     try {
@@ -42,6 +54,7 @@ class AdsterraPlaybackAdsConfig {
         popunder: experimentRequested
             ? null
             : PlaybackAdPlacement.parse(json['popunder']),
+        tvPopunder: PlaybackAdPlacement.parseTv(json['tv_popunder']),
         streamFoundExperiment:
             PlaybackAdExperiment.parse(json['stream_found_experiment']),
       );
@@ -99,6 +112,7 @@ class PlaybackAdPlacement {
     this.subId,
     this.network = AdNetwork.adsterra,
     this.zoneId,
+    this.closeFallback = const Duration(seconds: 15),
   }) : assert((scriptUrl != null ? 1 : 0) +
                 (smartlinkUrl != null ? 1 : 0) +
                 (pageUrl != null ? 1 : 0) ==
@@ -128,12 +142,29 @@ class PlaybackAdPlacement {
   /// `data-clocid` or Monetag's `data-zone`.
   final String? zoneId;
 
+  /// When the way on appears even though the ad never finished loading.
+  /// Google Play allows a full-screen ad to stay unclosable for at most
+  /// 15 seconds.
+  final Duration closeFallback;
+
+  /// Opens with no tap in the page: a Smartlink or Direct Link, or Monetag's
+  /// tag, which FlixQuest starts itself. The other tags open their popup only
+  /// from a touch, which a TV remote cannot give.
+  bool get playsWithoutTouch => isSmartlink || network == AdNetwork.monetag;
+
   Uri? get trackedSmartlinkUrl => smartlinkUrl == null || subId == null
       ? smartlinkUrl
       : smartlinkUrl!.replace(queryParameters: {
           ...smartlinkUrl!.queryParameters,
           'psid': subId!,
         });
+
+  /// A `tv_popunder`: as [parse], but only a format that [playsWithoutTouch].
+  static PlaybackAdPlacement? parseTv(Object? value,
+      {AdNetwork network = AdNetwork.adsterra}) {
+    final placement = parse(value, network: network);
+    return placement != null && placement.playsWithoutTouch ? placement : null;
+  }
 
   static PlaybackAdPlacement? parse(Object? value,
       {AdNetwork network = AdNetwork.adsterra}) {
@@ -181,6 +212,8 @@ class PlaybackAdPlacement {
               network == AdNetwork.monetag ? 30000 : 10000)),
       maxDuration: Duration(
           seconds: _bounded(value['max_duration_seconds'], 30, 5, 120)),
+      closeFallback: Duration(
+          seconds: _bounded(value['close_fallback_seconds'], 15, 5, 15)),
     );
   }
 
@@ -204,13 +237,24 @@ class PlaybackAdPlacement {
 /// onclick tag (`script`) or a Direct Link (`smartlink`). Missing or malformed
 /// values disable it.
 class PopunderAdsConfig {
-  const PopunderAdsConfig(this.network, {this.enabled = false, this.popunder});
+  const PopunderAdsConfig(this.network,
+      {this.enabled = false, this.popunder, this.tvPopunder});
 
   final AdNetwork network;
   final bool enabled;
   final PlaybackAdPlacement? popunder;
 
+  /// The popup on Android TV (`tv_popunder`); see
+  /// [PlaybackAdPlacement.playsWithoutTouch].
+  final PlaybackAdPlacement? tvPopunder;
+
   PlaybackAdPlacement? get activePopunder => enabled ? popunder : null;
+
+  PlaybackAdPlacement? activeFor({required bool television}) => !enabled
+      ? null
+      : television
+          ? tvPopunder
+          : popunder;
 
   static PopunderAdsConfig parse(String raw,
       {required AdNetwork network, required bool enabled}) {
@@ -221,6 +265,8 @@ class PopunderAdsConfig {
         network,
         enabled: enabled,
         popunder: PlaybackAdPlacement.parse(json['popunder'], network: network),
+        tvPopunder:
+            PlaybackAdPlacement.parseTv(json['tv_popunder'], network: network),
       );
     } catch (_) {
       return PopunderAdsConfig(network);

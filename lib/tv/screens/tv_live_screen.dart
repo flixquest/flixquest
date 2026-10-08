@@ -14,6 +14,7 @@ import '../../models/live_tv.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../screens/common/live_player.dart';
+import '../../services/adsterra_playback_ads_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/live_channel_focus.dart';
@@ -406,6 +407,12 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         source: _mode.name,
       );
       if (!mounted) return;
+      // The channel works: the TV's stream-found popup, first.
+      if (!await AdsterraPlaybackAdsService.instance
+              .streamFound(context, television: true) ||
+          !mounted) {
+        return;
+      }
       final theme = Theme.of(context);
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(

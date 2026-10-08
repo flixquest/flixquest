@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -25,15 +26,20 @@ enum _Phase { script, page }
 /// Script tags (Adsterra's Social Bar and Popunder, Clickadu's and Monetag's
 /// onclick tags) run in one WebView. Advertiser pages (Smartlinks, Direct Links and the popups a
 /// script emits) open in FlixQuest's own ad page,
-/// never in an external browser. On that page the close control and Back stay
-/// hidden until the final redirect has served visible content, capped at
-/// [closeDelayCap].
+/// never in an external browser. On that page a friendly placeholder covers
+/// blank redirect pages, and the way on (and Back) waits until the final
+/// redirect has shown its ad for [minimumView]. If the ad never gets there,
+/// the placement's [PlaybackAdPlacement.closeFallback] lets the viewer on.
+///
+/// On a TV the remote drives it: the way on takes focus as it appears, and
+/// the arrows stay on FlixQuest's controls instead of wandering into the page.
 class AdsterraPlaybackAdScreen extends StatefulWidget {
   const AdsterraPlaybackAdScreen(
       {required this.placement,
       required this.stage,
       this.storeLauncher,
       this.holdClose = true,
+      this.television = false,
       super.key});
   final PlaybackAdPlacement placement;
   final PlaybackAdStage stage;
@@ -44,8 +50,16 @@ class AdsterraPlaybackAdScreen extends StatefulWidget {
   /// "Visit advertiser".
   final bool holdClose;
 
-  /// The longest the viewer waits for a way out, whatever the ad does.
-  static const closeDelayCap = Duration(seconds: 5);
+  /// Android TV: larger type, overscan margins and D-pad focus.
+  final bool television;
+
+  /// How long the final ad stays up before the viewer moves on, counted from
+  /// when it first shows content, so the advertiser gets a real view.
+  static const minimumView = Duration(seconds: 3);
+
+  /// How long one content check may run. A check sent while the document is
+  /// being replaced may never answer.
+  static const contentCheckTimeout = Duration(seconds: 2);
 
   /// How long a page with visible content must go without another navigation
   /// before it counts as the final redirect.
@@ -64,10 +78,29 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   Timer? _durationTimer;
   Timer? _contentTimer;
   Timer? _settleTimer;
-  Timer? _closeCapTimer;
+  Timer? _fallbackTimer;
+  Timer? _minimumViewTimer;
+  Timer? _countdownTimer;
+  Timer? _waitHintTimer;
   _Phase _phase = _Phase.script;
   bool _pageReady = false;
   bool _closeAllowed = false;
+
+  /// The current document has been served and stopped redirecting.
+  bool _served = false;
+  bool _minimumViewDone = false;
+
+  /// The document whose ad is being counted toward [minimumView].
+  int? _visibleGeneration;
+  final FocusNode _continueFocus = FocusNode(debugLabel: 'ad continue');
+
+  /// The ad page has been shown; later redirects keep it on screen.
+  bool _revealed = false;
+
+  /// Back was pressed before the way on appeared.
+  bool _waitHint = false;
+  int _secondsLeft = 0;
+  String? _advertiserHost;
   bool _checkingContent = false;
   int _documentGeneration = 0;
   DateTime? _lastPointer;
@@ -83,9 +116,12 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       widget.stage == PlaybackAdStage.streamFound &&
       !widget.placement.isSmartlink;
 
-  // The script page keeps an immediate close; the ad page waits.
+  // The Social Bar page keeps an immediate close. Every other surface waits
+  // for its ad to be seen, or for the placement's fallback.
   bool get _closable =>
-      !widget.holdClose || _phase == _Phase.script || _closeAllowed;
+      !widget.holdClose ||
+      _closeAllowed ||
+      (_phase == _Phase.script && widget.stage == PlaybackAdStage.beforeLoader);
 
   @override
   void initState() {
@@ -99,6 +135,8 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     if (smartlink != null) {
       unawaited(_openPage(smartlink));
     } else {
+      // The tag page's own Play button leads on; Skip is the fallback.
+      if (widget.stage == PlaybackAdStage.streamFound) _holdClose();
       _loadTimer =
           Timer(widget.placement.loadTimeout, () => _finish('load_timeout'));
       unawaited(_loadScript());
@@ -326,8 +364,10 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     _loadTimer?.cancel();
     _loadTimer =
         Timer(widget.placement.loadTimeout, () => _finish('page_load_timeout'));
-    _closeCapTimer = Timer(AdsterraPlaybackAdScreen.closeDelayCap,
-        () => _allowClose('cap_reached'));
+    // The ad page starts its own wait, whatever the tag page allowed.
+    _pageReady = false;
+    _revealed = false;
+    _holdClose();
     // Deactivate the tag so it cannot open a second page.
     unawaited(_stop(_script));
     var mainUrl = uri;
@@ -341,6 +381,10 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         onNavigationRequest: (request) {
           if (request.url == 'about:blank') return NavigationDecision.navigate;
           final target = Uri.tryParse(request.url);
+          if (request.isMainFrame && isNoAdFallback(target)) {
+            _onNoAd(target!);
+            return NavigationDecision.prevent;
+          }
           if (_webUrl(target)) {
             if (request.isMainFrame) mainUrl = target!;
             return NavigationDecision.navigate;
@@ -386,19 +430,40 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   void _onPageStarted(String url) {
     if (url == 'about:blank' || _finished) return;
     _log('page started ${_origin(url)}');
-    // A new document means the redirect chain is still moving.
+    final started = Uri.tryParse(url);
+    if (isNoAdFallback(started)) {
+      _onNoAd(started!);
+      return;
+    }
+    // A new document means the redirect chain is still moving: its ad, not
+    // the previous page's, is the one the viewer must see.
     _documentGeneration++;
+    _served = false;
+    _minimumViewDone = false;
     _contentTimer?.cancel();
     _settleTimer?.cancel();
+    _minimumViewTimer?.cancel();
+    _countdownTimer?.cancel();
     _loadTimer?.cancel();
     _loadTimer =
         Timer(widget.placement.loadTimeout, () => _finish('page_load_timeout'));
     if (mounted) setState(() => _pageReady = false);
   }
 
+  /// Trackers send traffic they will not pay for to a search engine's home
+  /// page. There is no ad to see, so continue at once.
+  void _onNoAd(Uri fallback) {
+    _log('redirect chain ended on ${fallback.origin}, not an ad');
+    _finish('no_ad_fallback');
+  }
+
   void _inspectPage(WebViewController page, String url) {
     if (_finished || url == 'about:blank') return;
     _log('page finished ${_origin(url)}; checking content');
+    final host = Uri.tryParse(url)?.host;
+    if (host != null && host.isNotEmpty) {
+      _advertiserHost = host.startsWith('www.') ? host.substring(4) : host;
+    }
     final generation = _documentGeneration;
     unawaited(_checkContent(page, generation));
     _contentTimer?.cancel();
@@ -422,7 +487,7 @@ var background=b&&visible(b)&&getComputedStyle(b).backgroundImage!=='none';
 return JSON.stringify({ready:!!(b&&((text>20&&visible(b))||media>0||background)),
 textLength:text,visibleElements:media,title:document.title.substring(0,80),
 type:document.contentType});})()
-''');
+''').timeout(AdsterraPlaybackAdScreen.contentCheckTimeout);
       if (!mounted || _finished || generation != _documentGeneration) return;
       final report = result is String ? jsonDecode(result) : result;
       // A link that answers with XML, JSON or text (such as an ad server's
@@ -443,6 +508,9 @@ type:document.contentType});})()
             : 'page content present');
         _onContentVisible(generation);
       }
+    } on TimeoutException {
+      // Dropped while the document was replaced: the next tick asks again.
+      _log('content check timed out');
     } catch (error) {
       // Some landing pages disable script inspection. Treat the finished
       // document as shown rather than rejecting a potentially valid page.
@@ -458,19 +526,80 @@ type:document.contentType});})()
   void _onContentVisible(int generation) {
     _contentTimer?.cancel();
     _loadTimer?.cancel();
-    setState(() => _pageReady = true);
-    // Allow closing only if no further redirect starts in the settle window.
+    // Repeated finish callbacks for one document must not restart its view.
+    if (_visibleGeneration == generation) return;
+    _visibleGeneration = generation;
+    setState(() {
+      _pageReady = true;
+      _revealed = true;
+      _secondsLeft = AdsterraPlaybackAdScreen.minimumView.inSeconds;
+    });
+    // The ad is final only if no further redirect starts in the settle
+    // window, and the viewer moves on once it has been up [minimumView].
     _settleTimer?.cancel();
     _settleTimer = Timer(AdsterraPlaybackAdScreen.redirectSettle, () {
-      if (generation == _documentGeneration) _allowClose('ad_served');
+      if (generation != _documentGeneration) return;
+      _served = true;
+      if (_minimumViewDone) _allowClose('ad_served');
     });
+    _minimumViewTimer?.cancel();
+    _minimumViewTimer = Timer(AdsterraPlaybackAdScreen.minimumView, () {
+      if (generation != _documentGeneration) return;
+      _minimumViewDone = true;
+      if (_served) _allowClose('ad_served');
+    });
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _finished || _closeAllowed || _secondsLeft <= 1) {
+        timer.cancel();
+        return;
+      }
+      setState(() => _secondsLeft--);
+    });
+  }
+
+  /// Starts the wait before the viewer can move on: until the final ad has
+  /// been seen, or the placement's fallback if it never loads.
+  void _holdClose() {
+    _closeAllowed = false;
+    _served = false;
+    _minimumViewDone = false;
+    _visibleGeneration = null;
+    _fallbackTimer?.cancel();
+    _minimumViewTimer?.cancel();
+    _countdownTimer?.cancel();
+    _fallbackTimer = Timer(
+        widget.placement.closeFallback, () => _allowClose('fallback_reached'));
   }
 
   void _allowClose(String reason) {
     if (!mounted || _finished || _closeAllowed) return;
-    _closeCapTimer?.cancel();
+    _fallbackTimer?.cancel();
+    _minimumViewTimer?.cancel();
+    _countdownTimer?.cancel();
     _log('close enabled reason=$reason');
-    setState(() => _closeAllowed = true);
+    setState(() {
+      _closeAllowed = true;
+      // At the fallback, show whatever the page has instead of the
+      // placeholder.
+      _revealed = true;
+    });
+    // The remote lands on the way on the moment it appears.
+    if (widget.television) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_finished) _continueFocus.requestFocus();
+      });
+    }
+  }
+
+  /// Back (or OK on a remote) before the way on appears draws the eye to the
+  /// wait instead of doing nothing.
+  void _showWaitHint() {
+    _waitHintTimer?.cancel();
+    setState(() => _waitHint = true);
+    _waitHintTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) setState(() => _waitHint = false);
+    });
   }
 
   /// App-install offers often end in a market:// or intent:// link, which a
@@ -563,7 +692,10 @@ type:document.contentType});})()
     _durationTimer?.cancel();
     _contentTimer?.cancel();
     _settleTimer?.cancel();
-    _closeCapTimer?.cancel();
+    _fallbackTimer?.cancel();
+    _minimumViewTimer?.cancel();
+    _countdownTimer?.cancel();
+    _waitHintTimer?.cancel();
   }
 
   Future<void> _stop(WebViewController? controller) async {
@@ -581,14 +713,58 @@ type:document.contentType});})()
     _cancelTimers();
     unawaited(_stop(_script));
     unawaited(_stop(_page));
+    _continueFocus.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = _phase == _Phase.page ? _page : _script;
-    final loadingPage = (_phase == _Phase.page && !_pageReady) ||
-        (_automaticMonetag && _phase == _Phase.script);
+    final opening = _page != null;
+    // The placeholder covers blank redirect pages until the ad has content,
+    // and Monetag's tag page, which never shows anything itself. It takes
+    // touches, so a tap on it never counts as a tap on the ad.
+    final placeholder =
+        (opening && !_revealed) || (_automaticMonetag && !opening);
+    final redirecting = opening && _revealed && !_pageReady;
+    final screen = Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Column(children: [
+          _bar(context),
+          SizedBox(
+            height: 2,
+            child: redirecting
+                ? const LinearProgressIndicator(
+                    minHeight: 2, backgroundColor: Colors.transparent)
+                : null,
+          ),
+          Expanded(
+            child: Stack(children: [
+              if (controller != null)
+                Positioned.fill(
+                  child: Listener(
+                    onPointerDown: (_) => _lastPointer = DateTime.now(),
+                    child: _webView(controller),
+                  ),
+                ),
+              Positioned.fill(
+                // While it fades out, taps already belong to the ad.
+                child: IgnorePointer(
+                  ignoring: !placeholder,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: placeholder
+                        ? _placeholder()
+                        : const SizedBox.shrink(key: ValueKey('ad')),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -597,55 +773,152 @@ type:document.contentType});})()
           _finish('system_back');
         } else {
           _log('back ignored until the ad is served');
+          _showWaitHint();
         }
       },
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
-          automaticallyImplyLeading: false,
-          title: const Text('Advertisement', style: TextStyle(fontSize: 14)),
-          actions: [
-            if (_closable)
-              IconButton(
-                  tooltip: 'Close ad',
-                  onPressed: () => _finish('user_close'),
-                  icon: const Icon(Icons.close))
-          ],
-          bottom: loadingPage
-              ? const PreferredSize(
-                  preferredSize: Size.fromHeight(2),
-                  child: LinearProgressIndicator(minHeight: 2))
-              : null,
-        ),
-        body: SafeArea(
-          child: controller == null
-              ? const Center(child: CircularProgressIndicator())
-              : Listener(
-                  onPointerDown: (_) => _lastPointer = DateTime.now(),
-                  child: Stack(children: [
-                    Positioned.fill(child: _webView(controller)),
-                    if (_automaticMonetag && _phase == _Phase.script)
-                      const Positioned.fill(
-                          child: ColoredBox(color: Colors.black)),
-                    if (loadingPage)
-                      const Center(
-                          child: Card(
-                              child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child:
-                            Column(mainAxisSize: MainAxisSize.min, children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 12),
-                          Text('Loading advertisement…'),
-                        ]),
-                      ))),
-                  ]),
+      child: widget.television
+          ? Focus(autofocus: true, onKeyEvent: _onRemoteKey, child: screen)
+          : screen,
+    );
+  }
+
+  static final _arrowKeys = {
+    LogicalKeyboardKey.arrowUp,
+    LogicalKeyboardKey.arrowDown,
+    LogicalKeyboardKey.arrowLeft,
+    LogicalKeyboardKey.arrowRight,
+  };
+
+  static final _selectKeys = {
+    LogicalKeyboardKey.select,
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+    LogicalKeyboardKey.gameButtonA,
+  };
+
+  /// The remote stays on FlixQuest's controls: the ad page is there to be
+  /// seen, and a WebView that took focus would keep the remote. OK before
+  /// the way on appears shows the wait; once it is there, any key finds it.
+  KeyEventResult _onRemoteKey(FocusNode node, KeyEvent event) {
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    final arrow = _arrowKeys.contains(key);
+    if (!arrow && !_selectKeys.contains(key)) return KeyEventResult.ignored;
+    if (!_closable) {
+      if (!arrow && event is KeyDownEvent) _showWaitHint();
+      return KeyEventResult.handled;
+    }
+    if (!_continueFocus.hasPrimaryFocus) {
+      _continueFocus.requestFocus();
+      return KeyEventResult.handled;
+    }
+    // OK on the focused button activates it; arrows have nowhere to go.
+    return arrow ? KeyEventResult.handled : KeyEventResult.ignored;
+  }
+
+  Widget _placeholder() {
+    final (icon, headline, message) = !widget.holdClose
+        ? (
+            Icons.open_in_new,
+            'Opening the advertiser\'s page',
+            'Your video is paused. It picks up again when you come back.',
+          )
+        : widget.stage == PlaybackAdStage.streamFound
+            ? (
+                Icons.play_circle_outline,
+                'Your video is ready',
+                'A short sponsored page comes first. Ads like this keep '
+                    'FlixQuest free.',
+              )
+            : (
+                Icons.open_in_new,
+                'Opening the sponsor\'s page',
+                'You can head back to FlixQuest in a few seconds.',
+              );
+    return _AdPlaceholder(
+        key: const ValueKey('placeholder'),
+        icon: icon,
+        headline: headline,
+        message: message,
+        scale: _scale);
+  }
+
+  double get _scale => widget.television ? 1.4 : 1.0;
+
+  /// "Ad" and who it is from, then the wait or the way on.
+  Widget _bar(BuildContext context) {
+    final host = _pageReady ? _advertiserHost : null;
+    final scale = _scale;
+    return SizedBox(
+      height: 52 * scale,
+      child: Padding(
+        // TVs crop the picture's edges (overscan).
+        padding: EdgeInsets.symmetric(
+            horizontal: widget.television ? 48 : 12,
+            vertical: widget.television ? 6 : 0),
+        child: Row(children: [
+          _AdBadge(scale: scale),
+          SizedBox(width: 10 * scale),
+          Expanded(
+            child: Text(
+              host == null
+                  ? 'Sponsored · keeps FlixQuest free'
+                  : 'Sponsored · $host',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white70, fontSize: 13 * scale),
+            ),
+          ),
+          SizedBox(width: 8 * scale),
+          if (_closable)
+            Tooltip(
+              message: 'Close ad',
+              child: FilledButton.icon(
+                focusNode: _continueFocus,
+                onPressed: () => _finish('user_close'),
+                icon: Icon(_continueIcon, size: 18 * scale),
+                label: Text(_continueLabel),
+                style: FilledButton.styleFrom(
+                  visualDensity: widget.television
+                      ? VisualDensity.standard
+                      : VisualDensity.compact,
+                  padding: EdgeInsets.symmetric(horizontal: 14 * scale),
+                  textStyle: TextStyle(
+                      fontSize: 14 * scale, fontWeight: FontWeight.w600),
+                ).copyWith(
+                  // A remote needs to see where it is.
+                  side: WidgetStateProperty.resolveWith((states) =>
+                      states.contains(WidgetState.focused)
+                          ? const BorderSide(color: Colors.white, width: 3)
+                          : null),
                 ),
-        ),
+              ),
+            )
+          // On the tag page its own Play button leads on.
+          else if (_phase == _Phase.page)
+            _WaitPill(
+              secondsLeft: _pageReady ? _secondsLeft : null,
+              total: AdsterraPlaybackAdScreen.minimumView.inSeconds,
+              emphasized: _waitHint,
+              scale: scale,
+            ),
+        ]),
       ),
     );
+  }
+
+  String get _continueLabel {
+    if (!widget.holdClose) return 'Back to video';
+    if (widget.stage == PlaybackAdStage.beforeLoader) return 'Continue';
+    return _phase == _Phase.script ? 'Skip' : 'Play now';
+  }
+
+  IconData get _continueIcon {
+    if (!widget.holdClose) return Icons.arrow_back;
+    if (widget.stage == PlaybackAdStage.beforeLoader) {
+      return Icons.arrow_forward;
+    }
+    return _phase == _Phase.script ? Icons.skip_next : Icons.play_arrow;
   }
 
   Widget _webView(WebViewController controller) {
@@ -661,6 +934,160 @@ type:document.contentType});})()
     return WebViewWidget.fromPlatformCreationParams(
         key: ObjectKey(controller), params: params);
   }
+}
+
+class _AdBadge extends StatelessWidget {
+  const _AdBadge({required this.scale});
+
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding:
+            EdgeInsets.symmetric(horizontal: 6 * scale, vertical: 2 * scale),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFC107),
+          borderRadius: BorderRadius.circular(4 * scale),
+        ),
+        child: Text('Ad',
+            style: TextStyle(
+                color: Colors.black,
+                fontSize: 12 * scale,
+                fontWeight: FontWeight.w700)),
+      );
+}
+
+/// Where the way on will appear: "Ad loading" until the final ad shows, then
+/// "Continue in 3" with a ring that fills as the view completes.
+class _WaitPill extends StatelessWidget {
+  const _WaitPill(
+      {required this.secondsLeft,
+      required this.total,
+      required this.emphasized,
+      required this.scale});
+
+  /// Null while the final ad is still loading.
+  final int? secondsLeft;
+  final int total;
+
+  /// Back or OK was pressed: grow and brighten so the wait is noticed.
+  final bool emphasized;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final seconds = secondsLeft;
+    final label = seconds == null ? 'Ad loading' : 'Continue in $seconds';
+    return Semantics(
+      label: seconds == null
+          ? 'The ad is loading'
+          : 'You can continue in $seconds seconds',
+      excludeSemantics: true,
+      child: AnimatedScale(
+        scale: emphasized ? 1.08 : 1,
+        duration: const Duration(milliseconds: 150),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding:
+              EdgeInsets.symmetric(horizontal: 12 * scale, vertical: 7 * scale),
+          decoration: BoxDecoration(
+            color: emphasized ? Colors.white24 : Colors.white10,
+            borderRadius: BorderRadius.circular(20 * scale),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            SizedBox.square(
+              dimension: 14 * scale,
+              child: CircularProgressIndicator(
+                value: seconds == null
+                    ? null
+                    : total <= 0
+                        ? 1
+                        : 1 - seconds / total,
+                strokeWidth: 2,
+                color: Colors.white,
+                backgroundColor: Colors.white24,
+              ),
+            ),
+            SizedBox(width: 8 * scale),
+            Text(label,
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13 * scale,
+                    fontWeight: FontWeight.w600)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// What the viewer sees while the ad's redirects run, instead of blank pages.
+class _AdPlaceholder extends StatelessWidget {
+  const _AdPlaceholder(
+      {required this.icon,
+      required this.headline,
+      required this.message,
+      required this.scale,
+      super.key});
+
+  final IconData icon;
+  final String headline;
+  final String message;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 32 * scale),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon,
+                  size: 56 * scale,
+                  color: Theme.of(context).colorScheme.primary),
+              SizedBox(height: 16 * scale),
+              Text(headline,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20 * scale,
+                      fontWeight: FontWeight.w600)),
+              SizedBox(height: 8 * scale),
+              Text(message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14 * scale,
+                      height: 1.4)),
+              SizedBox(height: 24 * scale),
+              SizedBox(
+                width: 140 * scale,
+                child: LinearProgressIndicator(
+                  minHeight: 3,
+                  borderRadius: BorderRadius.circular(2),
+                  backgroundColor: Colors.white12,
+                ),
+              ),
+            ]),
+          ),
+        ),
+      );
+}
+
+/// A search engine's home page at the end of a redirect chain means the
+/// tracker rejected the visit: there is no ad to show. App store listings and
+/// every other page are left alone.
+@visibleForTesting
+bool isNoAdFallback(Uri? uri) {
+  if (uri == null ||
+      !const {'https', 'http'}.contains(uri.scheme) ||
+      (uri.path.isNotEmpty && uri.path != '/')) {
+    return false;
+  }
+  final host = uri.host.toLowerCase();
+  return RegExp(r'^(www\.)?google\.[a-z]{2,3}(\.[a-z]{2})?$').hasMatch(host) ||
+      host == 'bing.com' ||
+      host == 'www.bing.com';
 }
 
 bool _playbackDebuggingEnabled = false;
@@ -821,18 +1248,19 @@ catch(e){window.fqTagLoaded=function(){fqSignal('script');arm();};}})();</script
       : "fqSignal('loaded')";
   return '''<!doctype html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<style>html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:sans-serif}
-#fq-controls{height:100%;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center}
-#fq-continue{padding:16px 24px;background:#fff;color:#000;border:0;border-radius:24px;font-size:16px}
+<style>html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:Roboto,system-ui,sans-serif}
+#fq-controls{height:100%;box-sizing:border-box;padding:0 32px;display:flex;flex-direction:column;gap:16px;align-items:center;justify-content:center;text-align:center}
+#fq-title{font-size:20px;font-weight:600}
+#fq-continue{min-width:200px;padding:16px 28px;background:#fff;color:#000;border:0;border-radius:28px;font-size:17px;font-weight:600}
 #fq-continue:disabled{opacity:.5}
-#fq-note{font-size:12px;color:#aaa}</style>
+#fq-note{max-width:320px;font-size:13px;line-height:1.4;color:#aaa}</style>
 <script>
-function fqSignal(event,url,detail){if(event==='loaded'){var b=document.getElementById("fq-continue");if(b){b.disabled=false;b.textContent="Continue to player";}}PlaybackAd.postMessage(JSON.stringify({event:event,url:url,detail:detail}));}
+function fqSignal(event,url,detail){if(event==='loaded'){var b=document.getElementById("fq-continue");if(b){b.disabled=false;b.textContent="\u25B6  Play now";}}PlaybackAd.postMessage(JSON.stringify({event:event,url:url,detail:detail}));}
 window.addEventListener('error',function(event){fqSignal('failed',null,event.message||'script resource failed');});
 </script>
 ${popunder ? '$armed$trace<script defer data-cfasync="false"$zone src="$script" onload="$onLoad" onerror="fqSignal(\'failed\')"></script>' : ''}
 </head><body>
-${popunder ? '''<main id="fq-controls"><button id="fq-continue" type="button" disabled>Loading…</button><div id="fq-note">Sponsored: an ad may open</div></main><script>
+${popunder ? '''<main id="fq-controls"><div id="fq-title">Your video is ready</div><button id="fq-continue" type="button" disabled>One moment…</button><div id="fq-note">Sponsored: an ad may open first. Ads like this keep FlixQuest free.</div></main><script>
 window.addEventListener("click",function(event){
  if(!event.target||event.target.id!=="fq-continue")return;
  setTimeout(function(){fqSignal("done");},750);

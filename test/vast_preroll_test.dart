@@ -7,6 +7,7 @@ import 'package:flixquest/services/vast/vast_ad_session.dart';
 import 'package:flixquest/services/vast/vast_client.dart';
 import 'package:flixquest/widgets/vast_ad_overlay.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -578,6 +579,28 @@ void main() {
       expect(find.byIcon(Icons.arrow_back), findsNothing);
       final focused = FocusManager.instance.primaryFocus;
       expect(focused?.debugLabel, 'vast-skip');
+    });
+
+    testWidgets('on TV the remote finds Skip and never wanders off',
+        (tester) async {
+      await pump(tester, television: true);
+      at(2);
+      await tester.pump();
+      // Before Skip, OK and the arrows are kept by the overlay.
+      expect(await tester.sendKeyEvent(LogicalKeyboardKey.select), isTrue);
+      expect(await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp), isTrue);
+      await tester.pump(const Duration(seconds: 2));
+      at(6);
+      await tester.pump();
+      await tester.pump();
+      var abandoned = 0;
+      session.onAbandon = () => abandoned++;
+      // Arrows cannot move focus off Skip; OK skips.
+      expect(await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft), isTrue);
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus?.debugLabel, 'vast-skip');
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      expect(abandoned, 1);
     });
   });
 }

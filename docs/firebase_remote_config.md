@@ -546,11 +546,17 @@ Legacy format does not expose user selection. Move to schema version 2 for
 overlaps, selection, priorities, and global effect controls.
 
 
-## Mobile playback ads
+## Playback ads
 
 Playback ads are controlled separately from banners. Android/iOS phones and
-tablets support them; television presentation, downloads, desktop and web skip
-both stages. No publisher code is compiled into the defaults.
+tablets show both stages. Android TV shows only the stream-found popup, from a
+`tv_popunder` placement (see [Playback ads on Android TV](#playback-ads-on-android-tv)).
+Downloads, desktop and web skip both stages. No publisher code is compiled into
+the defaults.
+
+The stream-found popup runs before movies and episodes, and before a Live TV
+channel opens from the phone or TV Live screen (not on channel switches inside
+the player).
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
@@ -577,8 +583,9 @@ fields are ignored by the updated app. Only overlapping active ads are blocked.
 - `stream_found_experiment`: alternates Popunder then Smartlink after a playable
   stream is selected, before navigating to `player.dart`. The counter is saved
   per experiment `id` on the device, so restarting continues the sequence. Each
-  eligible attempt consumes one variant, including failed loads. TV/download/
-  background skips and overlapping requests do not consume variants. No second
+  eligible attempt consumes one variant, including failed loads. TV never uses
+  the experiment. Download/background skips and overlapping requests do not
+  consume variants. No second
   variant is loaded on the same attempt when the first fails.
 - `popunder`: the single-placement key for this stage, whatever the format.
   The supplied catalog uses it for the Smartlink. It applies only
@@ -597,11 +604,35 @@ web URL is treated as the popup. Advertiser pages (Smartlinks, and the popup
 URLs that scripts emit) open in FlixQuest's **ad page**, a second full-screen
 WebView that follows the network's redirect chain:
 
-- The **Close ad** control and system Back stay hidden until the final redirect
-  is served. That means the page has finished loading, shows visible content,
-  and has started no new navigation for 800 ms. They appear after 5 seconds at
-  most, whatever the ad does, as Google Play's ad policy requires. A loading bar
-  and "Loading advertisement…" show until the page has visible content.
+- A top bar shows an amber **Ad** badge and "Sponsored · keeps FlixQuest
+  free". Once the page shows content, it names the advertiser's site instead
+  ("Sponsored · example.com").
+- Until the page has visible content, a placeholder covers the blank redirect
+  pages: "Your video is ready. A short sponsored page comes first." (or "Opening
+  the sponsor's page" / "Opening the advertiser's page"). It takes touches, so
+  a tap on it never counts as a tap on the ad. Once revealed, the page stays on
+  screen through later redirects, with a thin loading line under the bar.
+- The way on (**Play now**, **Continue** before the loader, or **Back to
+  video** for a video ad's click-through) and system Back appear only once the
+  final ad has been seen. Seen means the last page of the redirect chain shows
+  visible content, starts no new navigation for 800 ms, and has been on screen
+  for 3 seconds since its content appeared. An earlier page that redirects
+  restarts the count with the next one. Until the final page has content the
+  pill where the button will be says "Ad loading"; then it counts "Continue in
+  3…1". Pressing Back (or OK on a remote) early briefly highlights it.
+- If the ad never gets there (a chain that keeps redirecting, say), the button
+  appears at the placement's `close_fallback_seconds`, 15 by default, and the
+  placeholder gives way to whatever the page shows. Google Play's
+  [Better Ads Experiences policy](https://support.google.com/googleplay/android-developer/answer/12271244)
+  allows a full-screen ad to stay unclosable for at most 15 seconds, so that is
+  also the upper limit. A page that shows no content at all ends sooner, at
+  `load_timeout_ms`.
+- A redirect chain that lands on a search engine's home page (`google.<tld>`,
+  `bing.com`) is a tracker rejecting the visit: there is no ad, so playback
+  continues at once (`closing reason=no_ad_fallback`). App store listings and
+  other Google pages are not affected.
+- Each content check gives up after 2 seconds and the next one asks again: a
+  check sent while the document is being replaced may never answer.
 - App-install offers often end in a `market://` or `intent://` link that a
   WebView cannot load. The ad page loads the link's web page in place: the
   intent's `browser_fallback_url`, its https target, or the Play Store listing.
@@ -611,7 +642,9 @@ WebView that follows the network's redirect chain:
 - A main-frame load error, an HTTP error on the main page, or a page that shows
   no content within `load_timeout_ms` continues playback.
 
-The script page keeps its **Close ad** control from the start. Backgrounding
+The Social Bar page keeps its **Continue** control from the start. On a
+stream-found tag page, its own **Play now** button leads on; **Skip** in the
+top bar and system Back appear at the same `close_fallback_seconds`. Backgrounding
 FlixQuest closes any ad, including the hand-off to the Play Store. Playback is
 never handed to the player while FlixQuest is in the background; it continues
 when the app resumes. An Android/iOS app cannot place a page behind its own
@@ -629,11 +662,43 @@ Per-stage fields:
 | `url` | Empty | In Smartlink mode, exact HTTPS direct link. |
 | `sub_id` | Empty | Smartlink tracking label: 1–64 letters, digits, underscores or hyphens. Appends `psid` to the URL while preserving other query parameters. Prefer alphanumeric labels per Adsterra's guide. |
 | `load_timeout_ms` | `5000` | 500–10,000 milliseconds (up to 30,000 for Monetag). Bounds script loading and each ad-page document until it shows content. Failure continues playback. |
-| `max_duration_seconds` | `30` | 5–120 seconds; upper bound for the whole ad, including the ad page. The viewer can close sooner once **Close ad** appears. |
+| `max_duration_seconds` | `30` | 5–120 seconds; upper bound for the whole ad, including the ad page. The viewer can leave sooner once **Play now** appears. |
+| `close_fallback_seconds` | `15` | 5–15 seconds. When **Play now** appears if the final ad never finishes loading. |
+
+### Playback ads on Android TV
+
+A remote cannot give the touch that Adsterra's Popunder and Clickadu's onclick
+tags open their popup from. TV therefore uses its own placement in each popup
+catalog, `tv_popunder`, with the same fields as `popunder`. Only formats that
+open without a touch are accepted: `mode: "smartlink"` (Adsterra Smartlink, a
+Clickadu or Monetag Direct Link) or Monetag's tag (`page` or `script`), which
+FlixQuest starts itself. Any other `tv_popunder` is ignored. Without one, TV
+shows no popup; the selected `playback_popunder_network` still decides which
+catalog is read. The Social Bar and the experiment never run on TV.
+
+```json
+{
+  "popunder": {"enabled": true, "mode": "script", "script_url": "…", "zone_id": "2150355"},
+  "tv_popunder": {"enabled": true, "mode": "smartlink", "url": "https://…your Direct Link…"}
+}
+```
+
+The supplied Adsterra catalog has a `tv_popunder` with its Smartlink and
+`sub_id` `fqsmarttvv1`, so TV traffic reports separately. The Monetag catalog
+reuses its hosted page. The Clickadu catalog has none: ask your Clickadu
+manager for a Direct Link and add it as above.
+
+On TV the ad page uses larger type and overscan margins. The remote stays on
+FlixQuest's controls: the arrows never move into the page, OK before the way
+on appears highlights the wait, and **Play now** takes focus the moment it
+appears, so one press of OK continues. Back behaves as on phones. Store
+hand-offs never happen on TV, since they need a tap inside the ad.
 
 For the original Popunder placement, use `mode: "script"` and its generated
-`script_url` instead of the Smartlink. The page shows a **Continue to player**
-button with a "Sponsored" note. The button stays disabled until the tag has
+`script_url` instead of the Smartlink. The page shows "Your video is ready", a
+**Play now** button (labelled "One moment…" while disabled) and a note:
+"Sponsored: an ad may open first. Ads like this keep FlixQuest free." The
+button stays disabled until the tag has
 loaded, then waits for the viewer's tap. The `max_duration_seconds` limit still
 applies. The tag opens its popup from that tap, and the app sends the popup URL
 to the ad page. The head script uses `defer` so the body and control
@@ -715,12 +780,12 @@ into `clickadu_playback_ads`, publish `clickadu_playback_enabled=true`, then set
 `playback_popunder_network=adsterra`.
 
 The supplied catalog runs Clickadu's onclick tag (zone 2150355) like the
-Adsterra Popunder script above. The page shows **Continue to player**. Unlike
+Adsterra Popunder script above. The page shows **Play now**. Unlike
 Adsterra's, it stays disabled until the tag has fetched its ad (its `/adx/get/`
 request), usually 1–3 seconds after the script loads: a tap before that opens
 nothing. If the tag hasn't fetched an ad within `load_timeout_ms`, playback
 continues without one. The viewer's tap lets the tag open its window, and the app
-loads that URL in the ad page, with the same held **Close ad** and redirect
+loads that URL in the ad page, with the same held **Play now** and redirect
 handling as the Smartlink. It never opens an external browser. A tap that
 opens nothing continues to the player after 750 ms.
 
@@ -742,11 +807,11 @@ show the network, for example `[AdsterraPage] clickadu/streamFound: popup URL re
 ### Monetag popup
 
 Monetag's stream-found popup starts automatically inside FlixQuest, without a
-**Continue to player** tap. With `mode: "page"` or `mode: "script"`, the app
-shows **Loading advertisement…**, waits for the Onclick tag's `/5/<zone>/`
+**Play now** tap. With `mode: "page"` or `mode: "script"`, the app
+shows the "Your video is ready" placeholder, waits for the Onclick tag's `/5/<zone>/`
 options request to finish, then invokes its `onClickTrigger` hook once after
 a short initialization delay. The emitted popup URL opens in the same ad
-page used by Adsterra, with the held **Close ad**. HTTP redirects and
+page used by Adsterra, with the held **Play now**. HTTP redirects and
 `intent://` web targets stay in that ad page.
 
 The tag hook is a dependency of this automatic path. The app does not fake a
@@ -780,7 +845,7 @@ Monetag registers zones to a website. On the app's placeholder origin
   `https://<domain>/401/<zone>` as `script_url` and leave out `zone_id`.
 - `mode: "smartlink"` with `url` opens a Monetag Direct Link, which is not tied
   to a site. It loads automatically as soon as the ad screen opens, without
-  showing or waiting for **Continue to player**. `sub_id` is rejected; put any
+  showing or waiting for **Play now**. `sub_id` is rejected; put any
   tracking parameters in the URL.
 
 The existing hosted `mode: "page"` catalog needs no configuration change for
@@ -802,7 +867,8 @@ the following, replacing the placeholder with that link:
 ```
 
 The app follows the Direct Link's redirects inside its ad page and enables
-**Close ad** after visible content settles, or after the five-second cap.
+**Play now** once the final page's content has settled and been up for
+3 seconds, or at `close_fallback_seconds`.
 The hosted page in `monetag_playback_ads.json` uses Onclick zone 11983408.
 Onclick and push zone IDs cannot be substituted for a Direct Link; use the
 link issued for its own zone.
@@ -870,7 +936,8 @@ two ads. Disable one of them unless that is intended.
 Copy [vast_preroll.json](vast_preroll.json) into `vast_preroll` and publish
 `vast_preroll_enabled=true`. It holds the Clickadu video zone's tag (zone
 2150357) under `clickadu` and the ExoClick in-stream zone's tag ("FQ video
-roll", zone 6050988) under `exoclick`:
+roll", zone 6050988) under `exoclick`. Both sections set `tv_enabled: true`,
+so Android TV and its Live TV play them too:
 
 ```json
 {
@@ -908,6 +975,9 @@ How it plays:
 
 - The tag is requested while the player opens, alongside the branded intro
   lookup. When an ad is returned it replaces the branded intro for that session.
+  Live TV does the same when a channel opens from the Live screen, on phones and
+  on TV (with `tv_enabled`). Channel switches and reconnects inside the Live
+  player play no ad.
 - The ad and the content play as one native ExoPlayer/AVPlayer sequence on the
   same video surface, without a new player or route. The content starts at its
   resume position, as it would without an ad. Resuming mid-title may still
@@ -915,9 +985,11 @@ How it plays:
 - While the ad plays, the player's controls are replaced by the ad overlay:
   an "Ad · 0:25" countdown, "Skip in N" then **Skip ad** at the tag's
   `skipoffset`, an amber ad progress line, and on phones **Visit advertiser**
-  and a back button. On TV, Skip takes focus as soon as it appears and Back
-  leaves the player. Seeking, gestures and the content menus are unavailable,
-  because the timeline belongs to the ad.
+  and a back button. On TV the overlay keeps the remote: the arrows stay on
+  it, OK before Skip highlights the countdown, Skip takes focus as soon as it
+  appears so OK skips, and Back leaves the player. When the ad ends, the TV
+  player's controls take focus again. Seeking, gestures and the content menus
+  are unavailable, because the timeline belongs to the ad.
 - Subtitles are hidden until the content starts; their cues are timed to the
   content. Watch progress, resume points, IntroDB lookup, completion detection
   and wellness time all ignore the ad. A "recently watched" save requested
