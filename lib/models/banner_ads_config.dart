@@ -293,6 +293,7 @@ class BannerAdsConfig {
             AdNetwork.adsterra => AdsterraBannerUnit.parse(entry.value),
             AdNetwork.clickadu => ClickaduBannerUnit.parse(entry.value,
                 scriptUrl: json['script_url']),
+            AdNetwork.monetag => null,
           };
           if (entry.key is String && unit != null) units[entry.key] = unit;
         }

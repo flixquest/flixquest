@@ -1,0 +1,10 @@
+{
+  "popunder": {
+    "enabled": true,
+    "mode": "script",
+    "script_url": "https://al5sm.com/tag.min.js",
+    "zone_id": "11983408",
+    "load_timeout_ms": 10000,
+    "max_duration_seconds": 30
+  }
+}

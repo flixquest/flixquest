@@ -108,7 +108,8 @@ class PlaybackAdPlacement {
   final String? subId;
   final AdNetwork network;
 
-  /// Clickadu's zone, passed to its onclick tag as `data-clocid`.
+  /// The zone the onclick tag reads from its script element: Clickadu's
+  /// `data-clocid` or Monetag's `data-zone`.
   final String? zoneId;
 
   Uri? get trackedSmartlinkUrl => smartlinkUrl == null || subId == null
@@ -134,7 +135,8 @@ class PlaybackAdPlacement {
             network != AdNetwork.adsterra)) {
       return null;
     }
-    // Clickadu's onclick tag reads its zone from the script element.
+    // Clickadu's and Monetag's onclick tags read their zone from the script
+    // element. Monetag's `/401/<zone>` tag carries it in the URL instead.
     final zone = value['zone_id'];
     final zoneId = zone is int && zone > 0
         ? '$zone'
@@ -142,6 +144,9 @@ class PlaybackAdPlacement {
             ? zone
             : null;
     if (network == AdNetwork.clickadu && script != null && zoneId == null) {
+      return null;
+    }
+    if (network == AdNetwork.monetag && zone != null && zoneId == null) {
       return null;
     }
     // Legacy `auto_activate` is ignored: the Popunder tag only opens on a real
@@ -152,7 +157,7 @@ class PlaybackAdPlacement {
       smartlinkUrl: smartlink,
       subId: subId as String?,
       network: network,
-      zoneId: network == AdNetwork.clickadu ? zoneId : null,
+      zoneId: network == AdNetwork.adsterra ? null : zoneId,
       loadTimeout: Duration(
           milliseconds: _bounded(value['load_timeout_ms'], 5000, 500, 10000)),
       maxDuration: Duration(
@@ -176,29 +181,30 @@ class PlaybackAdPlacement {
       value is num && value.isFinite ? value.toInt().clamp(min, max) : fallback;
 }
 
-/// Clickadu's popup for the stream-found stage: its onclick tag (`script`) or
-/// a Direct Link (`smartlink`). Missing or malformed values disable it.
-class ClickaduPlaybackAdsConfig {
-  const ClickaduPlaybackAdsConfig({this.enabled = false, this.popunder});
+/// Clickadu's or Monetag's popup for the stream-found stage: the network's
+/// onclick tag (`script`) or a Direct Link (`smartlink`). Missing or malformed
+/// values disable it.
+class PopunderAdsConfig {
+  const PopunderAdsConfig(this.network, {this.enabled = false, this.popunder});
 
+  final AdNetwork network;
   final bool enabled;
   final PlaybackAdPlacement? popunder;
 
   PlaybackAdPlacement? get activePopunder => enabled ? popunder : null;
 
-  static ClickaduPlaybackAdsConfig parse(String raw, {required bool enabled}) {
+  static PopunderAdsConfig parse(String raw,
+      {required AdNetwork network, required bool enabled}) {
     try {
       final json = jsonDecode(raw);
-      if (json is! Map<String, dynamic>) {
-        return const ClickaduPlaybackAdsConfig();
-      }
-      return ClickaduPlaybackAdsConfig(
+      if (json is! Map<String, dynamic>) return PopunderAdsConfig(network);
+      return PopunderAdsConfig(
+        network,
         enabled: enabled,
-        popunder: PlaybackAdPlacement.parse(json['popunder'],
-            network: AdNetwork.clickadu),
+        popunder: PlaybackAdPlacement.parse(json['popunder'], network: network),
       );
     } catch (_) {
-      return const ClickaduPlaybackAdsConfig();
+      return PopunderAdsConfig(network);
     }
   }
 }

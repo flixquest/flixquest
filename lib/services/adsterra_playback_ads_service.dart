@@ -67,12 +67,14 @@ class AdsterraPlaybackAdsService {
     final config = selection?.adsterra;
     var placement = switch (network) {
       AdNetwork.adsterra => config?.forStage(stage),
-      AdNetwork.clickadu => selection?.clickadu.activePopunder,
+      AdNetwork.clickadu ||
+      AdNetwork.monetag =>
+        selection?.popunders[network]?.activePopunder,
       null => null,
     };
     if (provider == null || placement == null) {
       _logSkip(stage,
-          'network=${network?.name ?? 'none'} adsterraEnabled=${config?.enabled ?? false} clickaduEnabled=${selection?.clickadu.enabled ?? false}; stage disabled or invalid/missing config');
+          'network=${network?.name ?? 'none'} adsterraEnabled=${config?.enabled ?? false} popupEnabled=${selection?.popunders[network]?.enabled ?? false}; stage disabled or invalid/missing config');
       return true;
     }
     _busy = true;

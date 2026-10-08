@@ -759,13 +759,16 @@ void main() {
   group('Clickadu popup', () {
     final clickadu = File('docs/clickadu_playback_ads.json').readAsStringSync();
 
+    PopunderAdsConfig parseClickadu(String raw, {required bool enabled}) =>
+        PopunderAdsConfig.parse(raw,
+            network: AdNetwork.clickadu, enabled: enabled);
+
     void selectClickadu() => provider
-      ..setClickaduPlaybackAdsConfig(
-          ClickaduPlaybackAdsConfig.parse(clickadu, enabled: true))
+      ..setPopunderAdsConfig(parseClickadu(clickadu, enabled: true))
       ..setPlaybackPopunderNetwork(AdNetwork.clickadu);
 
     test('the published catalog runs the onclick tag for zone 2150355', () {
-      final config = ClickaduPlaybackAdsConfig.parse(clickadu, enabled: true);
+      final config = parseClickadu(clickadu, enabled: true);
       final popunder = config.activePopunder!;
       expect(popunder.network, AdNetwork.clickadu);
       expect(popunder.scriptUrl,
@@ -773,7 +776,7 @@ void main() {
       expect(popunder.zoneId, '2150355');
       expect(popunder.loadTimeout, const Duration(seconds: 10));
       expect(
-          ClickaduPlaybackAdsConfig.parse(clickadu, enabled: false)
+          parseClickadu(clickadu, enabled: false)
               .activePopunder,
           isNull);
     });
@@ -794,12 +797,12 @@ void main() {
         },
       ]) {
         expect(
-            ClickaduPlaybackAdsConfig.parse(jsonEncode({'popunder': popunder}),
+            parseClickadu(jsonEncode({'popunder': popunder}),
                     enabled: true)
                 .activePopunder,
             isNull);
       }
-      final direct = ClickaduPlaybackAdsConfig.parse(
+      final direct = parseClickadu(
               jsonEncode({
                 'popunder': {
                   'enabled': true,
@@ -812,7 +815,7 @@ void main() {
       expect(direct.trackedSmartlinkUrl,
           Uri.parse('https://clickadu.example/direct'));
       expect(
-          ClickaduPlaybackAdsConfig.parse(
+          parseClickadu(
                   jsonEncode({
                     'popunder': {
                       'enabled': true,
@@ -828,7 +831,7 @@ void main() {
 
     test('the tag finds its zone on its own script element', () {
       final html = playbackAdHtml(
-          ClickaduPlaybackAdsConfig.parse(clickadu, enabled: true).popunder!,
+          parseClickadu(clickadu, enabled: true).popunder!,
           PlaybackAdStage.streamFound);
       expect(
           html,
@@ -884,13 +887,13 @@ void main() {
       remote.setMockString(AppRemoteConfig.clickaduPlaybackAdsKey, clickadu);
       AppRemoteConfig.apply(remote, provider);
       expect(provider.playbackPopunderNetwork, AdNetwork.adsterra);
-      expect(provider.clickaduPlaybackAds.activePopunder, isNull);
+      expect(provider.popunderAdsFor(AdNetwork.clickadu).activePopunder, isNull);
       remote
         ..setMockBool(AppRemoteConfig.clickaduPlaybackEnabledKey, true)
         ..setMockString(AppRemoteConfig.playbackPopunderNetworkKey, 'Clickadu');
       AppRemoteConfig.apply(remote, provider);
       expect(provider.playbackPopunderNetwork, AdNetwork.clickadu);
-      expect(provider.clickaduPlaybackAds.activePopunder?.zoneId, '2150355');
+      expect(provider.popunderAdsFor(AdNetwork.clickadu).activePopunder?.zoneId, '2150355');
       for (final value in ['none', 'popads']) {
         remote.setMockString(AppRemoteConfig.playbackPopunderNetworkKey, value);
         AppRemoteConfig.apply(remote, provider);
@@ -957,6 +960,99 @@ void main() {
       await pumpHost(tester);
       expect(await service.streamFound(host), isTrue);
       expect(platform.controllers, isEmpty);
+    }, variant: android);
+  });
+
+  group('Monetag popup', () {
+    final monetag = File('docs/monetag_playback_ads.json').readAsStringSync();
+
+    PopunderAdsConfig parseMonetag(String raw, {bool enabled = true}) =>
+        PopunderAdsConfig.parse(raw,
+            network: AdNetwork.monetag, enabled: enabled);
+
+    String popunder(Map<String, Object> fields) =>
+        jsonEncode({'popunder': {'enabled': true, ...fields}});
+
+    test('config takes a zoned tag, a /401/ tag or a Direct Link', () {
+      final tag = parseMonetag(monetag).activePopunder!;
+      expect(tag.network, AdNetwork.monetag);
+      expect(tag.scriptUrl, Uri.parse('https://al5sm.com/tag.min.js'));
+      expect(tag.zoneId, '11983408');
+      expect(tag.loadTimeout, const Duration(seconds: 10));
+      expect(parseMonetag(monetag, enabled: false).activePopunder, isNull);
+      // Monetag's inline onclick snippet puts the zone in the script path.
+      final inline = parseMonetag(
+              popunder({'script_url': 'https://monetag.example/401/11983408'}))
+          .activePopunder!;
+      expect(inline.zoneId, isNull);
+      expect(
+          parseMonetag(popunder(
+                  {'mode': 'smartlink', 'url': 'https://monetag.example/4/1'}))
+              .activePopunder
+              ?.trackedSmartlinkUrl,
+          Uri.parse('https://monetag.example/4/1'));
+      for (final invalid in [
+        {'script_url': 'https://monetag.example/tag.min.js', 'zone_id': '1"2'},
+        {
+          'mode': 'smartlink',
+          'url': 'https://monetag.example/4/1',
+          'sub_id': 'fq'
+        },
+      ]) {
+        expect(parseMonetag(popunder(invalid)).activePopunder, isNull);
+      }
+    });
+
+    test('the tag reads its zone from data-zone and arms on load', () {
+      final html = playbackAdHtml(parseMonetag(monetag).popunder!,
+          PlaybackAdStage.streamFound);
+      expect(
+          html,
+          contains('<script defer data-cfasync="false" data-zone="11983408" '
+              'src="https://al5sm.com/tag.min.js"'));
+      expect(html, contains('onload="fqSignal(\'loaded\')"'));
+      expect(html, isNot(contains('data-clocid')));
+    });
+
+    test('Remote Config needs Monetag\'s own switch', () async {
+      final remote = FakeFirebaseRemoteConfig();
+      await AppRemoteConfig.configure(remote);
+      remote
+        ..setMockString(AppRemoteConfig.monetagPlaybackAdsKey, monetag)
+        ..setMockString(AppRemoteConfig.playbackPopunderNetworkKey, 'monetag');
+      AppRemoteConfig.apply(remote, provider);
+      expect(provider.playbackPopunderNetwork, AdNetwork.monetag);
+      expect(provider.popunderAdsFor(AdNetwork.monetag).activePopunder, isNull);
+      remote.setMockBool(AppRemoteConfig.monetagPlaybackEnabledKey, true);
+      AppRemoteConfig.apply(remote, provider);
+      expect(provider.popunderAdsFor(AdNetwork.monetag).activePopunder?.zoneId,
+          '11983408');
+    });
+
+    testWidgets('its popup opens in the ad page', (tester) async {
+      provider
+        ..setPopunderAdsConfig(parseMonetag(monetag))
+        ..setPlaybackPopunderNetwork(AdNetwork.monetag);
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      expect(opener.htmlLoads.single, contains('data-zone="11983408"'));
+      expect(
+          await opener.delegate!.onNavigationRequest!(NavigationRequest(
+              url: 'https://monetag.example/click', isMainFrame: true)),
+          NavigationDecision.prevent);
+      await tester.pump();
+      await tester.pump();
+      final page = platform.controllers.last;
+      expect(page.requests, [Uri.parse('https://monetag.example/click')]);
+      expect(find.byTooltip('Close ad'), findsNothing);
+      page.delegate!.onPageFinished!('https://advertiser.example/');
+      await tester.pump();
+      await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
     }, variant: android);
   });
 }

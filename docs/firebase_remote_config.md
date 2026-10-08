@@ -68,6 +68,8 @@ the format off. Selectors are case-insensitive and apply while the app runs.
 | --- | --- | --- | --- |
 | Banners | `banner_ad_network` (`adsterra`) | `adsterra_banner_enabled`, `adsterra_tv_enabled`, `adsterra_banners` | `clickadu_banner_enabled`, `clickadu_tv_enabled`, `clickadu_banners` |
 | Stream-found popup (Popunder / Smartlink / Direct Link) | `playback_popunder_network` (`adsterra`) | `adsterra_playback_enabled`, `adsterra_playback_ads` | `clickadu_playback_enabled`, `clickadu_playback_ads` |
+
+Monetag serves only the stream-found popup: `playback_popunder_network=monetag` with `monetag_playback_enabled` and `monetag_playback_ads`. See [Monetag popup](#monetag-popup).
 | Video pre-roll (VAST) | `vast_preroll_network` (`clickadu`) | `vast_preroll_enabled`, `vast_preroll.adsterra` | `vast_preroll_enabled`, `vast_preroll.clickadu` |
 
 The Social Bar before the media loader is Adsterra-only (`adsterra_playback_ads`
@@ -665,7 +667,7 @@ advertiser click or app-reported paid impression. Provider script downloads from
 workstation returned HTTP 403; native live fill and actual earnings still require
 validation on a mobile device with the remote switches enabled.
 
-### Choosing the popup network (Adsterra or Clickadu)
+### Choosing the popup network (Adsterra, Clickadu or Monetag)
 
 `playback_popunder_network` picks which network serves the stream-found popup.
 The Social Bar before the loader is Adsterra-only and stays controlled by
@@ -673,9 +675,11 @@ The Social Bar before the loader is Adsterra-only and stays controlled by
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `playback_popunder_network` | String | `adsterra` | `adsterra` uses `adsterra_playback_ads` (its `popunder` or experiment). `clickadu` uses `clickadu_playback_ads`. `none`, or any other value, shows no stream-found popup. Case-insensitive. |
+| `playback_popunder_network` | String | `adsterra` | `adsterra` uses `adsterra_playback_ads` (its `popunder` or experiment). `clickadu` uses `clickadu_playback_ads`. `monetag` uses `monetag_playback_ads`. `none`, or any other value, shows no stream-found popup. Case-insensitive. |
 | `clickadu_playback_enabled` | Boolean | `false` | Clickadu's own switch. Must be published remotely. |
 | `clickadu_playback_ads` | String (JSON) | `{}` | Clickadu's `popunder` placement. |
+| `monetag_playback_enabled` | Boolean | `false` | Monetag's own switch. Must be published remotely. |
+| `monetag_playback_ads` | String (JSON) | `{}` | Monetag's `popunder` placement. |
 
 Changing any of these while a popup is open closes it and continues playback.
 
@@ -708,6 +712,35 @@ Clickadu's tag snippet uses a protocol-relative `src` (`//driverhugoverblown.com
 origin (`appassets.androidplatform.net`), not the site the zone was approved
 for; confirm with Clickadu that the zone accepts in-app WebView traffic. Logs
 show the network, for example `[AdsterraPage] clickadu/streamFound: popup URL received`.
+
+### Monetag popup
+
+Monetag's Onclick (Popunder) runs exactly like Clickadu's onclick tag: the page
+shows **Continue to player**, the viewer's tap lets the tag open its window, and
+the app loads that URL in its own ad page with the held **Close ad**. It never
+opens an external browser. Continue is enabled once the tag's script loads.
+
+`monetag_playback_ads` takes the same `popunder` fields as Clickadu's. Monetag's
+dashboard gives the tag as inline JS; copy its parts into `popunder`:
+
+- A snippet that sets `s.dataset.zone='<zone>'` and `s.src='https://<domain>/tag.min.js'`:
+  use that `src` as `script_url` and the zone as `zone_id`. The app adds it to
+  the script element as `data-zone`.
+- A snippet like `s.src='https://'+d+'/401/'+z` with `('<domain>',<zone>,…)`:
+  use `https://<domain>/401/<zone>` as `script_url` and leave out `zone_id`.
+- A Monetag Direct Link: `mode: "smartlink"` and `url`. `sub_id` is rejected;
+  put any tracking parameters in the URL.
+
+[monetag_playback_ads.json](monetag_playback_ads.json) holds the flix.quest
+Onclick zone 11983408 (`https://al5sm.com/tag.min.js`). Publish it as
+`monetag_playback_ads`, publish `monetag_playback_enabled=true`,
+then set `playback_popunder_network=monetag`.
+
+Monetag ties onclick zones to a website (here `flix.quest`), but the app runs
+the tag on its placeholder origin (`appassets.androidplatform.net`), so it
+neither loads nor needs `flix.quest`. Monetag may fill or pay that traffic
+differently from site traffic. A Direct Link is not tied to a site at all and is
+the format Monetag offers for app traffic.
 
 ## Video pre-roll (VAST)
 

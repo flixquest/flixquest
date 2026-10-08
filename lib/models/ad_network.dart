@@ -6,7 +6,10 @@
 /// swapping providers is a change of the selector alone.
 enum AdNetwork {
   adsterra,
-  clickadu;
+  clickadu,
+
+  /// Popup only (stream-found stage); it has no banner or VAST formats here.
+  monetag;
 
   /// `none` and unknown values select no network.
   static AdNetwork? parse(String value) {

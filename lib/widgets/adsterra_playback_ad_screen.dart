@@ -22,8 +22,8 @@ enum _Phase { script, page }
 
 /// A visible, disposable ad surface with no hidden preloading or refresh.
 ///
-/// Script tags (Adsterra's Social Bar and Popunder, Clickadu's onclick tag) run
-/// in one WebView. Advertiser pages (Smartlinks, Direct Links and the popups a
+/// Script tags (Adsterra's Social Bar and Popunder, Clickadu's and Monetag's
+/// onclick tags) run in one WebView. Advertiser pages (Smartlinks, Direct Links and the popups a
 /// script emits) open in FlixQuest's own ad page,
 /// never in an external browser. On that page the close control and Back stay
 /// hidden until the final redirect has served visible content, capped at
@@ -618,10 +618,16 @@ String playbackAdHtml(PlaybackAdPlacement placement, PlaybackAdStage stage) {
   }
   final escape = const HtmlEscape(HtmlEscapeMode.attribute);
   final script = escape.convert(placement.scriptUrl.toString());
-  // Clickadu's onclick tag finds its zone on its own script element.
-  final zone = placement.zoneId == null
+  // Clickadu's and Monetag's onclick tags find their zone on their own
+  // script element.
+  final zoneAttribute = switch (placement.network) {
+    AdNetwork.clickadu => 'data-clocid',
+    AdNetwork.monetag => 'data-zone',
+    AdNetwork.adsterra => null,
+  };
+  final zone = placement.zoneId == null || zoneAttribute == null
       ? ''
-      : ' data-clocid="${escape.convert(placement.zoneId!)}"';
+      : ' $zoneAttribute="${escape.convert(placement.zoneId!)}"';
   final popunder = stage == PlaybackAdStage.streamFound;
   // Clickadu's tag fetches its ad (`/adx/get/`) a few seconds after its script
   // loads, and a tap before that opens nothing. Enable Continue only once

@@ -100,12 +100,14 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  ClickaduPlaybackAdsConfig _clickaduPlaybackAds =
-      const ClickaduPlaybackAdsConfig();
-  ClickaduPlaybackAdsConfig get clickaduPlaybackAds => _clickaduPlaybackAds;
+  /// Clickadu's and Monetag's popup catalogs, whichever one is selected.
+  Map<AdNetwork, PopunderAdsConfig> _popunderAds = const {};
 
-  void setClickaduPlaybackAdsConfig(ClickaduPlaybackAdsConfig config) {
-    _clickaduPlaybackAds = config;
+  PopunderAdsConfig popunderAdsFor(AdNetwork network) =>
+      _popunderAds[network] ?? PopunderAdsConfig(network);
+
+  void setPopunderAdsConfig(PopunderAdsConfig config) {
+    _popunderAds = Map.unmodifiable({..._popunderAds, config.network: config});
     notifyListeners();
   }
 
@@ -124,11 +126,11 @@ class AppDependencyProvider extends ChangeNotifier {
   ({
     AdNetwork? network,
     AdsterraPlaybackAdsConfig adsterra,
-    ClickaduPlaybackAdsConfig clickadu,
+    Map<AdNetwork, PopunderAdsConfig> popunders,
   }) get playbackAdsSelection => (
         network: _playbackPopunderNetwork,
         adsterra: _adsterraPlaybackAds,
-        clickadu: _clickaduPlaybackAds,
+        popunders: _popunderAds,
       );
 
   VastPrerollConfig _vastPreroll = const VastPrerollConfig();

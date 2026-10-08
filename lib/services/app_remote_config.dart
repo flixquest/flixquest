@@ -35,6 +35,8 @@ class AppRemoteConfig {
   static const playbackPopunderNetworkKey = 'playback_popunder_network';
   static const clickaduPlaybackEnabledKey = 'clickadu_playback_enabled';
   static const clickaduPlaybackAdsKey = 'clickadu_playback_ads';
+  static const monetagPlaybackEnabledKey = 'monetag_playback_enabled';
+  static const monetagPlaybackAdsKey = 'monetag_playback_ads';
   static const vastPrerollEnabledKey = 'vast_preroll_enabled';
   static const vastPrerollKey = 'vast_preroll';
   static const vastPrerollNetworkKey = 'vast_preroll_network';
@@ -82,6 +84,8 @@ class AppRemoteConfig {
       playbackPopunderNetworkKey: 'adsterra',
       clickaduPlaybackEnabledKey: false,
       clickaduPlaybackAdsKey: '{}',
+      monetagPlaybackEnabledKey: false,
+      monetagPlaybackAdsKey: '{}',
       vastPrerollEnabledKey: false,
       vastPrerollKey: '{}',
       vastPrerollNetworkKey: 'clickadu',
@@ -178,12 +182,16 @@ class AppRemoteConfig {
       enabled: playbackEnabled.source == ValueSource.valueRemote &&
           playbackEnabled.asBool(),
     ));
-    final clickaduEnabled = remoteConfig.getValue(clickaduPlaybackEnabledKey);
-    provider.setClickaduPlaybackAdsConfig(ClickaduPlaybackAdsConfig.parse(
-      remoteConfig.getString(clickaduPlaybackAdsKey),
-      enabled: clickaduEnabled.source == ValueSource.valueRemote &&
-          clickaduEnabled.asBool(),
-    ));
+    for (final (network, enabledKey, catalogKey) in [
+      (AdNetwork.clickadu, clickaduPlaybackEnabledKey, clickaduPlaybackAdsKey),
+      (AdNetwork.monetag, monetagPlaybackEnabledKey, monetagPlaybackAdsKey),
+    ]) {
+      provider.setPopunderAdsConfig(PopunderAdsConfig.parse(
+        remoteConfig.getString(catalogKey),
+        network: network,
+        enabled: _remoteBool(remoteConfig, enabledKey),
+      ));
+    }
     provider.setPlaybackPopunderNetwork(
         AdNetwork.parse(remoteConfig.getString(playbackPopunderNetworkKey)));
     provider.setVastPrerollConfig(VastPrerollConfig.parse(
