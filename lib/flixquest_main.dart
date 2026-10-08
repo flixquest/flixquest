@@ -4,6 +4,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flixquest/models/app_colors.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -56,38 +57,81 @@ class _FlixQuestState extends State<FlixQuest>
     try {
       await AppRemoteConfig.configure(_remoteConfig);
       await _fetchConfig();
-    } catch (_) {
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[PlaybackAdConfig] initialization failed: $error');
+      }
       // The persisted app configuration remains usable while Firebase is
       // temporarily unavailable.
     }
     if (mounted) {
       _remoteConfigSubscription = _remoteConfig.onConfigUpdated.listen(
         _onRemoteConfigUpdated,
-        onError: (_) {},
+        onError: (Object error) {
+          if (kDebugMode) {
+            debugPrint('[PlaybackAdConfig] real-time update error: $error');
+          }
+        },
       );
     }
   }
 
-  Future<void> _fetchConfig() async {
+  Future<void> _fetchConfig({bool requestPermissions = true}) async {
     try {
-      await _remoteConfig.fetchAndActivate();
-    } catch (_) {
+      final activated = await _remoteConfig.fetchAndActivate();
+      if (kDebugMode) {
+        debugPrint('[PlaybackAdConfig] fetch '
+            'status=${_remoteConfig.lastFetchStatus.name} '
+            'lastFetch=${_remoteConfig.lastFetchTime.toUtc().toIso8601String()} '
+            'activated=$activated');
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[PlaybackAdConfig] fetch failed: $error; '
+            'using previously activated/default values');
+      }
       // Cached/default values still provide a safe startup when offline.
     }
     if (mounted) {
       AppRemoteConfig.apply(_remoteConfig, widget.appDependencyProvider);
     }
-    await requestNotificationPermissions();
+    if (requestPermissions) await requestNotificationPermissions();
   }
 
   Future<void> _onRemoteConfigUpdated(RemoteConfigUpdate update) async {
     try {
-      await _remoteConfig.activate();
+      final activated = await _remoteConfig.activate();
+      if (kDebugMode) {
+        debugPrint('[PlaybackAdConfig] real-time update '
+            'keys=${update.updatedKeys.join(',')} activated=$activated');
+      }
       if (mounted) {
         AppRemoteConfig.apply(_remoteConfig, widget.appDependencyProvider);
       }
-    } catch (_) {
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[PlaybackAdConfig] real-time activation failed: $error');
+      }
       // Keep the last successfully activated configuration.
+    }
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    if (kDebugMode) unawaited(_refreshConfigAfterReload());
+  }
+
+  Future<void> _refreshConfigAfterReload() async {
+    try {
+      // Hot reload preserves initState and the provider's old catalog. Fetch
+      // and apply the current remote values without repeating permissions.
+      await AppRemoteConfig.configure(_remoteConfig);
+      await _fetchConfig(requestPermissions: false);
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[PlaybackAdConfig] reload refresh failed: $error');
+      }
     }
   }
 

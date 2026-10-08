@@ -2680,7 +2680,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     if (!mounted) return;
     await Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => AdsterraPlaybackGate(
+        builder: (context) => AdsterraPlaybackGate.buildLoader(context,
             television: widget.useTvControls,
             builder: (context) => TVVideoLoader(
                   download: false,
@@ -2710,7 +2710,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     );
     await Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => AdsterraPlaybackGate(
+        builder: (context) => AdsterraPlaybackGate.buildLoader(context,
             television: widget.useTvControls,
             builder: (context) => MovieVideoLoader(
                   download: false,
@@ -3454,7 +3454,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     _closePlayer();
     await navigator.pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => AdsterraPlaybackGate(
+        builder: (context) => AdsterraPlaybackGate.buildLoader(context,
             television: widget.useTvControls,
             builder: (context) => TVVideoLoader(
                   download: false,

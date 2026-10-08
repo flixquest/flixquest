@@ -563,7 +563,11 @@ fields are ignored by the updated app. Only overlapping active ads are blocked.
 - `interstitial`: shows Social Bar immediately before entering the movie/episode
   media loader. The loader is not constructed or started until the ad closes or
   fails. This includes Play Now, phone browse/detail/resume/episode entry points,
-  and player recommendation/episode transitions.
+  and player recommendation/episode transitions. When this placement is disabled,
+  playback builds the loader immediately, including its first frame; an enabled
+  stream-found popunder does not insert a before-loader screen. Set
+  `interstitial.enabled=false`, or remove the `interstitial` entry, to skip its
+  ad page and gate entirely.
 - `stream_found_experiment`: alternates Popunder then Smartlink after a playable
   stream is selected, before navigating to `player.dart`. The counter is saved
   per experiment `id` on the device, so restarting continues the sequence. Each
@@ -574,6 +578,11 @@ fields are ignored by the updated app. Only overlapping active ads are blocked.
   The supplied catalog uses it for the Smartlink. It applies only
   when the experiment is absent or disabled. A malformed enabled experiment
   disables this stage instead of silently loading a different placement.
+
+Popunder content starts loading only after a playable stream is selected and
+its ad screen opens. Movie and episode scraping does not create an ad WebView
+or start advertiser requests. Experiment variants are also selected at
+stream-found, so an abandoned scrape consumes no variant.
 
 Ads never open an external browser. Script tags (Social Bar, or a Popunder
 tag) run in one WebView whose main frame never navigates. Script-initiated
@@ -613,7 +622,7 @@ Per-stage fields:
 | `script_url` | Empty | In script mode, exact generated HTTPS `src`; numeric dashboard IDs are not script URLs. |
 | `url` | Empty | In Smartlink mode, exact HTTPS direct link. |
 | `sub_id` | Empty | Smartlink tracking label: 1–64 letters, digits, underscores or hyphens. Appends `psid` to the URL while preserving other query parameters. Prefer alphanumeric labels per Adsterra's guide. |
-| `load_timeout_ms` | `5000` | 500–10,000 milliseconds. Bounds script loading and each ad-page document until it shows content. Failure continues playback. |
+| `load_timeout_ms` | `5000` | 500–10,000 milliseconds (up to 30,000 for Monetag). Bounds script loading and each ad-page document until it shows content. Failure continues playback. |
 | `max_duration_seconds` | `30` | 5–120 seconds; upper bound for the whole ad, including the ad page. The viewer can close sooner once **Close ad** appears. |
 
 For the original Popunder placement, use `mode: "script"` and its generated
@@ -649,6 +658,17 @@ path when coming from video playback. Script loading, popup URLs, page
 starts/finishes, visible content, `close enabled reason=ad_served` or
 `cap_reached`, store hand-offs and the closing reason are logged under
 `[AdsterraPage]`.
+
+Android playback ad WebViews remove the `; wv` and `Version/4.0` user-agent
+markers before loading a script, hosted page or advertiser. The device details
+and installed Chromium version are retained, including for subsequent redirects;
+iOS uses its system user agent. This is scoped to playback ad WebViews.
+The app adds no `X-Requested-With` header. Android has discontinued WebView's
+automatic package-name header; its former allow-list API is now a no-op.
+See [Android's WebSettingsCompat reference](https://developer.android.com/reference/androidx/webkit/WebSettingsCompat#setRequestedWithHeaderOriginAllowList(android.webkit.WebSettings,%20java.util.Set%3Cjava.lang.String%3E)).
+Changing the user agent does not guarantee advertiser fill or make WebView
+identical to Chrome; JavaScript capabilities, cookies and other device signals
+can still differ. Logs report the applied user agent.
 
 A script download is not an interstitial-ready callback: the Social Bar view
 waits for a visible creative element, otherwise the load timeout continues
@@ -715,32 +735,118 @@ show the network, for example `[AdsterraPage] clickadu/streamFound: popup URL re
 
 ### Monetag popup
 
-Monetag's Onclick (Popunder) runs exactly like Clickadu's onclick tag: the page
-shows **Continue to player**, the viewer's tap lets the tag open its window, and
-the app loads that URL in its own ad page with the held **Close ad**. It never
-opens an external browser. Continue is enabled once the tag's script loads.
+Monetag's stream-found popup starts automatically inside FlixQuest, without a
+**Continue to player** tap. With `mode: "page"` or `mode: "script"`, the app
+shows **Loading advertisement…**, waits for the Onclick tag's `/5/<zone>/`
+options request to finish, then invokes its `onClickTrigger` hook once after
+a short initialization delay. The emitted popup URL opens in the same ad
+page used by Adsterra, with the held **Close ad**. HTTP redirects and
+`intent://` web targets stay in that ad page.
 
-`monetag_playback_ads` takes the same `popunder` fields as Clickadu's. Monetag's
-dashboard gives the tag as inline JS; copy its parts into `popunder`:
+The tag hook is a dependency of this automatic path. The app does not fake a
+trusted click or retry an activation. If the tag has no offer (HTTP 204),
+playback continues immediately. A missing hook, stalled tag or trigger that
+emits no URL is bounded by `load_timeout_ms` rather than leaving the viewer
+on Continue until the maximum duration. Other networks retain their existing
+activation behavior.
 
-- A snippet that sets `s.dataset.zone='<zone>'` and `s.src='https://<domain>/tag.min.js'`:
-  use that `src` as `script_url` and the zone as `zone_id`. The app adds it to
-  the script element as `data-zone`.
-- A snippet like `s.src='https://'+d+'/401/'+z` with `('<domain>',<zone>,…)`:
-  use `https://<domain>/401/<zone>` as `script_url` and leave out `zone_id`.
-- A Monetag Direct Link: `mode: "smartlink"` and `url`. `sub_id` is rejected;
-  put any tracking parameters in the URL.
+The hosted Monetag catalog allows 30 seconds for loading and 60 seconds for
+the entire ad screen. Once the tag reports loaded, its automatic popup gets
+a fresh 30-second loading window, still bounded by the overall 60-second
+limit. A completed HTTP 204 response continues playback immediately;
+increasing the timeout does not turn that empty response into an offer.
 
-[monetag_playback_ads.json](monetag_playback_ads.json) holds the flix.quest
-Onclick zone 11983408 (`https://al5sm.com/tag.min.js`). Publish it as
-`monetag_playback_ads`, publish `monetag_playback_enabled=true`,
-then set `playback_popunder_network=monetag`.
+Monetag registers zones to a website. On the app's placeholder origin
+(`appassets.androidplatform.net`) zone 11983408 answered its ad request with
+`204 No Content`, so the published catalog loads a page on flix.quest instead:
 
-Monetag ties onclick zones to a website (here `flix.quest`), but the app runs
-the tag on its placeholder origin (`appassets.androidplatform.net`), so it
-neither loads nor needs `flix.quest`. Monetag may fill or pay that traffic
-differently from site traffic. A Direct Link is not tied to a site at all and is
-the format Monetag offers for app traffic.
+- `mode: "page"` with `url`: the app loads that page in the ad WebView. The
+  page carries the tags and `PlaybackAd` signals. Its web Continue control
+  is covered by the app's loading surface during automatic activation.
+  [monetag_playback_ads.json](monetag_playback_ads.json) uses
+  `https://flix.quest/a/3ad05c8e4d`, served from
+  `public/a/3ad05c8e4d/index.html` in the flixquest-landing repo. It runs
+  Onclick zone 11983408 and the push tag for zone 11917894 (push does nothing
+  in a WebView, which has no Notification API).
+- `mode: "script"` runs the tag on the placeholder origin. From Monetag's inline
+  snippet, use `s.src` as `script_url` and `s.dataset.zone` as `zone_id` (sent
+  as `data-zone`). For a `/401/<zone>` snippet, use
+  `https://<domain>/401/<zone>` as `script_url` and leave out `zone_id`.
+- `mode: "smartlink"` with `url` opens a Monetag Direct Link, which is not tied
+  to a site. It loads automatically as soon as the ad screen opens, without
+  showing or waiting for **Continue to player**. `sub_id` is rejected; put any
+  tracking parameters in the URL.
+
+The existing hosted `mode: "page"` catalog needs no configuration change for
+automatic activation. A Direct Link remains an alternative that skips tag
+initialization: create a **Direct Link (SmartLink)** zone in Monetag and copy
+its exact HTTPS link from **Get tag**. To use it, set `monetag_playback_ads` to
+the following, replacing the placeholder with that link:
+
+```json
+{
+  "popunder": {
+    "enabled": true,
+    "mode": "smartlink",
+    "url": "<paste your Monetag HTTPS Direct Link here>",
+    "load_timeout_ms": 10000,
+    "max_duration_seconds": 30
+  }
+}
+```
+
+The app follows the Direct Link's redirects inside its ad page and enables
+**Close ad** after visible content settles, or after the five-second cap.
+The hosted page in `monetag_playback_ads.json` uses Onclick zone 11983408.
+Onclick and push zone IDs cannot be substituted for a Direct Link; use the
+link issued for its own zone.
+
+Publish the catalog as `monetag_playback_ads`, publish
+`monetag_playback_enabled=true`, then set `playback_popunder_network=monetag`.
+
+In a WebView, Monetag's tag hands its ad to Chrome with an `intent://` link
+instead of opening a window. The app loads that link's web page in its ad page.
+
+To debug an empty popup, check `[PlaybackAdConfig]` for the active mode, target
+and Remote Config value source. Editing `docs/monetag_playback_ads.json` does
+not publish it to Firebase. For the hosted setup, the playback log must say
+`presenting monetag page` and load `https://flix.quest/a/3ad05c8e4d`; a log
+saying `presenting monetag script` is using another active catalog value.
+Publish the JSON under `monetag_playback_ads` and check any conditional values
+that may override the default. The app activates real-time config updates.
+Debug builds fetch and activate config on hot reload as well as startup,
+with no minimum fetch interval; release builds retain the one-minute minimum.
+Fetch/activation failures are logged under `[PlaybackAdConfig]` in debug builds.
+An options request with HTTP 204 returned no offer, so the automatic trigger
+is not called. HTTP 204 was also observed on the hosted page during emulator
+testing; correcting the catalog selects the intended origin but does not
+guarantee that Monetag will return an offer.
+
+On 2026-10-08, a comparison in regular desktop Chrome returned HTTP 200
+from the same `/5/11983408/` endpoint. A real Continue click opened an
+advertiser page. The Monetag dashboard also confirmed that flix.quest is
+verified and issued the same `data-zone=11983408` and
+`https://al5sm.com/tag.min.js` used by the live hosted page. The emulator's
+FlixQuest WebView session instead returned HTTP 204 before activation.
+This rules out a completely unavailable zone or an incorrect hosted tag;
+it does not establish whether the differing response is due to the
+WebView, emulator, browser session, frequency limits or another delivery
+decision. Compare the same build on a real Android phone before changing
+the integration based on a presumed cause.
+
+The user also tested the hosted page with a real Continue tap in Chrome
+134 on the same Android emulator and reported that no advertiser opened.
+That failure occurs outside FlixQuest as well. The Android Chrome debug
+target disconnected before its request response could be inspected, so
+its HTTP status is unverified. The comparison points toward Android/emulator
+delivery or client compatibility; it does not prove emulator filtering or
+that real Android phones would fail.
+
+Hosting the tag on flix.quest supplies the publisher origin, but does not
+proxy the ad request through the website's server. The WebView still sends
+the request directly to Monetag with its own browser/device information.
+The account had no Direct Links during this check; an advertiser URL
+captured from a browser test must not be reused as a placement URL.
 
 ## Video pre-roll (VAST)
 
@@ -813,8 +919,9 @@ frame; `firstQuartile`, `midpoint`, `thirdQuartile`, `progress` offsets;
 mid-ad, and `ClickTracking`. Errors are reported through `[ERRORCODE]`: 100 bad
 XML, 301/302 wrapper timeout/limit, 303 no ad, 402 media timeout or stall, 403
 no playable media, 405 playback error. Tag requests and tracking use the
-system WebView's user agent, the same browser the click-through opens in, so
-the request, impression and click share one identity. Without a WebView they
+system WebView's user agent. The click-through opens in that WebView; on Android
+its ad page removes the WebView-specific markers as described above. Without a WebView,
+tag requests and tracking
 fall back to `Mozilla/5.0 (Linux; Android <version>; <model>) FlixQuest/<version>`.
 Logs use the `[VAST]` prefix. An advertiser link that answers with XML, JSON or
 text instead of a page closes the ad page immediately and the video ad resumes.

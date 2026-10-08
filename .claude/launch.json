@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "landing",
+      "runtimeExecutable": "/Users/beamlak/Library/Application Support/Herd/config/nvm/versions/node/v22.23.2/bin/node",
+      "runtimeArgs": ["/Users/beamlak/Documents/web/flixquest-landing/node_modules/vite/bin/vite.js", "/Users/beamlak/Documents/web/flixquest-landing", "--config", "/Users/beamlak/Documents/web/flixquest-landing/vite.config.js", "--port", "5173", "--strictPort"],
+      "port": 5173
+    }
+  ]
+}

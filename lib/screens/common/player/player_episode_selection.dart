@@ -135,7 +135,8 @@ class PlayerEpisodeSelection {
                               Navigator.pushReplacement(
                                 playerContext,
                                 MaterialPageRoute(
-                                  builder: (_) => AdsterraPlaybackGate(
+                                  builder: (context) =>
+                                      AdsterraPlaybackGate.buildLoader(context,
                                       television: useTvPlayer,
                                       builder: (context) => TVVideoLoader(
                                             download: false,

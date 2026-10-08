@@ -24,6 +24,28 @@ class AdsterraPlaybackAdsService {
   final Map<String, int> _rotation = {};
   bool _busy = false;
 
+  /// Lets route builders omit the waiting frame when no interstitial can run.
+  bool needsBeforeLoader(BuildContext context, {bool television = false}) =>
+      _eligible(context, television: television) &&
+      context
+              .read<AppDependencyProvider?>()
+              ?.adsterraPlaybackAds
+              .forStage(PlaybackAdStage.beforeLoader) !=
+          null;
+
+  bool _eligible(BuildContext context,
+      {bool download = false, bool television = false}) {
+    final state = WidgetsBinding.instance.lifecycleState;
+    return context.mounted &&
+        (state == null || state == AppLifecycleState.resumed) &&
+        !download &&
+        !television &&
+        !DevicePresentationService.instance.isTelevision &&
+        !kIsWeb &&
+        const {TargetPlatform.android, TargetPlatform.iOS}
+            .contains(defaultTargetPlatform);
+  }
+
   Future<bool> beforeLoader(BuildContext context,
           {bool download = false, bool television = false}) =>
       show(context, PlaybackAdStage.beforeLoader,
@@ -118,7 +140,7 @@ class AdsterraPlaybackAdsService {
       }
 
       debugPrint(
-          '[AdsterraPlayback] ${stage.name}: presenting ${selectedPlacement.network.name} ${selectedPlacement.isSmartlink ? 'smartlink' : 'script'} variant=${variantId ?? 'legacy'}');
+          '[AdsterraPlayback] ${stage.name}: presenting ${selectedPlacement.network.name} ${selectedPlacement.mode} variant=${variantId ?? 'legacy'}');
       provider.addListener(onConfigChanged);
       try {
         await navigator.push(route);

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:flutter/foundation.dart';
 
 import '../constants/api_constants.dart';
 import '../models/banner_ad.dart';
@@ -48,7 +49,8 @@ class AppRemoteConfig {
     await remoteConfig.setConfigSettings(
       RemoteConfigSettings(
         fetchTimeout: const Duration(minutes: 1),
-        minimumFetchInterval: const Duration(minutes: 1),
+        minimumFetchInterval:
+            kDebugMode ? Duration.zero : const Duration(minutes: 1),
       ),
     );
     await remoteConfig.setDefaults(const <String, Object>{
@@ -194,6 +196,36 @@ class AppRemoteConfig {
     }
     provider.setPlaybackPopunderNetwork(
         AdNetwork.parse(remoteConfig.getString(playbackPopunderNetworkKey)));
+    if (kDebugMode) {
+      final network = provider.playbackPopunderNetwork;
+      final catalogKey = switch (network) {
+        AdNetwork.adsterra => adsterraPlaybackAdsKey,
+        AdNetwork.clickadu => clickaduPlaybackAdsKey,
+        AdNetwork.monetag => monetagPlaybackAdsKey,
+        null => null,
+      };
+      final placement = network == AdNetwork.adsterra
+          ? provider.adsterraPlaybackAds.forStage(PlaybackAdStage.streamFound)
+          : network == null
+              ? null
+              : provider.popunderAdsFor(network).activePopunder;
+      final enabled = network == AdNetwork.adsterra
+          ? provider.adsterraPlaybackAds.enabled
+          : network != null && provider.popunderAdsFor(network).enabled;
+      final target =
+          placement?.pageUrl ?? placement?.smartlinkUrl ?? placement?.scriptUrl;
+      final source = catalogKey == null
+          ? 'none'
+          : remoteConfig.getValue(catalogKey).source.name;
+      final interstitialEnabled =
+          provider.adsterraPlaybackAds.forStage(PlaybackAdStage.beforeLoader) !=
+              null;
+      debugPrint('[PlaybackAdConfig] selected=${network?.name ?? 'none'} '
+          'catalog=${catalogKey ?? 'none'} source=$source '
+          'enabled=$enabled interstitialEnabled=$interstitialEnabled '
+          'mode=${placement?.mode ?? 'disabled/invalid'} '
+          'target=${target == null ? 'none' : '${target.origin}${target.path}'}');
+    }
     provider.setVastPrerollConfig(VastPrerollConfig.parse(
       remoteConfig.getString(vastPrerollKey),
       enabled: _remoteBool(remoteConfig, vastPrerollEnabledKey),

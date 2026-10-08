@@ -52,7 +52,7 @@ class PlayerMovieRecommendations {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => AdsterraPlaybackGate(
+            builder: (context) => AdsterraPlaybackGate.buildLoader(context,
                 television: useTvPlayer,
                 builder: (context) => MovieVideoLoader(
                       download: false,

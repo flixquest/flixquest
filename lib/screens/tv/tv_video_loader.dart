@@ -116,6 +116,7 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
   }
 
   Future<void> loadVideo() async {
+    if (!mounted) return;
     try {
       await _loadProviders();
       VideoProvider? selectedDownloadProvider;

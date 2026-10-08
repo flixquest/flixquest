@@ -93,16 +93,32 @@ class PlaybackAdPlacement {
   const PlaybackAdPlacement({
     this.scriptUrl,
     this.smartlinkUrl,
+    this.pageUrl,
     this.loadTimeout = const Duration(seconds: 5),
     this.maxDuration = const Duration(seconds: 30),
     this.subId,
     this.network = AdNetwork.adsterra,
     this.zoneId,
-  }) : assert((scriptUrl == null) != (smartlinkUrl == null));
+  }) : assert((scriptUrl != null ? 1 : 0) +
+                (smartlinkUrl != null ? 1 : 0) +
+                (pageUrl != null ? 1 : 0) ==
+            1);
 
   final Uri? scriptUrl;
   final Uri? smartlinkUrl;
   bool get isSmartlink => smartlinkUrl != null;
+
+  /// A page FlixQuest hosts with the network's tags, such as
+  /// `https://flix.quest/a/...`, so they run on the site their zone is
+  /// registered to. It supplies the same signals as the page the app builds
+  /// for [scriptUrl]; Monetag's stream-found tag is activated automatically.
+  final Uri? pageUrl;
+
+  String get mode => isSmartlink
+      ? 'smartlink'
+      : pageUrl != null
+          ? 'page'
+          : 'script';
   final Duration loadTimeout;
   final Duration maxDuration;
   final String? subId;
@@ -123,10 +139,11 @@ class PlaybackAdPlacement {
       {AdNetwork network = AdNetwork.adsterra}) {
     if (value is! Map || value['enabled'] != true) return null;
     final mode = value['mode'] ?? 'script';
-    if (mode != 'script' && mode != 'smartlink') return null;
+    if (mode != 'script' && mode != 'smartlink' && mode != 'page') return null;
     final script = mode == 'script' ? _https(value['script_url']) : null;
     final smartlink = mode == 'smartlink' ? _https(value['url']) : null;
-    if (script == null && smartlink == null) return null;
+    final page = mode == 'page' ? _https(value['url']) : null;
+    if (script == null && smartlink == null && page == null) return null;
     final subId = value['sub_id'];
     if (subId != null &&
         (!_identifier(subId) ||
@@ -155,11 +172,13 @@ class PlaybackAdPlacement {
     return PlaybackAdPlacement(
       scriptUrl: script,
       smartlinkUrl: smartlink,
+      pageUrl: page,
       subId: subId as String?,
       network: network,
       zoneId: network == AdNetwork.adsterra ? null : zoneId,
       loadTimeout: Duration(
-          milliseconds: _bounded(value['load_timeout_ms'], 5000, 500, 10000)),
+          milliseconds: _bounded(value['load_timeout_ms'], 5000, 500,
+              network == AdNetwork.monetag ? 30000 : 10000)),
       maxDuration: Duration(
           seconds: _bounded(value['max_duration_seconds'], 30, 5, 120)),
     );

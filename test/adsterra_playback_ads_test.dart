@@ -39,6 +39,15 @@ const experimentCatalog = '''{
   }
 }''';
 
+class _PlaybackRouteObserver extends NavigatorObserver {
+  final pushed = <Route<dynamic>>[];
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    pushed.add(route);
+  }
+}
+
 void main() {
   late FakeAdsterraWebViewPlatform platform;
   late AppDependencyProvider provider;
@@ -73,13 +82,17 @@ void main() {
         .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
   });
 
-  Future<void> pumpHost(WidgetTester tester) async {
+  Future<void> pumpHost(WidgetTester tester,
+      {NavigatorObserver? observer}) async {
     await tester.pumpWidget(ChangeNotifierProvider.value(
       value: provider,
-      child: MaterialApp(home: Scaffold(body: Builder(builder: (context) {
-        host = context;
-        return const Text('Title details');
-      }))),
+      child: MaterialApp(
+        navigatorObservers: [if (observer != null) observer],
+        home: Scaffold(body: Builder(builder: (context) {
+          host = context;
+          return const Text('Title details');
+        })),
+      ),
     ));
   }
 
@@ -661,10 +674,8 @@ void main() {
     await tester.pump();
     expect(storeLaunches, [Uri.parse('market://details?id=com.game')]);
     // Leaving for the store closes the ad; no web listing is loaded instead.
-    expect(page.requests, [
-      Uri.parse('https://ads.example/smartlink'),
-      Uri.parse('about:blank')
-    ]);
+    expect(page.requests,
+        [Uri.parse('https://ads.example/smartlink'), Uri.parse('about:blank')]);
     expect(continued, isFalse);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
@@ -720,6 +731,46 @@ void main() {
     expect(await result, isTrue);
   }, variant: android);
 
+  testWidgets('Android removes WebView UA markers before tag and popup loads',
+      (tester) async {
+    await pumpHost(tester);
+    final result = service.streamFound(host);
+    await pumpAd(tester);
+    final opener = platform.controllers.single;
+    const expectedAgent = 'Mozilla/5.0 (Linux; Android 16; TestDevice) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/153.0.8010.36 Mobile Safari/537.36';
+    expect(opener.documentUserAgents.first, expectedAgent);
+    opener.send('{"event":"offer","url":"https://offer.example/ad"}');
+    await tester.pump();
+    final page = platform.controllers.last;
+    expect(platform.controllers, hasLength(2));
+    expect(page.requests.first, Uri.parse('https://offer.example/ad'));
+    expect(page.documentUserAgents.first, expectedAgent);
+    page.delegate!.onPageFinished!('https://offer.example/ad');
+    await tester.pump();
+    await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+    await tester.tap(find.byTooltip('Close ad'));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+  }, variant: android);
+
+  testWidgets('iOS keeps its system user agent', (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final result = service.streamFound(host);
+    await pumpAd(tester);
+    final page = platform.controllers.single;
+    expect(page.assignedUserAgents, isEmpty);
+    page.delegate!.onPageFinished!('https://ads.example/smartlink');
+    await tester.pump();
+    await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+    await tester.tap(find.byTooltip('Close ad'));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+  }, variant: const TargetPlatformVariant({TargetPlatform.iOS}));
+
   testWidgets('failed script releases playback without another request',
       (tester) async {
     await pumpHost(tester);
@@ -737,7 +788,8 @@ void main() {
     await pumpHost(tester);
     var builds = 0;
     final route = Navigator.of(host).push<void>(MaterialPageRoute(
-        builder: (_) => AdsterraPlaybackGate(
+        builder: (context) => AdsterraPlaybackGate.buildLoader(
+              context,
               builder: (_) {
                 builds++;
                 return const Scaffold(body: Text('Media loader'));
@@ -754,6 +806,62 @@ void main() {
     Navigator.of(tester.element(find.text('Media loader'))).pop();
     await tester.pumpAndSettle();
     await route;
+  }, variant: android);
+
+  testWidgets('disabled interstitial builds the loader on its first frame',
+      (tester) async {
+    // Leave the popunder enabled: its switch must not create a before-loader
+    // gate when the independent interstitial placement is disabled.
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    var builds = 0;
+    final route = Navigator.of(host).push<void>(MaterialPageRoute(
+      builder: (context) => AdsterraPlaybackGate.buildLoader(
+        context,
+        builder: (_) {
+          builds++;
+          return const Scaffold(body: Text('Media loader'));
+        },
+      ),
+    ));
+    await tester.pump();
+    expect(builds, greaterThan(0));
+    // MaterialPageRoute measures its first frame offstage before animating.
+    expect(find.text('Media loader', skipOffstage: false), findsOneWidget);
+    expect(
+        find.byType(AdsterraPlaybackGate, skipOffstage: false), findsNothing);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+    expect(platform.controllers, isEmpty);
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.text('Media loader'))).pop();
+    await tester.pumpAndSettle();
+    await route;
+  }, variant: android);
+
+  testWidgets('disabled interstitial never pushes an advertisement route',
+      (tester) async {
+    final observer = _PlaybackRouteObserver();
+    await pumpHost(tester, observer: observer);
+    observer.pushed.clear();
+    for (final config in [
+      // The master switch is off, though both catalog placements are enabled.
+      AdsterraPlaybackAdsConfig.parse(catalog, enabled: false),
+      // Only the interstitial switch is off; the popunder remains enabled.
+      AdsterraPlaybackAdsConfig.parse(
+          catalog.replaceFirst('"interstitial":{"enabled":true',
+              '"interstitial":{"enabled":false'),
+          enabled: true),
+      // No interstitial placement was supplied.
+      AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true),
+    ]) {
+      provider.setAdsterraPlaybackAdsConfig(config);
+      expect(await service.beforeLoader(host), isTrue);
+      await tester.pump();
+      expect(observer.pushed, isEmpty);
+      expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+      expect(platform.controllers, isEmpty);
+    }
   }, variant: android);
 
   group('Clickadu popup', () {
@@ -775,10 +883,7 @@ void main() {
           Uri.parse('https://driverhugoverblown.com/on.js'));
       expect(popunder.zoneId, '2150355');
       expect(popunder.loadTimeout, const Duration(seconds: 10));
-      expect(
-          parseClickadu(clickadu, enabled: false)
-              .activePopunder,
-          isNull);
+      expect(parseClickadu(clickadu, enabled: false).activePopunder, isNull);
     });
 
     test('config rejects a tag without a zone and Adsterra sub IDs', () {
@@ -797,8 +902,7 @@ void main() {
         },
       ]) {
         expect(
-            parseClickadu(jsonEncode({'popunder': popunder}),
-                    enabled: true)
+            parseClickadu(jsonEncode({'popunder': popunder}), enabled: true)
                 .activePopunder,
             isNull);
       }
@@ -887,13 +991,15 @@ void main() {
       remote.setMockString(AppRemoteConfig.clickaduPlaybackAdsKey, clickadu);
       AppRemoteConfig.apply(remote, provider);
       expect(provider.playbackPopunderNetwork, AdNetwork.adsterra);
-      expect(provider.popunderAdsFor(AdNetwork.clickadu).activePopunder, isNull);
+      expect(
+          provider.popunderAdsFor(AdNetwork.clickadu).activePopunder, isNull);
       remote
         ..setMockBool(AppRemoteConfig.clickaduPlaybackEnabledKey, true)
         ..setMockString(AppRemoteConfig.playbackPopunderNetworkKey, 'Clickadu');
       AppRemoteConfig.apply(remote, provider);
       expect(provider.playbackPopunderNetwork, AdNetwork.clickadu);
-      expect(provider.popunderAdsFor(AdNetwork.clickadu).activePopunder?.zoneId, '2150355');
+      expect(provider.popunderAdsFor(AdNetwork.clickadu).activePopunder?.zoneId,
+          '2150355');
       for (final value in ['none', 'popads']) {
         remote.setMockString(AppRemoteConfig.playbackPopunderNetworkKey, value);
         AppRemoteConfig.apply(remote, provider);
@@ -964,14 +1070,23 @@ void main() {
   });
 
   group('Monetag popup', () {
-    final monetag = File('docs/monetag_playback_ads.json').readAsStringSync();
+    final hosted = File('docs/monetag_playback_ads.json').readAsStringSync();
+    final monetag = jsonEncode({
+      'popunder': {
+        'enabled': true,
+        'script_url': 'https://al5sm.com/tag.min.js',
+        'zone_id': '11983408',
+        'load_timeout_ms': 10000,
+      }
+    });
 
     PopunderAdsConfig parseMonetag(String raw, {bool enabled = true}) =>
         PopunderAdsConfig.parse(raw,
             network: AdNetwork.monetag, enabled: enabled);
 
-    String popunder(Map<String, Object> fields) =>
-        jsonEncode({'popunder': {'enabled': true, ...fields}});
+    String popunder(Map<String, Object> fields) => jsonEncode({
+          'popunder': {'enabled': true, ...fields}
+        });
 
     test('config takes a zoned tag, a /401/ tag or a Direct Link', () {
       final tag = parseMonetag(monetag).activePopunder!;
@@ -1003,9 +1118,125 @@ void main() {
       }
     });
 
+    test('the published catalog loads the page hosted on flix.quest', () {
+      final page = parseMonetag(hosted).activePopunder!;
+      expect(page.mode, 'page');
+      expect(page.pageUrl, Uri.parse('https://flix.quest/a/3ad05c8e4d'));
+      expect(page.scriptUrl, isNull);
+      expect(page.loadTimeout, const Duration(seconds: 30));
+      expect(page.maxDuration, const Duration(seconds: 60));
+      expect(
+          parseMonetag(popunder({'mode': 'page', 'url': 'http://flix.quest/a'}))
+              .activePopunder,
+          isNull);
+    });
+
+    test('Monetag permits longer loading while keeping bounded timeouts', () {
+      final placement = parseMonetag(popunder({
+        'mode': 'page',
+        'url': 'https://flix.quest/a/3ad05c8e4d',
+        'load_timeout_ms': 999999,
+        'max_duration_seconds': 999999,
+      })).activePopunder!;
+      expect(placement.loadTimeout, const Duration(seconds: 30));
+      expect(placement.maxDuration, const Duration(seconds: 120));
+    });
+
+    testWidgets('a hosted page starts its popup automatically in the ad page',
+        (tester) async {
+      provider
+        ..setPopunderAdsConfig(parseMonetag(hosted))
+        ..setPlaybackPopunderNetwork(AdNetwork.monetag);
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      expect(opener.htmlLoads, isEmpty);
+      expect(opener.requests, [Uri.parse('https://flix.quest/a/3ad05c8e4d')]);
+      // Vercel's own redirect for the page still loads in place.
+      expect(
+          await opener.delegate!.onNavigationRequest!(NavigationRequest(
+              url: 'https://flix.quest/a/3ad05c8e4d/', isMainFrame: true)),
+          NavigationDecision.navigate);
+      // A Chrome hand-off to the publisher is not the advertiser, even if
+      // it arrives before the first document-finished callback.
+      expect(
+          await opener.delegate!.onNavigationRequest!(NavigationRequest(
+              url: 'intent://flix.quest/a/3ad05c8e4d/?intnt_r=1'
+                  '#Intent;scheme=https;package=com.android.chrome;end',
+              isMainFrame: true)),
+          NavigationDecision.prevent);
+      await tester.pump();
+      expect(platform.controllers, hasLength(1));
+      expect(opener.javaScriptMode, JavaScriptMode.unrestricted);
+      opener.delegate!.onPageFinished!('https://flix.quest/a/3ad05c8e4d');
+      opener.send('{"event":"loaded"}');
+      await tester.pump();
+      expect(opener.evaluatedScripts, [monetagAutomaticPlaybackScript]);
+      expect(find.text('Loading advertisement…'), findsOneWidget);
+      // Duplicate finish callbacks must not install another trigger.
+      opener.delegate!.onPageFinished!('https://flix.quest/a/3ad05c8e4d');
+      await tester.pump(const Duration(seconds: 1));
+      expect(opener.evaluatedScripts, hasLength(1));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      // After it loads, a navigation is the tag's ad, even on flix.quest.
+      expect(
+          await opener.delegate!.onNavigationRequest!(NavigationRequest(
+              url: 'https://ads.example/offer', isMainFrame: true)),
+          NavigationDecision.prevent);
+      await tester.pump();
+      await tester.pump();
+      expect(platform.controllers.last.requests,
+          [Uri.parse('https://ads.example/offer')]);
+      await tester.pump(AdsterraPlaybackAdScreen.closeDelayCap);
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }, variant: android);
+
+    testWidgets('an empty automatic Monetag response continues playback',
+        (tester) async {
+      provider
+        ..setPopunderAdsConfig(parseMonetag(hosted))
+        ..setPlaybackPopunderNetwork(AdNetwork.monetag);
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      opener.send('{"event":"loaded"}');
+      opener.send('{"event":"empty"}');
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+      expect(platform.controllers, hasLength(1));
+      expect(opener.javaScriptMode, JavaScriptMode.disabled);
+      expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+      opener.delegate!.onPageFinished!('https://flix.quest/a/3ad05c8e4d');
+      await tester.pump();
+      expect(opener.evaluatedScripts, [monetagAutomaticPlaybackScript]);
+    }, variant: android);
+
+    testWidgets('a loaded tag without an automatic popup times out',
+        (tester) async {
+      provider
+        ..setPopunderAdsConfig(parseMonetag(hosted))
+        ..setPlaybackPopunderNetwork(AdNetwork.monetag);
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      await tester.pump(const Duration(seconds: 20));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      platform.controllers.single.send('{"event":"loaded"}');
+      await tester.pump(const Duration(seconds: 29));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+      expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+    }, variant: android);
+
     test('the tag reads its zone from data-zone and arms on load', () {
-      final html = playbackAdHtml(parseMonetag(monetag).popunder!,
-          PlaybackAdStage.streamFound);
+      final html = playbackAdHtml(
+          parseMonetag(monetag).popunder!, PlaybackAdStage.streamFound);
       expect(
           html,
           contains('<script defer data-cfasync="false" data-zone="11983408" '
@@ -1013,6 +1244,46 @@ void main() {
       expect(html, contains('onload="fqSignal(\'loaded\')"'));
       expect(html, isNot(contains('data-clocid')));
     });
+
+    testWidgets('a Direct Link loads automatically without a Continue tap',
+        (tester) async {
+      final url = Uri.parse('https://monetag.example/4/123?source=flixquest');
+      provider
+        ..setPopunderAdsConfig(parseMonetag(popunder({
+          'mode': 'smartlink',
+          'url': url.toString(),
+          'load_timeout_ms': 10000,
+        })))
+        ..setPlaybackPopunderNetwork(AdNetwork.monetag);
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      // No tag load signal or touch is needed to request the advertiser.
+      final page = platform.controllers.single;
+      expect(page.requests, [url]);
+      expect(page.htmlLoads, isEmpty);
+      expect(page.channel, isNull);
+      expect(find.text('Loading advertisement…'), findsOneWidget);
+      expect(find.byTooltip('Close ad'), findsNothing);
+      // A browser intent in the automatic redirect chain stays in this view.
+      expect(
+          await page.delegate!.onNavigationRequest!(NavigationRequest(
+              url: 'intent://advertiser.example/offer?source=flixquest'
+                  '#Intent;scheme=https;package=com.android.chrome;end',
+              isMainFrame: true)),
+          NavigationDecision.prevent);
+      await tester.pump();
+      expect(platform.controllers, hasLength(1));
+      expect(page.requests.last,
+          Uri.parse('https://advertiser.example/offer?source=flixquest'));
+      expect(storeLaunches, isEmpty);
+      page.delegate!.onPageFinished!(page.requests.last.toString());
+      await tester.pump();
+      await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }, variant: android);
 
     test('Remote Config needs Monetag\'s own switch', () async {
       final remote = FakeFirebaseRemoteConfig();
@@ -1050,6 +1321,68 @@ void main() {
       page.delegate!.onPageFinished!('https://advertiser.example/');
       await tester.pump();
       await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }, variant: android);
+
+    testWidgets('an automatic intent offer opens inside the ad page',
+        (tester) async {
+      provider
+        ..setPopunderAdsConfig(parseMonetag(hosted))
+        ..setPlaybackPopunderNetwork(AdNetwork.monetag);
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      opener.send(jsonEncode({
+        'event': 'offer',
+        'url': 'intent://advertiser.example/offer?source=flixquest'
+            '#Intent;scheme=https;package=com.android.chrome;end',
+      }));
+      await tester.pump();
+      await tester.pump();
+      final page = platform.controllers.last;
+      expect(page.requests,
+          [Uri.parse('https://advertiser.example/offer?source=flixquest')]);
+      expect(opener.javaScriptMode, JavaScriptMode.disabled);
+      expect(storeLaunches, isEmpty);
+      page.delegate!.onPageFinished!(page.requests.single.toString());
+      await tester.pump();
+      await tester.pump(AdsterraPlaybackAdScreen.redirectSettle);
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }, variant: android);
+
+    testWidgets('its hand-off to Chrome opens in the ad page instead',
+        (tester) async {
+      provider
+        ..setPopunderAdsConfig(parseMonetag(monetag))
+        ..setPlaybackPopunderNetwork(AdNetwork.monetag);
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      expect(opener.htmlLoads.single, contains('PerformanceObserver'));
+      // The same-page variant points back at the placeholder origin.
+      await opener.delegate!.onNavigationRequest!(NavigationRequest(
+          url: 'intent://appassets.androidplatform.net/adsterra/?x=1'
+              '#Intent;scheme=https;package=com.android.chrome;end',
+          isMainFrame: true));
+      await tester.pump();
+      expect(platform.controllers, hasLength(1));
+      expect(
+          await opener.delegate!.onNavigationRequest!(NavigationRequest(
+              url: 'intent://monetag.example/r?z=1'
+                  '#Intent;scheme=https;package=com.android.chrome;end',
+              isMainFrame: true)),
+          NavigationDecision.prevent);
+      await tester.pump();
+      await tester.pump();
+      expect(platform.controllers.last.requests,
+          [Uri.parse('https://monetag.example/r?z=1')]);
+      await tester.pump(AdsterraPlaybackAdScreen.closeDelayCap);
       await tester.tap(find.byTooltip('Close ad'));
       await tester.pumpAndSettle();
       expect(await result, isTrue);

@@ -10,16 +10,34 @@ class AdsterraPlaybackGate extends StatefulWidget {
   final WidgetBuilder builder;
   final bool television;
 
+  /// Disabled interstitials build the loader directly, without creating a gate.
+  static Widget buildLoader(BuildContext context,
+      {required WidgetBuilder builder, bool television = false}) {
+    if (!AdsterraPlaybackAdsService.instance
+        .needsBeforeLoader(context, television: television)) {
+      return builder(context);
+    }
+    return AdsterraPlaybackGate(builder: builder, television: television);
+  }
+
   @override
   State<AdsterraPlaybackGate> createState() => _AdsterraPlaybackGateState();
 }
 
 class _AdsterraPlaybackGateState extends State<AdsterraPlaybackGate> {
   bool _ready = false;
+  bool _checked = false;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_checked) return;
+    _checked = true;
+    if (!AdsterraPlaybackAdsService.instance
+        .needsBeforeLoader(context, television: widget.television)) {
+      _ready = true;
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final proceed = await AdsterraPlaybackAdsService.instance

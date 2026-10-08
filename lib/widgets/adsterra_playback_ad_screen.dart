@@ -73,6 +73,16 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   DateTime? _lastPointer;
   bool _finished = false;
 
+  /// Whether the hosted page ([PlaybackAdPlacement.pageUrl]) has loaded.
+  /// Until then its own redirects may navigate the script WebView.
+  bool _hostedPageLoaded = false;
+  bool _automaticMonetagInstalled = false;
+
+  bool get _automaticMonetag =>
+      widget.placement.network == AdNetwork.monetag &&
+      widget.stage == PlaybackAdStage.streamFound &&
+      !widget.placement.isSmartlink;
+
   // The script page keeps an immediate close; the ad page waits.
   bool get _closable =>
       !widget.holdClose || _phase == _Phase.script || _closeAllowed;
@@ -85,7 +95,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         Timer(widget.placement.maxDuration, () => _finish('max_duration'));
     final smartlink = widget.placement.trackedSmartlinkUrl;
     _log(
-        'starting mode=${smartlink != null ? 'smartlink' : 'script'} loadTimeoutMs=${widget.placement.loadTimeout.inMilliseconds}');
+        'starting mode=${widget.placement.mode} loadTimeoutMs=${widget.placement.loadTimeout.inMilliseconds}');
     if (smartlink != null) {
       unawaited(_openPage(smartlink));
     } else {
@@ -106,8 +116,10 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
 
   Future<void> _loadScript() async {
     try {
-      _log(
-          'loading script ${widget.placement.scriptUrl} base=${NetworkBannerWidget.documentBaseUrl}');
+      final hostedPage = widget.placement.pageUrl;
+      _log(hostedPage != null
+          ? 'loading hosted page $hostedPage'
+          : 'loading script ${widget.placement.scriptUrl} base=${NetworkBannerWidget.documentBaseUrl}');
       final controller = WebViewController();
       _script = controller;
       await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
@@ -120,8 +132,13 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       await controller.setNavigationDelegate(NavigationDelegate(
         onNavigationRequest: _onScriptNavigation,
         onPageStarted: (url) => _log('script document started ${_origin(url)}'),
-        onPageFinished: (url) =>
-            _log('script document finished ${_origin(url)}'),
+        onPageFinished: (url) {
+          _log('script document finished ${_origin(url)}');
+          if (Uri.tryParse(url)?.host == hostedPage?.host) {
+            _hostedPageLoaded = true;
+          }
+          if (url != 'about:blank') unawaited(_activateMonetag(controller));
+        },
         onWebResourceError: (error) {
           _log(
               'script resource error code=${error.errorCode} ${error.description} origin=${_origin(error.url ?? '')} path=${Uri.tryParse(error.url ?? '')?.path ?? ''} mainFrame=${error.isForMainFrame}');
@@ -136,23 +153,49 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       ));
       if (!mounted || _finished) return;
       setState(() {});
-      await controller.loadHtmlString(
-        playbackAdHtml(widget.placement, widget.stage),
-        baseUrl: NetworkBannerWidget.documentBaseUrl,
-      );
+      if (hostedPage != null) {
+        await controller.loadRequest(hostedPage);
+      } else {
+        await controller.loadHtmlString(
+          playbackAdHtml(widget.placement, widget.stage),
+          baseUrl: NetworkBannerWidget.documentBaseUrl,
+        );
+      }
     } catch (error) {
       _log('script unavailable ($error)');
       _finish('script_setup_error');
     }
   }
 
+  Future<void> _activateMonetag(WebViewController controller) async {
+    if (!_automaticMonetag ||
+        _automaticMonetagInstalled ||
+        !mounted ||
+        _finished ||
+        _page != null) {
+      return;
+    }
+    _automaticMonetagInstalled = true;
+    try {
+      _log('automatic activation installed; waiting for the tag options '
+          'mode=${widget.placement.mode}');
+      await controller.runJavaScript(monetagAutomaticPlaybackScript);
+    } catch (error) {
+      _log('automatic Monetag activation unavailable ($error)');
+      _finish('automatic_activation_error');
+    }
+  }
+
   void _onScriptMessage(JavaScriptMessage message) {
-    if (!mounted || _finished || _phase != _Phase.script) return;
+    if (!mounted || _finished || _phase != _Phase.script || _page != null) {
+      return;
+    }
     try {
       final payload = jsonDecode(message.message);
       switch (payload['event']) {
         case 'failed':
-          _log('script failure: ${payload['detail'] ?? 'script or page error'}');
+          _log(
+              'script failure: ${payload['detail'] ?? 'script or page error'}');
           _finish('script_failed');
         case 'done':
           _finish('continue_control');
@@ -162,18 +205,47 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           // The tag's own requests, to see where it stops before arming.
           _log('tag request ${payload['url']} ${payload['detail']}');
         case 'loaded':
-          // A loaded script is not proof of an impression. The Popunder is
-          // armed now and waits for the viewer's tap on Continue; the maximum
-          // duration still bounds the wait.
-          if (widget.stage == PlaybackAdStage.streamFound) _loadTimer?.cancel();
+          // A loaded script is not proof of an impression. Monetag starts
+          // automatically once its options request finishes; the other tags
+          // wait for the viewer's Continue tap.
+          if (_automaticMonetag) {
+            // Give the tag's asynchronous offer request its own load window,
+            // just as advertiser redirects reset the page's load window.
+            _loadTimer?.cancel();
+            _loadTimer = Timer(widget.placement.loadTimeout,
+                () => _finish('automatic_popup_timeout'));
+          } else if (widget.stage == PlaybackAdStage.streamFound) {
+            _loadTimer?.cancel();
+          }
+          final script = _script;
+          if (script != null) unawaited(_activateMonetag(script));
           _log(widget.placement.network == AdNetwork.clickadu
               ? 'tag fetched its ad; Continue enabled'
               : 'script loaded');
+        case 'activated':
+          _log('Monetag popup triggered automatically; waiting for its URL');
+        case 'empty':
+          _log('Monetag options returned HTTP 204 No Content; '
+              'no advertiser URL and no activation attempted '
+              'request=${payload['url'] ?? 'unknown'} '
+              'mode=${widget.placement.mode}');
+          if (widget.placement.network == AdNetwork.monetag &&
+              widget.placement.scriptUrl != null) {
+            _log('This tag is running on the placeholder origin. '
+                'For the registered site, publish mode=page with its hosted '
+                'URL in monetag_playback_ads.');
+          }
+          _finish('monetag_no_content');
         case 'rendered':
           _loadTimer?.cancel();
         case 'offer':
           final uri = Uri.tryParse(payload['url'] as String);
-          if (uri != null) _openPopup(uri);
+          final target = _webUrl(uri)
+              ? uri
+              : uri == null
+                  ? null
+                  : offerAppLink(uri)?.web;
+          if (target != null) _openPopup(target);
       }
     } catch (_) {
       // Ignore malformed messages from third-party content.
@@ -182,18 +254,37 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
 
   NavigationDecision _onScriptNavigation(NavigationRequest request) {
     final uri = Uri.tryParse(request.url);
-    // The document is loaded from a string, so any main-frame request comes
-    // from page script or a popup window. Never navigate this WebView itself:
+    // Once the document is in place, any main-frame request comes from page
+    // script or a popup window. Never navigate this WebView itself:
     // about:blank or the unresolvable base URL would replace the armed tag.
     if (!request.isMainFrame) {
       return _webUrl(uri)
           ? NavigationDecision.navigate
           : NavigationDecision.prevent;
     }
+    // The hosted page itself, including the host's own redirects (such as a
+    // trailing slash), loads here; after that it is the armed tag's document.
+    final hostedPage = widget.placement.pageUrl;
+    if (hostedPage != null &&
+        !_hostedPageLoaded &&
+        _webUrl(uri) &&
+        uri?.host == hostedPage.host) {
+      return NavigationDecision.navigate;
+    }
     _log(
         'script main-frame navigation scheme=${uri?.scheme} origin=${_origin(request.url)}');
-    if (_webUrl(uri) && request.url != NetworkBannerWidget.documentBaseUrl) {
-      _openPopup(uri!);
+    // Monetag's tag detects the WebView and hands its ad to Chrome with an
+    // intent:// link instead of a popup; show that link's web page here.
+    final target = _webUrl(uri)
+        ? uri
+        : uri == null
+            ? null
+            : offerAppLink(uri)?.web;
+    if (target != null &&
+        target.host != Uri.parse(NetworkBannerWidget.documentBaseUrl).host) {
+      _openPopup(target);
+    } else if (target != null) {
+      _log('ignored navigation back to the placeholder origin');
     }
     return NavigationDecision.prevent;
   }
@@ -203,6 +294,17 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       DateTime.now().difference(_lastPointer!) <= const Duration(seconds: 2);
 
   void _openPopup(Uri uri) {
+    if (!_webUrl(uri)) return;
+    final hostedPage = widget.placement.pageUrl;
+    if (hostedPage != null &&
+        uri.host == hostedPage.host &&
+        uri.path.replaceFirst(RegExp(r'/$'), '') ==
+            hostedPage.path.replaceFirst(RegExp(r'/$'), '')) {
+      // Monetag may first try to reopen the publisher page in Chrome. That
+      // is not the advertiser: keep the armed tag for the actual offer URL.
+      _log('ignored popup back to the hosted tag page');
+      return;
+    }
     // Social Bar advertiser links require a real touch. Popunder URLs may
     // arrive from the tag's delayed trigger after the Continue tap.
     if (widget.stage == PlaybackAdStage.beforeLoader && !_tappedRecently) {
@@ -250,7 +352,11 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           }
           return NavigationDecision.prevent;
         },
-        onPageStarted: _onPageStarted,
+        onPageStarted: (url) {
+          final started = Uri.tryParse(url);
+          if (_webUrl(started)) mainUrl = started!;
+          _onPageStarted(url);
+        },
         onPageFinished: (url) => _inspectPage(page, url),
         onWebResourceError: (error) {
           if (error.isForMainFrame == true) {
@@ -397,26 +503,28 @@ type:document.contentType});})()
     }
   }
 
-  static bool _debuggingEnabled = false;
-
   /// Ad tags set cookies from their own domains inside a page loaded from the
   /// app's placeholder origin; Android WebView blocks those third-party
   /// cookies by default. Debug builds can also be inspected from
   /// chrome://inspect.
   Future<void> _prepareAndroid(WebViewController controller) async {
-    final platform = controller.platform;
-    if (platform is! AndroidWebViewController) return;
-    try {
-      if (kDebugMode && !_debuggingEnabled) {
-        _debuggingEnabled = true;
-        await AndroidWebViewController.enableDebugging(true);
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        final userAgent = await controller.getUserAgent();
+        if (userAgent != null && userAgent.isNotEmpty) {
+          final browserAgent = userAgent
+              .replaceAll(RegExp(r';\s*wv(?=[;)])'), '')
+              .replaceAll(RegExp(r'\s+Version/4\.0\b'), '');
+          if (browserAgent != userAgent) {
+            await controller.setUserAgent(browserAgent);
+          }
+          _log('Android playback user agent: $browserAgent');
+        }
+      } catch (error) {
+        _log('user agent configuration unavailable ($error)');
       }
-      await AndroidWebViewCookieManager(
-              const PlatformWebViewCookieManagerCreationParams())
-          .setAcceptThirdPartyCookies(platform, true);
-    } catch (error) {
-      _log('third-party cookies unavailable ($error)');
     }
+    await _prepareAndroidController(controller);
   }
 
   bool _webUrl(Uri? uri) =>
@@ -459,10 +567,7 @@ type:document.contentType});})()
   }
 
   Future<void> _stop(WebViewController? controller) async {
-    try {
-      await controller?.setJavaScriptMode(JavaScriptMode.disabled);
-      await controller?.loadRequest(Uri.parse('about:blank'));
-    } catch (_) {}
+    await _stopPlaybackController(controller);
   }
 
   @override
@@ -482,7 +587,8 @@ type:document.contentType});})()
   @override
   Widget build(BuildContext context) {
     final controller = _phase == _Phase.page ? _page : _script;
-    final loadingPage = _phase == _Phase.page && !_pageReady;
+    final loadingPage = (_phase == _Phase.page && !_pageReady) ||
+        (_automaticMonetag && _phase == _Phase.script);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -520,12 +626,16 @@ type:document.contentType});})()
                   onPointerDown: (_) => _lastPointer = DateTime.now(),
                   child: Stack(children: [
                     Positioned.fill(child: _webView(controller)),
+                    if (_automaticMonetag && _phase == _Phase.script)
+                      const Positioned.fill(
+                          child: ColoredBox(color: Colors.black)),
                     if (loadingPage)
                       const Center(
                           child: Card(
                               child: Padding(
                         padding: EdgeInsets.all(16),
-                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
                           CircularProgressIndicator(),
                           SizedBox(height: 12),
                           Text('Loading advertisement…'),
@@ -552,6 +662,66 @@ type:document.contentType});})()
         key: ObjectKey(controller), params: params);
   }
 }
+
+bool _playbackDebuggingEnabled = false;
+
+Future<void> _prepareAndroidController(WebViewController controller) async {
+  final platform = controller.platform;
+  if (platform is! AndroidWebViewController) return;
+  try {
+    if (kDebugMode && !_playbackDebuggingEnabled) {
+      _playbackDebuggingEnabled = true;
+      await AndroidWebViewController.enableDebugging(true);
+    }
+    await AndroidWebViewCookieManager(
+            const PlatformWebViewCookieManagerCreationParams())
+        .setAcceptThirdPartyCookies(platform, true);
+  } catch (error) {
+    debugPrint('[AdsterraPage] third-party cookies unavailable ($error)');
+  }
+}
+
+Future<void> _stopPlaybackController(WebViewController? controller) async {
+  try {
+    await controller?.setJavaScriptMode(JavaScriptMode.disabled);
+    await controller?.loadRequest(Uri.parse('about:blank'));
+  } catch (_) {}
+}
+
+/// The current Onclick tag exposes onClickTrigger after loading its script,
+/// before its asynchronous `/5/<zone>/` options request finishes. Wait for that
+/// request and a short initialization grace period, then invoke the trigger
+/// once. This does not dispatch a click or claim a trusted user gesture.
+/// The screen's load timer bounds a missing hook/request; disabling JavaScript
+/// on close cancels this document and prevents late activation.
+@visibleForTesting
+const monetagAutomaticPlaybackScript = r'''
+(function(){
+ if(window.fqMonetagAutomatic)return;
+ window.fqMonetagAutomatic=true;
+ var readyAt=null;
+ var timer=setInterval(function(){
+  var requests=performance.getEntriesByType('resource').filter(function(entry){
+   try{return /^\/5\/\d+\/?$/.test(new URL(entry.name).pathname);}
+   catch(e){return false;}
+  });
+  if(!requests.length)return;
+  var request=requests[requests.length-1];
+  if(request.responseStatus===204){
+   clearInterval(timer);
+   PlaybackAd.postMessage(JSON.stringify({event:'empty',url:request.name}));
+   return;
+  }
+  if(typeof window.onClickTrigger!=='function')return;
+  if(readyAt===null){readyAt=Date.now()+500;return;}
+  if(Date.now()<readyAt)return;
+  clearInterval(timer);
+  PlaybackAd.postMessage(JSON.stringify({event:'activated'}));
+  try{window.onClickTrigger();}
+  catch(e){PlaybackAd.postMessage(JSON.stringify({event:'failed',detail:String(e)}));}
+ },100);
+})();
+''';
 
 /// The Play Store and web pages behind a market:// or intent:// offer link.
 /// `app` opens the store app; `web` is what the ad page can show instead.
@@ -591,11 +761,11 @@ type:document.contentType});})()
       final scheme = extras['scheme'];
       final page =
           web(fallback == null ? null : Uri.decodeComponent(fallback)) ??
-          (scheme == 'https' || scheme == 'http'
-              ? web('$scheme://${link.host}${link.path}'
-                  '${link.hasQuery ? '?${link.query}' : ''}')
-              : null) ??
-          listing(package);
+              (scheme == 'https' || scheme == 'http'
+                  ? web('$scheme://${link.host}${link.path}'
+                      '${link.hasQuery ? '?${link.query}' : ''}')
+                  : null) ??
+              listing(package);
       final app = package == null || package.isEmpty
           ? null
           : Uri(scheme: 'market', host: 'details', queryParameters: {
@@ -610,7 +780,9 @@ type:document.contentType});})()
 /// when a creative occupies visible space. The Continue control is a real DOM
 /// button that stays disabled until the Popunder tag has loaded, so the
 /// viewer's tap is the gesture the tag opens its popup from. Nothing clicks it
-/// programmatically. Defer the head script so document.body and the controls
+/// programmatically. Its tap is caught on the window in the capture phase,
+/// registered before the tag, so a tag that stops the click cannot leave
+/// Continue dead. Defer the head script so document.body and the controls
 /// exist when it runs.
 String playbackAdHtml(PlaybackAdPlacement placement, PlaybackAdStage stage) {
   if (placement.isSmartlink) {
@@ -639,6 +811,11 @@ var host=new URL('$script'.replace(/&amp;/g,'&')).host;
 try{new PerformanceObserver(function(list){list.getEntries().forEach(function(e){var u=new URL(e.name);if(u.host===host)fqSignal('request',u.pathname,Math.round(e.duration)+'ms status='+(e.responseStatus===undefined?'?':e.responseStatus));if(e.name.indexOf('/adx/get/')>=0)arm();});}).observe({type:'resource',buffered:true});}
 catch(e){window.fqTagLoaded=function(){fqSignal('script');arm();};}})();</script>'''
       : '';
+  // Monetag's tag loads its ad code from rotating domains; log every request
+  // so a tag that never opens anything shows where it stopped.
+  final trace = placement.network == AdNetwork.monetag
+      ? '''<script>try{new PerformanceObserver(function(list){list.getEntries().forEach(function(e){var u=new URL(e.name);fqSignal('request',u.host+u.pathname,Math.round(e.duration)+'ms status='+(e.responseStatus===undefined?'?':e.responseStatus));});}).observe({type:'resource',buffered:true});}catch(e){}</script>'''
+      : '';
   final onLoad = placement.network == AdNetwork.clickadu
       ? 'fqTagLoaded()'
       : "fqSignal('loaded')";
@@ -653,12 +830,13 @@ catch(e){window.fqTagLoaded=function(){fqSignal('script');arm();};}})();</script
 function fqSignal(event,url,detail){if(event==='loaded'){var b=document.getElementById("fq-continue");if(b){b.disabled=false;b.textContent="Continue to player";}}PlaybackAd.postMessage(JSON.stringify({event:event,url:url,detail:detail}));}
 window.addEventListener('error',function(event){fqSignal('failed',null,event.message||'script resource failed');});
 </script>
-${popunder ? '$armed<script defer data-cfasync="false"$zone src="$script" onload="$onLoad" onerror="fqSignal(\'failed\')"></script>' : ''}
+${popunder ? '$armed$trace<script defer data-cfasync="false"$zone src="$script" onload="$onLoad" onerror="fqSignal(\'failed\')"></script>' : ''}
 </head><body>
 ${popunder ? '''<main id="fq-controls"><button id="fq-continue" type="button" disabled>Loading…</button><div id="fq-note">Sponsored: an ad may open</div></main><script>
-document.getElementById("fq-continue").addEventListener("click",function(){
+window.addEventListener("click",function(event){
+ if(!event.target||event.target.id!=="fq-continue")return;
  setTimeout(function(){fqSignal("done");},750);
-});
+},true);
 </script>''' : '''<script>
 var fqVisible=false,fqAbsent=0;
 setInterval(function(){

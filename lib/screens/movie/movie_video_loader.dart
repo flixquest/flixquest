@@ -133,6 +133,7 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
   }
 
   Future<void> loadVideo() async {
+    if (!mounted) return;
     try {
       await _loadProviders();
       VideoProvider? selectedDownloadProvider;

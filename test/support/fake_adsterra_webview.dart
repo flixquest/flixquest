@@ -75,6 +75,11 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
   final htmlLoads = <String>[];
   final baseUrls = <String?>[];
   final requests = <Uri>[];
+  String? userAgent = 'Mozilla/5.0 (Linux; Android 16; TestDevice; wv) '
+      'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 '
+      'Chrome/153.0.8010.36 Mobile Safari/537.36';
+  final assignedUserAgents = <String?>[];
+  final documentUserAgents = <String?>[];
   JavaScriptMode? javaScriptMode;
   JavaScriptChannelParams? channel;
   FakeAdsterraNavigationDelegate? delegate;
@@ -83,6 +88,11 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
   /// The page inspection's JSON report; when null, [pageHasContent] answers.
   String? contentReport;
   final evaluatedScripts = <String>[];
+
+  @override
+  Future<void> runJavaScript(String javaScript) async {
+    evaluatedScripts.add(javaScript);
+  }
 
   @override
   Future<void> setOnConsoleMessage(
@@ -103,6 +113,15 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
   Future<void> setBackgroundColor(Color color) async {}
 
   @override
+  Future<String?> getUserAgent() async => userAgent;
+
+  @override
+  Future<void> setUserAgent(String? value) async {
+    userAgent = value;
+    assignedUserAgents.add(value);
+  }
+
+  @override
   Future<void> addJavaScriptChannel(JavaScriptChannelParams params) async {
     channel = params;
   }
@@ -116,6 +135,7 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
   @override
   Future<void> loadHtmlString(String html, {String? baseUrl}) async {
     htmlLoads.add(html);
+    documentUserAgents.add(userAgent);
     baseUrls.add(baseUrl);
     if (signalLoaded) send('loaded');
   }
@@ -126,6 +146,7 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
   @override
   Future<void> loadRequest(LoadRequestParams params) async {
     requests.add(params.uri);
+    documentUserAgents.add(userAgent);
   }
 }
 
