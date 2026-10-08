@@ -92,7 +92,7 @@ class AdsterraPlaybackAdsService {
       AdNetwork.clickadu ||
       AdNetwork.monetag =>
         selection?.popunders[network]?.activePopunder,
-      null => null,
+      AdNetwork.exoclick || null => null,
     };
     if (provider == null || placement == null) {
       _logSkip(stage,

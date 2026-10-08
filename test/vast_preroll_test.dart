@@ -52,6 +52,27 @@ String wrapperVast(String next) => '''<VAST version="3.0"><Ad id="w"><Wrapper>
 <ClickTracking><![CDATA[https://wrap.example/click]]></ClickTracking>
 </VideoClicks></Linear></Creative></Creatives></Wrapper></Ad></VAST>''';
 
+// Shaped like the ExoClick video zone's response: one InLine ad, skippable
+// after 5 s, a single MP4 without dimensions or bitrate, and only timed
+// progress tracking.
+const exoclickVast = '''<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="3.0"><Ad id="8679490"><InLine><AdSystem>ExoClick</AdSystem>
+<AdTitle/>
+<Impression id="msgtr"><![CDATA[https://exo.example/imp]]></Impression>
+<Error><![CDATA[https://exo.example/err?errorcode=[ERRORCODE]]]></Error>
+<Creatives><Creative sequence="1" id="154936984">
+<Linear skipoffset="00:00:05.0"><Duration>00:00:12.0</Duration>
+<TrackingEvents>
+<Tracking id="prog_1" event="progress" offset="00:00:10.000"><![CDATA[https://exo.example/p10]]></Tracking>
+<Tracking id="prog_2" event="progress" offset="00:00:02.000"><![CDATA[https://exo.example/p2]]></Tracking>
+</TrackingEvents>
+<VideoClicks><ClickThrough><![CDATA[https://exo.example/click]]></ClickThrough></VideoClicks>
+<MediaFiles>
+<MediaFile delivery="progressive" type="video/mp4"><![CDATA[https://cdn.exo.example/ad.mp4]]></MediaFile>
+</MediaFiles>
+<Icons><Icon><IconClicks><IconClickThrough>icon.example</IconClickThrough></IconClicks></Icon></Icons>
+</Linear></Creative></Creatives></InLine></Ad></VAST>''';
+
 void main() {
   group('VAST document', () {
     test('parses the inline ad, its skip offset and media', () {
@@ -189,6 +210,53 @@ void main() {
           everyElement(predicate<Uri>((url) =>
               url.queryParameters['c'] == '${VastError.wrapperLimit}')));
       expect(requests.where((url) => url.host == 'wrap.example'), isNotEmpty);
+    });
+
+    test('plays the ExoClick response: one MP4 without dimensions', () async {
+      responses['exo.example/vast.php'] = http.Response(exoclickVast, 200);
+      final ad = await client.load(Uri.parse('https://exo.example/vast.php'),
+          timeout: const Duration(seconds: 5));
+      expect(ad!.adSystem, 'ExoClick');
+      expect(ad.duration, const Duration(seconds: 12));
+      expect(ad.skipAfter, const Duration(seconds: 5));
+      expect(ad.clickThrough, Uri.parse('https://exo.example/click'));
+      expect(ad.progress.map((event) => event.url.path), ['/p10', '/p2']);
+      final media = ad.pickMediaFile(maxHeight: 720, maxBitrate: 2500);
+      expect(media!.url, Uri.parse('https://cdn.exo.example/ad.mp4'));
+    });
+
+    test('asks networks in priority order until one fills', () async {
+      VastPrerollSource source(AdNetwork network, String host) =>
+          VastPrerollSource(
+              network: network, tagUrl: Uri.parse('https://$host/vast.xml'));
+      final sources = [
+        source(AdNetwork.exoclick, 'exo.example'),
+        source(AdNetwork.clickadu, 'cl.example'),
+      ];
+      // The first network has no fill: the second one plays.
+      responses['exo.example/vast.xml'] =
+          http.Response('<VAST version="3.0"/>', 200);
+      responses['cl.example/vast.xml'] = http.Response(inlineVast, 200);
+      var preroll = await client.loadPreroll(sources, maxHeight: 720);
+      expect(preroll!.source.network, AdNetwork.clickadu);
+      expect(preroll.media.url, Uri.parse('https://cdn.example/720.mp4'));
+
+      // The first network fills: the second one is never asked.
+      responses['exo.example/vast.xml'] = http.Response(exoclickVast, 200);
+      requests.clear();
+      preroll = await client.loadPreroll(sources, maxHeight: 720);
+      expect(preroll!.source.network, AdNetwork.exoclick);
+      expect(requests.map((url) => url.host), ['exo.example']);
+
+      // Nobody fills, or the player closed before asking.
+      responses.clear();
+      expect(await client.loadPreroll(sources, maxHeight: 720), isNull);
+      requests.clear();
+      expect(
+          await client.loadPreroll(sources,
+              maxHeight: 720, cancelled: () => true),
+          isNull);
+      expect(requests, isEmpty);
     });
 
     test('no fill, HTTP errors and timeouts return no ad', () async {
@@ -359,69 +427,95 @@ void main() {
     test('requires an HTTPS tag and keeps values in range', () {
       expect(
           VastPrerollConfig.parse('{}',
-                  enabled: true, network: AdNetwork.clickadu)
-              .isActive,
+              enabled: true, networks: [AdNetwork.clickadu]).isActive,
           isFalse);
       expect(
           VastPrerollConfig.parse('{"tag_url":"http://a.example/t.xml"}',
-                  enabled: true, network: AdNetwork.clickadu)
-              .isActive,
+              enabled: true, networks: [AdNetwork.clickadu]).isActive,
           isFalse);
       final config = VastPrerollConfig.parse(
           '{"tag_url":"https://a.example/t.xml","request_timeout_ms":999999,'
           '"max_wrappers":-3,"tv_enabled":true}',
           enabled: true,
-          network: AdNetwork.clickadu);
+          networks: [AdNetwork.clickadu]);
       expect(config.isActive, isTrue);
-      expect(config.requestTimeout, const Duration(seconds: 15));
-      expect(config.maxWrappers, 0);
+      expect(config.sources.single.requestTimeout, const Duration(seconds: 15));
+      expect(config.sources.single.maxWrappers, 0);
       expect(config.appliesTo(television: true), isTrue);
       final phoneOnly = VastPrerollConfig.parse(
           '{"tag_url":"https://a.example/t.xml"}',
           enabled: true,
-          network: AdNetwork.clickadu);
+          networks: [AdNetwork.clickadu]);
       expect(phoneOnly.appliesTo(television: false), isTrue);
       expect(phoneOnly.appliesTo(television: true), isFalse);
-      expect(
-          VastPrerollConfig.parse('{"tag_url":"https://a.example/t.xml"}',
-                  enabled: false, network: AdNetwork.clickadu)
-              .isActive,
-          isFalse);
+      final off = VastPrerollConfig.parse(
+          '{"tag_url":"https://a.example/t.xml"}',
+          enabled: false,
+          networks: [AdNetwork.clickadu]);
+      expect(off.isActive, isFalse);
+      expect(off.sourcesFor(television: false), isEmpty);
     });
 
     test('vast_preroll_network picks that network\'s section', () {
       const catalog = '{"clickadu":{"tag_url":"https://cl.example/t.xml",'
           '"tv_enabled":true},'
-          '"adsterra":{"tag_url":"https://at.example/t.xml",'
+          '"exoclick":{"tag_url":"https://exo.example/vast.php?idz=1",'
           '"request_timeout_ms":2000}}';
       final clickadu = VastPrerollConfig.parse(catalog,
-          enabled: true, network: AdNetwork.clickadu);
+          enabled: true, networks: [AdNetwork.clickadu]).sources.single;
       expect(clickadu.network, AdNetwork.clickadu);
       expect(clickadu.tagUrl, Uri.parse('https://cl.example/t.xml'));
       expect(clickadu.tvEnabled, isTrue);
-      final adsterra = VastPrerollConfig.parse(catalog,
-          enabled: true, network: AdNetwork.adsterra);
-      expect(adsterra.tagUrl, Uri.parse('https://at.example/t.xml'));
-      expect(adsterra.requestTimeout, const Duration(seconds: 2));
-      expect(adsterra.tvEnabled, isFalse);
+      final exoclick = VastPrerollConfig.parse(catalog,
+          enabled: true, networks: [AdNetwork.exoclick]).sources.single;
+      expect(exoclick.network, AdNetwork.exoclick);
+      expect(exoclick.tagUrl, Uri.parse('https://exo.example/vast.php?idz=1'));
+      expect(exoclick.requestTimeout, const Duration(seconds: 2));
+      expect(exoclick.tvEnabled, isFalse);
       expect(
-          VastPrerollConfig.parse(catalog, enabled: true, network: null)
+          VastPrerollConfig.parse(catalog, enabled: true, networks: const [])
               .isActive,
           isFalse);
       // A network without a section plays nothing.
       expect(
           VastPrerollConfig.parse(
-                  '{"clickadu":{"tag_url":"https://cl.example/t.xml"}}',
-                  enabled: true,
-                  network: AdNetwork.adsterra)
-              .isActive,
+              '{"clickadu":{"tag_url":"https://cl.example/t.xml"}}',
+              enabled: true,
+              networks: [AdNetwork.exoclick]).isActive,
           isFalse);
-      // A flat catalog from before the selector serves the selected network.
+      // A flat catalog from before the selector serves the first network.
+      final flat = VastPrerollConfig.parse(
+          '{"tag_url":"https://a.example/t.xml"}',
+          enabled: true,
+          networks: [AdNetwork.exoclick, AdNetwork.clickadu]);
       expect(
-          VastPrerollConfig.parse('{"tag_url":"https://a.example/t.xml"}',
-                  enabled: true, network: AdNetwork.adsterra)
-              .tagUrl,
-          Uri.parse('https://a.example/t.xml'));
+          flat.sources.map((source) => source.network), [AdNetwork.exoclick]);
+      expect(flat.sources.single.tagUrl, Uri.parse('https://a.example/t.xml'));
+    });
+
+    test('a priority list keeps its order and skips networks without a tag',
+        () {
+      expect(AdNetwork.parseList(' ExoClick, clickadu ,bogus,exoclick'),
+          [AdNetwork.exoclick, AdNetwork.clickadu]);
+      expect(AdNetwork.parseList('none'), isEmpty);
+      expect(AdNetwork.parseList(''), isEmpty);
+      const catalog = '{"clickadu":{"tag_url":"https://cl.example/t.xml",'
+          '"tv_enabled":true},'
+          '"exoclick":{"tag_url":"https://exo.example/vast.php?idz=1"}}';
+      final config = VastPrerollConfig.parse(catalog,
+          enabled: true,
+          networks: AdNetwork.parseList('adsterra,exoclick,clickadu'));
+      expect(config.sources.map((source) => source.network),
+          [AdNetwork.exoclick, AdNetwork.clickadu]);
+      // TV asks only the networks that accept TV traffic.
+      expect(
+          config.sourcesFor(television: true).map((source) => source.network),
+          [AdNetwork.clickadu]);
+      expect(
+          config,
+          VastPrerollConfig.parse(catalog,
+              enabled: true,
+              networks: [AdNetwork.exoclick, AdNetwork.clickadu]));
     });
   });
 

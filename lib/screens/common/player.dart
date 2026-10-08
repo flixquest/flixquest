@@ -557,7 +557,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         // The ad replaces the branded intro for this session: one pre-roll
         // keeps the wait before the content short.
         _preRollActive = true;
-        _startAdSession(prerollAd.ad, prerollAd.media);
+        _startAdSession(prerollAd);
         await _betterPlayerController.setupDataSourceWithPreRoll(
           preRollDataSource: _buildAdDataSource(prerollAd.media),
           betterPlayerDataSource: dataSource,
@@ -598,22 +598,20 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     }
   }
 
-  Future<({VastAd ad, VastMediaFile media})?> _loadPrerollAd() async {
-    final config = _appDependencies.vastPreroll;
-    if (!config.appliesTo(television: widget.useTvControls)) return null;
+  /// The first ad from the networks `vast_preroll_network` lists, asked in
+  /// order.
+  Future<VastPreroll?> _loadPrerollAd() async {
+    final sources = _appDependencies.vastPreroll
+        .sourcesFor(television: widget.useTvControls);
+    if (sources.isEmpty) return null;
     try {
       final client = _vastClient ??= VastClient();
-      final ad = await client.load(
-        config.tagUrl!,
-        timeout: config.requestTimeout,
-        maxWrappers: config.maxWrappers,
-      );
-      if (ad == null) return null;
-      final media = ad.pickMediaFile(
+      return await client.loadPreroll(
+        sources,
         maxHeight: widget.useTvControls ? 1080 : 720,
         maxBitrate: widget.useTvControls ? 8000 : 2500,
+        cancelled: () => !mounted,
       );
-      return media == null ? null : (ad: ad, media: media);
     } catch (error) {
       debugPrint('[VAST] pre-roll unavailable: $error');
       return null;
@@ -630,12 +628,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     );
   }
 
-  void _startAdSession(VastAd ad, VastMediaFile media) {
+  void _startAdSession(VastPreroll preroll) {
     final session = VastAdSession(
-      ad: ad,
-      media: media,
+      ad: preroll.ad,
+      media: preroll.media,
       ping: _vastClient!.send,
-      startTimeout: _appDependencies.vastPreroll.startTimeout,
+      startTimeout: preroll.source.startTimeout,
     );
     // Failure or Skip: the native sequence moves to the content at its start
     // position, exactly as when the ad ends on its own.

@@ -202,7 +202,7 @@ class AppRemoteConfig {
         AdNetwork.adsterra => adsterraPlaybackAdsKey,
         AdNetwork.clickadu => clickaduPlaybackAdsKey,
         AdNetwork.monetag => monetagPlaybackAdsKey,
-        null => null,
+        AdNetwork.exoclick || null => null,
       };
       final placement = network == AdNetwork.adsterra
           ? provider.adsterraPlaybackAds.forStage(PlaybackAdStage.streamFound)
@@ -229,8 +229,14 @@ class AppRemoteConfig {
     provider.setVastPrerollConfig(VastPrerollConfig.parse(
       remoteConfig.getString(vastPrerollKey),
       enabled: _remoteBool(remoteConfig, vastPrerollEnabledKey),
-      network: AdNetwork.parse(remoteConfig.getString(vastPrerollNetworkKey)),
+      networks:
+          AdNetwork.parseList(remoteConfig.getString(vastPrerollNetworkKey)),
     ));
+    if (kDebugMode) {
+      final preroll = provider.vastPreroll;
+      debugPrint('[VAST] config enabled=${preroll.enabled} order='
+          '${preroll.sources.map((source) => source.network.name).join(',')}');
+    }
     final parsedInstances = parseApiInstances(instancesRaw);
     final legacyUrl = remoteConfig.getString(flixquestApiUrlKey).trim();
     provider.setFlixquestApiConfig(

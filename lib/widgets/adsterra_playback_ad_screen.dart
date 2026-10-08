@@ -795,7 +795,7 @@ String playbackAdHtml(PlaybackAdPlacement placement, PlaybackAdStage stage) {
   final zoneAttribute = switch (placement.network) {
     AdNetwork.clickadu => 'data-clocid',
     AdNetwork.monetag => 'data-zone',
-    AdNetwork.adsterra => null,
+    AdNetwork.adsterra || AdNetwork.exoclick => null,
   };
   final zone = placement.zoneId == null || zoneAttribute == null
       ? ''

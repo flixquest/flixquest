@@ -68,9 +68,14 @@ the format off. Selectors are case-insensitive and apply while the app runs.
 | --- | --- | --- | --- |
 | Banners | `banner_ad_network` (`adsterra`) | `adsterra_banner_enabled`, `adsterra_tv_enabled`, `adsterra_banners` | `clickadu_banner_enabled`, `clickadu_tv_enabled`, `clickadu_banners` |
 | Stream-found popup (Popunder / Smartlink / Direct Link) | `playback_popunder_network` (`adsterra`) | `adsterra_playback_enabled`, `adsterra_playback_ads` | `clickadu_playback_enabled`, `clickadu_playback_ads` |
+| Video pre-roll (VAST) | `vast_preroll_network` (`clickadu`) | `vast_preroll_enabled`, `vast_preroll.adsterra` | `vast_preroll_enabled`, `vast_preroll.clickadu` |
 
 Monetag serves only the stream-found popup: `playback_popunder_network=monetag` with `monetag_playback_enabled` and `monetag_playback_ads`. See [Monetag popup](#monetag-popup).
-| Video pre-roll (VAST) | `vast_preroll_network` (`clickadu`) | `vast_preroll_enabled`, `vast_preroll.adsterra` | `vast_preroll_enabled`, `vast_preroll.clickadu` |
+
+ExoClick serves only the video pre-roll, from `vast_preroll.exoclick`. The
+pre-roll selector also takes a priority list such as `exoclick,clickadu`: the
+next network is asked when the one before it has no ad. See
+[Video pre-roll (VAST)](#video-pre-roll-vast).
 
 The Social Bar before the media loader is Adsterra-only (`adsterra_playback_ads`
 `interstitial`). Switching a selector closes an active popup and replaces live
@@ -80,8 +85,9 @@ To add another network in code: add it to `AdNetwork`
 (`lib/models/ad_network.dart`). The compiler then points at each place that
 needs its formats: a `BannerAdUnit` subclass and its catalog parse in
 `lib/models/banner_ads_config.dart`, its keys in `AppRemoteConfig`, and the
-popup placement in `AdsterraPlaybackAdsService`. VAST tags need no code: any
-network's tag goes in its own `vast_preroll` section.
+popup placement in `AdsterraPlaybackAdsService`. A VAST-only network needs
+nothing beyond the enum value: its tag goes in its own `vast_preroll` section,
+named after the enum value.
 
 ## Ad network and banner configuration
 
@@ -858,25 +864,35 @@ two ads. Disable one of them unless that is intended.
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `vast_preroll_enabled` | Boolean | `false` | Explicitly published switch. Turning it off stops new pre-rolls; an ad already playing finishes. |
-| `vast_preroll_network` | String | `clickadu` | Which network's section of `vast_preroll` plays: `clickadu` or `adsterra`. `none` or any other value plays no pre-roll. |
+| `vast_preroll_network` | String | `clickadu` | Which networks' sections of `vast_preroll` are asked, in priority order: one name (`exoclick`) or a comma-separated list (`exoclick,clickadu`). Names are `clickadu`, `exoclick` or `adsterra`. Unknown names and repeats are dropped; `none` or an empty value plays no pre-roll. |
 | `vast_preroll` | String (JSON) | `{}` | Each network's tag and limits, under the network's name. |
 
 Copy [vast_preroll.json](vast_preroll.json) into `vast_preroll` and publish
 `vast_preroll_enabled=true`. It holds the Clickadu video zone's tag (zone
-2150357) under `clickadu`:
+2150357) under `clickadu` and the ExoClick in-stream zone's tag ("FQ video
+roll", zone 6050988) under `exoclick`:
 
 ```json
 {
   "clickadu": {"tag_url": "https://detoxifylagoonsnugness.com/ceef/gdt3g0/tbt/2150357/tlk.xml"},
-  "adsterra": {"tag_url": "https://…/your-adsterra-vast-tag.xml"}
+  "exoclick": {"tag_url": "https://s.magsrv.com/v1/vast.php?idz=6050988"}
 }
 ```
 
-To swap networks, add the other network's section and publish
-`vast_preroll_network` with its name. A selected network without a section
-plays nothing. A flat object with `tag_url` at the top level (the format
-before `vast_preroll_network`) still works and serves whichever network is
-selected.
+Every network goes through the same VAST client, ad session and overlay; only
+its section differs. To swap networks, publish `vast_preroll_network` with the
+other name. To use both, publish a list such as `exoclick,clickadu`. The first
+network is asked first. Only when it returns no playable ad (no fill, an HTTP
+error, invalid XML, the wrapper limit, or its `request_timeout_ms` running out)
+is the next one asked, and so on. The first ad returned plays, with the
+`start_timeout_ms` of the network that served it. Each network asked adds up to
+its own `request_timeout_ms` to the wait before the content, so give fallbacks
+a short budget. A no-fill answer is usually fast. A listed network without a
+section, or without `tv_enabled` on TV, is passed over. A flat object with
+`tag_url` at the top level (the format before `vast_preroll_network`) still
+works and serves the first listed network. Debug builds log the order in effect
+as `[VAST] config enabled=… order=exoclick,clickadu` and the network that
+filled as `[VAST] pre-roll from exoclick`.
 
 Each section takes these fields:
 
@@ -937,3 +953,25 @@ falling back to 180p.
 
 Ask Clickadu which macros they expect from an app (there is no page URL) and
 for confirmation that in-app requests are accepted and counted.
+
+ExoClick's in-stream zone 6050988 was checked on 2026-10-08: it answers with a
+VAST 3.0 InLine ad (no wrapper), a 12-second linear creative skippable after
+5 seconds, and one progressive MP4 without `width`, `height` or `bitrate`. That
+file is used whatever the device's rendition cap. Its only tracking is timed
+`progress` events,
+sent as each offset passes, and the impression fires on the first frame. The
+`Icons` element and ExoClick's `TitleCTA` extension (a "View More" bar) are not
+drawn; **Visit advertiser** uses the `ClickThrough`. The response sets a
+5-minute `zone-cap-6050988` cookie. Tag requests keep no cookies, so ExoClick's
+server-side rules decide frequency.
+
+ExoClick's dashboard also offers a Client Hints meta tag (`Delegate-CH` for
+`s.magsrv.com`). It is for web pages that load the tag in a browser. The app
+requests the tag natively, so there is no page to put it in. The request's
+user agent, the system WebView's own, already carries the Android version and
+device model.
+
+Ask ExoClick for confirmation that in-app requests to this zone are accepted and
+counted, and check the zone's advertiser category filters. The 2026-10-08 test
+fill advertised an AI companion app, and ads must suit the app's content rating
+under Google Play's ads policy.

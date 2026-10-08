@@ -7,7 +7,15 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../models/vast_preroll_config.dart';
 import 'vast.dart';
+
+/// The pre-roll the player shows and the network that served it.
+typedef VastPreroll = ({
+  VastAd ad,
+  VastMediaFile media,
+  VastPrerollSource source,
+});
 
 /// Resolves a VAST tag to one playable linear ad and sends its tracking.
 ///
@@ -93,6 +101,35 @@ class VastClient {
       next = wrapper.wrapperTagUri!;
       depth++;
     }
+  }
+
+  /// Asks each network in [sources] in order and returns the first ad with a
+  /// rendition within the caps. A network is asked only after the one before
+  /// it returned no ad, so each adds at most its own request budget to the
+  /// wait. [cancelled] stops the chain, for example when the player closes.
+  Future<VastPreroll?> loadPreroll(
+    List<VastPrerollSource> sources, {
+    required int maxHeight,
+    int? maxBitrate,
+    bool Function()? cancelled,
+  }) async {
+    for (final source in sources) {
+      if (cancelled?.call() ?? false) return null;
+      try {
+        final ad = await load(source.tagUrl,
+            timeout: source.requestTimeout, maxWrappers: source.maxWrappers);
+        final media =
+            ad?.pickMediaFile(maxHeight: maxHeight, maxBitrate: maxBitrate);
+        if (ad != null && media != null) {
+          _log('pre-roll from ${source.network.name}');
+          return (ad: ad, media: media, source: source);
+        }
+        _log('no ad from ${source.network.name}');
+      } catch (error) {
+        _log('${source.network.name} unavailable ($error)');
+      }
+    }
+    return null;
   }
 
   Future<String> _get(Uri url, Duration timeout) async {
