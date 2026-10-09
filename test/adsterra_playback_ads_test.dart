@@ -115,6 +115,259 @@ void main() {
 
   final android = const TargetPlatformVariant({TargetPlatform.android});
 
+  testWidgets('native JSON content reports reveal the preloaded advertiser',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final preload = service.preloadStreamFound(host)!;
+    await tester.pump();
+    final page = platform.controllers.single
+      ..contentReport = jsonEncode({
+        'ready': true,
+        'textLength': 80,
+        'visibleElements': 1,
+        'title': 'A "sponsored" offer',
+        'type': 'text/html',
+      });
+    page.delegate!.onPageStarted!('https://offer.example/ad');
+    page.delegate!.onPageFinished!('https://offer.example/ad');
+    final result = service.streamFound(host, preload: preload);
+    await pumpAd(tester);
+    expect(find.text('Your video is ready'), findsNothing);
+    expect(find.text('Sponsored · offer.example'), findsOneWidget);
+    await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+    await tester.tap(find.byTooltip('Close ad'));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+  },
+      variant: const TargetPlatformVariant(
+          {TargetPlatform.android, TargetPlatform.iOS}));
+
+  testWidgets('Smartlink preload is reused and counts only its visible view',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final preload = service.preloadStreamFound(host)!;
+    await tester.pump();
+    final page = platform.controllers.single;
+    expect(page.requests.single, Uri.parse('https://ads.example/smartlink'));
+    expect(page.assignedUserAgents.single, isNot(contains('; wv')));
+    expect(platform.widgetParams, isEmpty);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+    page.delegate!.onPageStarted!('https://offer.example/ad');
+    page.delegate!.onPageFinished!('https://offer.example/ad');
+    await tester.pump(const Duration(seconds: 5));
+
+    final result = service.streamFound(host, preload: preload);
+    await pumpAd(tester);
+    expect(platform.controllers, hasLength(1));
+    expect(page.requests, hasLength(1));
+    expect(find.text('Sponsored · offer.example'), findsOneWidget);
+    expect(find.byTooltip('Close ad'), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+    expect(find.byTooltip('Close ad'), findsNothing);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.byTooltip('Close ad'));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+    expect(page.javaScriptMode, JavaScriptMode.disabled);
+  }, variant: android);
+
+  testWidgets('an in-flight preload keeps its original load deadline',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final preload = service.preloadStreamFound(host)!;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    final result = service.streamFound(host, preload: preload);
+    await pumpAd(tester);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+    expect(platform.controllers, hasLength(1));
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+    expect(
+        platform.controllers.single.requests
+            .where((url) => url.scheme == 'https'),
+        hasLength(1));
+  }, variant: android);
+
+  testWidgets('a preload timeout skips the ad without another request',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final preload = service.preloadStreamFound(host)!;
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(preload.unavailable, isTrue);
+    expect(await service.streamFound(host, preload: preload), isTrue);
+    await tester.pump();
+    expect(platform.controllers, hasLength(1));
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+  }, variant: android);
+
+  testWidgets('disposing during preload setup cannot start a late ad request',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    platform.setupGate = Completer<void>();
+    await pumpHost(tester);
+    final preload = service.preloadStreamFound(host)!;
+    preload.dispose();
+    platform.setupGate!.complete();
+    await tester.pump();
+    expect(await preload.ready, isNull);
+    expect(platform.controllers.single.requests,
+        everyElement(Uri.parse('about:blank')));
+    expect(platform.controllers.single.javaScriptMode, JavaScriptMode.disabled);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+  }, variant: android);
+
+  testWidgets('config changes and backgrounding stop unpresented preloads',
+      (tester) async {
+    final config =
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true);
+    provider.setAdsterraPlaybackAdsConfig(config);
+    await pumpHost(tester);
+    var preload = service.preloadStreamFound(host)!;
+    await tester.pump();
+    provider.setAdsterraPlaybackAdsConfig(const AdsterraPlaybackAdsConfig());
+    await tester.pump();
+    expect(preload.unavailable, isTrue);
+    expect(platform.controllers.single.javaScriptMode, JavaScriptMode.disabled);
+
+    provider.setAdsterraPlaybackAdsConfig(config);
+    preload = service.preloadStreamFound(host)!;
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    expect(preload.unavailable, isTrue);
+    expect(platform.controllers.last.javaScriptMode, JavaScriptMode.disabled);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+  }, variant: android);
+
+  testWidgets('ad timeout cancels a preload whose setup is still pending',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));
+    platform.setupGate = Completer<void>();
+    await pumpHost(tester);
+    final preload = service.preloadStreamFound(host)!;
+    final result = service.streamFound(host, preload: preload);
+    await pumpAd(tester);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+    expect(preload.unavailable, isTrue);
+    platform.setupGate!.complete();
+    await tester.pump();
+    expect(await preload.ready, isNull);
+    expect(platform.controllers.single.requests,
+        everyElement(Uri.parse('about:blank')));
+  }, variant: android);
+
+  testWidgets('a reused preload forwards later redirects and HTTP failures',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final preload = service.preloadStreamFound(host)!;
+    await tester.pump();
+    final page = platform.controllers.single;
+    page.delegate!.onPageStarted!('https://offer.example/ad');
+    page.delegate!.onPageFinished!('https://offer.example/ad');
+    final result = service.streamFound(host, preload: preload);
+    await pumpAd(tester);
+    page.delegate!.onPageStarted!('https://offer.example/final');
+    page.delegate!.onHttpError!(HttpResponseError(
+      request:
+          WebResourceRequest(uri: Uri.parse('https://offer.example/final')),
+      response: WebResourceResponse(
+          uri: Uri.parse('https://offer.example/final'), statusCode: 503),
+    ));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+    expect(platform.controllers, hasLength(1));
+  }, variant: android);
+
+  testWidgets('TV preloads use the tracked TV placement', (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(tvCatalog, enabled: true));
+    await pumpHost(tester);
+    final preload = service.preloadStreamFound(host, television: true)!;
+    await tester.pump();
+    expect(platform.controllers.single.requests.single,
+        Uri.parse('https://ads.example/smartlink?psid=fqtv'));
+    preload.dispose();
+    await tester.pump();
+  }, variant: android);
+
+  testWidgets('preloaded no-ad redirects continue without an ad route',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final preload = service.preloadStreamFound(host)!;
+    await tester.pump();
+    expect(
+        await platform.controllers.single.delegate!.onNavigationRequest!(
+            const NavigationRequest(
+                url: 'https://www.google.com/', isMainFrame: true)),
+        NavigationDecision.prevent);
+    await tester.pump();
+    expect(await service.streamFound(host, preload: preload), isTrue);
+    expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+  }, variant: android);
+
+  testWidgets('preloading an install offer follows only its web fallback',
+      (tester) async {
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    await pumpHost(tester);
+    final preload = service.preloadStreamFound(host)!;
+    await tester.pump();
+    final page = platform.controllers.single;
+    expect(
+        await page.delegate!.onNavigationRequest!(const NavigationRequest(
+            url: 'market://details?id=com.example.app', isMainFrame: true)),
+        NavigationDecision.prevent);
+    await tester.pump();
+    expect(
+        page.requests.last,
+        Uri.parse(
+            'https://play.google.com/store/apps/details?id=com.example.app'));
+    expect(storeLaunches, isEmpty);
+    preload.dispose();
+    await tester.pump();
+  }, variant: android);
+
+  testWidgets('downloads, disabled ads, scripts and experiments do not preload',
+      (tester) async {
+    await pumpHost(tester);
+    expect(service.preloadStreamFound(host), isNull);
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true));
+    expect(service.preloadStreamFound(host, download: true), isNull);
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: false));
+    expect(service.preloadStreamFound(host), isNull);
+    provider.setAdsterraPlaybackAdsConfig(
+        AdsterraPlaybackAdsConfig.parse(experimentCatalog, enabled: true));
+    expect(service.preloadStreamFound(host), isNull);
+    expect(platform.controllers, isEmpty);
+    expect(sharedPrefsSingleton.getInt('adsterra_playback.rotation.formats_v1'),
+        isNull);
+  }, variant: android);
+
   test('config rejects malformed, disabled, unsafe and dashboard ID values',
       () {
     for (final raw in [

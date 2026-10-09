@@ -68,6 +68,7 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
   int currentProviderIndex = 0;
   String _scraperApiUrl = '';
   final Map<String, int?> _streamSizeCacheByToken = {};
+  PlaybackAdPreload? _adPreload;
 
   Map<String, String> videos = {};
   List<BetterPlayerSubtitlesSource> subs = [];
@@ -98,7 +99,20 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
   }
 
   Future<void> _startPlayback() async {
-    await loadVideo();
+    if (!mounted) return;
+    _adPreload = AdsterraPlaybackAdsService.instance.preloadStreamFound(context,
+        download: widget.download, television: widget.useTvPlayer);
+    try {
+      await loadVideo();
+    } finally {
+      _adPreload?.dispose();
+    }
+  }
+
+  @override
+  void dispose() {
+    _adPreload?.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProviders() async {
@@ -228,7 +242,9 @@ class _MovieVideoLoaderState extends State<MovieVideoLoader> {
 
       if (selection != null) {
         if (!await AdsterraPlaybackAdsService.instance.streamFound(context,
-                download: widget.download, television: widget.useTvPlayer) ||
+                download: widget.download,
+                television: widget.useTvPlayer,
+                preload: _adPreload) ||
             !mounted) {
           return;
         }

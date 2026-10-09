@@ -10,6 +10,8 @@ import '../provider/app_dependency_provider.dart';
 import '../widgets/adsterra_playback_ad_screen.dart';
 import 'device_presentation_service.dart';
 
+export '../widgets/adsterra_playback_ad_screen.dart' show PlaybackAdPreload;
+
 /// One coordinator for every playback entry point, phone and TV. Skipped or
 /// failed ads continue immediately; an overlapping request never starts
 /// another loader. TV shows only a stream-found `tv_popunder`.
@@ -53,12 +55,61 @@ class AdsterraPlaybackAdsService {
           download: download, television: television);
 
   Future<bool> streamFound(BuildContext context,
-          {bool download = false, bool television = false}) =>
+          {bool download = false,
+          bool television = false,
+          PlaybackAdPreload? preload}) =>
       show(context, PlaybackAdStage.streamFound,
-          download: download, television: television);
+          download: download, television: television, preload: preload);
+
+  /// Preload direct links once per loader. Experiments keep selecting their arm
+  /// at presentation, so cancelled source lookups do not advance the rotation.
+  PlaybackAdPreload? preloadStreamFound(BuildContext context,
+      {bool download = false, bool television = false}) {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (!context.mounted ||
+        download ||
+        _busy ||
+        (lifecycle != null && lifecycle != AppLifecycleState.resumed) ||
+        kIsWeb ||
+        !const {TargetPlatform.android, TargetPlatform.iOS}
+            .contains(defaultTargetPlatform)) {
+      return null;
+    }
+    final provider = context.read<AppDependencyProvider?>();
+    final selection = provider?.playbackAdsSelection;
+    final tv = television || DevicePresentationService.instance.isTelevision;
+    if (provider == null || selection == null) return null;
+    if (!tv &&
+        selection.network == AdNetwork.adsterra &&
+        selection.adsterra.streamFoundExperiment != null) {
+      return null;
+    }
+    final placement = switch (selection.network) {
+      AdNetwork.adsterra => selection.adsterra
+          .forStage(PlaybackAdStage.streamFound, television: tv),
+      AdNetwork.clickadu ||
+      AdNetwork.monetag =>
+        selection.popunders[selection.network]?.activeFor(television: tv),
+      AdNetwork.exoclick || null => null,
+    };
+    if (placement == null || !placement.isSmartlink) return null;
+    late final PlaybackAdPreload preload;
+    void onConfigChanged() {
+      if (provider.playbackAdsSelection != selection) preload.dispose();
+    }
+
+    provider.addListener(onConfigChanged);
+    preload = PlaybackAdPreload(
+      placement: placement,
+      onReleased: () => provider.removeListener(onConfigChanged),
+    );
+    return preload;
+  }
 
   Future<bool> show(BuildContext context, PlaybackAdStage stage,
-      {bool download = false, bool television = false}) async {
+      {bool download = false,
+      bool television = false,
+      PlaybackAdPreload? preload}) async {
     if (!context.mounted) {
       _logSkip(stage, 'playback screen disposed');
       return false;
@@ -123,6 +174,12 @@ class AdsterraPlaybackAdsService {
       final state = WidgetsBinding.instance.lifecycleState;
       if (state != null && state != AppLifecycleState.resumed) return true;
       final selectedPlacement = placement;
+      final prepared = preload?.placement == selectedPlacement ? preload : null;
+      if (prepared?.unavailable == true) {
+        _logSkip(stage, 'preloaded ad unavailable');
+        return true;
+      }
+      prepared?.claim();
       final navigator = Navigator.of(context);
       final route = MaterialPageRoute<void>(
         settings: RouteSettings(
@@ -132,6 +189,7 @@ class AdsterraPlaybackAdsService {
           stage: stage,
           storeLauncher: storeLauncher,
           television: tv,
+          preload: prepared,
         ),
       );
       // Compare the catalogs and network, not the chosen arm: unrelated

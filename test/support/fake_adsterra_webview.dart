@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flixquest/models/banner_ads_config.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 // The fake exercises the actual public WebView controller/widget boundary.
 // ignore: depend_on_referenced_packages
@@ -45,13 +47,15 @@ class FakeAdsterraWebViewPlatform extends WebViewPlatform {
   final controllers = <FakeAdsterraWebViewController>[];
   bool signalLoaded = true;
   bool pageHasContent = true;
+  Completer<void>? setupGate;
   final widgetParams = <PlatformWebViewWidgetCreationParams>[];
 
   @override
   PlatformWebViewController createPlatformWebViewController(
       PlatformWebViewControllerCreationParams params) {
     final controller = FakeAdsterraWebViewController(params, signalLoaded)
-      ..pageHasContent = pageHasContent;
+      ..pageHasContent = pageHasContent
+      ..setupGate = setupGate;
     controllers.add(controller);
     return controller;
   }
@@ -83,11 +87,13 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
   final assignedUserAgents = <String?>[];
   final documentUserAgents = <String?>[];
   JavaScriptMode? javaScriptMode;
+  Completer<void>? setupGate;
   JavaScriptChannelParams? channel;
   FakeAdsterraNavigationDelegate? delegate;
   bool pageHasContent = true;
 
-  /// The page inspection's JSON report; when null, [pageHasContent] answers.
+  /// The JSON returned by the content-check script, before native encoding.
+  /// When null, build a report from [pageHasContent].
   String? contentReport;
 
   /// The next inspections that never answer, as when the document is
@@ -111,12 +117,27 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
       hangingChecks--;
       return Completer<Object>().future;
     }
-    return Future.value(contentReport ?? pageHasContent);
+    final report = contentReport ??
+        jsonEncode({
+          'ready': pageHasContent,
+          'textLength': pageHasContent ? 80 : 0,
+          'visibleElements': pageHasContent ? 1 : 0,
+          'title': 'Test advertiser',
+          'type': 'text/html',
+        });
+    // Android evaluateJavascript serializes strings; the plugin returns that
+    // JSON envelope unchanged. WKWebView returns the script's string directly.
+    return Future.value(defaultTargetPlatform == TargetPlatform.android
+        ? jsonEncode(report)
+        : report);
   }
 
   @override
   Future<void> setJavaScriptMode(JavaScriptMode mode) async {
     javaScriptMode = mode;
+    if (mode == JavaScriptMode.unrestricted && setupGate != null) {
+      await setupGate!.future;
+    }
   }
 
   @override
