@@ -22,150 +22,43 @@ Future<bool> openStoreApp(Uri uri) =>
 
 enum _Phase { script, page }
 
-/// One Smartlink request started alongside source loading, then transferred to
-/// the visible ad screen. It never runs a viewing countdown or opens a store.
+/// An empty WebView prepared alongside source loading, then transferred to
+/// the visible ad screen. No tag, redirect, advertiser or activation runs here,
+/// so cancelled lookups cannot consume an offer or a provider's frequency cap.
 class PlaybackAdPreload with WidgetsBindingObserver {
   PlaybackAdPreload({required this.placement, VoidCallback? onReleased})
       : _onReleased = onReleased {
     WidgetsBinding.instance.addObserver(this);
     _expiryTimer = Timer(placement.maxDuration, dispose);
-    ready = _load();
+    ready = _prepare();
   }
 
   final PlaybackAdPlacement placement;
   late final Future<WebViewController?> ready;
   WebViewController? _controller;
-  NavigationDelegate? _visibleDelegate;
-  void Function(HttpResponseError)? _visibleHttpError;
-  VoidCallback? _onLoadTimeout;
   VoidCallback? _onReleased;
-  Timer? _loadTimer;
   Timer? _expiryTimer;
-  Uri? _mainUrl;
-  String? _startedUrl;
-  String? _finishedUrl;
   bool _disposed = false;
   bool _claimed = false;
 
   bool get unavailable => _disposed;
 
-  void _startLoadTimer() {
-    _loadTimer?.cancel();
-    _loadTimer = Timer(placement.loadTimeout, () {
-      final visibleTimeout = _onLoadTimeout;
-      if (visibleTimeout != null) {
-        visibleTimeout();
-      } else {
-        _fail();
-      }
-    });
-  }
-
-  Future<WebViewController?> _load() async {
+  Future<WebViewController?> _prepare() async {
     try {
-      final url = placement.trackedSmartlinkUrl!;
       final controller = WebViewController();
       _controller = controller;
-      _mainUrl = url;
       await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
       await _preparePlaybackController(controller, _log);
-      await controller.setBackgroundColor(Colors.white);
-      await controller.setOnConsoleMessage((message) =>
-          _log('page console ${message.level.name}: ${message.message}'));
-      await controller.setNavigationDelegate(NavigationDelegate(
-        onNavigationRequest: (request) {
-          if (request.url == 'about:blank') return NavigationDecision.navigate;
-          if (_disposed) return NavigationDecision.prevent;
-          final visible = _visibleDelegate?.onNavigationRequest;
-          if (visible != null) return visible(request);
-          final target = Uri.tryParse(request.url);
-          if (request.isMainFrame && isNoAdFallback(target)) {
-            _fail();
-            return NavigationDecision.prevent;
-          }
-          if (_isPlaybackWebUrl(target)) {
-            if (request.isMainFrame) _mainUrl = target;
-            return NavigationDecision.navigate;
-          }
-          // Install offers may redirect to an app link before presentation.
-          // Follow only its web fallback; a hidden page cannot launch an app.
-          final fallback = request.isMainFrame && target != null
-              ? offerAppLink(target)?.web
-              : null;
-          if (fallback != null) {
-            _mainUrl = fallback;
-            unawaited(_loadFallback(controller, fallback));
-          }
-          return NavigationDecision.prevent;
-        },
-        onPageStarted: (url) {
-          if (_disposed || url == 'about:blank') return;
-          final visible = _visibleDelegate?.onPageStarted;
-          if (visible != null) {
-            visible(url);
-            return;
-          }
-          final target = Uri.tryParse(url);
-          if (isNoAdFallback(target)) {
-            _fail();
-            return;
-          }
-          if (_isPlaybackWebUrl(target)) _mainUrl = target;
-          _startedUrl = url;
-          _finishedUrl = null;
-          _startLoadTimer();
-        },
-        onPageFinished: (url) {
-          if (_disposed || url == 'about:blank') return;
-          final visible = _visibleDelegate?.onPageFinished;
-          if (visible != null) {
-            visible(url);
-          } else if (Uri.tryParse(url) == _mainUrl) {
-            _finishedUrl = url;
-            _loadTimer?.cancel();
-          }
-        },
-        onWebResourceError: (error) {
-          if (_disposed) return;
-          final visible = _visibleDelegate?.onWebResourceError;
-          if (visible != null) {
-            visible(error);
-          } else if (error.isForMainFrame == true) {
-            _fail();
-          }
-        },
-        onHttpError: (error) {
-          if (_disposed) return;
-          final visible = _visibleHttpError;
-          if (visible != null) {
-            visible(error);
-          } else if ((error.request?.uri ?? error.response?.uri) == _mainUrl &&
-              (error.response?.statusCode ?? 0) >= 400) {
-            _fail();
-          }
-        },
-      ));
       if (_disposed) {
         await _stopPlaybackController(controller);
         return null;
       }
-      _log('loading Smartlink while video sources load');
-      _startLoadTimer();
-      await controller.loadRequest(url);
-      return _disposed ? null : controller;
+      _log('empty WebView prepared; ad request waits for presentation');
+      return controller;
     } catch (error) {
-      _log('unavailable ($error)');
+      _log('preparation unavailable ($error); presentation can start fresh');
       _fail();
       return null;
-    }
-  }
-
-  Future<void> _loadFallback(WebViewController controller, Uri url) async {
-    try {
-      if (!_disposed) await controller.loadRequest(url);
-    } catch (error) {
-      _log('web fallback unavailable ($error)');
-      _fail();
     }
   }
 
@@ -174,23 +67,6 @@ class PlaybackAdPreload with WidgetsBindingObserver {
     _claimed = true;
     _expiryTimer?.cancel();
     _release();
-  }
-
-  Timer? attach(NavigationDelegate delegate,
-      {required VoidCallback onLoadTimeout,
-      required void Function(HttpResponseError) onHttpError}) {
-    _visibleDelegate = delegate;
-    _visibleHttpError = onHttpError;
-    _onLoadTimeout = onLoadTimeout;
-    final pendingTimer = _finishedUrl == null ? _loadTimer : null;
-    _loadTimer = null;
-    _expiryTimer?.cancel();
-    final started = _startedUrl ?? _mainUrl?.toString();
-    if (started != null) delegate.onPageStarted?.call(started);
-    final finished = _finishedUrl;
-    if (finished != null) delegate.onPageFinished?.call(finished);
-    _log('reusing preloaded WebView');
-    return pendingTimer;
   }
 
   void _release() {
@@ -216,7 +92,6 @@ class PlaybackAdPreload with WidgetsBindingObserver {
   void _fail() {
     if (_disposed) return;
     _disposed = true;
-    _loadTimer?.cancel();
     _expiryTimer?.cancel();
     _release();
     unawaited(_stopPlaybackController(_controller));
@@ -226,7 +101,7 @@ class PlaybackAdPreload with WidgetsBindingObserver {
       '[AdsterraPreload] ${placement.network.name}/streamFound: $message');
 }
 
-/// A disposable ad surface which can reuse a Smartlink preloaded by the loader.
+/// A disposable ad surface which can reuse an empty WebView prepared by the loader.
 ///
 /// Script tags (Adsterra's Social Bar and Popunder, Clickadu's and Monetag's
 /// onclick tags) run in one WebView. Advertiser pages (Smartlinks, Direct Links and the popups a
@@ -316,6 +191,8 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   int _documentGeneration = 0;
   DateTime? _lastPointer;
   bool _finished = false;
+  bool _openingPage = false;
+  Completer<void>? _visibilityWait;
 
   /// Whether the hosted page ([PlaybackAdPlacement.pageUrl]) has loaded.
   /// Until then its own redirects may navigate the script WebView.
@@ -368,6 +245,68 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     }
   }
 
+  Future<WebViewController?> _createController({
+    required bool initial,
+    required void Function(WebViewController) onCreated,
+  }) async {
+    final preload = initial ? widget.preload : null;
+    var controller = await preload?.ready;
+    if (!mounted || _finished) {
+      unawaited(_stopPlaybackController(controller));
+      return null;
+    }
+    final prepared = controller != null && preload?.unavailable == false;
+    if (!prepared) {
+      if (preload != null) {
+        _log('preparation unavailable; starting a fresh view');
+      }
+      controller = WebViewController();
+    } else {
+      _log('reusing prepared WebView; no ad was requested in the background');
+    }
+    final result = controller;
+    onCreated(result);
+    if (!prepared) {
+      await result.setJavaScriptMode(JavaScriptMode.unrestricted);
+      await _prepareAndroid(result);
+    }
+    if (!mounted || _finished) {
+      unawaited(_stopPlaybackController(result));
+      return null;
+    }
+    return result;
+  }
+
+  /// Attach the native view and finish presenting the route before requesting
+  /// an ad. A prepared controller alone is not a visible ad surface.
+  Future<bool> _waitForVisibleSurface() async {
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || _finished) return false;
+    final route = ModalRoute.of(context);
+    final animation = route?.animation;
+    if (animation != null && animation.status == AnimationStatus.forward) {
+      final wait = Completer<void>();
+      _visibilityWait = wait;
+      void onStatus(AnimationStatus status) {
+        if (status != AnimationStatus.forward && !wait.isCompleted) {
+          wait.complete();
+        }
+      }
+
+      animation.addStatusListener(onStatus);
+      try {
+        await wait.future;
+      } finally {
+        animation.removeStatusListener(onStatus);
+        if (identical(_visibilityWait, wait)) _visibilityWait = null;
+      }
+    }
+    if (!mounted || _finished) return false;
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    return (route == null || route.isCurrent) &&
+        (lifecycle == null || lifecycle == AppLifecycleState.resumed);
+  }
+
   Future<void> _loadScript() async {
     final setupTime = Stopwatch()..start();
     try {
@@ -375,10 +314,9 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       _log(hostedPage != null
           ? 'loading hosted page $hostedPage'
           : 'loading script ${widget.placement.scriptUrl} base=${NetworkBannerWidget.documentBaseUrl}');
-      final controller = WebViewController();
-      _script = controller;
-      await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
-      await _prepareAndroid(controller);
+      final controller = await _createController(
+          initial: true, onCreated: (controller) => _script = controller);
+      if (controller == null) return;
       await controller.setBackgroundColor(Colors.black);
       await controller.addJavaScriptChannel('PlaybackAd',
           onMessageReceived: _onScriptMessage);
@@ -412,6 +350,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       ));
       if (!mounted || _finished) return;
       setState(() {});
+      if (!await _waitForVisibleSurface()) return;
       _log('requesting tag document after ${setupTime.elapsedMilliseconds}ms '
           'of WebView setup; load timeout starts now');
       _loadTimer = Timer(widget.placement.loadTimeout, () {
@@ -642,36 +581,26 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   /// Shows one advertiser URL in the ad page and follows its redirect chain
   /// there. Later popups are ignored.
   Future<void> _openPage(Uri uri) async {
-    if (!mounted || _finished || _page != null) return;
+    if (!mounted || _finished || _openingPage) return;
+    _openingPage = true;
     _log(
         'opening ad page ${_origin(uri.toString())} subId=${widget.placement.subId ?? 'none'}');
-    final preload = widget.preload;
-    final page = preload == null ? WebViewController() : await preload.ready;
-    if (!mounted || _finished) {
-      unawaited(_stopPlaybackController(page));
-      return;
-    }
-    if (page == null || preload?.unavailable == true) {
-      _finish('preload_unavailable');
-      return;
-    }
-    _page = page;
-    _loadTimer?.cancel();
-    // The ad page starts its own wait, whatever the tag page allowed.
-    _pageReady = false;
-    _revealed = false;
-    _holdClose();
-    // Deactivate the tag so it cannot open a second page.
-    unawaited(_stop(_script));
     var mainUrl = uri;
     try {
-      if (preload == null) {
-        await page.setJavaScriptMode(JavaScriptMode.unrestricted);
-        await _prepareAndroid(page);
-        await page.setBackgroundColor(Colors.white);
-        await page.setOnConsoleMessage((message) =>
-            _log('page console ${message.level.name}: ${message.message}'));
-      }
+      final page = await _createController(
+          initial: widget.placement.isSmartlink,
+          onCreated: (controller) => _page = controller);
+      if (page == null) return;
+      _loadTimer?.cancel();
+      // The ad page starts its own wait, whatever the tag page allowed.
+      _pageReady = false;
+      _revealed = false;
+      _holdClose();
+      // A popup uses a new view; never overwrite the prepared tag document.
+      unawaited(_stop(_script));
+      await page.setBackgroundColor(Colors.white);
+      await page.setOnConsoleMessage((message) =>
+          _log('page console ${message.level.name}: ${message.message}'));
       void onHttpError(HttpResponseError error) {
         final failedUrl = error.request?.uri ?? error.response?.uri;
         final status = error.response?.statusCode ?? 0;
@@ -733,22 +662,13 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         },
         onHttpError: onHttpError,
       );
-      if (preload == null) await page.setNavigationDelegate(delegate);
+      await page.setNavigationDelegate(delegate);
       if (!mounted || _finished) return;
       setState(() => _phase = _Phase.page);
-      if (preload == null) {
-        _loadTimer = Timer(
-            widget.placement.loadTimeout, () => _finish('page_load_timeout'));
-        await page.loadRequest(uri);
-      } else {
-        final pendingTimer = preload.attach(delegate,
-            onLoadTimeout: () => _finish('page_load_timeout'),
-            onHttpError: onHttpError);
-        _loadTimer?.cancel();
-        _loadTimer = pendingTimer ??
-            Timer(widget.placement.loadTimeout,
-                () => _finish('page_load_timeout'));
-      }
+      if (!await _waitForVisibleSurface()) return;
+      _loadTimer = Timer(
+          widget.placement.loadTimeout, () => _finish('page_load_timeout'));
+      await page.loadRequest(uri);
     } catch (error) {
       _log('ad page unavailable ($error)');
       _finish('page_setup_error');
@@ -1069,6 +989,8 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   }
 
   void _cancelTimers() {
+    final wait = _visibilityWait;
+    if (wait != null && !wait.isCompleted) wait.complete();
     _loadTimer?.cancel();
     _durationTimer?.cancel();
     _contentTimer?.cancel();
@@ -1473,11 +1395,6 @@ bool isNoAdFallback(Uri? uri) {
       host == 'yahoo.com' ||
       host == 'www.yahoo.com';
 }
-
-bool _isPlaybackWebUrl(Uri? uri) =>
-    uri != null &&
-    const {'https', 'http'}.contains(uri.scheme) &&
-    uri.host.isNotEmpty;
 
 /// A loaded document with visible content is a landing-page diagnostic, not
 /// confirmation that the network credited an impression.

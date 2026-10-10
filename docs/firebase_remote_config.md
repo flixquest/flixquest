@@ -785,6 +785,29 @@ advertiser click or app-reported paid impression. Provider script downloads from
 workstation returned HTTP 403; native live fill and actual earnings still require
 validation on a mobile device with the remote switches enabled.
 
+### Playback ad preparation
+
+All four playback networks (Adsterra, Clickadu, ExoClick and Monetag) can
+prepare an empty native WebView during movie, episode or Live TV source
+loading, including supported `tv_popunder` formats. This initializes the
+controller and its existing browser/cookie settings without requesting any
+provider tag, hosted page, delivery URL or advertiser. Automatic activation
+and the viewing countdown remain on the visible ad screen. A script's popup
+opens in its own ad WebView; preparation never replaces the tag document.
+
+This avoids consuming offers or frequency caps during a cancelled source
+lookup. The full `load_timeout_ms` begins with the foreground document request,
+and the existing redirect completion checks and minimum visible view still
+apply. `max_duration_seconds` bounds the whole ad screen, including setup.
+Expired, failed or mismatched preparation falls back to a fresh foreground
+WebView rather than skipping an eligible ad. Downloads, disabled placements,
+configuration changes and backgrounding cancel unused preparation. Adsterra
+experiment rotation still advances only at presentation.
+
+Preparation does not verify a billable impression. Provider no-fill, delivery
+errors, frequency limits and the provider's own impression validation still
+apply; compare actual device delivery with the network dashboard.
+
 ### Choosing the popup network (Adsterra, Clickadu, Monetag or ExoClick)
 
 `playback_popunder_network` picks which network serves the stream-found popup.
@@ -823,9 +846,10 @@ and reinstall the app for this Kotlin change; hot restart cannot update an
 installed native bridge. Logs include `PlaybackAdInput` rejection reasons or
 `Continue touch sent: accepted=true inline=true` when the touch is dispatched.
 
-The tag starts when this screen is shown. Only Clickadu Direct Links can be
-preloaded. If the tag never becomes ready, or the automatic touch opens no
-ad within `load_timeout_ms`, playback continues without one. Duplicate
+Clickadu tags, hosted pages and Direct Links reuse an empty WebView prepared
+during source loading. The first tag or ad request starts after the ad screen
+and its WebView are visible. If the tag never becomes ready, or the automatic
+touch opens no ad within `load_timeout_ms`, playback continues without one. Duplicate
 readiness signals cannot trigger a second touch or extend that waiting period.
 Closing the screen disables the tag and prevents late activation. When native
 input is unavailable, including on iOS, the enabled **Play now** button remains
@@ -903,9 +927,11 @@ rotating domain either. The route is a delivery workaround to validate after
 deployment, not proof of an advertiser impression on every network.
 
 The catalog uses `mode: "smartlink"`, the same direct-navigation mode as
-Adsterra's Smartlink. ExoClick popup preloading is disabled: movie, episode
-and Live TV flows request the link when the ad screen opens after a stream
-is ready. The presentation log reports `preloaded=false`. Advertiser
+Adsterra's Smartlink. Movie, episode and Live TV flows prepare an empty WebView
+while resolving the stream, on phones and Android TV. The ExoClick link is
+requested only after that view is attached to the visible ad screen.
+`preloaded=true` in the presentation log means the native view was prepared;
+no delivery link or advertiser was loaded in the background. Advertiser
 redirects stay in the app, with the same content detection, minimum visible
 view, close fallback, timeouts and cancellation as Adsterra. Missing or invalid
 configuration issues no ad requests. Switching networks or disabling the
@@ -926,9 +952,10 @@ popup runs before the video pre-roll.
 ### Monetag popup
 
 Monetag's stream-found popup starts automatically inside FlixQuest, without a
-**Play now** tap. Preloading is disabled for every Monetag mode, including
-Direct Links. Its first request starts when the ad screen opens after a
-stream is ready; the presentation log reports `preloaded=false`.
+**Play now** tap. Every Monetag mode, including Direct Links, can reuse an
+empty WebView prepared while the stream is resolved. Its first request starts
+after the WebView is attached to the visible ad screen. `preloaded=true`
+reports native preparation, not a background ad request.
 With `mode: "page"` or `mode: "script"`, the app
 shows the "Your video is ready" placeholder, waits for the Onclick tag's `/5/<zone>/`
 options request to finish and the Continue button to become enabled. After

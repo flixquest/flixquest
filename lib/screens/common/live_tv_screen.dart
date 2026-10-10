@@ -70,6 +70,7 @@ class _ChannelListState extends State<ChannelList> {
   String? _selectedCategory;
   String? _letter;
   String? _resolvingId;
+  PlaybackAdPreload? _adPreload;
   String _query = '';
   String? _error;
   bool _loading = true;
@@ -142,6 +143,7 @@ class _ChannelListState extends State<ChannelList> {
 
   @override
   void dispose() {
+    _adPreload?.dispose();
     _highlightTimer?.cancel();
     _scrollController.dispose();
     _searchAnalyticsDebounce?.cancel();
@@ -382,7 +384,10 @@ class _ChannelListState extends State<ChannelList> {
   }
 
   Future<void> _play(Channel channel) async {
+    if (_resolvingId != null) return;
     setState(() => _resolvingId = channel.id);
+    _adPreload =
+        AdsterraPlaybackAdsService.instance.preloadStreamFound(context);
     final stopwatch = Stopwatch()..start();
     try {
       final stream = await _api().getStream(channel.id);
@@ -402,10 +407,11 @@ class _ChannelListState extends State<ChannelList> {
       );
       if (!mounted) return;
       // The channel works: the same stream-found popup as movies, first.
-      if (!await AdsterraPlaybackAdsService.instance.streamFound(context) ||
-          !mounted) {
-        return;
-      }
+      final proceed = await AdsterraPlaybackAdsService.instance
+          .streamFound(context, preload: _adPreload);
+      _adPreload?.dispose();
+      _adPreload = null;
+      if (!proceed || !mounted) return;
       final autoFullScreen = context.read<SettingsProvider>().defaultViewMode;
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -453,6 +459,8 @@ class _ChannelListState extends State<ChannelList> {
         );
       }
     } finally {
+      _adPreload?.dispose();
+      _adPreload = null;
       if (mounted) setState(() => _resolvingId = null);
     }
   }

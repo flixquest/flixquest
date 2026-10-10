@@ -75,6 +75,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   // Schedule events start collapsed; keys come from [_eventKey].
   final Set<String> _expandedEvents = <String>{};
   String? _resolvingId;
+  PlaybackAdPreload? _adPreload;
   String _query = '';
   String? _error;
   bool _loading = true;
@@ -170,6 +171,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
 
   @override
   void dispose() {
+    _adPreload?.dispose();
     LiveChannelFocus.pending.removeListener(_onChannelFocusRequested);
     widget.focusController?.detach(this);
     _searchAnalyticsDebounce?.cancel();
@@ -388,7 +390,10 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   }
 
   Future<void> _play(Channel channel) async {
+    if (_resolvingId != null) return;
     setState(() => _resolvingId = channel.id);
+    _adPreload = AdsterraPlaybackAdsService.instance
+        .preloadStreamFound(context, television: true);
     final stopwatch = Stopwatch()..start();
     try {
       final stream = await _api().getStream(channel.id);
@@ -408,11 +413,11 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
       );
       if (!mounted) return;
       // The channel works: the TV's stream-found popup, first.
-      if (!await AdsterraPlaybackAdsService.instance
-              .streamFound(context, television: true) ||
-          !mounted) {
-        return;
-      }
+      final proceed = await AdsterraPlaybackAdsService.instance
+          .streamFound(context, television: true, preload: _adPreload);
+      _adPreload?.dispose();
+      _adPreload = null;
+      if (!proceed || !mounted) return;
       final theme = Theme.of(context);
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -463,6 +468,8 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         );
       }
     } finally {
+      _adPreload?.dispose();
+      _adPreload = null;
       if (mounted) setState(() => _resolvingId = null);
     }
   }

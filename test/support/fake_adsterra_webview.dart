@@ -48,6 +48,7 @@ class FakeAdsterraWebViewPlatform extends WebViewPlatform {
   bool signalLoaded = true;
   bool pageHasContent = true;
   Completer<void>? setupGate;
+  Object? setupError;
   final widgetParams = <PlatformWebViewWidgetCreationParams>[];
 
   @override
@@ -55,6 +56,7 @@ class FakeAdsterraWebViewPlatform extends WebViewPlatform {
       PlatformWebViewControllerCreationParams params) {
     final controller = FakeAdsterraWebViewController(params, signalLoaded)
       ..pageHasContent = pageHasContent
+      ..setupError = setupError
       ..setupGate = setupGate;
     controllers.add(controller);
     return controller;
@@ -88,6 +90,7 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
   final documentUserAgents = <String?>[];
   JavaScriptMode? javaScriptMode;
   Completer<void>? setupGate;
+  Object? setupError;
   JavaScriptChannelParams? channel;
   FakeAdsterraNavigationDelegate? delegate;
   bool pageHasContent = true;
@@ -144,6 +147,9 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
     javaScriptMode = mode;
     if (mode == JavaScriptMode.unrestricted && setupGate != null) {
       await setupGate!.future;
+    }
+    if (mode == JavaScriptMode.unrestricted && setupError != null) {
+      throw setupError!;
     }
   }
 

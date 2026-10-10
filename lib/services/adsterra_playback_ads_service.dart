@@ -23,7 +23,6 @@ class AdsterraPlaybackAdsService {
     this.continueTap,
   }) : _preferences = preferences ?? SharedPreferences.getInstance;
   static final instance = AdsterraPlaybackAdsService();
-  static const _preloadNetworks = {AdNetwork.adsterra, AdNetwork.clickadu};
 
   final Future<SharedPreferences> Function() _preferences;
   final StoreLauncher? storeLauncher;
@@ -65,9 +64,10 @@ class AdsterraPlaybackAdsService {
       show(context, PlaybackAdStage.streamFound,
           download: download, television: television, preload: preload);
 
-  /// Preload Adsterra and Clickadu direct links once per loader. ExoClick and
-  /// Monetag start their requests when presented. Experiments keep selecting
-  /// their arm at presentation, so cancelled lookups do not advance rotation.
+  /// Prepare an empty WebView while sources load, for any network or format.
+  /// Ad requests and activation wait for the visible ad screen. Experiments
+  /// keep selecting their arm at presentation, so cancelled lookups do not
+  /// advance rotation.
   PlaybackAdPreload? preloadStreamFound(BuildContext context,
       {bool download = false, bool television = false}) {
     final lifecycle = WidgetsBinding.instance.lifecycleState;
@@ -83,16 +83,7 @@ class AdsterraPlaybackAdsService {
     final provider = context.read<AppDependencyProvider?>();
     final selection = provider?.playbackAdsSelection;
     final tv = television || DevicePresentationService.instance.isTelevision;
-    if (provider == null ||
-        selection == null ||
-        !_preloadNetworks.contains(selection.network)) {
-      return null;
-    }
-    if (!tv &&
-        selection.network == AdNetwork.adsterra &&
-        selection.adsterra.streamFoundExperiment != null) {
-      return null;
-    }
+    if (provider == null || selection == null) return null;
     final placement = switch (selection.network) {
       AdNetwork.adsterra => selection.adsterra
           .forStage(PlaybackAdStage.streamFound, television: tv),
@@ -102,7 +93,7 @@ class AdsterraPlaybackAdsService {
         selection.popunders[selection.network]?.activeFor(television: tv),
       null => null,
     };
-    if (placement == null || !placement.isSmartlink) return null;
+    if (placement == null) return null;
     late final PlaybackAdPreload preload;
     void onConfigChanged() {
       if (provider.playbackAdsSelection != selection) preload.dispose();
@@ -185,15 +176,16 @@ class AdsterraPlaybackAdsService {
       final state = WidgetsBinding.instance.lifecycleState;
       if (state != null && state != AppLifecycleState.resumed) return true;
       final selectedPlacement = placement;
-      final allowPreload = _preloadNetworks.contains(network);
-      if (!allowPreload) preload?.dispose();
-      final prepared = allowPreload && preload?.placement == selectedPlacement
-          ? preload
-          : null;
-      if (prepared?.unavailable == true) {
-        _logSkip(stage, 'preloaded ad unavailable');
-        return true;
-      }
+      // An empty view also works for another arm of this same experiment;
+      // preparation never selects or requests that arm's ad.
+      final matches = preload?.placement == selectedPlacement ||
+          experiment?.variants
+                  .any((variant) => variant.placement == preload?.placement) ==
+              true;
+      final prepared =
+          matches && preload?.unavailable == false ? preload : null;
+      // Expired or changed preparation must not suppress an eligible ad.
+      if (prepared == null) preload?.dispose();
       prepared?.claim();
       final navigator = Navigator.of(context);
       final route = MaterialPageRoute<void>(
