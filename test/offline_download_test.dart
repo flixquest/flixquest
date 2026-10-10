@@ -23,7 +23,7 @@ void main() {
       expect(isAlreadyDownloaded(error), isTrue);
       expect(
         offlineEnqueueErrorMessage(error, title: 'Example'),
-        'Example is already in your downloads. Open Downloads to watch it.',
+        'Example is already downloaded. Watch it in Downloads.',
       );
     });
 

@@ -45,7 +45,7 @@ bool isAlreadyDownloaded(Object error) =>
 /// [title].
 String offlineEnqueueErrorMessage(Object error, {required String title}) {
   if (isAlreadyDownloaded(error)) {
-    return '$title is already in your downloads. Open Downloads to watch it.';
+    return '$title is already downloaded. Watch it in Downloads.';
   }
   if (error is PlatformException && error.code == 'PREPARE_FAILED') {
     return 'Could not reach this stream to download it. '
