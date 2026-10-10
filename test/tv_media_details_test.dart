@@ -5,12 +5,15 @@ import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/provider/recently_watched_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
 import 'package:flixquest/services/hosted_ads_repository.dart';
-import 'package:flixquest/services/start_io_ads_service.dart';
+import 'package:flixquest/services/device_presentation_service.dart';
 import 'package:flixquest/tv/controllers/tv_media_details_controller.dart';
 import 'package:flixquest/tv/models/tv_media_item.dart';
 import 'package:flixquest/tv/screens/tv_media_details_screen.dart';
-import 'package:flixquest/widgets/start_io_banner_widget.dart';
+import 'package:flixquest/widgets/network_banner_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+import 'support/fake_adsterra_webview.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -181,34 +184,35 @@ void main() {
     sharedPrefsSingleton = await SharedPreferences.getInstance();
   });
 
-  testWidgets('TV details lays out the enabled top-right banner slot',
-      (tester) async {
-    final ads = StartIoAdsService.instance;
-    ads.setTelevision(true);
-    HostedAdsRepository.instance.useFetcherForTesting((_) async => []);
-    addTearDown(() {
-      ads.setTelevision(false);
+  testWidgets(
+    'TV details lays out the enabled top-right banner slot',
+    (tester) async {
+      final device = DevicePresentationService.instance;
+      WebViewPlatform.instance = FakeAdsterraWebViewPlatform();
+      device.isTelevision = true;
       HostedAdsRepository.instance.useFetcherForTesting((_) async => []);
-    });
-    final dependencies = AppDependencyProvider()
-      ..setStartIoAdsConfig(
-        bannerEnabled: true,
-        interstitialEnabled: false,
-      );
-    await _pumpDetails(tester, dependencies: dependencies);
+      addTearDown(() {
+        device.isTelevision = false;
+        HostedAdsRepository.instance.useFetcherForTesting((_) async => []);
+      });
+      final dependencies = AppDependencyProvider()
+        ..setBannerAdsConfig(testAdsterraConfig());
+      await _pumpDetails(tester, dependencies: dependencies);
 
-    final banner = find.byType(StartIoBannerWidget);
-    expect(banner, findsOneWidget);
-    expect(
-        tester.widget<StartIoBannerWidget>(banner).placement, 'title_detail');
-    final slot = tester.widget<Positioned>(
-      find.ancestor(of: banner, matching: find.byType(Positioned)).first,
-    );
-    expect(slot.right, isNotNull);
-    expect(slot.top, isNotNull);
-    expect(slot.width, 360);
-    expect(tester.takeException(), isNull);
-  });
+      final banner = find.byType(NetworkBannerWidget);
+      expect(banner, findsOneWidget);
+      expect(
+          tester.widget<NetworkBannerWidget>(banner).placement, 'title_detail');
+      final slot = tester.widget<Positioned>(
+        find.ancestor(of: banner, matching: find.byType(Positioned)).first,
+      );
+      expect(slot.right, isNotNull);
+      expect(slot.top, isNotNull);
+      expect(slot.width, 360);
+      expect(tester.takeException(), isNull);
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.android}),
+  );
 
   group('TvResumePoint', () {
     test('resumes a movie part way through', () {

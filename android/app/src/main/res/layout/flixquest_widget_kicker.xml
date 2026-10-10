@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app hero card's kicker: the FlixQuest mark in the accent, then the label in caps. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <ImageView
+        android:id="@+id/widget_mark"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="@dimen/widget_mark_gap"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no"
+        android:src="@drawable/flixquest_widget_mark" />
+
+    <ImageView
+        android:id="@+id/widget_eyebrow"
+        style="@style/FlixQuestWidgetText" />
+</LinearLayout>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The wide layout's text runs up beside the poster, higher than the bottom shade alone covers, so
+  this one darkens the start side of the artwork as well.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:centerColor="#80000000"
+        android:centerX="0.6"
+        android:endColor="#00000000"
+        android:startColor="#B3000000"
+        android:type="linear" />
+    <corners android:radius="@dimen/widget_radius" />
+</shape>

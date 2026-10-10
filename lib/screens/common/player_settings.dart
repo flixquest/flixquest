@@ -208,6 +208,13 @@ class _PlayerSettingsState extends State<PlayerSettings> {
                         settingValues.playerAmbientGlowEnabled = value,
                   ),
                   SwitchRow(
+                    icon: PhosphorIcons.pictureInpicture(),
+                    label: tr('auto_pip_on_leave'),
+                    subtitle: tr('auto_pip_on_leave_description'),
+                    value: settingValues.autoPipOnLeave,
+                    onChanged: (value) => settingValues.autoPipOnLeave = value,
+                  ),
+                  SwitchRow(
                     icon: PhosphorIcons.skipForward(),
                     label: tr('enable_next_episode_button'),
                     value: settingValues.enableNextEpisodeButton,

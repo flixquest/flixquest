@@ -17,6 +17,7 @@ import '../../design/skeleton.dart';
 import '../../mobile/widgets/filter_chips.dart';
 import '../../mobile/widgets/page_kit.dart';
 import '../../mobile/widgets/pill_button.dart';
+import '../../mobile/widgets/settings_kit.dart' show SheetTitle;
 import '../../models/wellness.dart';
 import '../../models/wellness_insights.dart';
 import '../../models/wellness_recap.dart';
@@ -362,34 +363,22 @@ class _WellnessScreenState extends State<WellnessScreen> {
         );
       case _WellnessAction.clear:
         if (!mounted) return;
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(tr('ins_clear_q')),
-            content: Text(
+        final confirmed = await showConfirmDialog(
+          context,
+          icon: PhosphorIcons.trash(),
+          title: tr('ins_clear_q'),
+          message:
               wellness.canSync ? tr('ins_clear_synced') : tr('ins_clear_local'),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(tr('cancel')),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(tr('ins_clear_history')),
-              ),
-            ],
-          ),
+          confirmLabel: tr('ins_clear_history'),
+          destructive: true,
         );
         if (confirmed == true) await wellness.clearHistory();
     }
   }
 
   Future<void> _showInsightsActions(WellnessProvider wellness) async {
-    final action = await showModalBottomSheet<_WellnessAction>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: false,
+    final action = await showAppSheet<_WellnessAction>(
+      context,
       builder: (context) => const _InsightsActionsSheet(),
     );
     if (action != null && mounted) await _handleAction(wellness, action);
@@ -429,156 +418,43 @@ class _InsightsActionsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
+    return SingleChildScrollView(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.paddingOf(context).bottom + AppSpace.lg,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              width: 38,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colors.outlineVariant,
-                borderRadius: BorderRadius.circular(99),
-              ),
+          SheetTitle(tr('ins_data_title')),
+          Padding(
+            padding: EdgeInsetsDirectional.fromSTEB(
+              gutter,
+              0,
+              gutter,
+              AppSpace.sm,
+            ),
+            child: Text(
+              tr('ins_data_desc'),
+              style: AppType.body.copyWith(color: palette.mutedText),
             ),
           ),
-          const SizedBox(height: 22),
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppPalette.of(context).idleFill,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  PhosphorIcons.slidersHorizontal(),
-                  color: AppPalette.of(context).foreground,
-                  size: 21,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      tr('ins_data_title'),
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    Text(
-                      tr('ins_data_desc'),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: tr('close'),
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(PhosphorIcons.x()),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _InsightsActionTile(
+          ListRow(
             icon: PhosphorIcons.export(),
-            title: tr('ins_export'),
-            description: tr('ins_export_desc'),
+            label: tr('ins_export'),
+            subtitle: tr('ins_export_desc'),
             onTap: () => Navigator.pop(context, _WellnessAction.export),
           ),
-          const SizedBox(height: 10),
-          _InsightsActionTile(
+          ListRow(
             icon: PhosphorIcons.trash(),
-            title: tr('ins_clear_title'),
-            description: tr('ins_clear_desc'),
+            label: tr('ins_clear_title'),
+            subtitle: tr('ins_clear_desc'),
             destructive: true,
             onTap: () => Navigator.pop(context, _WellnessAction.clear),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _InsightsActionTile extends StatelessWidget {
-  const _InsightsActionTile({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.onTap,
-    this.destructive = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String description;
-  final VoidCallback onTap;
-  final bool destructive;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final accent =
-        destructive ? colors.error : AppPalette.of(context).foreground;
-    return Material(
-      color: destructive
-          ? colors.errorContainer.withValues(alpha: .32)
-          : _insightSurface(context),
-      borderRadius: BorderRadius.circular(10),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(15),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: accent, size: 21),
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: destructive ? colors.error : null,
-                          ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      description,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                PhosphorIcons.caretRight(),
-                color: destructive ? colors.error : colors.onSurfaceVariant,
-                size: 18,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -2545,24 +2421,13 @@ class _HistoryRow extends StatelessWidget {
   }
 
   Future<void> _confirmDelete(BuildContext context) async {
-    final remove = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(tr('ins_remove_q')),
-        content: Text(
-          tr('ins_remove_body', namedArgs: {'title': session.title}),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(tr('ins_keep')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(tr('remove')),
-          ),
-        ],
-      ),
+    final remove = await showConfirmDialog(
+      context,
+      title: tr('ins_remove_q'),
+      message: tr('ins_remove_body', namedArgs: {'title': session.title}),
+      cancelLabel: tr('ins_keep'),
+      confirmLabel: tr('remove'),
+      destructive: true,
     );
     if (remove == true) onDelete();
   }
@@ -3592,35 +3457,74 @@ class _GuestMergeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final palette = AppPalette.of(context);
+    return Container(
       margin: const EdgeInsets.only(bottom: 14),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(tr('ins_guest_q'),
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 6),
-            Text(
-              tr('ins_guest_desc'),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              children: [
-                FilledButton(
-                  onPressed: provider.mergeGuestHistory,
-                  child: Text(tr('ins_guest_merge')),
+      padding: const EdgeInsets.all(AppSpace.lg),
+      decoration: BoxDecoration(
+        color: _insightSurface(context),
+        borderRadius: BorderRadius.circular(AppRadii.hero),
+        border: Border.all(color: palette.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: palette.idleFill,
+                  shape: BoxShape.circle,
                 ),
-                TextButton(
-                  onPressed: provider.dismissGuestMerge,
-                  child: Text(tr('ins_guest_keep')),
+                child: Icon(
+                  PhosphorIcons.usersThree(),
+                  size: 18,
+                  color: palette.foreground,
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              const SizedBox(width: AppSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tr('ins_guest_q'),
+                      style: AppType.cardTitle.copyWith(
+                        fontSize: 15,
+                        color: palette.foreground,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      tr('ins_guest_desc'),
+                      style: AppType.body.copyWith(color: palette.mutedText),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.lg),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              PillButton(
+                primary: true,
+                icon: PhosphorIcons.gitMerge(),
+                label: tr('ins_guest_merge'),
+                onPressed: provider.mergeGuestHistory,
+              ),
+              PillButton(
+                label: tr('ins_guest_keep'),
+                onPressed: provider.dismissGuestMerge,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -3633,12 +3537,14 @@ class _PrivacyNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    // A quiet note in the page's own tones; Material's tonal containers
+    // would tint it with the accent.
+    final palette = AppPalette.of(context);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpace.lg),
       decoration: BoxDecoration(
-        color: colors.secondaryContainer.withValues(alpha: .32),
-        borderRadius: BorderRadius.circular(9),
+        color: _insightSurface(context),
+        borderRadius: BorderRadius.circular(AppRadii.hero),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3647,29 +3553,32 @@ class _PrivacyNote extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: colors.secondaryContainer,
+              color: palette.idleFill,
               shape: BoxShape.circle,
             ),
             child: Icon(
               PhosphorIcons.lockKey(),
               size: 17,
-              color: colors.onSecondaryContainer,
+              color: palette.foreground,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpace.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tr('ins_private'),
-                    style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  tr('ins_private'),
+                  style: AppType.cardTitle.copyWith(color: palette.foreground),
+                ),
                 const SizedBox(height: 3),
                 Text(
                   canSync ? tr('ins_private_synced') : tr('ins_private_local'),
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: colors.onSurfaceVariant),
+                  style: AppType.metadata.copyWith(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: palette.mutedText,
+                  ),
                 ),
               ],
             ),

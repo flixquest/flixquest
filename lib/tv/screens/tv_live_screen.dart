@@ -14,10 +14,10 @@ import '../../models/live_tv.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../screens/common/live_player.dart';
+import '../../services/adsterra_playback_ads_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/live_channel_focus.dart';
-import '../../services/start_io_ads_service.dart';
 import '../../widgets/hosted_ads_banner.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
@@ -75,6 +75,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   // Schedule events start collapsed; keys come from [_eventKey].
   final Set<String> _expandedEvents = <String>{};
   String? _resolvingId;
+  PlaybackAdPreload? _adPreload;
   String _query = '';
   String? _error;
   bool _loading = true;
@@ -170,6 +171,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
 
   @override
   void dispose() {
+    _adPreload?.dispose();
     LiveChannelFocus.pending.removeListener(_onChannelFocusRequested);
     widget.focusController?.detach(this);
     _searchAnalyticsDebounce?.cancel();
@@ -388,10 +390,10 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   }
 
   Future<void> _play(Channel channel) async {
+    if (_resolvingId != null) return;
     setState(() => _resolvingId = channel.id);
-    // The interstitial runs while the stream resolves; the player opens only
-    // once it is gone.
-    unawaited(StartIoAdsService.instance.showPlaybackInterstitial());
+    _adPreload = AdsterraPlaybackAdsService.instance
+        .preloadStreamFound(context, television: true);
     final stopwatch = Stopwatch()..start();
     try {
       final stream = await _api().getStream(channel.id);
@@ -409,8 +411,13 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         durationMs: stopwatch.elapsedMilliseconds,
         source: _mode.name,
       );
-      await StartIoAdsService.instance.whenFullScreenAdClosed();
       if (!mounted) return;
+      // The channel works: the TV's stream-found popup, first.
+      final proceed = await AdsterraPlaybackAdsService.instance
+          .streamFound(context, television: true, preload: _adPreload);
+      _adPreload?.dispose();
+      _adPreload = null;
+      if (!proceed || !mounted) return;
       final theme = Theme.of(context);
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -461,6 +468,8 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         );
       }
     } finally {
+      _adPreload?.dispose();
+      _adPreload = null;
       if (mounted) setState(() => _resolvingId = null);
     }
   }
@@ -619,12 +628,10 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
               child: isSchedule ? _buildSchedule() : _buildGrid(),
             ),
             // A thin strip under the list stays on screen while the viewer
-            // browses, so every refresh is a viewable impression, and it
-            // only takes one banner's height from the grid, never a column.
-            const StartIoAdSlot(
+            // browses and only takes one banner's height from the grid.
+            const BannerAdSlot(
               placement: 'live_tv_strip',
               variant: HostedBannerVariant.standard,
-              keywords: StartIoAdsService.liveKeywords,
               padding: EdgeInsets.only(top: 8, bottom: 12),
             ),
           ],

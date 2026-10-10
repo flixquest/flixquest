@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flixquest/models/banner_ad.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/services/hosted_ads_repository.dart';
-import 'package:flixquest/services/start_io_ads_service.dart';
+import 'package:flixquest/services/device_presentation_service.dart';
 import 'package:flixquest/widgets/hosted_ads_banner.dart';
-import 'package:flixquest/widgets/start_io_banner_widget.dart';
+import 'package:flixquest/widgets/network_banner_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter/services.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+import 'support/fake_adsterra_webview.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -32,11 +34,10 @@ TMDB_API_KEY=test_tmdb_key
 FLIXQUEST_API_URL=https://test.flixquest.api/
 ''',
     );
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-      const MethodChannel('com.startapp.flutter'),
-      (MethodCall call) async => null,
-    );
+  });
+
+  setUp(() {
+    WebViewPlatform.instance = FakeAdsterraWebViewPlatform();
   });
 
   group('BannerAd.appliesTo', () {
@@ -112,13 +113,10 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
 
     setUp(() {
       provider = AppDependencyProvider();
-      provider.setStartIoAdsConfig(
-        bannerEnabled: true,
-        interstitialEnabled: false,
-      );
+      provider.setBannerAdsConfig(testAdsterraConfig());
     });
 
-    tearDown(() => StartIoAdsService.instance.setTelevision(false));
+    tearDown(() => DevicePresentationService.instance.isTelevision = false);
 
     Future<void> pumpSlot(
       WidgetTester tester, {
@@ -144,149 +142,187 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
       await tester.pump();
     }
 
-    testWidgets('stack shows the announcement and the Start.io banner',
-        (tester) async {
-      await pumpSlot(tester, ads: <BannerAd>[_ad()]);
+    testWidgets(
+      'stack shows the announcement and the Adsterra banner',
+      (tester) async {
+        await pumpSlot(tester, ads: <BannerAd>[_ad()]);
 
-      expect(find.byType(HostedAdsBanner), findsOneWidget);
-      expect(find.byType(StartIoBannerWidget), findsOneWidget);
-    });
+        expect(find.byType(HostedAdsBanner), findsOneWidget);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
 
-    testWidgets('an ad aimed at another placement leaves Start.io alone',
-        (tester) async {
-      await pumpSlot(
-        tester,
-        ads: <BannerAd>[
-          _ad(placements: const <String>['bookmarks']),
-        ],
-      );
+    testWidgets(
+      'an ad aimed at another placement leaves Adsterra alone',
+      (tester) async {
+        await pumpSlot(
+          tester,
+          ads: <BannerAd>[
+            _ad(placements: const <String>['bookmarks']),
+          ],
+        );
 
-      expect(find.byType(HostedAdsBanner), findsNothing);
-      expect(find.byType(StartIoBannerWidget), findsOneWidget);
-    });
+        expect(find.byType(HostedAdsBanner), findsNothing);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
 
-    testWidgets('priority hands a slot with a hosted ad to the hosted ad',
-        (tester) async {
-      provider.setHostedBannerMode(HostedBannerMode.priority);
-      await pumpSlot(tester, ads: <BannerAd>[_ad()]);
+    testWidgets(
+      'priority hands a slot with a hosted ad to the hosted ad',
+      (tester) async {
+        provider.setHostedBannerMode(HostedBannerMode.priority);
+        await pumpSlot(tester, ads: <BannerAd>[_ad()]);
 
-      expect(find.byType(HostedAdsBanner), findsOneWidget);
-      expect(find.byType(StartIoBannerWidget), findsNothing);
-    });
+        expect(find.byType(HostedAdsBanner), findsOneWidget);
+        expect(find.byType(NetworkBannerWidget), findsNothing);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
 
-    testWidgets('priority keeps Start.io where there is no hosted ad',
-        (tester) async {
-      provider.setHostedBannerMode(HostedBannerMode.priority);
-      await pumpSlot(tester, ads: const <BannerAd>[]);
+    testWidgets(
+      'priority keeps Adsterra where there is no hosted ad',
+      (tester) async {
+        provider.setHostedBannerMode(HostedBannerMode.priority);
+        await pumpSlot(tester, ads: const <BannerAd>[]);
 
-      expect(find.byType(HostedAdsBanner), findsNothing);
-      expect(find.byType(StartIoBannerWidget), findsOneWidget);
-    });
+        expect(find.byType(HostedAdsBanner), findsNothing);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
 
-    testWidgets('priority does not load Start.io before /ads answers',
-        (tester) async {
-      provider.setHostedBannerMode(HostedBannerMode.priority);
-      final pending = Completer<List<BannerAd>>();
-      await tester.pumpWidget(
-        MaterialApp(
-          home: ChangeNotifierProvider<AppDependencyProvider>.value(
-            value: provider,
-            child: Scaffold(
-              body: RemoteHostedAdsBanner(
-                placement: 'downloads',
-                loadAds: () => pending.future,
+    testWidgets(
+      'priority does not load Adsterra before /ads answers',
+      (tester) async {
+        provider.setHostedBannerMode(HostedBannerMode.priority);
+        final pending = Completer<List<BannerAd>>();
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ChangeNotifierProvider<AppDependencyProvider>.value(
+              value: provider,
+              child: Scaffold(
+                body: RemoteHostedAdsBanner(
+                  placement: 'downloads',
+                  loadAds: () => pending.future,
+                ),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pump();
+        );
+        await tester.pump();
 
-      expect(find.byType(StartIoBannerWidget), findsNothing);
+        expect(find.byType(NetworkBannerWidget), findsNothing);
 
-      pending.complete(const <BannerAd>[]);
-      await tester.pump();
-      await tester.pump();
+        pending.complete(const <BannerAd>[]);
+        await tester.pump();
+        await tester.pump();
 
-      expect(find.byType(StartIoBannerWidget), findsOneWidget);
-    });
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
 
-    testWidgets('off leaves only Start.io', (tester) async {
-      provider.setHostedBannerMode(HostedBannerMode.off);
-      await pumpSlot(tester, ads: <BannerAd>[_ad()]);
+    testWidgets(
+      'off leaves only Adsterra',
+      (tester) async {
+        provider.setHostedBannerMode(HostedBannerMode.off);
+        await pumpSlot(tester, ads: <BannerAd>[_ad()]);
 
-      expect(find.byType(HostedAdsBanner), findsNothing);
-      expect(find.byType(StartIoBannerWidget), findsOneWidget);
-    });
+        expect(find.byType(HostedAdsBanner), findsNothing);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
 
-    testWidgets('hosted still shows when Start.io is switched off',
-        (tester) async {
-      provider.setStartIoAdsConfig(
-        bannerEnabled: false,
-        interstitialEnabled: false,
-      );
-      await pumpSlot(tester, ads: <BannerAd>[_ad()]);
+    testWidgets(
+      'hosted still shows when Adsterra is switched off',
+      (tester) async {
+        provider.setBannerAdsConfig(testAdsterraConfig(enabled: false));
+        await pumpSlot(tester, ads: <BannerAd>[_ad()]);
 
-      expect(find.byType(HostedAdsBanner), findsOneWidget);
-      expect(find.byType(StartIoBannerWidget), findsNothing);
-    });
+        expect(find.byType(HostedAdsBanner), findsOneWidget);
+        expect(find.byType(NetworkBannerWidget), findsNothing);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
 
-    testWidgets('banner_ad_network none hides both', (tester) async {
-      provider.setBannerAdNetwork('none');
-      await pumpSlot(tester, ads: <BannerAd>[_ad()]);
+    testWidgets(
+      'banner_ad_network none hides both',
+      (tester) async {
+        provider.setBannerAdNetwork('none');
+        await pumpSlot(tester, ads: <BannerAd>[_ad()]);
 
-      expect(find.byType(HostedAdsBanner), findsNothing);
-      expect(find.byType(StartIoBannerWidget), findsNothing);
-    });
+        expect(find.byType(HostedAdsBanner), findsNothing);
+        expect(find.byType(NetworkBannerWidget), findsNothing);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
 
-    testWidgets('the per-ad banners config can still disable an ad',
-        (tester) async {
-      provider.setBannerConfigs(const <String, BannerDisplayConfig>{
-        'announcement':
-            BannerDisplayConfig(key: 'announcement', enabled: false),
-      });
-      await pumpSlot(tester, ads: <BannerAd>[_ad()]);
+    testWidgets(
+      'the per-ad banners config can still disable an ad',
+      (tester) async {
+        provider.setBannerConfigs(const <String, BannerDisplayConfig>{
+          'announcement':
+              BannerDisplayConfig(key: 'announcement', enabled: false),
+        });
+        await pumpSlot(tester, ads: <BannerAd>[_ad()]);
 
-      expect(find.byType(HostedAdsBanner), findsNothing);
-    });
+        expect(find.byType(HostedAdsBanner), findsNothing);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
 
-    testWidgets('TV stacks a display-only announcement and Start.io banner',
-        (tester) async {
-      StartIoAdsService.instance.setTelevision(true);
-      await pumpSlot(
-        tester,
-        placement: 'title_detail',
-        ads: <BannerAd>[
-          _ad(placements: const <String>['title_detail_tv']),
-        ],
-      );
+    testWidgets(
+      'TV stacks a display-only announcement and Adsterra banner',
+      (tester) async {
+        DevicePresentationService.instance.isTelevision = true;
+        await pumpSlot(
+          tester,
+          placement: 'title_detail',
+          ads: <BannerAd>[
+            _ad(placements: const <String>['title_detail_tv']),
+          ],
+        );
 
-      final banner = tester.widget<HostedAdsBanner>(
-        find.byType(HostedAdsBanner),
-      );
-      expect(banner.interactive, isFalse);
-      expect(find.byType(StartIoBannerWidget), findsOneWidget);
-    });
+        final banner = tester.widget<HostedAdsBanner>(
+          find.byType(HostedAdsBanner),
+        );
+        expect(banner.interactive, isFalse);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
 
-    testWidgets('TV keeps Start.io when hosted banners are off', (tester) async {
-      StartIoAdsService.instance.setTelevision(true);
-      provider.setHostedBannerMode(HostedBannerMode.off);
-      await pumpSlot(tester, placement: 'title_detail', ads: <BannerAd>[_ad()]);
+    testWidgets(
+      'TV keeps Adsterra when hosted banners are off',
+      (tester) async {
+        DevicePresentationService.instance.isTelevision = true;
+        provider.setHostedBannerMode(HostedBannerMode.off);
+        await pumpSlot(tester,
+            placement: 'title_detail', ads: <BannerAd>[_ad()]);
 
-      expect(find.byType(HostedAdsBanner), findsNothing);
-      expect(find.byType(StartIoBannerWidget), findsOneWidget);
-    });
+        expect(find.byType(HostedAdsBanner), findsNothing);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
 
-    testWidgets('TV ignores an ad that is not aimed at it', (tester) async {
-      StartIoAdsService.instance.setTelevision(true);
-      await pumpSlot(
-        tester,
-        placement: 'title_detail',
-        ads: <BannerAd>[_ad()],
-      );
+    testWidgets(
+      'TV ignores an ad that is not aimed at it',
+      (tester) async {
+        DevicePresentationService.instance.isTelevision = true;
+        await pumpSlot(
+          tester,
+          placement: 'title_detail',
+          ads: <BannerAd>[_ad()],
+        );
 
-      expect(find.byType(HostedAdsBanner), findsNothing);
-      expect(find.byType(StartIoBannerWidget), findsOneWidget);
-    });
+        expect(find.byType(HostedAdsBanner), findsNothing);
+        expect(find.byType(NetworkBannerWidget), findsOneWidget);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
   });
 }

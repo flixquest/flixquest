@@ -313,6 +313,78 @@ void main() {
       });
     });
 
+    test('retries without full when the server has full collection disabled',
+        () async {
+      final requestedUris = <Uri>[];
+      final api = ScraperApi(
+        'https://scraper.example',
+        client: MockClient((request) async {
+          requestedUris.add(request.url);
+          if (request.url.queryParameters['full'] == 'true') {
+            return http.Response(
+              jsonEncode({
+                'success': false,
+                'provider': 'vidsrc',
+                'links': [],
+                'error': 'Full stream collection is disabled. '
+                    'Omit full=true to find the first working server.',
+              }),
+              200,
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'provider': 'vidsrc',
+              'links': [
+                {
+                  'url': 'https://scraper.example/first-server',
+                  'quality': '1080p',
+                  'isM3U8': true,
+                  'subtitles': [],
+                },
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+
+      final result =
+          await api.loadMovie(providerId: 'vidsrc', movieId: 42, full: true);
+
+      expect(result.success, isTrue);
+      expect(result.videoLinks?.single.url,
+          'https://scraper.example/first-server');
+      expect(requestedUris.map((uri) => uri.queryParameters['full']),
+          ['true', null]);
+    });
+
+    test('does not retry a full request that failed for another reason',
+        () async {
+      var requests = 0;
+      final api = ScraperApi(
+        'https://scraper.example',
+        client: MockClient((request) async {
+          requests++;
+          return http.Response(
+            jsonEncode({
+              'success': false,
+              'error': 'No streams found for this movie',
+            }),
+            404,
+          );
+        }),
+      );
+
+      final result =
+          await api.loadMovie(providerId: 'vidsrc', movieId: 42, full: true);
+
+      expect(result.success, isFalse);
+      expect(result.errorMessage, 'No streams found for this movie');
+      expect(requests, 1);
+    });
+
     test('posts a signed token and maps a stream size estimate', () async {
       late http.Request request;
       final api = ScraperApi(

@@ -70,4 +70,13 @@ class AppUpdateService {
     if (version.isNotEmpty) return version;
     return remoteBuild > 0 ? remoteBuild.toString() : '';
   }
+
+  /// The changelog as one entry per line, list markers stripped, so a long
+  /// remote string can be previewed a few lines at a time.
+  static List<String> changelogItems(String changeLog) => changeLog
+      .split('\n')
+      .map((line) =>
+          line.trim().replaceFirst(RegExp(r'^(?:#+|[-*•·]|\d+[.)])\s+'), ''))
+      .where((line) => line.isNotEmpty)
+      .toList(growable: false);
 }

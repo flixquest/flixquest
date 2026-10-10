@@ -45,6 +45,10 @@ class MyFlixQuestScreen extends StatefulWidget {
 class _MyFlixQuestScreenState extends State<MyFlixQuestScreen> {
   User? _user;
 
+  /// Leaving the guest session waits on the network; the pill spins until
+  /// the sign-in page takes over.
+  bool _signingIn = false;
+
   @override
   void initState() {
     super.initState();
@@ -129,6 +133,7 @@ class _MyFlixQuestScreenState extends State<MyFlixQuestScreen> {
                 user: _user,
                 onProfile: () => _push(const ProfileEdit()),
                 onSignIn: _leaveGuestSession,
+                signingIn: _signingIn,
               ),
             ),
             if (continueWatching.isNotEmpty) ...<Widget>[
@@ -234,22 +239,13 @@ class _MyFlixQuestScreenState extends State<MyFlixQuestScreen> {
   }
 
   Future<void> _confirmSignOut() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(tr('sign_out')),
-        content: Text(tr('want_to_sign_out')),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(tr('cancel')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(tr('ok')),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      icon: PhosphorIcons.signOut(),
+      title: tr('sign_out'),
+      message: tr('want_to_sign_out'),
+      confirmLabel: tr('sign_out'),
+      destructive: true,
     );
     if (confirmed != true || !mounted) return;
     final analytics = context.read<SettingsProvider>().analytics;
@@ -261,12 +257,20 @@ class _MyFlixQuestScreenState extends State<MyFlixQuestScreen> {
   /// Guests sign in by discarding the anonymous account, as the old profile
   /// page did.
   Future<void> _leaveGuestSession() async {
+    if (_signingIn) return;
+    setState(() => _signingIn = true);
     try {
-      await FirebaseAuth.instance.currentUser?.delete();
-    } catch (_) {
-      // A guest session can still be cleared locally when offline.
+      try {
+        await FirebaseAuth.instance.currentUser?.delete().timeout(
+          const Duration(seconds: 10),
+        );
+      } catch (_) {
+        // A guest session can still be cleared locally when offline.
+      }
+      await _signOut();
+    } finally {
+      if (mounted) setState(() => _signingIn = false);
     }
-    await _signOut();
   }
 
   Future<void> _signOut() async {
@@ -288,11 +292,13 @@ class _ProfileHeader extends StatelessWidget {
     required this.user,
     required this.onProfile,
     required this.onSignIn,
+    this.signingIn = false,
   });
 
   final User? user;
   final VoidCallback onProfile;
   final VoidCallback onSignIn;
+  final bool signingIn;
 
   @override
   Widget build(BuildContext context) {
@@ -310,6 +316,7 @@ class _ProfileHeader extends StatelessWidget {
         actionLabel: tr('login_signup'),
         actionIcon: PhosphorIcons.signIn(),
         onAction: onSignIn,
+        busy: signingIn,
       );
     }
     return StreamBuilder<_ProfileSnapshot>(
@@ -365,6 +372,7 @@ class _ProfileHeaderContent extends StatelessWidget {
     required this.actionLabel,
     required this.actionIcon,
     required this.onAction,
+    this.busy = false,
   });
 
   final _ProfileSnapshot profile;
@@ -372,6 +380,7 @@ class _ProfileHeaderContent extends StatelessWidget {
   final String actionLabel;
   final IconData actionIcon;
   final VoidCallback onAction;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -415,6 +424,7 @@ class _ProfileHeaderContent extends StatelessWidget {
               child: PillButton(
                 label: actionLabel,
                 icon: actionIcon,
+                busy: busy,
                 onPressed: onAction,
               ),
             ),

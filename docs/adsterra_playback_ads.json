@@ -1,0 +1,24 @@
+{
+  "interstitial": {
+    "enabled": true,
+    "script_url": "https://bancadeltempoidea.org/14/990c274fd7800e5ffa346cf66322bc19",
+    "load_timeout_ms": 5000,
+    "max_duration_seconds": 30
+  },
+  "popunder": {
+    "enabled": true,
+    "mode": "smartlink",
+    "url": "https://directyp.org/4/d85eb7a00a73c8de8a3252dbd9b19411",
+    "sub_id": "fqsmartpagev1",
+    "load_timeout_ms": 10000,
+    "max_duration_seconds": 30
+  },
+  "tv_popunder": {
+    "enabled": true,
+    "mode": "smartlink",
+    "url": "https://directyp.org/4/d85eb7a00a73c8de8a3252dbd9b19411",
+    "sub_id": "fqsmarttvv1",
+    "load_timeout_ms": 10000,
+    "max_duration_seconds": 30
+  }
+}

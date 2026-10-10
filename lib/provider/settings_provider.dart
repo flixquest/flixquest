@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../functions/subtitle_style.dart';
+import '../models/app_mode.dart';
 import '../models/default_home.dart';
 import '../preferences/setting_preferences.dart';
 import '../services/analytics_service.dart';
@@ -7,6 +8,22 @@ import '../video_providers/names.dart';
 
 class SettingsProvider with ChangeNotifier {
   final SettingsPreferences _settingsPreferences = SettingsPreferences();
+
+  AppMode _appMode = AppMode.automatic;
+  AppMode get appMode => _appMode;
+
+  Future<void> getCurrentAppMode() async {
+    _appMode = await _settingsPreferences.getAppMode();
+    notifyListeners();
+  }
+
+  set appMode(AppMode value) {
+    if (_appMode == value) return;
+    _appMode = value;
+    _settingsPreferences.setAppMode(value);
+    _trackSetting('App Mode', value.id);
+    notifyListeners();
+  }
 
   bool _isAdult = false;
   bool get isAdult => _isAdult;
@@ -108,6 +125,9 @@ class SettingsProvider with ChangeNotifier {
 
   bool _playerAmbientGlowEnabled = false;
   bool get playerAmbientGlowEnabled => _playerAmbientGlowEnabled;
+
+  bool _autoPipOnLeave = true;
+  bool get autoPipOnLeave => _autoPipOnLeave;
 
   bool _autoLoadSources = true;
   bool get autoLoadSources => _autoLoadSources;
@@ -442,6 +462,18 @@ class SettingsProvider with ChangeNotifier {
     _playerAmbientGlowEnabled = value;
     _settingsPreferences.setPlayerAmbientGlowEnabled(value);
     _trackSetting('Player Ambient Glow', value);
+    notifyListeners();
+  }
+
+  Future<void> getAutoPipOnLeave() async {
+    autoPipOnLeave = await _settingsPreferences.getAutoPipOnLeave();
+  }
+
+  set autoPipOnLeave(bool value) {
+    if (_autoPipOnLeave == value) return;
+    _autoPipOnLeave = value;
+    _settingsPreferences.setAutoPipOnLeave(value);
+    _trackSetting('Auto Picture in Picture', value);
     notifyListeners();
   }
 

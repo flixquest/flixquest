@@ -1,8 +1,18 @@
 // ignore_for_file: constant_identifier_names
 import 'package:flixquest/constants/app_constants.dart';
+import 'package:flixquest/models/app_mode.dart';
 import 'package:flixquest/models/default_home.dart';
 
 class SettingsPreferences {
+  static const APP_MODE = 'app_mode';
+
+  Future<void> setAppMode(AppMode mode) async {
+    await sharedPrefsSingleton.setString(APP_MODE, mode.id);
+  }
+
+  Future<AppMode> getAppMode() async =>
+      AppMode.fromId(sharedPrefsSingleton.getString(APP_MODE));
+
   static const ADULT_MODE_STATUS = 'adultStatus-v2';
 
   setAdultMode(bool value) async {
@@ -280,6 +290,16 @@ class SettingsPreferences {
 
   Future<bool> getPlayerAmbientGlowEnabled() async {
     return sharedPrefsSingleton.getBool(PLAYER_AMBIENT_GLOW_ENABLED) ?? false;
+  }
+
+  static const AUTO_PIP_ON_LEAVE = 'auto_pip_on_leave';
+
+  setAutoPipOnLeave(bool value) {
+    sharedPrefsSingleton.setBool(AUTO_PIP_ON_LEAVE, value);
+  }
+
+  Future<bool> getAutoPipOnLeave() async {
+    return sharedPrefsSingleton.getBool(AUTO_PIP_ON_LEAVE) ?? true;
   }
 
   static const AUTO_LOAD_SOURCES = 'auto_load_sources_v1';

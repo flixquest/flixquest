@@ -1,87 +1,80 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Picker preview. Rendered by the launcher with no data behind it, so the sample copy here mirrors
-  the shape of the real widget: one fact per row, none of them repeating the eyebrow.
+  the shape of the real widget: one fact per row, none of them repeating the kicker. It shows the
+  plain-surface state, laid out like flixquest_widget.xml.
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:layout_margin="4dp"
+    android:layout_margin="@dimen/widget_margin"
     android:background="@drawable/flixquest_widget_background"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:padding="14dp">
+    android:clipToOutline="true">
 
-    <ImageView
-        android:layout_width="@dimen/widget_poster_width"
-        android:layout_height="@dimen/widget_poster_height"
-        android:layout_gravity="center_vertical"
-        android:layout_marginEnd="14dp"
-        android:background="@drawable/flixquest_widget_poster_background"
-        android:contentDescription="@null"
-        android:importantForAccessibility="no" />
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="bottom"
+        android:orientation="horizontal"
+        android:padding="@dimen/widget_padding">
 
-        <TextView
-            android:layout_width="match_parent"
+        <!-- Only RemoteViews-safe views here: a bare View fails to inflate in the launcher. -->
+        <ImageView
+            android:layout_width="@dimen/widget_poster_width"
+            android:layout_height="@dimen/widget_poster_height"
+            android:layout_marginEnd="@dimen/widget_padding"
+            android:background="@drawable/flixquest_widget_poster_background"
+            android:contentDescription="@null"
+            android:importantForAccessibility="no" />
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:fontFamily="@font/figtree_family"
-            android:letterSpacing="0.09"
-            android:maxLines="1"
-            android:text="CONTINUE WATCHING"
-            android:textColor="#FFF57C00"
-            android:textSize="10sp"
-            android:textStyle="bold" />
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
-            android:ellipsize="end"
-            android:fontFamily="@font/figtree_family"
-            android:maxLines="2"
-            android:text="Right where you left off"
-            android:textColor="#FFFFFFFF"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
-            android:ellipsize="end"
-            android:fontFamily="@font/figtree_family"
-            android:maxLines="1"
-            android:text="S2 E4  ·  The episode title"
-            android:textColor="#E6FFFFFF"
-            android:textSize="12sp" />
+                <ImageView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/widget_mark_gap"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/flixquest_widget_mark"
+                    android:tint="#FFF57C00" />
 
-        <ProgressBar
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="4dp"
-            android:layout_marginTop="9dp"
-            android:indeterminate="false"
-            android:max="100"
-            android:progress="78"
-            android:progressBackgroundTint="#40FFFFFF"
-            android:progressDrawable="@drawable/flixquest_widget_progress"
-            android:progressTint="#FFF57C00" />
+                <TextView
+                    style="@style/FlixQuestWidgetPreviewText.Kicker"
+                    android:text="CONTINUE WATCHING" />
+            </LinearLayout>
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="7dp"
-            android:ellipsize="end"
-            android:fontFamily="@font/figtree_family"
-            android:maxLines="2"
-            android:text="18m left"
-            android:textColor="#B3FFFFFF"
-            android:textSize="11sp" />
+            <TextView
+                style="@style/FlixQuestWidgetPreviewText.Title"
+                android:text="Right where you left off" />
+
+            <TextView
+                style="@style/FlixQuestWidgetPreviewText.Subtitle"
+                android:text="S2 E4  ·  The episode title" />
+
+            <TextView
+                style="@style/FlixQuestWidgetPreviewText.Meta"
+                android:text="18m left" />
+        </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+
+    <ProgressBar
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_gravity="bottom"
+        android:indeterminate="false"
+        android:max="100"
+        android:progress="78"
+        android:progressDrawable="@drawable/flixquest_widget_progress"
+        android:progressTint="#FFF57C00" />
+</FrameLayout>

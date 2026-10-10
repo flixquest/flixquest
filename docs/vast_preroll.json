@@ -1,0 +1,16 @@
+{
+  "clickadu": {
+    "tag_url": "https://detoxifylagoonsnugness.com/ceef/gdt3g0/tbt/2150357/tlk.xml",
+    "request_timeout_ms": 5000,
+    "start_timeout_ms": 8000,
+    "max_wrappers": 5,
+    "tv_enabled": true
+  },
+  "exoclick": {
+    "tag_url": "https://s.magsrv.com/v1/vast.php?idz=6050988",
+    "request_timeout_ms": 5000,
+    "start_timeout_ms": 8000,
+    "max_wrappers": 5,
+    "tv_enabled": true
+  }
+}

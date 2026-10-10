@@ -639,8 +639,8 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                     ),
                     // A thin banner along the backdrop's top edge, clear of
                     // the artwork's subject and the bottom-left info, while
-                    // the viewer reads and picks. It is kept loaded but
-                    // hidden while the rows below are in view.
+                    // the viewer reads and picks. Remove the WebView while
+                    // the rows below are in view so hidden ads stop loading.
                     Positioned(
                       top: inset * 0.6,
                       right: inset,
@@ -649,8 +649,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                           .toDouble(),
                       child: Visibility(
                         visible: !browsing,
-                        maintainState: true,
-                        child: const StartIoAdSlot(
+                        child: const BannerAdSlot(
                           placement: 'title_detail',
                           variant: HostedBannerVariant.standard,
                         ),

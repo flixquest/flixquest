@@ -15,11 +15,13 @@ void main() {
   late int keyBacks;
   late int systemBacks;
 
-  Future<void> pumpApp(WidgetTester tester, {bool appHandlesKey = true}) async {
+  Future<void> pumpApp(WidgetTester tester,
+      {bool appHandlesKey = true, bool enabled = true}) async {
     keyBacks = 0;
     systemBacks = 0;
     await tester.pumpWidget(
       TvBackKeyGuard(
+        enabled: enabled,
         child: MaterialApp(
           home: PopScope<void>(
             canPop: false,
@@ -103,6 +105,33 @@ void main() {
 
     expect(keyBacks, 1);
     expect(systemBacks, 0);
+  });
+
+  testWidgets('mobile mode lets system Back through immediately',
+      (tester) async {
+    await pumpApp(tester, enabled: false);
+    await systemBack(tester);
+    expect(systemBacks, 1);
+    await settle(tester);
+    expect(systemBacks, 1);
+  });
+
+  testWidgets('switching to mobile cancels a pending TV Back', (tester) async {
+    await pumpApp(tester);
+    await systemBack(tester);
+    expect(systemBacks, 0);
+
+    await pumpApp(tester, enabled: false);
+    await settle(tester);
+    expect(systemBacks, 0);
+    await systemBack(tester);
+    expect(systemBacks, 1);
+
+    await pumpApp(tester);
+    await systemBack(tester);
+    expect(systemBacks, 0);
+    await settle(tester);
+    expect(systemBacks, 1);
   });
 
   testWidgets('a system Back with no key behind it still goes back',

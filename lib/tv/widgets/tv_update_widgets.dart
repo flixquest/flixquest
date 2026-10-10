@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../services/app_update_service.dart';
 import '../focus/tv_keymap.dart';
 
 import '../app/tv_design.dart';
@@ -46,9 +47,14 @@ class TvUpdateChangelog extends StatelessWidget {
   final VoidCallback onPressed;
   final FocusNode? focusNode;
 
+  /// Entries shown on the card; the rest are a press away.
+  static const _previewItems = 4;
+
   @override
   Widget build(BuildContext context) {
     final palette = TvPalette.of(context);
+    final items = AppUpdateService.changelogItems(changeLog);
+    final more = items.length - _previewItems;
     return TvFocusable(
       semanticLabel: 'What’s new',
       focusNode: focusNode,
@@ -84,14 +90,47 @@ class TvUpdateChangelog extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              changeLog,
-              style: TextStyle(
-                color: palette.mutedText,
-                fontSize: 19,
-                height: 1.45,
+            for (final item in items.take(_previewItems))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Container(
+                      width: 6,
+                      height: 6,
+                      margin: const EdgeInsets.only(top: 11, right: 14),
+                      decoration: BoxDecoration(
+                        color: palette.mutedText,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        item,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: palette.mutedText,
+                          fontSize: 19,
+                          height: 1.45,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            if (more > 0) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(
+                '+$more more · Select to read all',
+                style: TextStyle(
+                  color: palette.foreground,
+                  fontFamily: 'FigtreeSB',
+                  fontSize: 16,
+                ),
+              ),
+            ],
           ],
         ),
       ),

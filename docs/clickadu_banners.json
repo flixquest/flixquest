@@ -1,0 +1,18 @@
+{
+  "script_url": "https://guidepaparazzisurface.com/bn.js",
+  "units": {
+    "rectangle": {
+      "spot_id": "2150724",
+      "size": "300x250"
+    }
+  },
+  "defaults": {
+    "tall": [
+      "rectangle"
+    ],
+    "tv_tall": [
+      "rectangle"
+    ]
+  },
+  "placements": {}
+}

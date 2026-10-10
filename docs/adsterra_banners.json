@@ -1,0 +1,149 @@
+{
+  "units": {
+    "mobile_banner": {
+      "key": "cdb23e7c9da76f931003c2ded7b140eb",
+      "script_url": "https://bancadeltempoidea.org/22/cdb23e7c9da76f931003c2ded7b140eb",
+      "size": "320x50"
+    },
+    "rectangle": {
+      "key": "de99e09da5dcecfdcabaded0e42713f9",
+      "script_url": "https://bancadeltempoidea.org/22/de99e09da5dcecfdcabaded0e42713f9",
+      "size": "300x250"
+    },
+    "tablet_banner": {
+      "key": "bd3321c96545a1d3238cc3410990b528",
+      "script_url": "https://bancadeltempoidea.org/22/bd3321c96545a1d3238cc3410990b528",
+      "size": "468x60"
+    },
+    "leaderboard": {
+      "key": "c451774b6f6da8a10331d2389a485d48",
+      "script_url": "https://bancadeltempoidea.org/22/c451774b6f6da8a10331d2389a485d48",
+      "size": "728x90"
+    },
+    "tv_banner": {
+      "key": "cdb23e7c9da76f931003c2ded7b140eb",
+      "script_url": "https://bancadeltempoidea.org/22/cdb23e7c9da76f931003c2ded7b140eb",
+      "size": "320x50"
+    },
+    "tv_leaderboard": {
+      "key": "c451774b6f6da8a10331d2389a485d48",
+      "script_url": "https://bancadeltempoidea.org/22/c451774b6f6da8a10331d2389a485d48",
+      "size": "728x90"
+    },
+    "vertical": {
+      "key": "5f8393d1dd71a49d17985c0694b250b9",
+      "script_url": "https://bancadeltempoidea.org/22/5f8393d1dd71a49d17985c0694b250b9",
+      "size": "160x300"
+    },
+    "skyscraper": {
+      "key": "b2ef65ac1dda8f0bc47550e13f6af2fe",
+      "script_url": "https://bancadeltempoidea.org/22/b2ef65ac1dda8f0bc47550e13f6af2fe",
+      "size": "160x600"
+    }
+  },
+  "defaults": {
+    "standard": [
+      "tablet_banner",
+      "mobile_banner"
+    ],
+    "tall": [
+      "rectangle"
+    ],
+    "tv_standard": [
+      "tv_banner"
+    ],
+    "tv_tall": [
+      "rectangle"
+    ]
+  },
+  "placements": {
+    "home_all_hero": {
+      "units": [
+        "leaderboard",
+        "tablet_banner",
+        "mobile_banner"
+      ]
+    },
+    "home_movies_hero": {
+      "units": [
+        "leaderboard",
+        "tablet_banner",
+        "mobile_banner"
+      ]
+    },
+    "home_series_hero": {
+      "units": [
+        "leaderboard",
+        "tablet_banner",
+        "mobile_banner"
+      ]
+    },
+    "movie_detail": {
+      "units": [
+        "rectangle"
+      ]
+    },
+    "tv_detail": {
+      "units": [
+        "rectangle"
+      ]
+    },
+    "season_detail": {
+      "units": [
+        "rectangle"
+      ]
+    },
+    "episode_detail": {
+      "units": [
+        "rectangle"
+      ]
+    },
+    "person_detail": {
+      "units": [
+        "rectangle"
+      ]
+    },
+    "collection_detail": {
+      "units": [
+        "rectangle"
+      ]
+    },
+    "stream_loading": {
+      "units": [
+        "rectangle",
+        "mobile_banner"
+      ]
+    },
+    "live_tv_top": {
+      "units": [
+        "rectangle"
+      ]
+    },
+    "live_tv_list_a": {
+      "units": [
+        "rectangle"
+      ]
+    },
+    "live_tv_list_b": {
+      "units": [
+        "rectangle"
+      ]
+    },
+    "live_tv_list_c": {
+      "units": [
+        "rectangle"
+      ]
+    },
+    "title_detail_tv": {
+      "units": [
+        "tv_banner"
+      ]
+    },
+    "live_tv_strip_tv": {
+      "units": [
+        "tv_leaderboard",
+        "tv_banner"
+      ]
+    }
+  }
+}

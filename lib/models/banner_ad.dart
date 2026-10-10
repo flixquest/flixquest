@@ -25,7 +25,7 @@ class BannerAd {
   ///
   /// Phones and tablets match an explicit placement, or every placement when
   /// the ad lists none. Android TV only matches its own `<placement>_tv` name
-  /// (the tag Start.io uses there), so a phone announcement never lands on a
+  /// (the tag Adsterra uses there), so a phone announcement never lands on a
   /// television by accident.
   bool appliesTo(String placement, {bool television = false}) {
     if (television) return placements.contains('${placement}_tv');
@@ -51,16 +51,16 @@ class BannerAd {
   }
 }
 
-/// How the hosted (`/ads`) banner shares a slot with the Start.io banner.
+/// How the hosted (`/ads`) banner shares a slot with the Adsterra banner.
 enum HostedBannerMode {
   /// Hosted banners never show.
   off,
 
-  /// The hosted banner sits above the Start.io banner in the same slot.
+  /// The hosted banner sits above the Adsterra banner in the same slot.
   stack,
 
-  /// A live hosted banner takes the slot from Start.io; slots with no hosted
-  /// ad keep their Start.io banner.
+  /// A live hosted banner takes the slot from Adsterra; slots with no hosted
+  /// ad keep their Adsterra banner.
   priority;
 
   static HostedBannerMode parse(String raw) {

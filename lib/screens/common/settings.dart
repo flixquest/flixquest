@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flixquest/models/app_colors.dart';
+import 'package:flixquest/models/app_mode.dart';
 import 'package:flixquest/models/default_home.dart';
 import 'package:flixquest/services/globle_method.dart';
 
@@ -159,6 +160,18 @@ class _SettingsState extends State<Settings> {
                   onChanged: (value) =>
                       setState(() => settingsValues.appTheme = value),
                 ),
+                ChoiceRow<AppMode>(
+                  icon: PhosphorIcons.monitor(),
+                  label: tr('app_mode'),
+                  subtitle: tr('app_mode_description'),
+                  value: settingsValues.appMode,
+                  options: {
+                    AppMode.automatic: tr('automatic'),
+                    AppMode.television: tr('app_mode_tv'),
+                    AppMode.mobile: tr('app_mode_mobile'),
+                  },
+                  onChanged: (value) => settingsValues.appMode = value,
+                ),
                 SwitchRow(
                   value: appDependencies.ambientModeEnabled,
                   icon: PhosphorIcons.imageSquare(),
@@ -225,35 +238,20 @@ class _SettingsState extends State<Settings> {
                   value: settingsValues.enableProxy,
                   icon: PhosphorIcons.globe(),
                   label: tr('use_proxy'),
-                  onChanged: (bool value) {
+                  onChanged: (bool value) async {
                     if (value) {
-                      showDialog(
-                          context: context,
-                          builder: (BuildContext ctx) {
-                            return AlertDialog(
-                              title: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Text(tr('use_proxy_title')),
-                              ),
-                              content: Text(tr('use_proxy_detail')),
-                              actions: <Widget>[
-                                PillButton(
-                                  label: tr('cancel'),
-                                  onPressed: () => Navigator.pop(ctx),
-                                ),
-                                PillButton(
-                                  label: tr('enable'),
-                                  primary: true,
-                                  onPressed: () {
-                                    setState(() {
-                                      settingsValues.enableProxy = value;
-                                    });
-                                    Navigator.pop(ctx);
-                                  },
-                                ),
-                              ],
-                            );
-                          });
+                      final enable = await showConfirmDialog(
+                        context,
+                        icon: PhosphorIcons.globe(),
+                        title: tr('use_proxy_title'),
+                        message: tr('use_proxy_detail'),
+                        confirmLabel: tr('enable'),
+                      );
+                      if (enable == true && mounted) {
+                        setState(() {
+                          settingsValues.enableProxy = value;
+                        });
+                      }
                     } else {
                       setState(() {
                         settingsValues.enableProxy = value;

@@ -4,6 +4,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flixquest/models/app_colors.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +15,7 @@ import 'provider/recently_watched_provider.dart';
 import 'provider/settings_provider.dart';
 import 'screens/user/user_state.dart';
 import 'widgets/occasional_effect_overlay.dart';
+import 'widgets/app_presentation.dart';
 import 'provider/bookmark_provider.dart';
 import 'provider/offline_download_provider.dart';
 import 'provider/wellness_provider.dart';
@@ -55,39 +57,87 @@ class _FlixQuestState extends State<FlixQuest>
   Future<void> _initConfig() async {
     try {
       await AppRemoteConfig.configure(_remoteConfig);
+      await _remoteConfig.ensureInitialized();
+      if (!mounted) return;
+      // A slow fetch must not leave playback using the disabled defaults
+      // while the last activated settings are already stored on the device.
+      AppRemoteConfig.apply(_remoteConfig, widget.appDependencyProvider);
       await _fetchConfig();
-    } catch (_) {
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[PlaybackAdConfig] initialization failed: $error');
+      }
       // The persisted app configuration remains usable while Firebase is
       // temporarily unavailable.
     }
     if (mounted) {
       _remoteConfigSubscription = _remoteConfig.onConfigUpdated.listen(
         _onRemoteConfigUpdated,
-        onError: (_) {},
+        onError: (Object error) {
+          if (kDebugMode) {
+            debugPrint('[PlaybackAdConfig] real-time update error: $error');
+          }
+        },
       );
     }
   }
 
-  Future<void> _fetchConfig() async {
+  Future<void> _fetchConfig({bool requestPermissions = true}) async {
     try {
-      await _remoteConfig.fetchAndActivate();
-    } catch (_) {
+      final activated = await _remoteConfig.fetchAndActivate();
+      if (kDebugMode) {
+        debugPrint('[PlaybackAdConfig] fetch '
+            'status=${_remoteConfig.lastFetchStatus.name} '
+            'lastFetch=${_remoteConfig.lastFetchTime.toUtc().toIso8601String()} '
+            'activated=$activated');
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[PlaybackAdConfig] fetch failed: $error; '
+            'using previously activated/default values');
+      }
       // Cached/default values still provide a safe startup when offline.
     }
     if (mounted) {
       AppRemoteConfig.apply(_remoteConfig, widget.appDependencyProvider);
     }
-    await requestNotificationPermissions();
+    if (requestPermissions) await requestNotificationPermissions();
   }
 
   Future<void> _onRemoteConfigUpdated(RemoteConfigUpdate update) async {
     try {
-      await _remoteConfig.activate();
+      final activated = await _remoteConfig.activate();
+      if (kDebugMode) {
+        debugPrint('[PlaybackAdConfig] real-time update '
+            'keys=${update.updatedKeys.join(',')} activated=$activated');
+      }
       if (mounted) {
         AppRemoteConfig.apply(_remoteConfig, widget.appDependencyProvider);
       }
-    } catch (_) {
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[PlaybackAdConfig] real-time activation failed: $error');
+      }
       // Keep the last successfully activated configuration.
+    }
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    if (kDebugMode) unawaited(_refreshConfigAfterReload());
+  }
+
+  Future<void> _refreshConfigAfterReload() async {
+    try {
+      // Hot reload preserves initState and the provider's old catalog. Fetch
+      // and apply the current remote values without repeating permissions.
+      await AppRemoteConfig.configure(_remoteConfig);
+      await _fetchConfig(requestPermissions: false);
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[PlaybackAdConfig] reload refresh failed: $error');
+      }
     }
   }
 
@@ -176,83 +226,89 @@ class _FlixQuestState extends State<FlixQuest>
             Consumer3<SettingsProvider, RecentProvider, AppDependencyProvider>(
                 builder: (context, settingsProvider, recentProvider,
                     appDependencyProvider, snapshot) {
-          return DynamicColorBuilder(
-            builder: (lightDynamic, darkDynamic) {
-              final isDarkTheme = settingsProvider.appTheme == 'dark' ||
-                  settingsProvider.appTheme == 'amoled';
-              final palette = AppColorsList().appColors(
-                isDarkTheme,
-                customColor: settingsProvider.customAppColor > 0
-                    ? settingsProvider.customAppColor
-                    : null,
-              );
-              final selectedAppColor = palette.firstWhere(
-                (color) => color.index == settingsProvider.appColorIndex,
-                orElse: () => palette.first,
-              );
-              final appTheme = Styles.themeData(
-                appThemeMode: settingsProvider.appTheme,
-                isM3Enabled: settingsProvider.isMaterial3Enabled,
-                lightDynamicColor: lightDynamic,
-                darkDynamicColor: darkDynamic,
-                context: context,
-                appColor: selectedAppColor,
-                compactCorners: widget.devicePresentation !=
-                    DevicePresentation.television,
-                occasionalTheme: appDependencyProvider.activeOccasionalTheme,
-                ambientColor: appDependencyProvider.activeAmbientColor,
-              );
-              unawaited(
-                HomeWidgetService.instance.syncResolvedTheme(appTheme),
-              );
-              final app = MaterialApp(
-                restorationScopeId: 'flixquest',
-                navigatorKey: InAppMessagingService.navigatorKey,
-                localizationsDelegates: context.localizationDelegates,
-                supportedLocales: context.supportedLocales,
-                locale: context.locale,
-                debugShowCheckedModeBanner: false,
-                builder: (context, child) =>
-                    AnnotatedRegion<SystemUiOverlayStyle>(
-                  value: SystemUiOverlayStyle(
-                    systemNavigationBarColor: Colors.transparent,
-                    systemNavigationBarDividerColor: Colors.transparent,
-                    systemNavigationBarIconBrightness:
-                        isDarkTheme ? Brightness.light : Brightness.dark,
-                    systemNavigationBarContrastEnforced: false,
+          return AppPresentation(
+            settings: settingsProvider,
+            detectedPresentation: widget.devicePresentation,
+            navigatorKey: InAppMessagingService.navigatorKey,
+            builder: (context, devicePresentation) => DynamicColorBuilder(
+              builder: (lightDynamic, darkDynamic) {
+                final isDarkTheme = settingsProvider.appTheme == 'dark' ||
+                    settingsProvider.appTheme == 'amoled';
+                final palette = AppColorsList().appColors(
+                  isDarkTheme,
+                  customColor: settingsProvider.customAppColor > 0
+                      ? settingsProvider.customAppColor
+                      : null,
+                );
+                final selectedAppColor = palette.firstWhere(
+                  (color) => color.index == settingsProvider.appColorIndex,
+                  orElse: () => palette.first,
+                );
+                final appTheme = Styles.themeData(
+                  appThemeMode: settingsProvider.appTheme,
+                  isM3Enabled: settingsProvider.isMaterial3Enabled,
+                  lightDynamicColor: lightDynamic,
+                  darkDynamicColor: darkDynamic,
+                  context: context,
+                  appColor: selectedAppColor,
+                  compactCorners:
+                      devicePresentation != DevicePresentation.television,
+                  occasionalTheme: appDependencyProvider.activeOccasionalTheme,
+                  ambientColor: appDependencyProvider.activeAmbientColor,
+                );
+                unawaited(
+                  HomeWidgetService.instance.syncResolvedTheme(appTheme),
+                );
+                final app = MaterialApp(
+                  restorationScopeId: 'flixquest',
+                  navigatorKey: InAppMessagingService.navigatorKey,
+                  localizationsDelegates: context.localizationDelegates,
+                  supportedLocales: context.supportedLocales,
+                  locale: context.locale,
+                  debugShowCheckedModeBanner: false,
+                  builder: (context, child) =>
+                      AnnotatedRegion<SystemUiOverlayStyle>(
+                    value: SystemUiOverlayStyle(
+                      systemNavigationBarColor: Colors.transparent,
+                      systemNavigationBarDividerColor: Colors.transparent,
+                      systemNavigationBarIconBrightness:
+                          isDarkTheme ? Brightness.light : Brightness.dark,
+                      systemNavigationBarContrastEnforced: false,
+                    ),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (devicePresentation == DevicePresentation.television)
+                          TvUpdateGate(child: child ?? const SizedBox.shrink())
+                        else
+                          child ?? const SizedBox.shrink(),
+                        if (devicePresentation != DevicePresentation.television)
+                          OccasionalEffectOverlay(
+                            theme: appDependencyProvider.activeOccasionalTheme,
+                            enabled: appDependencyProvider
+                                .shouldShowOccasionalEffects,
+                            visibilityListenable: appDependencyProvider,
+                            visibilityResolver: () => appDependencyProvider
+                                .shouldShowOccasionalEffects,
+                          ),
+                      ],
+                    ),
                   ),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      if (widget.devicePresentation ==
-                          DevicePresentation.television)
-                        TvUpdateGate(child: child ?? const SizedBox.shrink())
-                      else
-                        child ?? const SizedBox.shrink(),
-                      if (widget.devicePresentation !=
-                          DevicePresentation.television)
-                        OccasionalEffectOverlay(
-                          theme: appDependencyProvider.activeOccasionalTheme,
-                          enabled:
-                              appDependencyProvider.shouldShowOccasionalEffects,
-                          visibilityListenable: appDependencyProvider,
-                          visibilityResolver: () =>
-                              appDependencyProvider.shouldShowOccasionalEffects,
-                        ),
-                    ],
+                  theme: appTheme,
+                  home: UserState(
+                    key: ValueKey<DevicePresentation>(devicePresentation),
+                    devicePresentation: devicePresentation,
                   ),
-                ),
-                theme: appTheme,
-                home: UserState(
-                  devicePresentation: widget.devicePresentation,
-                ),
-              );
-              // Wraps the app itself: it has to hear about system Backs
-              // before the navigator does.
-              return widget.devicePresentation == DevicePresentation.television
-                  ? TvBackKeyGuard(child: app)
-                  : app;
-            },
+                );
+                // Wraps the app itself: it has to hear about system Backs
+                // before the navigator does. Keep the wrapper mounted in both
+                // modes so the navigator's home builder stays up to date.
+                return TvBackKeyGuard(
+                  enabled: devicePresentation == DevicePresentation.television,
+                  child: app,
+                );
+              },
+            ),
           );
         }));
   }

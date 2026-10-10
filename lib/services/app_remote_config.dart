@@ -1,11 +1,14 @@
 import 'dart:convert';
 
 import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:flutter/foundation.dart';
 
 import '../constants/api_constants.dart';
 import '../models/banner_ad.dart';
 import '../provider/app_dependency_provider.dart';
-import 'start_io_ads_service.dart';
+import '../models/banner_ads_config.dart';
+import '../models/adsterra_playback_ads_config.dart';
+import '../models/vast_preroll_config.dart';
 
 class AppRemoteConfig {
   const AppRemoteConfig._();
@@ -22,14 +25,26 @@ class AppRemoteConfig {
   static const bannersKey = 'banners';
   static const bannerAdNetworkKey = 'banner_ad_network';
   static const hostedBannerModeKey = 'hosted_banner_mode';
-  static const unityGameIdAndroidKey = 'unity_game_id_android';
-  static const unityBannerPlacementIdKey = 'unity_banner_placement_id';
-  static const unityTestModeKey = 'unity_test_mode';
-  static const startIoBannerEnabledKey = 'startio_banner_enabled';
-  static const startIoInterstitialEnabledKey = 'startio_interstitial_enabled';
-  static const startIoInterstitialIntervalKey =
-      'startio_interstitial_interval_seconds';
-  static const startIoTvInterstitialModeKey = 'startio_tv_interstitial_mode';
+  static const adsterraBannerEnabledKey = 'adsterra_banner_enabled';
+  static const adsterraTvEnabledKey = 'adsterra_tv_enabled';
+  static const adsterraBannersKey = 'adsterra_banners';
+  static const clickaduBannerEnabledKey = 'clickadu_banner_enabled';
+  static const clickaduTvEnabledKey = 'clickadu_tv_enabled';
+  static const clickaduBannersKey = 'clickadu_banners';
+  static const adsterraPlaybackEnabledKey = 'adsterra_playback_enabled';
+  static const adsterraPlaybackAdsKey = 'adsterra_playback_ads';
+  static const playbackPopunderNetworkKey = 'playback_popunder_network';
+  static const playbackPopupFrequencyMinutesKey =
+      'playback_popup_frequency_minutes';
+  static const clickaduPlaybackEnabledKey = 'clickadu_playback_enabled';
+  static const clickaduPlaybackAdsKey = 'clickadu_playback_ads';
+  static const monetagPlaybackEnabledKey = 'monetag_playback_enabled';
+  static const monetagPlaybackAdsKey = 'monetag_playback_ads';
+  static const exoclickPlaybackEnabledKey = 'exoclick_playback_enabled';
+  static const exoclickPlaybackAdsKey = 'exoclick_playback_ads';
+  static const vastPrerollEnabledKey = 'vast_preroll_enabled';
+  static const vastPrerollKey = 'vast_preroll';
+  static const vastPrerollNetworkKey = 'vast_preroll_network';
 
   /// Live TV used to ride on the OTT flag before it got a dedicated key.
   static const legacyEnableLiveTvKey = 'enable_ott';
@@ -38,7 +53,8 @@ class AppRemoteConfig {
     await remoteConfig.setConfigSettings(
       RemoteConfigSettings(
         fetchTimeout: const Duration(minutes: 1),
-        minimumFetchInterval: const Duration(minutes: 1),
+        minimumFetchInterval:
+            kDebugMode ? Duration.zero : const Duration(minutes: 1),
       ),
     );
     await remoteConfig.setDefaults(const <String, Object>{
@@ -61,15 +77,27 @@ class AppRemoteConfig {
       enableLiveTvKey: true,
       legacyEnableLiveTvKey: true,
       bannersKey: '{"banners":[]}',
-      bannerAdNetworkKey: 'native',
+      bannerAdNetworkKey: 'adsterra',
       hostedBannerModeKey: 'stack',
-      unityGameIdAndroidKey: '5445375',
-      unityBannerPlacementIdKey: 'Banner_Android',
-      unityTestModeKey: false,
-      startIoBannerEnabledKey: false,
-      startIoInterstitialEnabledKey: false,
-      startIoInterstitialIntervalKey: 600,
-      startIoTvInterstitialModeKey: 'video',
+      adsterraBannerEnabledKey: false,
+      adsterraTvEnabledKey: false,
+      adsterraBannersKey: '{"units":{},"defaults":{},"placements":{}}',
+      clickaduBannerEnabledKey: false,
+      clickaduTvEnabledKey: false,
+      clickaduBannersKey: '{"units":{},"defaults":{},"placements":{}}',
+      adsterraPlaybackEnabledKey: false,
+      adsterraPlaybackAdsKey: '{}',
+      playbackPopunderNetworkKey: 'adsterra',
+      playbackPopupFrequencyMinutesKey: 0,
+      clickaduPlaybackEnabledKey: false,
+      clickaduPlaybackAdsKey: '{}',
+      monetagPlaybackEnabledKey: false,
+      monetagPlaybackAdsKey: '{}',
+      exoclickPlaybackEnabledKey: false,
+      exoclickPlaybackAdsKey: '{}',
+      vastPrerollEnabledKey: false,
+      vastPrerollKey: '{}',
+      vastPrerollNetworkKey: 'clickadu',
     });
   }
 
@@ -126,45 +154,101 @@ class AppRemoteConfig {
 
     final bannerNetwork = remoteConfig.getString(bannerAdNetworkKey).trim();
     provider.setBannerAdNetwork(
-      bannerNetwork.isNotEmpty ? bannerNetwork : 'native',
+      bannerNetwork.isNotEmpty ? bannerNetwork : 'adsterra',
     );
 
     provider.setHostedBannerMode(
       HostedBannerMode.parse(remoteConfig.getString(hostedBannerModeKey)),
     );
 
-    final unityGameId = remoteConfig.getString(unityGameIdAndroidKey).trim();
-    final unityPlacement =
-        remoteConfig.getString(unityBannerPlacementIdKey).trim();
-    final unityTestMode = remoteConfig.getBool(unityTestModeKey);
-    provider.setUnityAdsConfig(
-      gameIdAndroid: unityGameId.isNotEmpty ? unityGameId : null,
-      bannerPlacementId: unityPlacement.isNotEmpty ? unityPlacement : null,
-      testMode: unityTestMode,
-    );
-    final bannerEnabled = remoteConfig.getValue(startIoBannerEnabledKey);
-    final interstitialEnabled =
-        remoteConfig.getValue(startIoInterstitialEnabledKey);
-    provider.setStartIoAdsConfig(
-      bannerEnabled: bannerEnabled.source == ValueSource.valueRemote &&
-          bannerEnabled.asBool(),
-      interstitialEnabled:
-          interstitialEnabled.source == ValueSource.valueRemote &&
-              interstitialEnabled.asBool(),
-      // Floors keep a mistyped value from turning pacing off entirely.
-      interstitialInterval: Duration(
-        seconds: remoteConfig.getInt(startIoInterstitialIntervalKey).clamp(
-              60,
-              86400,
-            ),
+    // Every network's catalog is kept; `banner_ad_network` picks the live one.
+    for (final (network, enabledKey, tvKey, catalogKey) in [
+      (
+        AdNetwork.adsterra,
+        adsterraBannerEnabledKey,
+        adsterraTvEnabledKey,
+        adsterraBannersKey
       ),
-      tvInterstitialMode: StartIoInterstitialMode.parse(
-        remoteConfig.getString(startIoTvInterstitialModeKey),
+      (
+        AdNetwork.clickadu,
+        clickaduBannerEnabledKey,
+        clickaduTvEnabledKey,
+        clickaduBannersKey
       ),
-    );
-    StartIoAdsService.instance.updateConfig(provider.startIoAds);
+    ]) {
+      provider.setBannerAdsConfig(BannerAdsConfig.parse(
+        remoteConfig.getString(catalogKey),
+        network: network,
+        enabled: _remoteBool(remoteConfig, enabledKey),
+        tvEnabled: _remoteBool(remoteConfig, tvKey),
+      ));
+    }
 
     final instancesRaw = remoteConfig.getString(flixquestApiInstancesKey);
+    final playbackEnabled = remoteConfig.getValue(adsterraPlaybackEnabledKey);
+    provider.setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse(
+      remoteConfig.getString(adsterraPlaybackAdsKey),
+      enabled: playbackEnabled.source == ValueSource.valueRemote &&
+          playbackEnabled.asBool(),
+    ));
+    for (final (network, enabledKey, catalogKey) in [
+      (AdNetwork.clickadu, clickaduPlaybackEnabledKey, clickaduPlaybackAdsKey),
+      (AdNetwork.monetag, monetagPlaybackEnabledKey, monetagPlaybackAdsKey),
+      (AdNetwork.exoclick, exoclickPlaybackEnabledKey, exoclickPlaybackAdsKey),
+    ]) {
+      provider.setPopunderAdsConfig(PopunderAdsConfig.parse(
+        remoteConfig.getString(catalogKey),
+        network: network,
+        enabled: _remoteBool(remoteConfig, enabledKey),
+      ));
+    }
+    provider.setPlaybackPopunderNetwork(
+        AdNetwork.parse(remoteConfig.getString(playbackPopunderNetworkKey)));
+    provider.setPlaybackPopupFrequencyMinutes(
+        remoteConfig.getValue(playbackPopupFrequencyMinutesKey).asInt());
+    if (kDebugMode) {
+      final network = provider.playbackPopunderNetwork;
+      final catalogKey = switch (network) {
+        AdNetwork.adsterra => adsterraPlaybackAdsKey,
+        AdNetwork.clickadu => clickaduPlaybackAdsKey,
+        AdNetwork.monetag => monetagPlaybackAdsKey,
+        AdNetwork.exoclick => exoclickPlaybackAdsKey,
+        null => null,
+      };
+      final placement = network == AdNetwork.adsterra
+          ? provider.adsterraPlaybackAds.forStage(PlaybackAdStage.streamFound)
+          : network == null
+              ? null
+              : provider.popunderAdsFor(network).activePopunder;
+      final enabled = network == AdNetwork.adsterra
+          ? provider.adsterraPlaybackAds.enabled
+          : network != null && provider.popunderAdsFor(network).enabled;
+      final target =
+          placement?.pageUrl ?? placement?.smartlinkUrl ?? placement?.scriptUrl;
+      final source = catalogKey == null
+          ? 'none'
+          : remoteConfig.getValue(catalogKey).source.name;
+      final interstitialEnabled =
+          provider.adsterraPlaybackAds.forStage(PlaybackAdStage.beforeLoader) !=
+              null;
+      debugPrint('[PlaybackAdConfig] selected=${network?.name ?? 'none'} '
+          'catalog=${catalogKey ?? 'none'} source=$source '
+          'popupFrequencyMinutes=${provider.playbackPopupFrequencyMinutes} '
+          'enabled=$enabled interstitialEnabled=$interstitialEnabled '
+          'mode=${placement?.mode ?? 'disabled/invalid'} '
+          'target=${target == null ? 'none' : '${target.origin}${target.path}'}');
+    }
+    provider.setVastPrerollConfig(VastPrerollConfig.parse(
+      remoteConfig.getString(vastPrerollKey),
+      enabled: _remoteBool(remoteConfig, vastPrerollEnabledKey),
+      networks:
+          AdNetwork.parseList(remoteConfig.getString(vastPrerollNetworkKey)),
+    ));
+    if (kDebugMode) {
+      final preroll = provider.vastPreroll;
+      debugPrint('[VAST] config enabled=${preroll.enabled} order='
+          '${preroll.sources.map((source) => source.network.name).join(',')}');
+    }
     final parsedInstances = parseApiInstances(instancesRaw);
     final legacyUrl = remoteConfig.getString(flixquestApiUrlKey).trim();
     provider.setFlixquestApiConfig(
@@ -220,6 +304,12 @@ class AppRemoteConfig {
     } catch (_) {
       return const {};
     }
+  }
+
+  /// Ad switches count only when published: no default turns an ad on.
+  static bool _remoteBool(FirebaseRemoteConfig remoteConfig, String key) {
+    final value = remoteConfig.getValue(key);
+    return value.source == ValueSource.valueRemote && value.asBool();
   }
 
   /// Resolves the Live TV toggle, preferring [enableLiveTvKey] and falling back

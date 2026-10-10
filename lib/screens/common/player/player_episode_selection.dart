@@ -1,3 +1,4 @@
+import 'package:flixquest/widgets/adsterra_playback_gate.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -134,25 +135,30 @@ class PlayerEpisodeSelection {
                               Navigator.pushReplacement(
                                 playerContext,
                                 MaterialPageRoute(
-                                  builder: (_) => TVVideoLoader(
-                                    download: false,
-                                    useTvPlayer: useTvPlayer,
-                                    metadata: TVStreamMetadata(
-                                      elapsed: null,
-                                      episodeId: episode.episodeId,
-                                      episodeName: episode.episodeName,
-                                      episodeNumber: episode.episodeNumber,
-                                      posterPath: tvMetadata.posterPath,
-                                      backdropPath: episode.stillPath ??
-                                          tvMetadata.backdropPath,
-                                      seasonNumber: episode.seasonNumber,
-                                      seriesName: tvMetadata.seriesName,
-                                      tvId: tvMetadata.tvId,
-                                      airDate: episode.airDate,
-                                      seasonEpisodes: episodes,
-                                      allSeasons: tvMetadata.allSeasons,
-                                    ),
-                                  ),
+                                  builder: (context) =>
+                                      AdsterraPlaybackGate.buildLoader(context,
+                                      television: useTvPlayer,
+                                      builder: (context) => TVVideoLoader(
+                                            download: false,
+                                            useTvPlayer: useTvPlayer,
+                                            metadata: TVStreamMetadata(
+                                              elapsed: null,
+                                              episodeId: episode.episodeId,
+                                              episodeName: episode.episodeName,
+                                              episodeNumber:
+                                                  episode.episodeNumber,
+                                              posterPath: tvMetadata.posterPath,
+                                              backdropPath: episode.stillPath ??
+                                                  tvMetadata.backdropPath,
+                                              seasonNumber:
+                                                  episode.seasonNumber,
+                                              seriesName: tvMetadata.seriesName,
+                                              tvId: tvMetadata.tvId,
+                                              airDate: episode.airDate,
+                                              seasonEpisodes: episodes,
+                                              allSeasons: tvMetadata.allSeasons,
+                                            ),
+                                          )),
                                 ),
                               );
                             },

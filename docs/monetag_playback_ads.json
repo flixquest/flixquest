@@ -1,0 +1,16 @@
+{
+  "popunder": {
+    "enabled": true,
+    "mode": "page",
+    "url": "https://flix.quest/a/3ad05c8e4d",
+    "load_timeout_ms": 30000,
+    "max_duration_seconds": 60
+  },
+  "tv_popunder": {
+    "enabled": true,
+    "mode": "page",
+    "url": "https://flix.quest/a/3ad05c8e4d",
+    "load_timeout_ms": 30000,
+    "max_duration_seconds": 60
+  }
+}

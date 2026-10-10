@@ -10,8 +10,8 @@ import 'package:url_launcher/url_launcher_string.dart';
 import '../models/banner_ad.dart';
 import '../provider/app_dependency_provider.dart';
 import '../services/hosted_ads_repository.dart';
-import '../services/start_io_ads_service.dart';
-import 'start_io_banner_widget.dart';
+import '../services/device_presentation_service.dart';
+import 'network_banner_widget.dart';
 
 final CacheManager _adImageCache = CacheManager(
   Config(
@@ -31,16 +31,16 @@ enum HostedBannerVariant {
 /// One banner slot shared by the two ad sources.
 ///
 /// The hosted `/ads` banner (announcements and calls to action from our own
-/// backend) and the Start.io banner are independent: each has its own
-/// switch and either can be live without the other. [HostedBannerMode]
-/// decides what happens when both are live in the same slot. A remotely
-/// configured `banner_ad_network=none` still hides everything.
+/// backend) and the ad network's banner are independent: each has its own
+/// switch and either can be live without the other. `banner_ad_network`
+/// picks the network (Adsterra or Clickadu). [HostedBannerMode] decides what
+/// happens when both are live in the same slot. A remotely configured
+/// `banner_ad_network=none` still hides everything.
 class RemoteHostedAdsBanner extends StatefulWidget {
   const RemoteHostedAdsBanner({
     required this.placement,
     this.loadAds,
     this.variant = HostedBannerVariant.standard,
-    this.keywords = StartIoAdsService.catalogKeywords,
     this.padding = const EdgeInsets.fromLTRB(20, 14, 20, 6),
     super.key,
   });
@@ -49,7 +49,6 @@ class RemoteHostedAdsBanner extends StatefulWidget {
   final Future<List<BannerAd>> Function()? loadAds;
   final String placement;
   final HostedBannerVariant variant;
-  final String keywords;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -69,11 +68,11 @@ class _RemoteHostedAdsBannerState extends State<RemoteHostedAdsBanner> {
     if (dependencies == null || dependencies.bannerAdNetwork == 'none') {
       return const SizedBox.shrink();
     }
-    final television = StartIoAdsService.instance.isTelevision;
+    final television = DevicePresentationService.instance.isTelevision;
     final hostedActive = dependencies.isHostedBannerActive;
     // Both sources can show on Android TV; their widgets stay display-only.
-    final startIoActive = dependencies.isStartIoBannerActive;
-    if (!hostedActive) return _startIo(dependencies, widget.padding);
+    final networkActive = dependencies.isNetworkBannerActive;
+    if (!hostedActive) return _network(dependencies, widget.padding);
     final ads = _ads ??= _load(dependencies);
     final priority = dependencies.hostedBannerMode == HostedBannerMode.priority;
 
@@ -96,18 +95,18 @@ class _RemoteHostedAdsBannerState extends State<RemoteHostedAdsBanner> {
                 interactive: !television,
                 padding: widget.padding,
               );
-        // In priority mode Start.io waits for the answer, so a slot that a
-        // hosted ad takes never loads (and bills) a banner underneath it.
-        final showStartIo =
-            startIoActive && (!priority || (settled && hosted == null));
-        if (hosted == null && !showStartIo) return const SizedBox.shrink();
+        // In priority mode the network banner waits for the answer, so a slot
+        // that a hosted ad takes never loads (and bills) a banner underneath.
+        final showNetwork =
+            networkActive && (!priority || (settled && hosted == null));
+        if (hosted == null && !showNetwork) return const SizedBox.shrink();
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             if (hosted != null) hosted,
-            if (showStartIo)
-              _startIo(
+            if (showNetwork)
+              _network(
                 dependencies,
                 hosted == null ? widget.padding : _tucked(widget.padding),
               ),
@@ -117,51 +116,59 @@ class _RemoteHostedAdsBannerState extends State<RemoteHostedAdsBanner> {
     );
   }
 
-  /// Keeps the Start.io banner close under a hosted banner it shares a slot
+  /// Keeps the network banner close under a hosted banner it shares a slot
   /// with, instead of doubling the gap.
   EdgeInsetsGeometry _tucked(EdgeInsetsGeometry padding) =>
       padding.resolve(Directionality.of(context)).copyWith(top: 6);
 
-  Widget _startIo(
+  Widget _network(
     AppDependencyProvider dependencies,
     EdgeInsetsGeometry padding,
   ) {
-    if (!dependencies.isStartIoBannerActive) {
+    final ads = dependencies.activeBannerAds;
+    if (ads == null || !NetworkBannerWidget.isSupported) {
       return const SizedBox.shrink();
     }
-    return StartIoBannerWidget(
-      placement: widget.placement,
-      testMode: dependencies.unityTestMode,
-      keywords: widget.keywords,
-      padding: padding,
-      variant: widget.variant == HostedBannerVariant.tall
-          ? StartIoBannerVariant.tall
-          : StartIoBannerVariant.standard,
-    );
+    final television = DevicePresentationService.instance.isTelevision;
+    return LayoutBuilder(builder: (context, constraints) {
+      final insets = padding.resolve(Directionality.of(context));
+      final unit = ads.resolve(
+        widget.placement,
+        tall: widget.variant.isTall,
+        television: television,
+        maxWidth: constraints.maxWidth - insets.horizontal,
+        maxHeight: constraints.maxHeight - insets.vertical - 18,
+      );
+      if (unit == null) return const SizedBox.shrink();
+      return NetworkBannerWidget(
+        key: ValueKey((widget.placement, unit, television)),
+        placement: widget.placement,
+        unit: unit,
+        television: television,
+        padding: padding,
+      );
+    });
   }
 }
 
 /// A banner for surfaces that never passed their own ad loader: the stream
 /// loader, Live TV and the TV details page.
-class StartIoAdSlot extends StatelessWidget {
-  const StartIoAdSlot({
+class BannerAdSlot extends StatelessWidget {
+  const BannerAdSlot({
     required this.placement,
     this.variant = HostedBannerVariant.tall,
-    this.keywords = StartIoAdsService.catalogKeywords,
     this.padding = EdgeInsets.zero,
     super.key,
   });
 
   final String placement;
   final HostedBannerVariant variant;
-  final String keywords;
   final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) => RemoteHostedAdsBanner(
         placement: placement,
         variant: variant,
-        keywords: keywords,
         padding: padding,
       );
 }

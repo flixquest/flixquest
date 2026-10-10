@@ -3,6 +3,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/app_colors.dart';
+import '../../models/app_mode.dart';
 import '../../screens/common/update_screen.dart';
 import '../../functions/subtitle_style.dart';
 import '../../provider/settings_provider.dart';
@@ -89,6 +90,13 @@ class TvSettingsScreen extends StatelessWidget {
             value: _colorThemeLabel(settings.appColorIndex),
             icon: PhosphorIcons.palette(),
             onActivate: () => _showColorThemePicker(context),
+          ),
+          _TvSettingTile(
+            key: const ValueKey<String>('app-mode'),
+            label: 'App mode',
+            value: _appModeLabel(settings.appMode),
+            icon: PhosphorIcons.monitor(),
+            onActivate: () => _showAppModePicker(context, settings),
           ),
         ];
         final playbackTiles = <Widget>[
@@ -204,6 +212,36 @@ class TvSettingsScreen extends StatelessWidget {
       'light' => 'Light',
       _ => 'Dark',
     };
+  }
+
+  static String _appModeLabel(AppMode mode) => switch (mode) {
+        AppMode.automatic => 'Automatic',
+        AppMode.television => 'TV',
+        AppMode.mobile => 'Mobile',
+      };
+
+  static Future<void> _showAppModePicker(
+    BuildContext context,
+    SettingsProvider settings,
+  ) async {
+    final selected = await showTvDialog<AppMode>(
+      context: context,
+      title: 'App mode',
+      content: const Text(
+        'Automatic detects your device. Choose TV or Mobile to switch the '
+        'interface immediately.',
+      ),
+      actions: <TvDialogAction>[
+        for (final mode in AppMode.values)
+          TvDialogAction(
+            label: _appModeLabel(mode),
+            autofocus: settings.appMode == mode,
+            isPrimary: settings.appMode == mode,
+            onPressed: () => Navigator.of(context).pop(mode),
+          ),
+      ],
+    );
+    if (selected != null) settings.appMode = selected;
   }
 
   static String _imageQualityLabel(String value) {

@@ -4,6 +4,11 @@ This file documents the Remote Config values used by the feature toggles and by
 the occasional-theme system. The theme catalog is intentionally one JSON string
 so a single publish activates a consistent catalog on every client.
 
+At startup, the app loads and applies Firebase's last activated values before
+refreshing them over the network. A slow refresh therefore keeps the cached ad
+selection usable for the first playback attempt. A fresh install still uses
+the disabled ad defaults until its first successful fetch.
+
 ## Feature toggles
 
 | Parameter | Firebase type | Default | Purpose |
@@ -56,54 +61,163 @@ splash remains bundled because it appears before Firebase initializes.
 | `flixquest_api_instances` | String | Empty | JSON array or `{"instances": [...]}` defining load-balanced FlixQuest scraper endpoints. |
 | `flixquest_api_url_v2` | String | Empty | Legacy single fallback URL for the scraper API. |
 
+## Ad networks at a glance
+
+FlixQuest serves three ad formats, and each one picks its network with its own
+selector. Every network keeps its codes in its own catalog and has its own
+switch, so both catalogs can stay published and swapping providers is a change
+of the selector alone. A selector value of `none`, or any unknown value, turns
+the format off. Selectors are case-insensitive and apply while the app runs.
+
+| Format | Selector (default) | Adsterra | Clickadu |
+| --- | --- | --- | --- |
+| Banners | `banner_ad_network` (`adsterra`) | `adsterra_banner_enabled`, `adsterra_tv_enabled`, `adsterra_banners` | `clickadu_banner_enabled`, `clickadu_tv_enabled`, `clickadu_banners` |
+| Stream-found popup (Popunder / Smartlink / Direct Link) | `playback_popunder_network` (`adsterra`) | `adsterra_playback_enabled`, `adsterra_playback_ads` | `clickadu_playback_enabled`, `clickadu_playback_ads` |
+| Video pre-roll (VAST) | `vast_preroll_network` (`clickadu`) | `vast_preroll_enabled`, `vast_preroll.adsterra` | `vast_preroll_enabled`, `vast_preroll.clickadu` |
+
+Monetag serves only the stream-found popup: `playback_popunder_network=monetag` with `monetag_playback_enabled` and `monetag_playback_ads`. See [Monetag popup](#monetag-popup).
+
+ExoClick serves the stream-found popup through `exoclick_playback_enabled` and
+`exoclick_playback_ads`, selected by `playback_popunder_network=exoclick`. See
+[ExoClick popup](#exoclick-popup). Its video pre-roll uses
+`vast_preroll.exoclick`. The pre-roll selector also takes a priority list such
+as `exoclick,clickadu`: the next network is asked when the one before it has
+no ad. See
+[Video pre-roll (VAST)](#video-pre-roll-vast).
+
+The Social Bar before the media loader is Adsterra-only (`adsterra_playback_ads`
+`interstitial`). Switching a selector closes an active popup and replaces live
+banners on the next frame; a pre-roll already playing finishes.
+
+To add another network in code: add it to `AdNetwork`
+(`lib/models/ad_network.dart`). The compiler then points at each place that
+needs its formats: a `BannerAdUnit` subclass and its catalog parse in
+`lib/models/banner_ads_config.dart`, its keys in `AppRemoteConfig`, and the
+popup placement in `AdsterraPlaybackAdsService`. A VAST-only network needs
+nothing beyond the enum value: its tag goes in its own `vast_preroll` section,
+named after the enum value.
+
 ## Ad network and banner configuration
 
 | Parameter | Firebase type | Default | Purpose |
 | --- | --- | --- | --- |
-| `banner_ad_network` | String | `native` | Legacy banner selector. `native`, `unity`, and `startio` all render Start.io banners so existing published values remain compatible; `none` hides every banner, hosted ones included. |
-| `hosted_banner_mode` | String | `stack` | How the hosted `/ads` banner (announcements and calls to action) shares a slot with the Start.io banner. `stack`: both show, hosted above Start.io. `priority`: a slot with a live hosted ad shows only that ad; other slots keep Start.io. `off`: hosted banners never show. Unknown values behave as `stack`. |
-| `unity_game_id_android` | String | `5445375` | Legacy compatibility key retained for older app versions. New builds do not initialize Unity from it. |
-| `unity_banner_placement_id` | String | `Banner_Android` | Legacy compatibility key retained for older app versions. |
-| `unity_test_mode` | Boolean | `false` | Legacy-named test-mode switch now also controls Start.io test ads. |
-| `startio_banner_enabled` | Boolean | `false` | Enables Start.io banners on all existing banner surfaces only when remotely set to `true`. `banner_ad_network=none` remains the global banner kill switch. |
-| `startio_interstitial_enabled` | Boolean | `false` | Enables the preloaded Start.io interstitial on phones/tablets only when remotely set to `true`. It runs while the stream resolves and the player opens once it closes. Android TV never loads or shows interstitials. |
-| `startio_rewarded_enabled` | Boolean | `true` | Legacy. Only the first Start.io build reads it (a rewarded video before every stream). Current builds show no rewarded ads; set `false` to switch it off in that old build. |
-| `startio_interstitial_interval_seconds` | Number | `600` | Minimum gap between two playback interstitials, so replays, retries and channel surfing see one ad. Values below `60` are raised to `60`. |
-| `startio_tv_interstitial_mode` | String | `video` | Legacy compatibility setting for older builds with TV interstitials. Current builds never load or show interstitials on Android TV. |
-| `banners` | String | `{"banners":[]}` | Per-ad display overrides for hosted `/ads` banners, keyed by the ad's `key` (`enabled`, `placements`, `shape`, `width`, `height`, `aspectRatio`). |
+| `banner_ad_network` | String | `adsterra` | Which network's WebView banners fill the slots: `adsterra` or `clickadu`. `none` hides all banners including hosted announcements. Published legacy values `native`, `unity`, and `startio` select Adsterra, but cannot enable requests without its switch and valid codes. Unknown values show no network banner but keep hosted announcements. |
+| `adsterra_banner_enabled` | Boolean | `false` | Adsterra banner switch. Must be explicitly enabled remotely; no demo ads or hardcoded publisher codes ship in the app. |
+| `adsterra_tv_enabled` | Boolean | `false` | Additional gate for Android TV; the global switch must also be on. TV placements use `_tv` names and TV-specific defaults. |
+| `adsterra_banners` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | Central catalog of banner codes, sizes, default variants and placement overrides. See below. |
+| `clickadu_banner_enabled` | Boolean | `false` | Clickadu banner switch. Must be published remotely. |
+| `clickadu_tv_enabled` | Boolean | `false` | Android TV gate for Clickadu banners, like `adsterra_tv_enabled`. |
+| `clickadu_banners` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | Clickadu's catalog: the same `units` / `defaults` / `placements` schema as Adsterra's, with Clickadu unit fields. See [Clickadu banners](#clickadu-banners). |
+| `hosted_banner_mode` | String | `stack` | How `/ads` announcements share a slot with the network banner. `stack`: hosted above the network banner. `priority`: an eligible hosted banner takes the slot and the network banner loads only where no hosted ad exists. `off`: show only the network banner. Unknown values use `stack`. |
+| `banners` | String (JSON) | `{"banners":[]}` | Existing per-announcement overrides for `/ads`, keyed by `key` (`enabled`, `placements`, `shape`, `width`, `height`, `aspectRatio`). Separate from the network catalogs. |
 
-### Hosted `/ads` banners beside Start.io
+### Activate Adsterra banners
 
-The two sources are independent: `startio_banner_enabled` controls Start.io,
-`hosted_banner_mode` controls hosted banners, and either can run without the
-other. One `/ads` response is fetched and shared by every slot on screen
-(cached for 5 minutes, or 1 minute when empty).
+**Ready-to-publish catalog:** [adsterra_banners.json](adsterra_banners.json) contains the six active banner codes read from the FlixQuest publisher dashboard. Publish its contents as `adsterra_banners`; TV reuses the corresponding size codes until separate TV units are generated. The blank example remains available for other publisher accounts.
 
-Each ad's `placements` list picks where it shows. On phones and tablets an
-empty list means every slot; otherwise the placement name must be listed.
-Slot names: `home_{all|movies|series}_{hero|trending|genres}`, `new_and_hot`,
-`movie_detail`, `tv_detail`, `season_detail`, `episode_detail`,
-`collection_detail`, `person_detail`, `bookmarks`, `downloads`,
-`stream_loading`, `live_tv_top` and `live_tv_list_{a|b|c}`.
+1. Generate banner codes in the Adsterra publisher dashboard, using the sizes you want. Each size needs its matching code; changing dimensions does not turn one ad unit into a different size.
+2. Copy [adsterra_banners.example.json](adsterra_banners.example.json). For each unit you intend to use, fill `key` from the generated `atOptions.key`, and `script_url` with the exact HTTPS script URL from the generated code (the URL does not have to end in `invoke.js`). Empty units remain inactive. Protocol-relative URLs (`//...`) must be written as `https://...`.
+3. Publish the completed JSON as the **String** parameter `adsterra_banners` in Firebase Remote Config.
+4. Set `banner_ad_network=adsterra` and `adsterra_banner_enabled=true`. To activate television slots too, publish `adsterra_tv_enabled=true` and fill the TV units.
+5. Select `hosted_banner_mode=off`, `stack`, or `priority` depending on whether your own announcements should appear.
 
-Android TV only shows an ad that lists the `_tv` name (`title_detail_tv`,
-`live_tv_strip_tv`), so a phone announcement never reaches a television. TV
-banners are display-only (no focus, no tap), because Android TV's quality
-rules forbid an in-page ad that opens a web page; put the message in the
-image itself. Start.io banners use the existing top-right title-details slot
-(`title_detail_tv`) and the strip below the Live TV list (`live_tv_strip_tv`)
-when `startio_banner_enabled=true`. TV interstitials remain disabled regardless
-of `startio_interstitial_enabled`. TV Home has no banner slot.
+Remote Config's existing realtime listener applies switches and new codes while the app is running. A changed unit replaces its WebView; turning a switch off removes the view and stops its document. Unrelated rebuilds keep the same WebView. No automatic ad refresh is scheduled.
 
-For Start.io banners without interstitials on any device, publish
-`startio_banner_enabled=true` and `startio_interstitial_enabled=false`.
+The Start.io SDK, Android initialization/metadata, and playback interstitial paths have been removed from this build. Existing `startio_*` and `unity_*` parameters may remain in Firebase for older app versions; this build ignores them. There is no rewarded or fullscreen ad replacement.
 
-The Start.io application ID is build-time Android metadata, not a Remote Config
-value. Set `startapp.appId` in `android/local.properties` or provide the
-`STARTAPP_APP_ID` build environment variable. Return and splash ads are disabled;
-only banners and the playback interstitial are used. Local builds fall
-back to Start.io's demo application ID (`205489527`); production builds should
-always supply the FlixQuest Start.io application ID.
+### Catalog schema and sizes
+
+```json
+{
+  "units": {
+    "mobile_banner": {
+      "key": "YOUR_320X50_KEY",
+      "script_url": "https://YOUR_ADSTERRA_HOST/YOUR_320X50_KEY/invoke.js",
+      "size": "320x50"
+    },
+    "rectangle": {
+      "key": "YOUR_300X250_KEY",
+      "script_url": "https://YOUR_ADSTERRA_HOST/YOUR_300X250_KEY/invoke.js",
+      "size": "300x250"
+    }
+  },
+  "defaults": {
+    "standard": ["mobile_banner"],
+    "tall": ["rectangle"],
+    "tv_standard": ["mobile_banner"]
+  },
+  "placements": {
+    "movie_detail": {"units": ["rectangle"]},
+    "bookmarks": {"enabled": false},
+    "title_detail_tv": {"units": ["mobile_banner"]}
+  }
+}
+```
+
+Supported `size` values are `320x50`, `300x250`, `468x60`, `728x90`, `160x300`, and `160x600`, matching [Adsterra's banner formats](https://adsterra.com/banner-ads/). Dimensions are CSS pixels / Flutter logical pixels, without enlarging or shrinking the creative.
+
+`units` defines reusable named codes. A unit can also set `enabled=false`. `defaults` maps the existing thin (`standard`) and rectangle (`tall`) variants to unit IDs, with separate `tv_standard` and `tv_tall` variants. `placements` overrides those defaults for a particular slot. Both defaults and overrides accept an ordered `units` list (or a shorthand list/string). The first valid unit that fits the available width and height wins. For example, `["leaderboard", "mobile_banner"]` chooses 728x90 on a wide surface and 320x50 on a phone. A unit too large for the slot is skipped, so a 728x90 creative never gets cropped into the 360-wide TV details slot.
+
+A placement override replaces the default; missing/invalid unit IDs in an override hide that placement rather than silently displaying another code. Malformed JSON, missing codes, invalid sizes, and non-HTTPS script URLs are inactive. TV never borrows a phone placement override or phone variant default.
+
+Existing phone/tablet slot names:
+
+- `home_{all|movies|series}_{hero|trending|genres}`
+- `new_and_hot`, `movie_detail`, `tv_detail`, `season_detail`, `episode_detail`
+- `collection_detail`, `person_detail`, `bookmarks`, `downloads`
+- `stream_loading`, `live_tv_top`, `live_tv_list_a`, `live_tv_list_b`, `live_tv_list_c`
+
+TV slots: `title_detail_tv` (top-right details slot, maximum width 360) and `live_tv_strip_tv` (below the Live TV list). TV Home has no banner slot. TV banners remain display-only and cannot take D-pad focus or open an offer. Hidden details banners are removed while browsing the lower rows.
+
+### Clickadu banners
+
+**Ready-to-publish catalog:** [clickadu_banners.json](clickadu_banners.json)
+holds spot `2150724`. Publish it as `clickadu_banners`, publish
+`clickadu_banner_enabled=true`, then set `banner_ad_network=clickadu`.
+Switching back is `banner_ad_network=adsterra`.
+
+Clickadu's code is a Main Tag (`bn.js`) plus one Ad Spot per banner
+(`<div data-cl-spot="…">`). Every banner is its own WebView document, so the
+app writes the Main Tag and the unit's spot into each one, which is the
+one-spot-per-page case of Clickadu's guide.
+
+```json
+{
+  "script_url": "https://guidepaparazzisurface.com/bn.js",
+  "units": {
+    "rectangle": {"spot_id": "2150724", "size": "300x250"}
+  },
+  "defaults": {"tall": ["rectangle"], "tv_tall": ["rectangle"]},
+  "placements": {}
+}
+```
+
+| Field | Where | Rules |
+| --- | --- | --- |
+| `script_url` | Catalog | The Main Tag's `src` with `https://` spelled out (the dashboard gives `//guidepaparazzisurface.com/bn.js`). |
+| `spot_id` | Unit | The `data-cl-spot` value, digits only (string or number). |
+| `size` | Unit | `WxH`, exactly the size the spot was created with in the Clickadu dashboard (the WebView is sized to it). Each side 20–1000. |
+| `script_url` | Unit, optional | Overrides the catalog's Main Tag for that unit. |
+| `enabled` | Unit, optional | `false` turns the unit off. |
+
+`defaults` and `placements` work exactly as in Adsterra's catalog below. The
+supplied catalog only fills the rectangle (`tall`) slots; thin (`standard`)
+slots stay empty on Clickadu until you add a 320x50 or 728x90 spot and list
+it under `standard` / `tv_standard`.
+
+Clickadu's script fills the spot a moment after it loads, or not at all when
+it has no ad. The slot counts as loaded only once a creative of visible size
+appears; a spot still empty after 20 seconds collapses. The spot runs on the
+app's placeholder origin (`appassets.androidplatform.net`), not the site it was
+approved for. A desktop test page on `localhost` loaded `bn.js` but got no
+creative, so confirm with Clickadu that the spot accepts in-app WebView
+traffic.
+
+### Loading and clicks
+
+The banner WebView loads a minimal local HTML document with the network's generated code, JavaScript enabled, an `AD` label, and the exact unit dimensions. Adsterra and Clickadu banners share this view. The local document uses `https://appassets.androidplatform.net/adsterra/` as its HTTPS base URL, giving it an isolated app-content origin where `document.cookie` and storage work. Loading without a base URL creates an opaque origin and makes cookie-dependent scripts fail. This URL is not fetched and does not adopt the ad server or publisher website's origin. Ads use the actual system WebView user agent. Script load/runtime errors, main-document failures, or a script that fails to load within 20 seconds collapse the slot without blocking browsing or playback.
+
+HTTP(S) offer navigation opens the external browser only following a recent pointer interaction on a phone/tablet. Programmatic main-frame redirects and non-web schemes are blocked; iframe resource navigation stays in the WebView. There are no forced clicks or Smartlink countdowns. Confirm the WebView inventory with Adsterra before publishing real codes, and use Adsterra's reporting to verify monetization; a script-load signal is not a billable-impression callback.
 
 ## Ready-to-paste complete catalog
 
@@ -438,3 +552,700 @@ Older values still work and are migrated in memory:
 
 Legacy format does not expose user selection. Move to schema version 2 for
 overlaps, selection, priorities, and global effect controls.
+
+
+## Playback ads
+
+Playback ads are controlled separately from banners. Android/iOS phones and
+tablets show both stages. Android TV shows only the stream-found popup, from a
+`tv_popunder` placement (see [Playback ads on Android TV](#playback-ads-on-android-tv)).
+Downloads, desktop and web skip both stages. No publisher code is compiled into
+the defaults.
+
+The stream-found popup runs before movies and episodes, and before a Live TV
+channel opens from the phone or TV Live screen (not on channel switches inside
+the player).
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `adsterra_playback_enabled` | Boolean | `false` | Explicitly published switch for both mobile playback stages. Turning it off closes an active playback ad and continues the flow. |
+| `adsterra_playback_ads` | String (JSON) | `{}` | Per-stage scripts or Smartlinks, enable flags and timeouts. |
+
+Copy [adsterra_playback_ads.json](adsterra_playback_ads.json) into the String
+parameter `adsterra_playback_ads`. It contains the Social Bar script and the
+Smartlink supplied for FlixQuest. Publish `adsterra_playback_enabled=true` to
+enable configured stages. Each stage also requires its own `enabled=true`. The
+supplied catalog enables both stages. It opens the Smartlink in FlixQuest's
+ad page on every stream-found attempt by default, with `psid=fqsmartpagev1`. It
+has no experiment. Set `playback_popup_frequency_minutes` to space out these
+popups as described below. Old per-placement `cooldown_seconds` fields remain
+ignored. Overlapping active ads are always blocked.
+
+- `interstitial`: shows Social Bar immediately before entering the movie/episode
+  media loader. The loader is not constructed or started until the ad closes or
+  fails. This includes Play Now, phone browse/detail/resume/episode entry points,
+  and player recommendation/episode transitions. When this placement is disabled,
+  playback builds the loader immediately, including its first frame; an enabled
+  stream-found popunder does not insert a before-loader screen. Set
+  `interstitial.enabled=false`, or remove the `interstitial` entry, to skip its
+  ad page and gate entirely.
+- `stream_found_experiment`: alternates Popunder then Smartlink after a playable
+  stream is selected, before navigating to `player.dart`. The counter is saved
+  per experiment `id` on the device, so restarting continues the sequence. Each
+  eligible attempt consumes one variant, including failed loads. TV never uses
+  the experiment. Download/background skips and overlapping requests do not
+  consume variants. No second
+  variant is loaded on the same attempt when the first fails.
+- `popunder`: the single-placement key for this stage, whatever the format.
+  The supplied catalog uses it for the Smartlink. It applies only
+  when the experiment is absent or disabled. A malformed enabled experiment
+  disables this stage instead of silently loading a different placement.
+
+Popunder content starts loading only after a playable stream is selected and
+its ad screen opens. Movie and episode scraping does not create an ad WebView
+or start advertiser requests. Experiment variants are also selected at
+stream-found, so an abandoned scrape consumes no variant.
+
+Ads never open an external browser. Script tags (Social Bar, or a Popunder
+tag) run in one WebView whose main frame never navigates. Script-initiated
+navigations to `about:blank` or the app's base URL are dropped, and any other
+web URL is treated as the popup. Advertiser pages (Smartlinks, and the popup
+URLs that scripts emit) open in FlixQuest's **ad page**, a second full-screen
+WebView that follows the network's redirect chain:
+
+- A top bar shows an amber **Ad** badge and "Sponsored · keeps FlixQuest
+  free". Once the page shows content, it names the advertiser's site instead
+  ("Sponsored · example.com").
+- Until the page has visible content, a placeholder covers the blank redirect
+  pages: "Your video is ready. A short sponsored page comes first." (or "Opening
+  the sponsor's page" / "Opening the advertiser's page"). It takes touches, so
+  a tap on it never counts as a tap on the ad. Once revealed, the page stays on
+  screen through later redirects, with a thin loading line under the bar.
+- The way on (**Play now**, **Continue** before the loader, or **Back to
+  video** for a video ad's click-through) and system Back appear only once the
+  final ad has been seen. Seen means the last page of the redirect chain shows
+  visible content, starts no new navigation for 800 ms, and has been on screen
+  for 3 seconds since its content appeared. An earlier page that redirects
+  restarts the count with the next one. Until the final page has content the
+  pill where the button will be says "Ad loading"; then it counts "Continue in
+  3…1". Pressing Back (or OK on a remote) early briefly highlights it.
+- If the ad never gets there (a chain that keeps redirecting, say), the button
+  appears at the placement's `close_fallback_seconds`, 15 by default, and the
+  placeholder gives way to whatever the page shows. Google Play's
+  [Better Ads Experiences policy](https://support.google.com/googleplay/android-developer/answer/12271244)
+  allows a full-screen ad to stay unclosable for at most 15 seconds, so that is
+  also the upper limit. A page that shows no content at all ends sooner, at
+  `load_timeout_ms`.
+- A redirect chain that lands on a search engine's home page (`google.<tld>`,
+  `bing.com`) is a tracker rejecting the visit: there is no ad, so playback
+  continues at once (`closing reason=no_ad_fallback`). App store listings and
+  other Google pages are not affected.
+- Each content check gives up after 2 seconds and the next one asks again: a
+  check sent while the document is being replaced may never answer.
+- App-install offers often end in a `market://` or `intent://` link that a
+  WebView cannot load. The ad page loads the link's web page in place: the
+  intent's `browser_fallback_url`, its https target, or the Play Store listing.
+  Only a tap inside the ad in the previous two seconds, such as Install, hands
+  the link to the Play Store app, using a launch mode that never opens a
+  browser.
+- A main-frame load error, an HTTP error on the main page, or a page that shows
+  no content within `load_timeout_ms` continues playback.
+
+The Social Bar page keeps its **Continue** control from the start. On a
+stream-found tag page, its own **Play now** button leads on; **Skip** in the
+top bar and system Back appear at the same `close_fallback_seconds`. Backgrounding
+FlixQuest closes any ad, including the hand-off to the Play Store. Playback is
+never handed to the player while FlixQuest is in the background; it continues
+when the app resumes. An Android/iOS app cannot place a page behind its own
+activity, so a Popunder's page opens in front, not as a literal pop-under.
+Scripts open only the popup URL they emit, never their JavaScript source URL.
+The tag's `window.open` is not replaced.
+
+Per-stage fields:
+
+| Field | Default | Limits |
+| --- | --- | --- |
+| `enabled` | `false` | Must be the JSON Boolean `true`. |
+| `mode` | `script` | `script` or `smartlink`. |
+| `script_url` | Empty | In script mode, exact generated HTTPS `src`; numeric dashboard IDs are not script URLs. |
+| `url` | Empty | In Smartlink mode, exact HTTPS direct link. |
+| `sub_id` | Empty | Smartlink tracking label: 1–64 letters, digits, underscores or hyphens. Appends `psid` to the URL while preserving other query parameters. Prefer alphanumeric labels per Adsterra's guide. |
+| `load_timeout_ms` | `5000` | 500–10,000 milliseconds (up to 30,000 for Monetag). Bounds script loading and each ad-page document until it shows content. Failure continues playback. |
+| `max_duration_seconds` | `30` | 5–120 seconds; upper bound for the whole ad, including the ad page. The viewer can leave sooner once **Play now** appears. |
+| `close_fallback_seconds` | `15` | 5–15 seconds. When **Play now** appears if the final ad never finishes loading. |
+
+### Playback ads on Android TV
+
+A remote cannot give the touch that Adsterra's Popunder opens its popup from.
+TV therefore uses its own placement in each popup
+catalog, `tv_popunder`, with the same fields as `popunder`. Only formats that
+open without a touch are accepted: `mode: "smartlink"` (Adsterra Smartlink, a
+Clickadu or Monetag Direct Link), or Clickadu's and Monetag's tags (`page` or
+`script`), which FlixQuest starts itself on Android. Any other `tv_popunder` is ignored. Without one, TV
+shows no popup; the selected `playback_popunder_network` still decides which
+catalog is read. The Social Bar and the experiment never run on TV.
+
+```json
+{
+  "popunder": {"enabled": true, "mode": "script", "script_url": "…", "zone_id": "2150355"},
+  "tv_popunder": {"enabled": true, "mode": "smartlink", "url": "https://…your Direct Link…"}
+}
+```
+
+The supplied Adsterra catalog has a `tv_popunder` with its Smartlink and
+`sub_id` `fqsmarttvv1`, so TV traffic reports separately. The Monetag catalog
+reuses its hosted page. The Clickadu catalog has none: add a `tv_popunder` with
+its zoned tag or a Direct Link from your Clickadu manager to enable it on TV.
+
+On TV the ad page uses larger type and overscan margins. The remote stays on
+FlixQuest's controls: the arrows never move into the page, OK before the way
+on appears highlights the wait, and **Play now** takes focus the moment it
+appears, so one press of OK continues. Back behaves as on phones. Store
+hand-offs never happen on TV, since they need a tap inside the ad.
+
+For the original Popunder placement, use `mode: "script"` and its generated
+`script_url` instead of the Smartlink. The page shows "Your video is ready", a
+**Play now** button (labelled "One moment…" while disabled) and a note:
+"Sponsored: an ad may open first. Ads like this keep FlixQuest free." The
+button stays disabled until the tag has
+loaded, then waits for the viewer's tap. The `max_duration_seconds` limit still
+applies. The tag opens its popup from that tap, and the app sends the popup URL
+to the ad page. The head script uses `defer` so the body and control
+exist before the tag runs. A tap that opens nothing continues to the player after
+750 ms. This happens when the tag's own frequency cap is reached; the cap is kept
+in the WebView's cookies. The old `auto_activate` key is ignored. The tag listens
+for real touch events and never opened a popup from a programmatic click.
+Loading the script does not guarantee a popup or a paid impression.
+Adsterra reports statistics per placement; see its
+[publisher API guide](https://adsterra.com/blog/how-to-use-adsterra-publishers-api/).
+
+The experiment requires an `id` and 2–8 `variants`. Each variant includes a unique
+`id` (1–64 letters, digits, underscores or hyphens), `enabled: true`, and the
+placement fields above. Use a new experiment `id` when changing the order or
+meaning of its variants. Logs identify each attempt as
+`variant=<experiment id>/<variant id>`. `variant=legacy` means no experiment is
+active on that client, which is expected with the supplied catalog.
+
+Retrieve statistics grouped by `placement_sub_id` through Adsterra's Publisher
+API; Popunder has its own placement statistics. Keep API credentials on your
+server, outside the app and Remote Config. Compare CPM, revenue per 1,000
+eligible playback attempts, and playback completion. App logs and DOM readiness
+are diagnostics, not billable-impression counters. The old `browser` field is
+ignored, so catalogs that still set it keep working.
+
+All popup networks, including ExoClick and Monetag, keep HTTP, JavaScript and
+intent-link web redirects in the advertiser WebView. A landing page must have
+visible content and `document.readyState=complete`, and its actual document URL
+must match the finished navigation, before its 3-second view countdown starts.
+Older page-finished callbacks and errors from earlier hops do not complete or
+cancel the current landing page. If a WebView reports only the first start and
+the final finish of an HTTP chain, the app verifies the final native URL before
+inspecting it. An accepted automatic navigation immediately cancels the prior
+countdown and holds close again until the new landing page is ready. The
+original close fallback deadline is preserved across redirects; a viewer
+following an advertiser link keeps their existing way back.
+
+The app still uses the configured loading and total-duration limits for stalled
+chains. No client can prove that a landing page will never redirect again or
+that an impression was credited. Monetag explicitly says that ad pages closed
+before they finish loading may not count; use the provider dashboards to check
+credited impressions and revenue after testing on a physical device. See
+[Monetag's impression guidance](https://help.monetag.com/en/articles/6738513-why-are-my-impressions-so-low-compared-to-the-number-of-visitors-on-my-site).
+
+Both WebViews use Hybrid Composition on Android to avoid the SurfaceTexture
+path when coming from video playback. Script loading, popup URLs, page
+starts/finishes, visible content, `close enabled reason=ad_served` or
+`cap_reached`, store hand-offs and the closing reason are logged under
+`[AdsterraPage]`.
+
+Android playback ad WebViews remove the `; wv` and `Version/4.0` user-agent
+markers before loading a script, hosted page or advertiser. The device details
+and installed Chromium version are retained, including for subsequent redirects;
+iOS uses its system user agent. This is scoped to playback ad WebViews.
+The app adds no `X-Requested-With` header. Android has discontinued WebView's
+automatic package-name header; its former allow-list API is now a no-op.
+See [Android's WebSettingsCompat reference](https://developer.android.com/reference/androidx/webkit/WebSettingsCompat#setRequestedWithHeaderOriginAllowList(android.webkit.WebSettings,%20java.util.Set%3Cjava.lang.String%3E)).
+Changing the user agent does not guarantee advertiser fill or make WebView
+identical to Chrome; JavaScript capabilities, cookies and other device signals
+can still differ. Logs report the applied user agent.
+
+A script download is not an interstitial-ready callback: the Social Bar view
+waits for a visible creative element, otherwise the load timeout continues
+playback. Adsterra chooses the Social Bar subformat and has its own frequency
+limits; ask your Adsterra manager for interstitial-only delivery and approved
+in-app placement. The app's popup frequency does not override network limits or guarantee
+fill/CPM. See [Adsterra's Social Bar publisher guide](https://adsterra.com/blog/publishers-guide-to-social-bar/)
+and [Popunder guide](https://adsterra.com/blog/popunder-traffic-monetization/).
+
+Script HTML uses the same isolated HTTPS app-content base origin as banners;
+Smartlinks load their actual URL directly. Neither claims requests originate from
+`flix.quest`. Closing, timing out, remote
+disabling, replacing the ad, or backgrounding the app prevents late callbacks from opening another ad
+over the player. There is no hidden preload, automatic refresh, fabricated
+advertiser click or app-reported paid impression. Provider script downloads from this
+workstation returned HTTP 403; native live fill and actual earnings still require
+validation on a mobile device with the remote switches enabled.
+
+### Playback ad preparation
+
+All four playback networks (Adsterra, Clickadu, ExoClick and Monetag) can
+prepare an empty native WebView during movie, episode or Live TV source
+loading, including supported `tv_popunder` formats. This initializes the
+controller and its existing browser/cookie settings without requesting any
+provider tag, hosted page, delivery URL or advertiser. Automatic activation
+and the viewing countdown remain on the visible ad screen. A script's popup
+opens in its own ad WebView; preparation never replaces the tag document.
+
+This avoids consuming offers or frequency caps during a cancelled source
+lookup. The full `load_timeout_ms` begins with the foreground document request,
+and the existing redirect completion checks and minimum visible view still
+apply. `max_duration_seconds` bounds the whole ad screen, including setup.
+Expired, failed or mismatched preparation falls back to a fresh foreground
+WebView rather than skipping an eligible ad. Downloads, disabled placements,
+configuration changes and backgrounding cancel unused preparation. Adsterra
+experiment rotation still advances only at presentation.
+
+Preparation does not verify a billable impression. Provider no-fill, delivery
+errors, frequency limits and the provider's own impression validation still
+apply; compare actual device delivery with the network dashboard.
+
+### Choosing the popup network (Adsterra, Clickadu, Monetag or ExoClick)
+
+`playback_popunder_network` picks which network serves the stream-found popup.
+The Social Bar before the loader is Adsterra-only and stays controlled by
+`adsterra_playback_ads`.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `playback_popunder_network` | String | `adsterra` | `adsterra` uses `adsterra_playback_ads` (its `popunder` or experiment). `clickadu` uses `clickadu_playback_ads`. `monetag` uses `monetag_playback_ads`. `exoclick` uses `exoclick_playback_ads`. `none`, or any other value, shows no stream-found popup. Case-insensitive. |
+| `playback_popup_frequency_minutes` | Number | `0` | Minimum whole minutes between visible stream-found popup ads, shared by all networks and mobile/TV placements. `0` allows every eligible playback; positive values set an interval. |
+| `clickadu_playback_enabled` | Boolean | `false` | Clickadu's own switch. Must be published remotely. |
+| `clickadu_playback_ads` | String (JSON) | `{}` | Clickadu's `popunder` placement. |
+| `monetag_playback_enabled` | Boolean | `false` | Monetag's own switch. Must be published remotely. |
+| `monetag_playback_ads` | String (JSON) | `{}` | Monetag's `popunder` placement. |
+| `exoclick_playback_enabled` | Boolean | `false` | ExoClick's own popup switch. Must be published remotely; independent of VAST pre-roll. |
+| `exoclick_playback_ads` | String (JSON) | `{}` | ExoClick's `popunder` and optional `tv_popunder` placements. |
+
+Changing any of these while a popup is open closes it and continues playback.
+
+To switch to Clickadu, copy [clickadu_playback_ads.json](clickadu_playback_ads.json)
+into `clickadu_playback_ads`, publish `clickadu_playback_enabled=true`, then set
+`playback_popunder_network=clickadu`. Switching back is just
+`playback_popunder_network=adsterra`.
+
+### Popup frequency
+
+Create the **Number** parameter `playback_popup_frequency_minutes` in Firebase
+Remote Config and publish a whole-minute value:
+
+| Value | Frequency |
+| --- | --- |
+| `0` | Every eligible playback (default) |
+| `15` | At most once every 15 minutes |
+| `30` | At most once every 30 minutes |
+| `45` | At most once every 45 minutes |
+| `60` | At most once every hour |
+| `120` | At most once every two hours |
+
+Other positive whole-minute values work too. Missing, invalid or negative
+values fall back to `0`. Existing network and placement enable switches still
+apply.
+
+The first eligible popup can show immediately. Its interval starts when the
+advertiser page first shows visible content and is saved on the device, so
+restarting FlixQuest or switching ad networks does not reset it. This local
+visibility check is not a network-confirmed paid impression. Ads that fail,
+stay empty or are cancelled before showing advertiser content do not start an
+interval. While the interval is active, playback
+continues without opening a popup or advancing experiment rotation. Empty
+WebView preparation after a restart may be discarded once the saved timestamp
+is read; it makes no ad request. If storage is unavailable, the interval still
+works for the current app session.
+
+Once the interval expires, the next eligible playback can show a popup; this
+does not schedule a popup during a movie or episode. Movies, episodes and Live
+TV channel entry share the same timestamp, including mobile and TV modes on
+the same installation. Devices do not share it. The Social Bar before the
+media loader, banners and VAST pre-roll keep their existing behavior.
+
+Activated Remote Config updates apply immediately, using the saved timestamp
+with the new interval. Publishing `0` restores every-playback eligibility.
+A future timestamp after a device clock correction does not block popup ads.
+
+### Clickadu popup delivery
+
+The supplied catalog runs Clickadu's onclick tag (zone 2150355). On Android,
+the app activates Continue automatically once the tag's `/adx/get/` request
+finishes and its initialization grace period ends. Loading `on.js` alone does
+not trigger it. The existing native input bridge sends one touch to the enabled
+`fq-continue` button in the original tag document; it never taps an advertiser
+link. A returned popup loads in the app's ad page, with the same held **Play
+now** and redirect handling as the Smartlink.
+
+Android can report `about:blank` as the native URL for this inline document,
+even though JavaScript sees its HTTPS base URL. The input bridge verifies that
+base URL and the original inline document before sending the touch. Rebuild
+and reinstall the app for this Kotlin change; hot restart cannot update an
+installed native bridge. Logs include `PlaybackAdInput` rejection reasons or
+`Continue touch sent: accepted=true inline=true` when the touch is dispatched.
+
+Clickadu tags, hosted pages and Direct Links reuse an empty WebView prepared
+during source loading. The first tag or ad request starts after the ad screen
+and its WebView are visible. If the tag never becomes ready, or the automatic
+touch opens no ad within `load_timeout_ms`, playback continues without one. Duplicate
+readiness signals cannot trigger a second touch or extend that waiting period.
+Closing the screen disables the tag and prevents late activation. When native
+input is unavailable, including on iOS, the enabled **Play now** button remains
+available for a manual tap; it continues after 750 ms if no popup opens.
+Use a provider-issued Direct Link in `smartlink` mode for automatic opening on
+both Android and iOS.
+
+The tag's loading window starts when the document is requested, after native
+WebView setup. Cold WebView initialization no longer consumes
+`load_timeout_ms`; `max_duration_seconds` still bounds the entire screen,
+including setup. Direct-link pages use the same timing rule. Timeout logs
+include `scriptLoaded` and `waitingForAdRequest`, distinguishing an unloaded
+`on.js` from a loaded tag whose ad request has not completed.
+
+`popunder` takes the per-stage fields above, with two differences:
+
+- `zone_id` is required in script mode: the zone from Clickadu's tag
+  (`data-clocid`), as digits. The app adds it to the script element, where the
+  tag looks for it.
+- `sub_id` is rejected, because `psid` is Adsterra's parameter. A Clickadu
+  Direct Link from your manager works with `mode: "smartlink"` and `url`, with
+  any tracking parameters already in the URL.
+
+Clickadu's tag snippet uses a protocol-relative `src` (`//driverhugoverblown.com/on.js`);
+`script_url` must spell out `https://`. The tag runs on the app's placeholder
+origin (`appassets.androidplatform.net`), not the site the zone was approved
+for; confirm with Clickadu that the zone accepts in-app WebView traffic. Logs
+show the network, for example `[AdsterraPage] clickadu/streamFound: popup URL received`.
+
+### ExoClick popup
+
+[exoclick_playback_ads.json](exoclick_playback_ads.json) contains the **Popunder
+Redirect URL** generated by ExoClick for FlixQuest's Mobile Popunder zone
+6050984: `https://s.pemsrv.com/v1/link.php?cat=&idzone=6050984&type=8`.
+
+Production was switched on 2026-10-10 to
+[exoclick_rotating_playback_ads.json](exoclick_rotating_playback_ads.json), using
+`https://flix.quest/api/exoclick-popup`. The server route was deployed through
+the landing repo's Git workflow (commit `3eae738`), and its HTTP 302 redirect
+and Vercel cache HIT were verified. The original catalog remains a reference
+for the publisher-generated URL.
+This is the publisher's zone URL, not a captured advertiser URL. To get a new
+one, open the zone's **HTML Tag** page and select **Popunder Redirect URL**.
+
+To activate it:
+
+1. Publish the rotating catalog as `exoclick_playback_ads` after deploying the
+   server endpoint described below.
+2. Publish `exoclick_playback_enabled=true`.
+3. Set `playback_popunder_network=exoclick`.
+
+For networks where the generated `s.pemsrv.com` endpoint cannot connect, deploy
+`api/exoclick-popup.js` in the existing flixquest-landing Vercel project, verify
+`https://flix.quest/api/exoclick-popup` returns HTTP 302, then publish
+[exoclick_rotating_playback_ads.json](exoclick_rotating_playback_ads.json) instead.
+The function fetches the current delivery domain on the server and caches its
+redirect at Vercel for 24 hours. The device follows the redirect and makes the
+ad request with its own IP, user agent and cookies. It retains zone 6050984 and
+the generated query parameters. No app update is needed for this catalog.
+
+This uses ExoClick's [Dynamic Domains API](https://docs.exoclick.com/publishers/adblock/adblock-dynamic-domains-api),
+which also documents support for replacing the VAST delivery domain. The popup
+endpoint changes only popup delivery; VAST remains separately configured.
+Rotating domains expire in six days, so do not paste today's domain permanently
+into Firebase. On 2026-10-10 the emulator's native TLS probe timed out on
+`s.pemsrv.com` but connected successfully to the API-issued delivery domain.
+The zone request with the emulator's user agent then answered HTTP 302 to the
+Yahoo home page rather than an advertiser. The app treats that as no fill and
+continues playback. A reachable delivery domain fixes the connection failure;
+it does not guarantee an offer for the device or network. Verify delivery on a
+physical phone using mobile data after deploying and publishing this catalog.
+A subsequent native probe on the connected physical phone also timed out
+connecting to `s.pemsrv.com`; that phone could not establish TCP to the current
+rotating domain either. The route is a delivery workaround to validate after
+deployment, not proof of an advertiser impression on every network.
+
+The catalog uses `mode: "smartlink"`, the same direct-navigation mode as
+Adsterra's Smartlink. Movie, episode and Live TV flows prepare an empty WebView
+while resolving the stream, on phones and Android TV. The ExoClick link is
+requested only after that view is attached to the visible ad screen.
+`preloaded=true` in the presentation log means the native view was prepared;
+no delivery link or advertiser was loaded in the background. Advertiser
+redirects stay in the app, with the same content detection, minimum visible
+view, close fallback, timeouts and cancellation as Adsterra. Missing or invalid
+configuration issues no ad requests. Switching networks or disabling the
+popup closes an active ad and continues playback.
+
+The supplied `tv_popunder` uses the same link for Android TV and the existing
+D-pad controls. Remove it or set its `enabled` to `false` to disable TV popups;
+the zone's targeting still determines whether ExoClick returns an ad. Put
+ExoClick tracking parameters directly in `url`; `sub_id` is reserved for
+Adsterra's `psid` and is rejected for other networks.
+
+The Social Bar before the loader remains controlled by Adsterra. ExoClick's
+VAST pre-roll is independently controlled by `vast_preroll_enabled`,
+`vast_preroll_network` and `vast_preroll.exoclick`; enabling only the VAST
+switch never enables a popup. If both formats are enabled, a stream-found
+popup runs before the video pre-roll.
+
+### Monetag popup
+
+Monetag's stream-found popup starts automatically inside FlixQuest, without a
+**Play now** tap. Every Monetag mode, including Direct Links, can reuse an
+empty WebView prepared while the stream is resolved. Its first request starts
+after the WebView is attached to the visible ad screen. `preloaded=true`
+reports native preparation, not a background ad request.
+With `mode: "page"` or `mode: "script"`, the app
+shows the "Your video is ready" placeholder, waits for the Onclick tag's `/5/<zone>/`
+options request to finish and the Continue button to become enabled. After
+a short initialization delay, Dart asks the Android bridge to send one native
+touch to that button. The emitted popup URL opens in the same ad
+page used by Adsterra, with the held **Play now**. HTTP redirects and
+`intent://` web targets stay in that ad page.
+
+The native touch is restricted to the original tag document's `fq-continue`
+button, and is attempted once per ad screen. The bridge cancels the release
+if the document changes or the screen disables JavaScript while closing.
+The tag page's 750 ms Continue callback does not close the screen during this
+attempt: its advertiser URL may arrive later. If native input is unavailable
+(including iOS), the app invokes `onClickTrigger` once as a fallback. Missing
+controls, a stalled tag or an activation that emits no URL is bounded by
+`load_timeout_ms`. An options response with HTTP 204 still continues playback
+immediately.
+
+Rebuild and reinstall the Android app for this native bridge; hot reload or
+hot restart alone cannot add it to an already installed build. Debug logs
+report `monetag Continue tapped automatically via Android WebView`, and the
+page reports `Monetag Continue input trusted=true userActivation=true` when
+its click listener receives the input. Live delivery requires a device test.
+
+The hosted Monetag catalog allows 30 seconds for loading and 60 seconds for
+the entire ad screen. Once the tag reports loaded, its automatic popup gets
+a fresh 30-second loading window, still bounded by the overall 60-second
+limit. A completed HTTP 204 response continues playback immediately;
+increasing the timeout does not turn that empty response into an offer.
+
+Monetag registers zones to a website. On the app's placeholder origin
+(`appassets.androidplatform.net`) zone 11983408 answered its ad request with
+`204 No Content`, so the published catalog loads a page on flix.quest instead:
+
+- `mode: "page"` with `url`: the app loads that page in the ad WebView. The
+  page carries the tags and `PlaybackAd` signals. Its web Continue control
+  is covered by the app's loading surface during automatic activation.
+  [monetag_playback_ads.json](monetag_playback_ads.json) uses
+  `https://flix.quest/a/3ad05c8e4d`, served from
+  `public/a/3ad05c8e4d/index.html` in the flixquest-landing repo. It runs
+  Onclick zone 11983408 and the push tag for zone 11917894 (push does nothing
+  in a WebView, which has no Notification API).
+- `mode: "script"` runs the tag on the placeholder origin. From Monetag's inline
+  snippet, use `s.src` as `script_url` and `s.dataset.zone` as `zone_id` (sent
+  as `data-zone`). For a `/401/<zone>` snippet, use
+  `https://<domain>/401/<zone>` as `script_url` and leave out `zone_id`.
+- `mode: "smartlink"` with `url` opens a Monetag Direct Link, which is not tied
+  to a site. It loads automatically as soon as the ad screen opens, without
+  showing or waiting for **Play now**. `sub_id` is rejected; put any
+  tracking parameters in the URL.
+
+The existing hosted `mode: "page"` catalog needs no configuration change for
+automatic activation. A Direct Link remains an alternative that skips tag
+initialization: create a **Direct Link (SmartLink)** zone in Monetag and copy
+its exact HTTPS link from **Get tag**. To use it, set `monetag_playback_ads` to
+the following, replacing the placeholder with that link:
+
+```json
+{
+  "popunder": {
+    "enabled": true,
+    "mode": "smartlink",
+    "url": "<paste your Monetag HTTPS Direct Link here>",
+    "load_timeout_ms": 10000,
+    "max_duration_seconds": 30
+  }
+}
+```
+
+The app follows the Direct Link's redirects inside its ad page and enables
+**Play now** once the final page's content has settled and been up for
+3 seconds, or at `close_fallback_seconds`.
+The hosted page in `monetag_playback_ads.json` uses Onclick zone 11983408.
+Onclick and push zone IDs cannot be substituted for a Direct Link; use the
+link issued for its own zone.
+
+Publish the catalog as `monetag_playback_ads`, publish
+`monetag_playback_enabled=true`, then set `playback_popunder_network=monetag`.
+
+In a WebView, Monetag's tag hands its ad to Chrome with an `intent://` link
+instead of opening a window. The app loads that link's web page in its ad page.
+
+To debug an empty popup, check `[PlaybackAdConfig]` for the active mode, target
+and Remote Config value source. Editing `docs/monetag_playback_ads.json` does
+not publish it to Firebase. For the hosted setup, the playback log must say
+`presenting monetag page` and load `https://flix.quest/a/3ad05c8e4d`; a log
+saying `presenting monetag script` is using another active catalog value.
+Publish the JSON under `monetag_playback_ads` and check any conditional values
+that may override the default. The app activates real-time config updates.
+Debug builds fetch and activate config on hot reload as well as startup,
+with no minimum fetch interval; release builds retain the one-minute minimum.
+Fetch/activation failures are logged under `[PlaybackAdConfig]` in debug builds.
+An options request with HTTP 204 returned no offer, so the automatic trigger
+is not called. HTTP 204 was also observed on the hosted page during emulator
+testing; correcting the catalog selects the intended origin but does not
+guarantee that Monetag will return an offer.
+
+On 2026-10-08, a comparison in regular desktop Chrome returned HTTP 200
+from the same `/5/11983408/` endpoint. A real Continue click opened an
+advertiser page. The Monetag dashboard also confirmed that flix.quest is
+verified and issued the same `data-zone=11983408` and
+`https://al5sm.com/tag.min.js` used by the live hosted page. The emulator's
+FlixQuest WebView session instead returned HTTP 204 before activation.
+This rules out a completely unavailable zone or an incorrect hosted tag;
+it does not establish whether the differing response is due to the
+WebView, emulator, browser session, frequency limits or another delivery
+decision. Compare the same build on a real Android phone before changing
+the integration based on a presumed cause.
+
+The user also tested the hosted page with a real Continue tap in Chrome
+134 on the same Android emulator and reported that no advertiser opened.
+That failure occurs outside FlixQuest as well. The Android Chrome debug
+target disconnected before its request response could be inspected, so
+its HTTP status is unverified. The comparison points toward Android/emulator
+delivery or client compatibility; it does not prove emulator filtering or
+that real Android phones would fail.
+
+Hosting the tag on flix.quest supplies the publisher origin, but does not
+proxy the ad request through the website's server. The WebView still sends
+the request directly to Monetag with its own browser/device information.
+The account had no Direct Links during this check; an advertiser URL
+captured from a browser test must not be reused as a placement URL.
+
+## Video pre-roll (VAST)
+
+A VAST video ad can play inside the player before a movie or episode. It is
+independent of the playback popups above. If both are enabled, the
+stream-found popup still runs before the player opens, so a viewer would see
+two ads. Disable one of them unless that is intended.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `vast_preroll_enabled` | Boolean | `false` | Explicitly published switch. Turning it off stops new pre-rolls; an ad already playing finishes. |
+| `vast_preroll_network` | String | `clickadu` | Which networks' sections of `vast_preroll` are asked, in priority order: one name (`exoclick`) or a comma-separated list (`exoclick,clickadu`). Names are `clickadu`, `exoclick` or `adsterra`. Unknown names and repeats are dropped; `none` or an empty value plays no pre-roll. |
+| `vast_preroll` | String (JSON) | `{}` | Each network's tag and limits, under the network's name. |
+
+Copy [vast_preroll.json](vast_preroll.json) into `vast_preroll` and publish
+`vast_preroll_enabled=true`. It holds the Clickadu video zone's tag (zone
+2150357) under `clickadu` and the ExoClick in-stream zone's tag ("FQ video
+roll", zone 6050988) under `exoclick`. Both sections set `tv_enabled: true`,
+so Android TV and its Live TV play them too:
+
+```json
+{
+  "clickadu": {"tag_url": "https://detoxifylagoonsnugness.com/ceef/gdt3g0/tbt/2150357/tlk.xml"},
+  "exoclick": {"tag_url": "https://s.magsrv.com/v1/vast.php?idz=6050988"}
+}
+```
+
+Every network goes through the same VAST client, ad session and overlay; only
+its section differs. To swap networks, publish `vast_preroll_network` with the
+other name. To use both, publish a list such as `exoclick,clickadu`. The first
+network is asked first. Only when it returns no playable ad (no fill, an HTTP
+error, invalid XML, the wrapper limit, or its `request_timeout_ms` running out)
+is the next one asked, and so on. The first ad returned plays, with the
+`start_timeout_ms` of the network that served it. Each network asked adds up to
+its own `request_timeout_ms` to the wait before the content, so give fallbacks
+a short budget. A no-fill answer is usually fast. A listed network without a
+section, or without `tv_enabled` on TV, is passed over. A flat object with
+`tag_url` at the top level (the format before `vast_preroll_network`) still
+works and serves the first listed network. Debug builds log the order in effect
+as `[VAST] config enabled=… order=exoclick,clickadu` and the network that
+filled as `[VAST] pre-roll from exoclick`.
+
+Each section takes these fields:
+
+| Field | Default | Limits |
+| --- | --- | --- |
+| `tag_url` | Empty | Required. The HTTPS VAST tag from the ad network. |
+| `request_timeout_ms` | `5000` | 1,000–15,000. Budget for the tag and all wrapper redirects. The content starts without an ad when it runs out. |
+| `start_timeout_ms` | `8000` | 2,000–20,000. How long the ad's video may take to start before the content plays (VAST error 402). |
+| `max_wrappers` | `5` | 0–10 wrapper redirects (VAST error 302 beyond). |
+| `tv_enabled` | `false` | Also play on Android TV. Confirm with the network that TV traffic is accepted first. |
+
+How it plays:
+
+- The tag is requested while the player opens, alongside the branded intro
+  lookup. When an ad is returned it replaces the branded intro for that session.
+  Live TV does the same when a channel opens from the Live screen, on phones and
+  on TV (with `tv_enabled`). Channel switches and reconnects inside the Live
+  player play no ad.
+- The ad and the content play as one native ExoPlayer/AVPlayer sequence on the
+  same video surface, without a new player or route. The content starts at its
+  resume position, as it would without an ad. Resuming mid-title may still
+  buffer briefly at that position.
+- While the ad plays, the player's controls are replaced by the ad overlay:
+  an "Ad · 0:25" countdown, "Skip in N" then **Skip ad** at the tag's
+  `skipoffset`, an amber ad progress line, and on phones **Visit advertiser**
+  and a back button. On TV the overlay keeps the remote: the arrows stay on
+  it, OK before Skip highlights the countdown, Skip takes focus as soon as it
+  appears so OK skips, and Back leaves the player. When the ad ends, the TV
+  player's controls take focus again. Seeking, gestures and the content menus
+  are unavailable, because the timeline belongs to the ad.
+- Subtitles are hidden until the content starts; their cues are timed to the
+  content. Watch progress, resume points, IntroDB lookup, completion detection
+  and wellness time all ignore the ad. A "recently watched" save requested
+  during the ad runs once the content starts, so leaving mid-ad keeps the old
+  resume point.
+- **Visit advertiser** pauses the ad and opens the click-through URL in
+  FlixQuest's ad page with its close control visible. The ad resumes on return.
+- Only linear MP4/WebM/HLS media is played. VPAID and other interactive
+  creatives are skipped. On phones the largest rendition up to 720p and
+  2.5 Mbps is used; on TV up to 1080p and 8 Mbps.
+
+Tracking follows VAST 3: impression and `creativeView`/`start` on the first
+frame; `firstQuartile`, `midpoint`, `thirdQuartile`, `progress` offsets;
+`complete`, `skip`, `pause`/`resume`, `closeLinear` when the viewer leaves
+mid-ad, and `ClickTracking`. Errors are reported through `[ERRORCODE]`: 100 bad
+XML, 301/302 wrapper timeout/limit, 303 no ad, 402 media timeout or stall, 403
+no playable media, 405 playback error. Tag requests and tracking use the
+system WebView's user agent. The click-through opens in that WebView; on Android
+its ad page removes the WebView-specific markers as described above. Without a WebView,
+tag requests and tracking
+fall back to `Mozilla/5.0 (Linux; Android <version>; <model>) FlixQuest/<version>`.
+Logs use the `[VAST]` prefix. An advertiser link that answers with XML, JSON or
+text instead of a page closes the ad page immediately and the video ad resumes.
+
+Clickadu's video zone 2150357 was checked on 2026-10-07: it answers with a
+VAST 3.0 InLine ad (no wrapper), a 30-second linear creative skippable after
+5 seconds, and four progressive MP4 renditions from 180p to 720p, with no VPAID.
+The video.js / VPAID plugin in Clickadu's integration guide is for websites;
+the app plays the tag natively and does not need it. Clickadu states
+`bitrate` in bits per second (`2000000`) instead of VAST's Kbps; the app reads
+values of 100000 or more as bps, so phones get the 720p rendition rather than
+falling back to 180p.
+
+Ask Clickadu which macros they expect from an app (there is no page URL) and
+for confirmation that in-app requests are accepted and counted.
+
+ExoClick's in-stream zone 6050988 was checked on 2026-10-08: it answers with a
+VAST 3.0 InLine ad (no wrapper), a 12-second linear creative skippable after
+5 seconds, and one progressive MP4 without `width`, `height` or `bitrate`. That
+file is used whatever the device's rendition cap. Its only tracking is timed
+`progress` events,
+sent as each offset passes, and the impression fires on the first frame. The
+`Icons` element and ExoClick's `TitleCTA` extension (a "View More" bar) are not
+drawn; **Visit advertiser** uses the `ClickThrough`. The response sets a
+5-minute `zone-cap-6050988` cookie. Tag requests keep no cookies, so ExoClick's
+server-side rules decide frequency.
+
+ExoClick's dashboard also offers a Client Hints meta tag (`Delegate-CH` for
+`s.magsrv.com`). It is for web pages that load the tag in a browser. The app
+requests the tag natively, so there is no page to put it in. The request's
+user agent, the system WebView's own, already carries the Android version and
+device model.
+
+Ask ExoClick for confirmation that in-app requests to this zone are accepted and
+counted, and check the zone's advertiser category filters. The 2026-10-08 test
+fill advertised an AI companion app, and ads must suit the app's content rating
+under Google Play's ads policy.

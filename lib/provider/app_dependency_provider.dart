@@ -8,7 +8,9 @@ import '../constants/api_constants.dart';
 import '../models/occasional_theme.dart';
 import '../models/banner_ad.dart';
 import '../preferences/app_dependency_preferences.dart';
-import '../services/start_io_ads_service.dart';
+import '../models/banner_ads_config.dart';
+import '../models/adsterra_playback_ads_config.dart';
+import '../models/vast_preroll_config.dart';
 
 class AppDependencyProvider extends ChangeNotifier {
   final AppDependencies _preferences = AppDependencies();
@@ -64,17 +66,108 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _bannerAdNetwork = 'native';
+  String _bannerAdNetwork = 'adsterra';
   String get bannerAdNetwork => _bannerAdNetwork;
-  bool get isStartIoBannerActive =>
-      _startIoAds.bannerEnabled &&
-      const {'native', 'unity', 'startio'}.contains(_bannerAdNetwork);
+
+  /// The network `banner_ad_network` selects; null for `none` and unknown
+  /// values. Names published before Adsterra (`native`, `unity`, `startio`)
+  /// still select Adsterra.
+  AdNetwork? get bannerNetwork =>
+      const {'native', 'unity', 'startio'}.contains(_bannerAdNetwork)
+          ? AdNetwork.adsterra
+          : AdNetwork.parse(_bannerAdNetwork);
+
+  /// Every network's banner catalog, whichever one is selected.
+  Map<AdNetwork, BannerAdsConfig> _bannerAds = const {};
+
+  BannerAdsConfig bannerAdsFor(AdNetwork network) =>
+      _bannerAds[network] ?? BannerAdsConfig(network: network);
+
+  /// The selected network's catalog, once its own switch is on.
+  BannerAdsConfig? get activeBannerAds {
+    final network = bannerNetwork;
+    if (network == null) return null;
+    final config = bannerAdsFor(network);
+    return config.enabled ? config : null;
+  }
+
+  AdsterraPlaybackAdsConfig _adsterraPlaybackAds =
+      const AdsterraPlaybackAdsConfig();
+  AdsterraPlaybackAdsConfig get adsterraPlaybackAds => _adsterraPlaybackAds;
+
+  void setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig config) {
+    _adsterraPlaybackAds = config;
+    notifyListeners();
+  }
+
+  /// Clickadu's, Monetag's and ExoClick's popup catalogs, whichever is selected.
+  Map<AdNetwork, PopunderAdsConfig> _popunderAds = const {};
+
+  PopunderAdsConfig popunderAdsFor(AdNetwork network) =>
+      _popunderAds[network] ?? PopunderAdsConfig(network);
+
+  void setPopunderAdsConfig(PopunderAdsConfig config) {
+    _popunderAds = Map.unmodifiable({..._popunderAds, config.network: config});
+    notifyListeners();
+  }
+
+  /// Which network serves the stream-found popup; null serves none. The
+  /// Social Bar before the loader stays with Adsterra.
+  AdNetwork? _playbackPopunderNetwork = AdNetwork.adsterra;
+  AdNetwork? get playbackPopunderNetwork => _playbackPopunderNetwork;
+
+  void setPlaybackPopunderNetwork(AdNetwork? network) {
+    if (_playbackPopunderNetwork == network) return;
+    _playbackPopunderNetwork = network;
+    notifyListeners();
+  }
+
+  /// Minimum minutes between visible stream-found popups; zero allows every
+  /// playback. Shared by all popup networks, including their TV placements.
+  int _playbackPopupFrequencyMinutes = 0;
+  int get playbackPopupFrequencyMinutes => _playbackPopupFrequencyMinutes;
+
+  void setPlaybackPopupFrequencyMinutes(int minutes) {
+    final normalized = minutes < 0 ? 0 : minutes;
+    if (_playbackPopupFrequencyMinutes == normalized) return;
+    _playbackPopupFrequencyMinutes = normalized;
+    notifyListeners();
+  }
+
+  /// Everything that decides a playback ad. A change closes an active one.
+  ({
+    AdNetwork? network,
+    AdsterraPlaybackAdsConfig adsterra,
+    Map<AdNetwork, PopunderAdsConfig> popunders,
+    int popupFrequencyMinutes,
+  }) get playbackAdsSelection => (
+        network: _playbackPopunderNetwork,
+        adsterra: _adsterraPlaybackAds,
+        popunders: _popunderAds,
+        popupFrequencyMinutes: _playbackPopupFrequencyMinutes,
+      );
+
+  VastPrerollConfig _vastPreroll = const VastPrerollConfig();
+  VastPrerollConfig get vastPreroll => _vastPreroll;
+
+  void setVastPrerollConfig(VastPrerollConfig config) {
+    if (config == _vastPreroll) return;
+    _vastPreroll = config;
+    notifyListeners();
+  }
+
+  // Only the selected network's own switch and catalog can activate network
+  // requests.
+  bool get isNetworkBannerActive => activeBannerAds != null;
+
+  void setBannerAdsConfig(BannerAdsConfig config) {
+    if (bannerAdsFor(config.network) == config) return;
+    _bannerAds = Map.unmodifiable({..._bannerAds, config.network: config});
+    notifyListeners();
+  }
 
   HostedBannerMode _hostedBannerMode = HostedBannerMode.stack;
   HostedBannerMode get hostedBannerMode => _hostedBannerMode;
-
-  /// Hosted `/ads` banners run beside Start.io; `banner_ad_network=none`
-  /// still hides every banner.
   bool get isHostedBannerActive =>
       _hostedBannerMode != HostedBannerMode.off && _bannerAdNetwork != 'none';
 
@@ -84,78 +177,10 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // These legacy values remain readable so existing Remote Config payloads
-  // and older clients can coexist while Unity itself is no longer linked.
-  String _unityGameIdAndroid = '5445375';
-  String get unityGameIdAndroid => _unityGameIdAndroid;
-
-  String _unityBannerPlacementId = 'Banner_Android';
-  String get unityBannerPlacementId => _unityBannerPlacementId;
-
-  bool _unityTestMode = false;
-  bool get unityTestMode => _unityTestMode;
-
-  StartIoAdsConfig _startIoAds = const StartIoAdsConfig();
-
-  /// Start.io behaviour, with the shared test-mode flag folded in.
-  StartIoAdsConfig get startIoAds =>
-      _startIoAds.copyWith(testMode: _unityTestMode);
-
-  bool get startIoBannerEnabled => _startIoAds.bannerEnabled;
-  bool get startIoInterstitialEnabled => _startIoAds.interstitialEnabled;
-
   void setBannerAdNetwork(String network) {
     final sanitized = network.trim().toLowerCase();
-    if (_bannerAdNetwork != sanitized) {
-      _bannerAdNetwork = sanitized;
-      notifyListeners();
-    }
-  }
-
-  /// Retains the old Unity-named values as compatibility inputs. Start.io uses
-  /// the existing test-mode flag; its application ID is supplied at build time
-  /// through the Android manifest.
-  void setUnityAdsConfig({
-    String? gameIdAndroid,
-    String? bannerPlacementId,
-    bool? testMode,
-  }) {
-    bool changed = false;
-    if (gameIdAndroid != null && gameIdAndroid.trim().isNotEmpty) {
-      final trimmed = gameIdAndroid.trim();
-      if (_unityGameIdAndroid != trimmed) {
-        _unityGameIdAndroid = trimmed;
-        changed = true;
-      }
-    }
-    if (bannerPlacementId != null && bannerPlacementId.trim().isNotEmpty) {
-      final trimmed = bannerPlacementId.trim();
-      if (_unityBannerPlacementId != trimmed) {
-        _unityBannerPlacementId = trimmed;
-        changed = true;
-      }
-    }
-    if (testMode != null && _unityTestMode != testMode) {
-      _unityTestMode = testMode;
-      changed = true;
-    }
-    if (changed) notifyListeners();
-  }
-
-  void setStartIoAdsConfig({
-    required bool bannerEnabled,
-    required bool interstitialEnabled,
-    Duration? interstitialInterval,
-    StartIoInterstitialMode? tvInterstitialMode,
-  }) {
-    final next = _startIoAds.copyWith(
-      bannerEnabled: bannerEnabled,
-      interstitialEnabled: interstitialEnabled,
-      interstitialInterval: interstitialInterval,
-      tvInterstitialMode: tvInterstitialMode,
-    );
-    if (next == _startIoAds) return;
-    _startIoAds = next;
+    if (_bannerAdNetwork == sanitized) return;
+    _bannerAdNetwork = sanitized;
     notifyListeners();
   }
 

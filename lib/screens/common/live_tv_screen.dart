@@ -19,9 +19,9 @@ import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/daddylive_service.dart';
 import '../../services/media_link.dart';
-import '../../services/start_io_ads_service.dart';
 // EthioTV source (commented out - disabled):
 // import '../../services/ethio_sports_service.dart';
+import '../../services/adsterra_playback_ads_service.dart';
 import '../../services/analytics_service.dart';
 import '../../mobile/widgets/filter_chips.dart';
 import '../../mobile/widgets/page_kit.dart';
@@ -70,6 +70,7 @@ class _ChannelListState extends State<ChannelList> {
   String? _selectedCategory;
   String? _letter;
   String? _resolvingId;
+  PlaybackAdPreload? _adPreload;
   String _query = '';
   String? _error;
   bool _loading = true;
@@ -142,6 +143,7 @@ class _ChannelListState extends State<ChannelList> {
 
   @override
   void dispose() {
+    _adPreload?.dispose();
     _highlightTimer?.cancel();
     _scrollController.dispose();
     _searchAnalyticsDebounce?.cancel();
@@ -382,10 +384,10 @@ class _ChannelListState extends State<ChannelList> {
   }
 
   Future<void> _play(Channel channel) async {
+    if (_resolvingId != null) return;
     setState(() => _resolvingId = channel.id);
-    // The interstitial runs while the stream resolves; the player opens only
-    // once it is gone.
-    unawaited(StartIoAdsService.instance.showPlaybackInterstitial());
+    _adPreload =
+        AdsterraPlaybackAdsService.instance.preloadStreamFound(context);
     final stopwatch = Stopwatch()..start();
     try {
       final stream = await _api().getStream(channel.id);
@@ -403,8 +405,13 @@ class _ChannelListState extends State<ChannelList> {
         durationMs: stopwatch.elapsedMilliseconds,
         source: _mode.name,
       );
-      await StartIoAdsService.instance.whenFullScreenAdClosed();
       if (!mounted) return;
+      // The channel works: the same stream-found popup as movies, first.
+      final proceed = await AdsterraPlaybackAdsService.instance
+          .streamFound(context, preload: _adPreload);
+      _adPreload?.dispose();
+      _adPreload = null;
+      if (!proceed || !mounted) return;
       final autoFullScreen = context.read<SettingsProvider>().defaultViewMode;
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -452,6 +459,8 @@ class _ChannelListState extends State<ChannelList> {
         );
       }
     } finally {
+      _adPreload?.dispose();
+      _adPreload = null;
       if (mounted) setState(() => _resolvingId = null);
     }
   }
@@ -631,8 +640,7 @@ class _ChannelListState extends State<ChannelList> {
     );
   }
 
-  /// Start.io ad tags must be letters only, so the slots are named, not
-  /// numbered.
+  /// Stable placement names for centrally configured Live TV banners.
   static const _headerPlacement = 'live_tv_top';
   static const _listPlacements = <String>[
     'live_tv_list_a',
@@ -640,13 +648,11 @@ class _ChannelListState extends State<ChannelList> {
     'live_tv_list_c',
   ];
 
-  /// Live TV ads use the larger MREC unit; it is the best-paying placement
-  /// the Start.io plugin exposes.
+  /// Live TV uses the larger rectangle variant by default.
   Widget _bannerSliver(String placement) => SliverToBoxAdapter(
         child: RemoteHostedAdsBanner(
           placement: placement,
           variant: HostedBannerVariant.tall,
-          keywords: StartIoAdsService.liveKeywords,
         ),
       );
 
