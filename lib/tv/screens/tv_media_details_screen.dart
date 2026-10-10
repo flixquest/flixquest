@@ -975,6 +975,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
         ),
         itemSpacing: 8,
         itemFocusScale: 1.04,
+        itemFocusRadius: 24,
         pinFocusedItem: true,
         onItemFocused: (season) => _selectSeason(season.seasonNumber!),
         onItemActivated: (season) {

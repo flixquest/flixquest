@@ -37,6 +37,7 @@ class TvContentRow<T> extends StatefulWidget {
     this.autofocus = false,
     this.itemSpacing = 14,
     this.itemFocusScale = 1.04,
+    this.itemFocusRadius = TvDesign.cardRadius + 2,
     this.controller,
     super.key,
   });
@@ -76,6 +77,9 @@ class TvContentRow<T> extends StatefulWidget {
   /// How much the focused item grows. A pinned row grows it from its leading
   /// edge, so the item stays lined up with the row title.
   final double itemFocusScale;
+
+  /// Corner radius of the focus outline around each item.
+  final double itemFocusRadius;
   final TvContentRowController? controller;
 
   @override
@@ -500,7 +504,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
                             ? Alignment.centerLeft
                             : Alignment.center,
                         borderRadius: BorderRadius.circular(
-                          TvDesign.cardRadius + 2,
+                          widget.itemFocusRadius,
                         ),
                         child: Stack(
                           children: <Widget>[

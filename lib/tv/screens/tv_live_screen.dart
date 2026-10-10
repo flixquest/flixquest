@@ -29,6 +29,7 @@ import '../widgets/tv_state_panel.dart';
 import '../widgets/tv_content_grid.dart';
 import '../widgets/tv_dialog.dart';
 import '../widgets/tv_loading_skeletons.dart';
+import '../widgets/tv_search_keyboard.dart';
 
 enum _TvLiveScope { all, favorites, recent }
 
@@ -49,11 +50,16 @@ class TvLiveScreen extends StatefulWidget {
 
 class _TvLiveScreenState extends State<TvLiveScreen> {
   static const _analyticsSurface = 'tv';
+  static final _backKeys = <LogicalKeyboardKey>{
+    LogicalKeyboardKey.escape,
+    LogicalKeyboardKey.goBack,
+    LogicalKeyboardKey.browserBack,
+  };
   final _daddyDatabase = LiveTVDatabaseController();
   // EthioTV source (commented out - disabled):
   // final _ethioDatabase = LiveTVDatabaseController(namespace: 'ethiosports');
-  final _searchController = TextEditingController();
-  late final FocusNode _searchFocus;
+  final GlobalKey<TvSearchKeyboardState> _keyboard =
+      GlobalKey<TvSearchKeyboardState>();
   final _channelGrid = TvContentGridController();
   final _browseFocus = FocusNode(debugLabel: 'Live TV browse controls');
   bool _showSearch = false;
@@ -85,10 +91,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   void initState() {
     super.initState();
     widget.focusController?.attach(this, _requestContentFocus);
-    _searchFocus = FocusNode(
-      debugLabel: 'Live TV search',
-      onKeyEvent: _handleSearchKeyEvent,
-    );
     LiveChannelFocus.pending.addListener(_onChannelFocusRequested);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _analytics.trackLiveTVScreenOpened(surface: _analyticsSurface);
@@ -116,7 +118,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
       if (_resolvingId == null) _play(Channel(id: id, name: id));
       return;
     }
-    _searchController.clear();
     setState(() {
       _mode = _TvLiveMode.channels;
       _scope = _TvLiveScope.all;
@@ -138,26 +139,10 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         _channelGrid.requestFocus()) {
       return true;
     }
+    if (_showSearch && _focusKeyboard()) return true;
     if (_browseFocus.context == null) return false;
     _browseFocus.requestFocus();
     return true;
-  }
-
-  KeyEventResult _handleSearchKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-      return KeyEventResult.ignored;
-    }
-    final direction = switch (event.logicalKey) {
-      LogicalKeyboardKey.arrowUp => TraversalDirection.up,
-      LogicalKeyboardKey.arrowDown => TraversalDirection.down,
-      LogicalKeyboardKey.arrowLeft => TraversalDirection.left,
-      LogicalKeyboardKey.arrowRight => TraversalDirection.right,
-      _ => null,
-    };
-    if (direction == null) return KeyEventResult.ignored;
-    return node.focusInDirection(direction)
-        ? KeyEventResult.handled
-        : KeyEventResult.ignored;
   }
 
   @override
@@ -178,8 +163,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
     _service?.close();
     // EthioTV source (commented out - disabled):
     // _ethioService?.close();
-    _searchController.dispose();
-    _searchFocus.dispose();
     _browseFocus.dispose();
     super.dispose();
   }
@@ -490,9 +473,86 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
     });
   }
 
-  void _focusFirstChannelResult() {
-    if (_mode != _TvLiveMode.channels || _visible.isEmpty) return;
-    _channelGrid.requestFocus();
+  // The search keyboard.
+
+  void _type(String character) {
+    // A leading or doubled space is never what was meant.
+    if (character == ' ' && (_query.isEmpty || _query.endsWith(' '))) return;
+    _onSearchChanged('$_query$character');
+  }
+
+  void _deleteCharacter() {
+    if (_query.isEmpty) return;
+    _onSearchChanged(_query.substring(0, _query.length - 1));
+  }
+
+  void _clearQuery() {
+    if (_query.isEmpty) return;
+    _onSearchChanged('');
+  }
+
+  bool _focusKeyboard() => _keyboard.currentState?.requestFocus() ?? false;
+
+  void _toggleSearch() {
+    setState(() => _showSearch = !_showSearch);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_showSearch) {
+        _focusKeyboard();
+      } else {
+        _browseFocus.requestFocus();
+      }
+    });
+  }
+
+  /// Right off the keyboard: the channels, or in the schedule whatever sits
+  /// beside the key.
+  bool _focusResultsFromKeyboard() {
+    if (_mode == _TvLiveMode.channels &&
+        _visible.isNotEmpty &&
+        _channelGrid.requestFocus()) {
+      return true;
+    }
+    final focused = FocusManager.instance.primaryFocus;
+    return focused != null &&
+        focused.focusInDirection(TraversalDirection.right);
+  }
+
+  /// Up off the keyboard: the Search button that opened it.
+  bool _focusSearchButton() {
+    if (_browseFocus.context == null) return false;
+    _browseFocus.requestFocus();
+    return true;
+  }
+
+  /// Back on the keyboard closes it.
+  KeyEventResult _handleKeyboardKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent || !_backKeys.contains(event.logicalKey)) {
+      return KeyEventResult.ignored;
+    }
+    _toggleSearch();
+    return KeyEventResult.handled;
+  }
+
+  /// Left off the first column of channels, or off an event, returns to the
+  /// key last used rather than whichever key happens to be level with it.
+  /// A row of an event's channels steps through its own chips first.
+  KeyEventResult _handleResultsKey(FocusNode node, KeyEvent event) {
+    if (!_showSearch ||
+        event.logicalKey != LogicalKeyboardKey.arrowLeft ||
+        (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
+      return KeyEventResult.ignored;
+    }
+    final focusedContext = FocusManager.instance.primaryFocus?.context;
+    if (focusedContext == null) return KeyEventResult.ignored;
+    final scrollable = Scrollable.maybeOf(focusedContext);
+    if (scrollable != null &&
+        axisDirectionToAxis(scrollable.axisDirection) == Axis.horizontal) {
+      return KeyEventResult.ignored;
+    }
+    // Holding Left stops at the edge instead of running into the keys.
+    if (event is KeyRepeatEvent) return KeyEventResult.handled;
+    return _focusKeyboard() ? KeyEventResult.handled : KeyEventResult.ignored;
   }
 
   void _selectMode(_TvLiveMode mode) {
@@ -604,28 +664,19 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
           children: <Widget>[
             _buildTitle(isSchedule),
             SizedBox(height: widget.metrics.compact ? 8 : 12),
-            _buildControls(isSchedule),
-            if (!isSchedule && _categories.isNotEmpty) ...<Widget>[
-              SizedBox(height: widget.metrics.compact ? 4 : 8),
-              _buildCategories(),
-            ],
-            if (!isSchedule && _letters.length > 1) ...<Widget>[
-              const SizedBox(height: 4),
-              _buildLetters(),
-            ],
-            if (isSchedule &&
-                _epg != null &&
-                _epg!.days.isNotEmpty) ...<Widget>[
-              SizedBox(height: widget.metrics.compact ? 4 : 8),
-              _buildDays(),
-              if (_sportSections.isNotEmpty) ...<Widget>[
-                const SizedBox(height: 4),
-                _buildSports(),
-              ],
-            ],
-            SizedBox(height: widget.metrics.compact ? 4 : 8),
+            // The keyboard docks beside everything under the title, so the
+            // filters and the list narrow rather than move down.
             Expanded(
-              child: isSchedule ? _buildSchedule() : _buildGrid(),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  if (_showSearch) ...<Widget>[
+                    _buildSearchDock(isSchedule),
+                    SizedBox(width: widget.metrics.compact ? 18 : 28),
+                  ],
+                  Expanded(child: _buildBrowse(isSchedule)),
+                ],
+              ),
             ),
             // A thin strip under the list stays on screen while the viewer
             // browses and only takes one banner's height from the grid.
@@ -640,11 +691,101 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
     );
   }
 
+  Widget _buildBrowse(bool isSchedule) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _buildControls(isSchedule),
+        if (!isSchedule && _categories.isNotEmpty) ...<Widget>[
+          SizedBox(height: widget.metrics.compact ? 4 : 8),
+          _buildCategories(),
+        ],
+        if (!isSchedule && _letters.length > 1) ...<Widget>[
+          const SizedBox(height: 4),
+          _buildLetters(),
+        ],
+        if (isSchedule && _epg != null && _epg!.days.isNotEmpty) ...<Widget>[
+          SizedBox(height: widget.metrics.compact ? 4 : 8),
+          _buildDays(),
+          if (_sportSections.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 4),
+            _buildSports(),
+          ],
+        ],
+        SizedBox(height: widget.metrics.compact ? 4 : 8),
+        Expanded(
+          child: Focus(
+            canRequestFocus: false,
+            skipTraversal: true,
+            onKeyEvent: _handleResultsKey,
+            child: isSchedule ? _buildSchedule() : _buildGrid(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// What has been typed over the keyboard, sized to fit the height left
+  /// between the title and the banner.
+  Widget _buildSearchDock(bool isSchedule) {
+    final compact = widget.metrics.compact;
+    final dockWidth = compact ? 246.0 : 300.0;
+    final fieldHeight = compact ? 44.0 : 50.0;
+    final fieldGap = compact ? 12.0 : 18.0;
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: _handleKeyboardKey,
+      child: SizedBox(
+        width: dockWidth,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final keyboardWidth = TvSearchKeyboard.widthFor(
+              constraints.maxHeight - fieldHeight - fieldGap - 8,
+            ).clamp(150.0, dockWidth);
+            return Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  SizedBox(
+                    height: fieldHeight,
+                    child: Align(
+                      alignment: Alignment.bottomLeft,
+                      child: TvSearchQueryField(
+                        query: _query,
+                        hint: isSchedule ? 'Teams and leagues' : 'Channels',
+                        compact: compact,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: fieldGap),
+                  TvSearchKeyboard(
+                    key: _keyboard,
+                    width: keyboardWidth,
+                    onType: _type,
+                    onDelete: _deleteCharacter,
+                    onClear: _clearQuery,
+                    onExitRight: _focusResultsFromKeyboard,
+                    onExitUp: _focusSearchButton,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   /// One line: title, the LIVE NOW / PROGRAM GUIDE badge and the count, so
   /// the grid starts a full row higher than with a stacked header.
   Widget _buildTitle(bool isSchedule) {
     final palette = TvPalette.of(context);
     final colors = Theme.of(context).colorScheme;
+    final shortQuery =
+        _query.length > 14 ? '${_query.substring(0, 14)}…' : _query;
+    final searchLabel = '“$shortQuery”';
     return Row(
       children: <Widget>[
         Text(
@@ -697,16 +838,14 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
           focusNode: _browseFocus,
           semanticLabel: 'Search channels',
           selected: _showSearch,
-          onActivate: () {
-            setState(() => _showSearch = !_showSearch);
-            if (_showSearch) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) _searchFocus.requestFocus();
-              });
-            }
-          },
-          child:
-              _TvPill(icon: PhosphorIcons.magnifyingGlass(), label: 'Search'),
+          onActivate: _toggleSearch,
+          // A search left in place while the keyboard is closed still
+          // filters, so it shows here.
+          child: _TvPill(
+            icon: PhosphorIcons.magnifyingGlass(),
+            label: _showSearch || _query.isEmpty ? 'Search' : searchLabel,
+            selected: _showSearch,
+          ),
         ),
         const SizedBox(width: 8),
         TvFocusable(
@@ -723,7 +862,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   }
 
   Widget _buildControls(bool isSchedule) {
-    final palette = TvPalette.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -749,55 +887,6 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         // ),
         // const SizedBox(height: 8),
         _buildModeTracks(isSchedule),
-        if (_showSearch) ...<Widget>[
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 50,
-            child: TextField(
-              controller: _searchController,
-              focusNode: _searchFocus,
-              onChanged: _onSearchChanged,
-              onSubmitted: (_) => _focusFirstChannelResult(),
-              textInputAction: TextInputAction.search,
-              style: TextStyle(
-                color: palette.foreground,
-                fontSize: 20,
-              ),
-              decoration: InputDecoration(
-                hintText: isSchedule
-                    ? 'Search matches, teams & leagues'
-                    : 'Search channels',
-                prefixIcon: Icon(PhosphorIcons.magnifyingGlass()),
-                suffixIcon: _query.isEmpty
-                    ? null
-                    : IconButton(
-                        tooltip: 'Clear search',
-                        onPressed: () {
-                          _searchController.clear();
-                          _onSearchChanged('');
-                          _searchFocus.requestFocus();
-                        },
-                        icon: Icon(PhosphorIcons.x()),
-                      ),
-                filled: true,
-                fillColor: palette.raisedSurface,
-                contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(TvDesign.cardRadius),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(TvDesign.cardRadius),
-                  borderSide: BorderSide(color: palette.hairline),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(TvDesign.cardRadius),
-                  borderSide: BorderSide(color: palette.foreground, width: 2),
-                ),
-              ),
-            ),
-          ),
-        ],
       ],
     );
   }

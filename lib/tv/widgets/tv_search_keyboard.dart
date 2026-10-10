@@ -9,15 +9,17 @@ import '../focus/tv_focusable.dart';
 /// Space, Delete and Clear, steered with the D-pad, the way Netflix's is.
 ///
 /// Arrows move key to key by column, so Up and Down land where expected even
-/// between the wide keys and the letters. Right off the last column and Left
-/// off the first are handed to [onExitRight] and to whatever is around the
-/// keyboard. A hardware keyboard types straight in while any key has focus.
+/// between the wide keys and the letters. Right off the last column and Up
+/// off the top row are handed to [onExitRight] and [onExitUp]; Left off the
+/// first column goes to whatever is around the keyboard. A hardware keyboard
+/// types straight in while any key has focus.
 class TvSearchKeyboard extends StatefulWidget {
   const TvSearchKeyboard({
     required this.onType,
     required this.onDelete,
     required this.onClear,
     this.onExitRight,
+    this.onExitUp,
     this.width = 300,
     super.key,
   });
@@ -28,12 +30,29 @@ class TvSearchKeyboard extends StatefulWidget {
 
   /// Right off the last column; returns whether focus left the keyboard.
   final bool Function()? onExitRight;
+
+  /// Up off the top row; returns whether focus left the keyboard. Without
+  /// it, Up there stays put.
+  final bool Function()? onExitUp;
   final double width;
 
   static const columns = 6;
 
   /// The letters and digits, a row per [columns].
   static const characters = 'abcdefghijklmnopqrstuvwxyz1234567890';
+
+  /// A key's height for each unit of width, and the gap under the top row.
+  static const _keyAspect = 0.82;
+  static const _actionGap = 6.0;
+  static final int _rows = 1 + (characters.length / columns).ceil();
+
+  /// How tall the keyboard is at [width].
+  static double heightFor(double width) =>
+      width / columns * _keyAspect * _rows + _actionGap;
+
+  /// The widest keyboard that fits in [height].
+  static double widthFor(double height) =>
+      (height - _actionGap) * columns / (_keyAspect * _rows);
 
   @override
   State<TvSearchKeyboard> createState() => TvSearchKeyboardState();
@@ -149,6 +168,10 @@ class TvSearchKeyboardState extends State<TvSearchKeyboard> {
     if (key == LogicalKeyboardKey.arrowUp ||
         key == LogicalKeyboardKey.arrowDown) {
       final row = spec.row + (key == LogicalKeyboardKey.arrowUp ? -1 : 1);
+      if (row < 0 && widget.onExitUp != null) {
+        widget.onExitUp!();
+        return KeyEventResult.handled;
+      }
       // Nothing above or below: stay rather than wander out of the keyboard.
       if (row >= 0 && row < _rowCount) {
         final column = spec.covers(_column) ? _column : spec.column;
@@ -194,7 +217,7 @@ class TvSearchKeyboardState extends State<TvSearchKeyboard> {
             for (final key in _keys.where((key) => key.row == index))
               SizedBox(
                 width: unit * key.span,
-                height: unit * 0.82,
+                height: unit * TvSearchKeyboard._keyAspect,
                 child: Padding(
                   padding: const EdgeInsets.all(2),
                   child: _Key(
@@ -227,7 +250,7 @@ class TvSearchKeyboardState extends State<TvSearchKeyboard> {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           row(0),
-          const SizedBox(height: 6),
+          const SizedBox(height: TvSearchKeyboard._actionGap),
           for (var index = 1; index < _rowCount; index++) row(index),
         ],
       ),
@@ -294,6 +317,98 @@ class _KeyState extends State<_Key> {
                   height: 1,
                 ),
               ),
+      ),
+    );
+  }
+}
+
+/// What has been typed, with a cursor, above the keyboard.
+class TvSearchQueryField extends StatelessWidget {
+  const TvSearchQueryField({
+    required this.query,
+    required this.hint,
+    required this.compact,
+    this.searching = false,
+    super.key,
+  });
+
+  final String query;
+
+  /// Shown in muted type while nothing is typed.
+  final String hint;
+  final bool searching;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = TvPalette.of(context);
+    final empty = query.isEmpty;
+    return Semantics(
+      label: empty ? 'Search, nothing typed' : 'Search for $query',
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: palette.foreground.withValues(alpha: 0.2),
+            ),
+          ),
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              PhosphorIcons.magnifyingGlass(),
+              color: palette.mutedText,
+              size: compact ? 20 : 22,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Row(
+                children: <Widget>[
+                  Flexible(
+                    // Scrolled to its end, so a long query shows what was
+                    // typed last, where the cursor is.
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      reverse: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: Text(
+                        empty ? hint : query,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          color: empty ? palette.mutedText : palette.foreground,
+                          fontFamily: empty ? 'Figtree' : 'FigtreeSB',
+                          fontSize: compact ? 20 : 24,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (!empty)
+                    Container(
+                      width: 2,
+                      height: compact ? 22 : 26,
+                      margin: const EdgeInsets.only(left: 2),
+                      color: palette.foreground,
+                    ),
+                ],
+              ),
+            ),
+            // Built only while searching: a spinner keeps animating, and
+            // drawing frames, even when faded out.
+            if (searching)
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: palette.mutedText,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

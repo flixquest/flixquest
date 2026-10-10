@@ -300,8 +300,9 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                _QueryField(
+                TvSearchQueryField(
                   query: _query,
+                  hint: 'Movies and series',
                   searching: _searching,
                   compact: compact,
                 ),
@@ -472,93 +473,6 @@ class _TvSearchScreenState extends State<TvSearchScreen> {
           shortcuts: genres(TvMediaKind.series, suggestions.seriesGenres),
         ),
       ],
-    );
-  }
-}
-
-/// What has been typed, with a cursor, above the keyboard.
-class _QueryField extends StatelessWidget {
-  const _QueryField({
-    required this.query,
-    required this.searching,
-    required this.compact,
-  });
-
-  final String query;
-  final bool searching;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = TvPalette.of(context);
-    final empty = query.isEmpty;
-    return Semantics(
-      label: empty ? 'Search, nothing typed' : 'Search for $query',
-      liveRegion: true,
-      child: Container(
-        padding: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: palette.foreground.withValues(alpha: 0.2),
-            ),
-          ),
-        ),
-        child: Row(
-          children: <Widget>[
-            Icon(
-              PhosphorIcons.magnifyingGlass(),
-              color: palette.mutedText,
-              size: compact ? 20 : 22,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Row(
-                children: <Widget>[
-                  Flexible(
-                    // Scrolled to its end, so a long query shows what was
-                    // typed last, where the cursor is.
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      reverse: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      child: Text(
-                        empty ? 'Movies and series' : query,
-                        maxLines: 1,
-                        softWrap: false,
-                        style: TextStyle(
-                          color: empty ? palette.mutedText : palette.foreground,
-                          fontFamily: empty ? 'Figtree' : 'FigtreeSB',
-                          fontSize: compact ? 20 : 24,
-                          height: 1.1,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (!empty)
-                    Container(
-                      width: 2,
-                      height: compact ? 22 : 26,
-                      margin: const EdgeInsets.only(left: 2),
-                      color: palette.foreground,
-                    ),
-                ],
-              ),
-            ),
-            // Built only while searching: a spinner keeps animating, and
-            // drawing frames, even when faded out.
-            if (searching)
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: palette.mutedText,
-                ),
-              ),
-          ],
-        ),
-      ),
     );
   }
 }
