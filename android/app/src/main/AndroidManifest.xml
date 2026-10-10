@@ -32,6 +32,12 @@
         android:banner="@drawable/tv_banner"
         android:requestLegacyExternalStorage="true"
         android:usesCleartextTraffic="true">    
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="vn.hunghd.flutterdownloader.NOTIFICATION_ICON"
+            android:resource="@drawable/ic_notification" />
         <!-- Replace the default receiver ID after registering cast_receiver/. -->
         <meta-data
             android:name="uz.shs.better_player_plus.CAST_RECEIVER_APPLICATION_ID"

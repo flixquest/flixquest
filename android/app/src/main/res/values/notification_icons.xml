@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Media3's player notification uses this drawable by default. -->
+    <item name="exo_notification_small_icon" type="drawable">@drawable/ic_notification</item>
+</resources>

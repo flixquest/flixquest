@@ -53,6 +53,12 @@ class _AdsterraPlaybackGateState extends State<AdsterraPlaybackGate> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      _ready ? widget.builder(context) : const ColoredBox(color: Colors.black);
+  Widget build(BuildContext context) => _ready
+      ? widget.builder(context)
+      : const ColoredBox(
+          color: Colors.black,
+          child: Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          ),
+        );
 }

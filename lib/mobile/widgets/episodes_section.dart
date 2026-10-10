@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 
@@ -12,7 +14,7 @@ import 'details_parts.dart';
 import 'episode_row.dart';
 import 'filter_chips.dart';
 
-typedef EpisodeAction = void Function(
+typedef EpisodeAction = FutureOr<void> Function(
   EpisodeList episode,
   List<EpisodeList> seasonEpisodes,
 );

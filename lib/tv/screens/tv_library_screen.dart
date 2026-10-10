@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
@@ -33,7 +35,7 @@ class TvLibraryScreen extends StatefulWidget {
 
   final TvShellMetrics metrics;
   final ValueChanged<TvMediaItem> onOpenMedia;
-  final ValueChanged<TvMediaItem>? onContinueWatching;
+  final FutureOr<void> Function(TvMediaItem item)? onContinueWatching;
   final ValueChanged<TvCollection>? onOpenCollection;
 
   /// Bumped when a bookmark may have changed; the list reloads in place so

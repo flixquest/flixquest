@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flixquest/widgets/adsterra_playback_gate.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -29,7 +31,7 @@ class PlayerEpisodeSelection {
     required BuildContext context,
     required List<Color> colors,
     required TVStreamMetadata tvMetadata,
-    required Function() onSaveProgress,
+    required FutureOr<void> Function() onSaveProgress,
     required Function() closePlayer,
     bool useTvPlayer = false,
   }) {
@@ -128,37 +130,48 @@ class PlayerEpisodeSelection {
                       colors,
                       current
                           ? null
-                          : () {
-                              onSaveProgress();
-                              Navigator.pop(sheetContext);
+                          : () async {
+                              await onSaveProgress();
+                              if (!playerContext.mounted ||
+                                  !sheetContext.mounted) {
+                                return;
+                              }
+                              final route = ModalRoute.of(sheetContext);
+                              if (route?.isActive != true) return;
+                              Navigator.of(sheetContext).removeRoute(route!);
                               closePlayer();
-                              Navigator.pushReplacement(
+                              await Navigator.pushReplacement(
                                 playerContext,
                                 MaterialPageRoute(
                                   builder: (context) =>
                                       AdsterraPlaybackGate.buildLoader(context,
-                                      television: useTvPlayer,
-                                      builder: (context) => TVVideoLoader(
-                                            download: false,
-                                            useTvPlayer: useTvPlayer,
-                                            metadata: TVStreamMetadata(
-                                              elapsed: null,
-                                              episodeId: episode.episodeId,
-                                              episodeName: episode.episodeName,
-                                              episodeNumber:
-                                                  episode.episodeNumber,
-                                              posterPath: tvMetadata.posterPath,
-                                              backdropPath: episode.stillPath ??
-                                                  tvMetadata.backdropPath,
-                                              seasonNumber:
-                                                  episode.seasonNumber,
-                                              seriesName: tvMetadata.seriesName,
-                                              tvId: tvMetadata.tvId,
-                                              airDate: episode.airDate,
-                                              seasonEpisodes: episodes,
-                                              allSeasons: tvMetadata.allSeasons,
-                                            ),
-                                          )),
+                                          television: useTvPlayer,
+                                          builder: (context) => TVVideoLoader(
+                                                download: false,
+                                                useTvPlayer: useTvPlayer,
+                                                metadata: TVStreamMetadata(
+                                                  elapsed: null,
+                                                  episodeId: episode.episodeId,
+                                                  episodeName:
+                                                      episode.episodeName,
+                                                  episodeNumber:
+                                                      episode.episodeNumber,
+                                                  posterPath:
+                                                      tvMetadata.posterPath,
+                                                  backdropPath: episode
+                                                          .stillPath ??
+                                                      tvMetadata.backdropPath,
+                                                  seasonNumber:
+                                                      episode.seasonNumber,
+                                                  seriesName:
+                                                      tvMetadata.seriesName,
+                                                  tvId: tvMetadata.tvId,
+                                                  airDate: episode.airDate,
+                                                  seasonEpisodes: episodes,
+                                                  allSeasons:
+                                                      tvMetadata.allSeasons,
+                                                ),
+                                              )),
                                 ),
                               );
                             },
@@ -180,7 +193,7 @@ class PlayerEpisodeSelection {
     bool hasProgress,
     double progressPercentage,
     List<Color> colors,
-    VoidCallback? onTap,
+    FutureOr<void> Function()? onTap,
   ) {
     final details = <String>[];
     if (episode.voteAverage != null && episode.voteAverage! > 0) {
@@ -214,7 +227,7 @@ class PlayerEpisodeSelection {
     required BuildContext context,
     required List<Color> colors,
     required TVStreamMetadata tvMetadata,
-    required Function() onSaveProgress,
+    required FutureOr<void> Function() onSaveProgress,
     required Function() closePlayer,
     bool useTvPlayer = false,
   }) {
@@ -267,36 +280,38 @@ class PlayerEpisodeSelection {
                       builder: (_) => PlayerTheme(
                         child: Builder(
                           builder: (context) => PopScope(
-                        canPop: false,
-                        child: Dialog(
-                          backgroundColor:
-                              BetterPlayerPanelColors.of(context).panel,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 20),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                  ),
-                                  child: Text(
-                                    tr('loading_episodes'),
-                                    style: AppType.cardTitle.copyWith(
-                                      fontSize: 16,
-                                      color: AppPalette.of(context).foreground,
+                            canPop: false,
+                            child: Dialog(
+                              backgroundColor:
+                                  BetterPlayerPanelColors.of(context).panel,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 20),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      child: Text(
+                                        tr('loading_episodes'),
+                                        style: AppType.cardTitle.copyWith(
+                                          fontSize: 16,
+                                          color:
+                                              AppPalette.of(context).foreground,
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                    const EpisodeListSkeleton(count: 2),
+                                  ],
                                 ),
-                                const EpisodeListSkeleton(count: 2),
-                              ],
+                              ),
                             ),
                           ),
                         ),
-                        ),
-                          ),
-                        ),
+                      ),
                     ),
                   );
                   await fetchEpisodesForSeason(

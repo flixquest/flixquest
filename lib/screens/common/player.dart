@@ -1,4 +1,5 @@
 import 'package:flixquest/widgets/adsterra_playback_gate.dart';
+import 'package:flixquest/widgets/playback_action.dart';
 // ignore_for_file: deprecated_member_use
 
 import 'dart:async';
@@ -190,6 +191,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   bool _tvSubtitleTimingOpen = false;
   int? _portraitBrowsedSeasonNumber;
   bool _portraitSeasonLoading = false;
+  bool _startingContent = false;
+  OverlayEntry? _contentSwitchLoading;
   Orientation? _lastScreenOrientation;
   bool _landscapeFullscreenRequestPending = false;
 
@@ -1351,9 +1354,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         }
         _hideNextEpisodeOverlay();
       },
-      onPlay: () {
-        _hideNextEpisodeOverlay();
-        unawaited(_playNextEpisodeFromControls());
+      busy: _startingContent,
+      onPlay: () async {
+        _phoneNextEpisodeTimer?.cancel();
+        await _playNextEpisodeFromControls();
       },
     );
   }
@@ -2041,6 +2045,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _hideContentSwitchLoading();
     _betterPlayerControllerInitialized = false;
     _prerollAd.dispose();
     settings.removeListener(_syncAmbientGlowSetting);
@@ -2553,61 +2558,107 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     _clearTvNextEpisodePrompt();
   }
 
-  Future<void> _playTvEpisode(EpisodeMetadata episode) async {
-    _tvNextEpisodeTimer?.cancel();
-    if (mounted) {
-      setState(() {
-        _tvMenu = null;
-        _tvSubtitleTimingOpen = false;
-        _tvNextEpisode = null;
-        _tvNextEpisodeCountdown = null;
-      });
-    }
-    await _handleContentSwitch();
-    if (!mounted) return;
-    await Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (context) => AdsterraPlaybackGate.buildLoader(context,
-            television: widget.useTvControls,
-            builder: (context) => TVVideoLoader(
-                  download: false,
-                  useTvPlayer: widget.useTvControls,
-                  onTvPlayerExit: widget.onTvPlayerExit,
-                  metadata: _metadataForTvEpisode(episode),
-                )),
+  Future<void> _startContent(Future<void> Function() action) async {
+    if (_startingContent || !mounted) return;
+    setState(() => _startingContent = true);
+    _nextEpisodeOverlay?.markNeedsBuild();
+    // Fullscreen controls live on a separate route. Show feedback above that
+    // route too while saving the current watch progress before navigation.
+    _contentSwitchLoading = OverlayEntry(
+      builder: (_) => const Positioned.fill(
+        child: AbsorbPointer(
+          child: ColoredBox(
+            color: Color(0x66000000),
+            child: Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          ),
+        ),
       ),
     );
+    Navigator.of(context, rootNavigator: true)
+        .overlay!
+        .insert(_contentSwitchLoading!);
+    try {
+      await action();
+    } finally {
+      _hideContentSwitchLoading();
+      if (mounted) {
+        setState(() => _startingContent = false);
+        _nextEpisodeOverlay?.markNeedsBuild();
+      }
+    }
   }
 
-  Future<void> _playTvMovie(MovieRecommendation movie) async {
-    if (mounted) setState(() => _tvMenu = null);
-    await _handleContentSwitch();
-    if (!mounted) return;
-    final metadata = MovieStreamMetadata(
-      movieId: movie.movieId,
-      movieName: movie.title,
-      posterPath: movie.posterPath,
-      backdropPath: movie.backdropPath,
-      releaseDate: movie.releaseDate,
-      releaseYear: movie.releaseDate == null
-          ? null
-          : DateTime.tryParse(movie.releaseDate!)?.year,
-      isAdult: false,
-      elapsed: 0,
-    );
-    await Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (context) => AdsterraPlaybackGate.buildLoader(context,
-            television: widget.useTvControls,
-            builder: (context) => MovieVideoLoader(
-                  download: false,
-                  useTvPlayer: widget.useTvControls,
-                  onTvPlayerExit: widget.onTvPlayerExit,
-                  metadata: metadata,
-                )),
-      ),
-    );
+  void _hideContentSwitchLoading() {
+    _contentSwitchLoading?.remove();
+    _contentSwitchLoading?.dispose();
+    _contentSwitchLoading = null;
   }
+
+  Future<void> _playTvEpisode(EpisodeMetadata episode) =>
+      _startContent(() async {
+        _tvNextEpisodeTimer?.cancel();
+        if (mounted) {
+          setState(() {
+            _tvMenu = null;
+            _tvSubtitleTimingOpen = false;
+          });
+        }
+        await _handleContentSwitch();
+        if (!mounted) return;
+        _hideContentSwitchLoading();
+        _hideNextEpisodeOverlay();
+        setState(() {
+          _tvNextEpisode = null;
+          _tvNextEpisodeCountdown = null;
+        });
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (context) => AdsterraPlaybackGate.buildLoader(context,
+                television: widget.useTvControls,
+                builder: (context) => TVVideoLoader(
+                      download: false,
+                      useTvPlayer: widget.useTvControls,
+                      onTvPlayerExit: widget.onTvPlayerExit,
+                      metadata: _metadataForTvEpisode(episode),
+                    )),
+          ),
+        );
+      });
+
+  Future<void> _playTvMovie(MovieRecommendation movie) =>
+      _startContent(() async {
+        if (mounted) setState(() => _tvMenu = null);
+        await _handleContentSwitch();
+        if (!mounted) return;
+        _hideContentSwitchLoading();
+        _hideNextEpisodeOverlay();
+        final metadata = MovieStreamMetadata(
+          movieId: movie.movieId,
+          movieName: movie.title,
+          posterPath: movie.posterPath,
+          backdropPath: movie.backdropPath,
+          releaseDate: movie.releaseDate,
+          releaseYear: movie.releaseDate == null
+              ? null
+              : DateTime.tryParse(movie.releaseDate!)?.year,
+          isAdult: false,
+          elapsed: 0,
+        );
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (context) => AdsterraPlaybackGate.buildLoader(context,
+                television: widget.useTvControls,
+                builder: (context) => MovieVideoLoader(
+                      download: false,
+                      useTvPlayer: widget.useTvControls,
+                      onTvPlayerExit: widget.onTvPlayerExit,
+                      metadata: metadata,
+                    )),
+          ),
+        );
+      });
 
   TVStreamMetadata _metadataForTvEpisode(EpisodeMetadata episode) {
     final current = widget.tvMetadata!;
@@ -2982,6 +3033,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                       ? tr('watch_credits')
                       : tr('cancel'),
                   onCancel: _dismissTvNextEpisodePrompt,
+                  busy: _startingContent,
                   onPlay: () => _playTvEpisode(nextEpisode),
                 ),
               ),
@@ -3049,7 +3101,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     return <WatchAction>[
       if (providers.isNotEmpty)
         WatchAction(
-          icon: PhosphorIcons.arrowsLeftRight(),
+          icon: PhosphorIcons.hardDrives(),
           label: providerName ?? tr('switch_provider'),
           busy: _isSwitchingProvider,
           onTap: _showProviderSwitcher,
@@ -3191,7 +3243,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
             title: 'E${upNext.episodeNumber} · ${upNext.episodeName}',
             meta: upNext.runtime == null ? null : '${upNext.runtime}m',
             imageUrl: tmdbImage(upNext.stillPath, 'w300'),
-            onPlay: () => unawaited(_playUpNext(upNext)),
+            onPlay: () => _playUpNext(upNext),
           ),
         ),
       if (episodes.isNotEmpty) ...<Widget>[
@@ -3229,7 +3281,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               unaired: unaired,
               progress:
                   current ? WatchLiveProgress(read: _contentProgress) : null,
-              onTap: () => unawaited(_playTvEpisode(episode)),
+              onTap: () => _playTvEpisode(episode),
             );
           },
         ),
@@ -3435,20 +3487,24 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       await _playTvEpisode(next);
       return;
     }
-    await _handleContentSwitch();
-    if (!mounted) return;
-    final navigator = Navigator.of(context);
-    _closePlayer();
-    await navigator.pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (context) => AdsterraPlaybackGate.buildLoader(context,
-            television: widget.useTvControls,
-            builder: (context) => TVVideoLoader(
-                  download: false,
-                  metadata: _metadataForTvEpisode(next),
-                )),
-      ),
-    );
+    await _startContent(() async {
+      await _handleContentSwitch();
+      if (!mounted) return;
+      _hideContentSwitchLoading();
+      _hideNextEpisodeOverlay();
+      final navigator = Navigator.of(context);
+      _closePlayer();
+      await navigator.pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (context) => AdsterraPlaybackGate.buildLoader(context,
+              television: widget.useTvControls,
+              builder: (context) => TVVideoLoader(
+                    download: false,
+                    metadata: _metadataForTvEpisode(next),
+                  )),
+        ),
+      );
+    });
   }
 
   void _exitPlayer() {
@@ -3772,12 +3828,14 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
     required this.onCancel,
     required this.onPlay,
     required this.cancelLabel,
+    this.busy = false,
     this.countdown,
     this.countdownTotal = 10,
     this.touch = false,
     this.liftedBy = 0,
   });
 
+  final bool busy;
   final bool touch;
   final double liftedBy;
 
@@ -3786,7 +3844,7 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
   final int countdownTotal;
   final String cancelLabel;
   final VoidCallback onCancel;
-  final VoidCallback onPlay;
+  final FutureOr<void> Function() onPlay;
 
   @override
   Widget build(BuildContext context) {
@@ -3936,6 +3994,7 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
                                 progress: elapsed,
                                 autofocus: !touch,
                                 colors: tv,
+                                busy: busy,
                                 onPressed: onPlay,
                               ),
                             ),
@@ -3971,6 +4030,7 @@ class _TvPromptButton extends StatefulWidget {
     required this.label,
     required this.icon,
     required this.onPressed,
+    this.busy = false,
     this.progress,
     this.autofocus = false,
     this.colors,
@@ -3978,7 +4038,8 @@ class _TvPromptButton extends StatefulWidget {
 
   final String label;
   final IconData icon;
-  final VoidCallback onPressed;
+  final FutureOr<void> Function() onPressed;
+  final bool busy;
   final double? progress;
   final bool autofocus;
   final BetterPlayerTvPanelColors? colors;
@@ -3996,7 +4057,13 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => PlaybackAction(
+        onStart: widget.onPressed,
+        builder: (context, busy, start) =>
+            _buildButton(context, busy || widget.busy, start),
+      );
+
+  Widget _buildButton(BuildContext context, bool busy, VoidCallback start) {
     // Focus on a remote, a finger on a phone: either lights it white.
     final lit = _focused || _pressed;
     final colors = widget.colors;
@@ -4015,13 +4082,13 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
       actions: {
         ActivateIntent: CallbackAction<ActivateIntent>(
           onInvoke: (_) {
-            widget.onPressed();
+            if (!busy) start();
             return null;
           },
         ),
       },
       child: GestureDetector(
-        onTap: widget.onPressed,
+        onTap: busy ? null : start,
         onTapDown: (_) => _press(true),
         onTapUp: (_) => _press(false),
         onTapCancel: () => _press(false),
@@ -4039,7 +4106,14 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(widget.icon, color: foreground, size: 20),
+                    if (busy)
+                      SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: foreground),
+                      )
+                    else
+                      Icon(widget.icon, color: foreground, size: 20),
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(

@@ -12,6 +12,7 @@ import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../design/title_logo.dart';
+import '../../widgets/playback_action.dart';
 import '../my_list.dart';
 import '../playback.dart';
 import 'media_art.dart';
@@ -63,9 +64,13 @@ class _HeroCardState extends State<HeroCard> {
   MediaItem get _item => widget.hero.item;
 
   Future<void> _play() async {
+    if (_starting) return;
     setState(() => _starting = true);
     try {
-      await MobilePlayback.play(context, _item);
+      await PlaybackAction.run(
+        context,
+        () => MobilePlayback.play(context, _item),
+      );
     } finally {
       if (mounted) setState(() => _starting = false);
     }

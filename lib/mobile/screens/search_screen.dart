@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
+import '../../widgets/playback_action.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
@@ -835,11 +836,23 @@ class _TopSearches extends StatelessWidget {
                       ),
                     ),
                     if (canPlay)
-                      IconButton(
-                        tooltip: tr('play'),
-                        color: palette.foreground,
-                        onPressed: () => MobilePlayback.play(context, item),
-                        icon: PlaybackIcon(PhosphorIcons.playCircle(), size: 30),
+                      PlaybackAction(
+                        onStart: () => MobilePlayback.play(context, item),
+                        builder: (context, busy, start) => IconButton(
+                          tooltip: tr('play'),
+                          color: palette.foreground,
+                          onPressed: busy ? null : start,
+                          icon: busy
+                              ? SizedBox.square(
+                                  dimension: 30,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: palette.foreground,
+                                  ),
+                                )
+                              : PlaybackIcon(PhosphorIcons.playCircle(),
+                                  size: 30),
+                        ),
                       ),
                   ],
                 ),

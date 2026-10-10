@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flixquest/widgets/adsterra_playback_gate.dart';
+import 'package:flixquest/widgets/playback_action.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -15,13 +18,14 @@ class PlayerMovieRecommendations {
     required BuildContext context,
     required int movieId,
     required MovieStreamMetadata movieMetadata,
-    required Function() onSaveProgress,
+    required FutureOr<void> Function() onSaveProgress,
     required Function() closePlayer,
     bool useTvPlayer = false,
+    bool Function()? onReady,
   }) async {
     try {
       // Save progress and analytics for current movie before switching
-      onSaveProgress();
+      await onSaveProgress();
 
       // Find the movie in recommendations to get all its details
       final recommendedMovie = movieMetadata.recommendations
@@ -48,8 +52,9 @@ class PlayerMovieRecommendations {
       // Pop current player, then push new video loader
       // This prevents player stacking while maintaining navigation history
       if (context.mounted) {
+        if (onReady?.call() == false) return;
         closePlayer();
-        Navigator.pushReplacement(
+        await Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => AdsterraPlaybackGate.buildLoader(context,
@@ -79,7 +84,7 @@ class PlayerMovieRecommendations {
     required BuildContext context,
     required List<Color> colors,
     required MovieStreamMetadata movieMetadata,
-    required Function() onSaveProgress,
+    required FutureOr<void> Function() onSaveProgress,
     required Function() closePlayer,
     bool useTvPlayer = false,
   }) {
@@ -138,17 +143,21 @@ class PlayerMovieRecommendations {
                       width: 112,
                       height: 68,
                     ),
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      loadRecommendedMovie(
-                        context: playerContext,
-                        movieId: movie.movieId,
-                        movieMetadata: movieMetadata,
-                        onSaveProgress: onSaveProgress,
-                        closePlayer: closePlayer,
-                        useTvPlayer: useTvPlayer,
-                      );
-                    },
+                    onTap: () => loadRecommendedMovie(
+                      context: playerContext,
+                      movieId: movie.movieId,
+                      movieMetadata: movieMetadata,
+                      onSaveProgress: onSaveProgress,
+                      closePlayer: closePlayer,
+                      useTvPlayer: useTvPlayer,
+                      onReady: () {
+                        if (!sheetContext.mounted) return false;
+                        final route = ModalRoute.of(sheetContext);
+                        if (route?.isActive != true) return false;
+                        Navigator.of(sheetContext).removeRoute(route!);
+                        return true;
+                      },
+                    ),
                   );
                 },
               ),
@@ -163,10 +172,11 @@ class PlayerMovieRecommendations {
     required BuildContext context,
     required List<Color> colors,
     required MovieStreamMetadata movieMetadata,
-    required Function() onSaveProgress,
+    required FutureOr<void> Function() onSaveProgress,
     required Function() closePlayer,
     bool useTvPlayer = false,
   }) {
+    final playerContext = context;
     final recommendations = movieMetadata.recommendations;
     debugPrint(
       '[MovieRecommendationsDebug][COUNTDOWN_ENTER] '
@@ -334,20 +344,35 @@ class PlayerMovieRecommendations {
                               child: Text(tr('cancel')),
                             ),
                             const SizedBox(width: 8),
-                            FilledButton.icon(
-                              onPressed: () {
-                                Navigator.pop(dialogContext);
-                                loadRecommendedMovie(
-                                  context: context,
-                                  movieId: selected.movieId,
-                                  movieMetadata: movieMetadata,
-                                  onSaveProgress: onSaveProgress,
-                                  closePlayer: closePlayer,
-                                  useTvPlayer: useTvPlayer,
-                                );
-                              },
-                              icon: Icon(PhosphorIcons.play()),
-                              label: Text(tr('play_now')),
+                            PlaybackAction(
+                              onStart: () => loadRecommendedMovie(
+                                context: playerContext,
+                                movieId: selected.movieId,
+                                movieMetadata: movieMetadata,
+                                onSaveProgress: onSaveProgress,
+                                closePlayer: closePlayer,
+                                useTvPlayer: useTvPlayer,
+                                onReady: () {
+                                  if (!dialogContext.mounted) return false;
+                                  final route = ModalRoute.of(dialogContext);
+                                  if (route?.isActive != true) return false;
+                                  Navigator.of(dialogContext)
+                                      .removeRoute(route!);
+                                  return true;
+                                },
+                              ),
+                              builder: (context, busy, start) =>
+                                  FilledButton.icon(
+                                onPressed: busy ? null : start,
+                                icon: busy
+                                    ? const SizedBox.square(
+                                        dimension: 18,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      )
+                                    : Icon(PhosphorIcons.play()),
+                                label: Text(tr('play_now')),
+                              ),
                             ),
                           ],
                         ),

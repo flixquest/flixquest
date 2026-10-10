@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
@@ -28,7 +30,7 @@ class TvHomeScreen extends StatefulWidget {
 
   final TvShellMetrics metrics;
   final ValueChanged<TvMediaItem> onOpenMedia;
-  final ValueChanged<TvMediaItem> onContinueWatching;
+  final FutureOr<void> Function(TvMediaItem item) onContinueWatching;
   final TvScreenFocusController? focusController;
 
   @override

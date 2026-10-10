@@ -11,6 +11,7 @@ import '../../constants/api_constants.dart';
 import '../../constants/app_constants.dart';
 import '../../design/outline_mark.dart';
 import '../../functions/function.dart';
+import '../../widgets/playback_action.dart';
 import '../../models/movie_stream_metadata.dart';
 import '../../models/tv.dart';
 import '../../models/tv_stream_metadata.dart';
@@ -478,7 +479,8 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
       hasAired(episode) &&
       context.read<AppDependencyProvider>().displayWatchNowButton;
 
-  void _activateEpisode(EpisodeList episode, List<EpisodeList> season) {
+  Future<void> _activateEpisode(
+      EpisodeList episode, List<EpisodeList> season) async {
     if (_canPlay(episode)) {
       final resume = _resume();
       final watched = resume?.episode;
@@ -486,9 +488,10 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
           !resume!.finished &&
           watched.seasonNum == episode.seasonNumber &&
           watched.episodeNum == episode.episodeNumber;
-      _playEpisode(episode, season, elapsed: resuming ? resume.elapsed : null);
+      await _playEpisode(episode, season,
+          elapsed: resuming ? resume.elapsed : null);
     } else {
-      _showEpisode(episode, season);
+      await _showEpisode(episode, season);
     }
   }
 
@@ -1111,7 +1114,7 @@ class _DetailButton extends StatefulWidget {
   final FocusNode focusNode;
   final String label;
   final IconData icon;
-  final VoidCallback onActivate;
+  final FutureOr<void> Function() onActivate;
   final VoidCallback? onFocused;
   final bool autofocus;
   final bool enabled;
@@ -1124,7 +1127,12 @@ class _DetailButtonState extends State<_DetailButton> {
   bool _focused = false;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => PlaybackAction(
+        onStart: widget.onActivate,
+        builder: (context, busy, start) => _buildButton(context, busy, start),
+      );
+
+  Widget _buildButton(BuildContext context, bool busy, VoidCallback start) {
     final palette = TvPalette.of(context);
     final foreground = _focused ? palette.onFocus : palette.foreground;
     return TvFocusable(
@@ -1132,7 +1140,7 @@ class _DetailButtonState extends State<_DetailButton> {
       semanticLabel: widget.label,
       autofocus: widget.autofocus,
       enabled: widget.enabled,
-      onActivate: widget.onActivate,
+      onActivate: busy ? () {} : start,
       onFocusChanged: (hasFocus) {
         if (hasFocus) widget.onFocused?.call();
         if (hasFocus != _focused) setState(() => _focused = hasFocus);
@@ -1151,7 +1159,16 @@ class _DetailButtonState extends State<_DetailButton> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(widget.icon, color: foreground, size: 20),
+            if (busy)
+              SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: foreground,
+                ),
+              )
+            else
+              Icon(widget.icon, color: foreground, size: 20),
             const SizedBox(width: 8),
             Text(
               widget.label,

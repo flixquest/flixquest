@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../widgets/playback_action.dart';
+
 import '../focus/tv_focus_memory.dart';
 import '../focus/tv_focusable.dart';
 import '../app/tv_design.dart';
@@ -45,7 +47,7 @@ class TvContentRow<T> extends StatefulWidget {
   final String Function(T item) itemId;
   final String Function(T item) semanticLabel;
   final TvContentItemBuilder<T> itemBuilder;
-  final ValueChanged<T> onItemActivated;
+  final FutureOr<void> Function(T item) onItemActivated;
 
   /// Secondary action for an item, reached by holding OK or by the remote's menu
   /// key. A remote has no room for an on-card button the way touch does, so the
@@ -116,6 +118,19 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
   Timer? _holdTimer;
   String? _holdItemId;
   bool _holdReached = false;
+  String? _startingItemId;
+
+  Future<void> _activateItem(T item) async {
+    if (_startingItemId != null) return;
+    await PlaybackAction.run(context, () async {
+      setState(() => _startingItemId = widget.itemId(item));
+      try {
+        await widget.onItemActivated(item);
+      } finally {
+        if (mounted) setState(() => _startingItemId = null);
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -308,7 +323,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
         _openMenu(id);
       } else {
         final item = _itemForId(id);
-        if (item != null) widget.onItemActivated(item);
+        if (item != null) unawaited(_activateItem(item));
       }
       return KeyEventResult.handled;
     }
@@ -475,7 +490,7 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
                           }
                           _handleItemFocusChanged(id: id, hasFocus: hasFocus);
                         },
-                        onActivate: () => widget.onItemActivated(item),
+                        onActivate: () => unawaited(_activateItem(item)),
                         onLongPress:
                             onItemMenu == null ? null : () => onItemMenu(item),
                         padding: const EdgeInsets.all(_itemFocusPadding),
@@ -487,7 +502,26 @@ class _TvContentRowState<T> extends State<TvContentRow<T>> {
                         borderRadius: BorderRadius.circular(
                           TvDesign.cardRadius + 2,
                         ),
-                        child: widget.itemBuilder(context, item),
+                        child: Stack(
+                          children: <Widget>[
+                            widget.itemBuilder(context, item),
+                            if (_startingItemId == id)
+                              const Positioned.fill(
+                                child: ColoredBox(
+                                  color: Color(0x66000000),
+                                  child: Center(
+                                    child: SizedBox.square(
+                                      dimension: 28,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       );
                     },
                   ),

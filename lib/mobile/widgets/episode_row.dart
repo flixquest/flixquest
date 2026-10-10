@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -8,6 +10,7 @@ import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../design/skeleton.dart';
 import '../../models/tv.dart';
+import '../../widgets/playback_action.dart';
 import 'media_art.dart';
 import 'page_kit.dart';
 import 'pill_button.dart';
@@ -39,7 +42,7 @@ class EpisodeRow extends StatelessWidget {
   final double? progress;
   final bool canPlay;
   final bool canDownload;
-  final VoidCallback onPlay;
+  final FutureOr<void> Function() onPlay;
   final VoidCallback? onDownload;
 
   /// The episode's own page; long press, or tap when it can't be played.
@@ -48,7 +51,12 @@ class EpisodeRow extends StatelessWidget {
   static const stillWidth = 132.0;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => PlaybackAction(
+        onStart: onPlay,
+        builder: (context, busy, start) => _buildRow(context, busy, start),
+      );
+
+  Widget _buildRow(BuildContext context, bool busy, VoidCallback start) {
     final palette = AppPalette.of(context);
     final gutter = AppSpace.gutter(context);
     final locale = Localizations.localeOf(context).toString();
@@ -71,7 +79,7 @@ class EpisodeRow extends StatelessWidget {
     final progress = this.progress;
     final downloadable = canDownload && aired && onDownload != null;
     final row = InkWell(
-      onTap: playable ? onPlay : onOpen,
+      onTap: busy ? null : (playable ? start : onOpen),
       onLongPress: onOpen,
       child: Padding(
         padding: EdgeInsetsDirectional.fromSTEB(
@@ -114,11 +122,20 @@ class EpisodeRow extends StatelessWidget {
                                     width: 1.5,
                                   ),
                                 ),
-                                child: PlaybackIcon(
-                                  PhosphorIcons.play(PhosphorIconsStyle.fill),
-                                  size: 16,
-                                  color: const Color(0xFFFFFFFF),
-                                ),
+                                child: busy
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(8),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : PlaybackIcon(
+                                        PhosphorIcons.play(
+                                            PhosphorIconsStyle.fill),
+                                        size: 16,
+                                        color: const Color(0xFFFFFFFF),
+                                      ),
                               ),
                             ),
                           if (progress != null)
@@ -164,7 +181,7 @@ class EpisodeRow extends StatelessWidget {
                   IconButton(
                     tooltip: tr('download_episode'),
                     color: palette.foreground,
-                    onPressed: onDownload,
+                    onPressed: busy ? null : onDownload,
                     icon: Icon(PhosphorIcons.downloadSimple(), size: 22),
                   ),
               ],

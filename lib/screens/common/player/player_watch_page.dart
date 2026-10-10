@@ -11,6 +11,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../constants/app_constants.dart';
 import '../../../design/app_tokens.dart';
 import '../../../mobile/widgets/pill_button.dart' show PlaybackIcon;
+import '../../../widgets/playback_action.dart';
 import 'player_sheet_ui.dart';
 
 /// The phone player's page while it isn't full screen, a "watch page" in the
@@ -24,8 +25,9 @@ import 'player_sheet_ui.dart';
 /// now-playing bars, the play glyphs) keeps fixed white.
 
 /// TMDB artwork at [size] ("w300", "w342", …), or null without a path.
-String? tmdbImage(String? path, String size) =>
-    path == null || path.isEmpty ? null : 'https://image.tmdb.org/t/p/$size$path';
+String? tmdbImage(String? path, String size) => path == null || path.isEmpty
+    ? null
+    : 'https://image.tmdb.org/t/p/$size$path';
 
 /// A soft card on the page: a shade of ink rather than a panel colour, so
 /// it reads the same on the black dark page and the light one.
@@ -649,10 +651,15 @@ class WatchUpNextCard extends StatelessWidget {
   final String title;
   final String? meta;
   final String? imageUrl;
-  final VoidCallback onPlay;
+  final FutureOr<void> Function() onPlay;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => PlaybackAction(
+        onStart: onPlay,
+        builder: (context, busy, start) => _buildCard(context, busy, start),
+      );
+
+  Widget _buildCard(BuildContext context, bool busy, VoidCallback start) {
     final colors = BetterPlayerPanelColors.of(context);
     final gutter = AppSpace.gutter(context);
     final meta = this.meta;
@@ -667,10 +674,12 @@ class WatchUpNextCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadii.hero),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              onPlay();
-            },
+            onTap: busy
+                ? null
+                : () {
+                    HapticFeedback.lightImpact();
+                    start();
+                  },
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Row(
@@ -724,11 +733,19 @@ class WatchUpNextCard extends StatelessWidget {
                       color: colors.pill,
                       shape: BoxShape.circle,
                     ),
-                    child: PlaybackIcon(
-                      PhosphorIcons.play(PhosphorIconsStyle.fill),
-                      size: 20,
-                      color: colors.onPill,
-                    ),
+                    child: busy
+                        ? Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: colors.onPill,
+                            ),
+                          )
+                        : PlaybackIcon(
+                            PhosphorIcons.play(PhosphorIconsStyle.fill),
+                            size: 20,
+                            color: colors.onPill,
+                          ),
                   ),
                 ],
               ),
@@ -771,16 +788,21 @@ class WatchEpisodeTile extends StatelessWidget {
 
   /// Along the bottom of the still on the episode playing.
   final Widget? progress;
-  final VoidCallback? onTap;
+  final FutureOr<void> Function()? onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => PlaybackAction(
+        onStart: () => onTap?.call(),
+        builder: (context, busy, start) => _buildTile(context, busy, start),
+      );
+
+  Widget _buildTile(BuildContext context, bool busy, VoidCallback start) {
     final colors = BetterPlayerPanelColors.of(context);
     final gutter = AppSpace.gutter(context);
     final meta = this.meta;
     final synopsis = this.synopsis;
     final progress = this.progress;
-    final tap = current || unaired ? null : onTap;
+    final tap = current || unaired || busy || onTap == null ? null : start;
     final kicker = current
         ? tr('player_now_playing')
         : upNext
@@ -813,6 +835,20 @@ class WatchEpisodeTile extends StatelessWidget {
                                 url: stillUrl,
                                 fallbackIcon: PhosphorIcons.filmStrip(),
                               ),
+                              if (busy)
+                                const Positioned.fill(
+                                  child: ColoredBox(
+                                    color: Color(0x66000000),
+                                    child: Center(
+                                      child: SizedBox.square(
+                                        dimension: 24,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               if (current)
                                 const DecoratedBox(
                                   decoration: BoxDecoration(
@@ -1188,8 +1224,7 @@ class WatchPosterGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final gutter = AppSpace.gutter(context);
-    final wide =
-        MediaQuery.sizeOf(context).width >= AppBreakpoints.tablet;
+    final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.tablet;
     return SliverPadding(
       padding: EdgeInsets.fromLTRB(gutter, AppSpace.xs, gutter, 0),
       sliver: SliverGrid.builder(

@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../catalog/media_item.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
+import '../../widgets/playback_action.dart';
 import '../my_list.dart';
 import '../playback.dart';
 import 'media_art.dart';
@@ -117,14 +118,22 @@ class _TitleSheet extends StatelessWidget {
                 children: <Widget>[
                   if (MobilePlayback.canPlay(context)) ...<Widget>[
                     Expanded(
-                      child: PillButton(
-                        primary: true,
-                        icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
-                        label: tr('play'),
-                        onPressed: () {
-                          close();
-                          MobilePlayback.play(host, item);
-                        },
+                      child: PlaybackAction(
+                        onStart: () =>
+                            MobilePlayback.play(host, item, onReady: () {
+                          if (!context.mounted) return false;
+                          final route = ModalRoute.of(context);
+                          if (route?.isCurrent != true) return false;
+                          Navigator.of(context).removeRoute(route!);
+                          return true;
+                        }),
+                        builder: (context, busy, start) => PillButton(
+                          primary: true,
+                          busy: busy,
+                          icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
+                          label: tr('play'),
+                          onPressed: start,
+                        ),
                       ),
                     ),
                     const SizedBox(width: AppSpace.sm),

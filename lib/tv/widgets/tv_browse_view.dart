@@ -47,7 +47,7 @@ class TvMediaRow extends TvBrowseRow {
   final bool showBadges;
 
   /// Replaces the view's `onOpenMedia` for this row's items.
-  final ValueChanged<TvMediaItem>? onItemActivated;
+  final FutureOr<void> Function(TvMediaItem item)? onItemActivated;
   final ValueChanged<TvMediaItem>? onItemMenu;
   final String? itemMenuHint;
 

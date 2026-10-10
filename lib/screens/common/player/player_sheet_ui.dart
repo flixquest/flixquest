@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../design/app_tokens.dart';
 import '../../../ui_components/app_ui_components.dart';
+import '../../../widgets/playback_action.dart';
 
 final Expando<ThemeData> _playerThemes = Expando<ThemeData>('playerTheme');
 final Expando<ThemeData> _videoThemes = Expando<ThemeData>('videoTheme');
@@ -215,7 +218,7 @@ class PlayerChoiceCard extends StatelessWidget {
   });
 
   final String title;
-  final VoidCallback? onTap;
+  final FutureOr<void> Function()? onTap;
   final Widget? thumbnail;
   final String? subtitle;
   final String? description;
@@ -228,17 +231,28 @@ class PlayerChoiceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final action = onTap;
+    if (action == null) return _buildCard(context, false, null);
+    return PlaybackAction(
+      onStart: action,
+      builder: (context, busy, start) =>
+          _buildCard(context, busy, busy ? null : start),
+    );
+  }
+
+  Widget _buildCard(BuildContext context, bool busy, VoidCallback? activate) {
     final colors = BetterPlayerPanelColors.of(context);
     final accent = Theme.of(context).colorScheme.primary;
     return Semantics(
       selected: selected,
       button: onTap != null,
+      enabled: onTap != null && !busy,
       child: Material(
         color: selected ? colors.selectedFill : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: onTap,
+          onTap: activate,
           child: Padding(
             padding: const EdgeInsetsDirectional.fromSTEB(10, 10, 12, 10),
             child: Row(
@@ -323,20 +337,29 @@ class PlayerChoiceCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                trailing ??
-                    (selected
-                        ? Icon(
-                            PhosphorIcons.check(PhosphorIconsStyle.bold),
-                            color: colors.foreground,
-                            size: 20,
-                          )
-                        : onTap == null
-                            ? const SizedBox.shrink()
-                            : Icon(
-                                PhosphorIcons.caretRight(),
-                                color: colors.muted,
-                                size: 18,
-                              )),
+                if (busy)
+                  SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: colors.foreground,
+                    ),
+                  )
+                else
+                  trailing ??
+                      (selected
+                          ? Icon(
+                              PhosphorIcons.check(PhosphorIconsStyle.bold),
+                              color: colors.foreground,
+                              size: 20,
+                            )
+                          : onTap == null
+                              ? const SizedBox.shrink()
+                              : Icon(
+                                  PhosphorIcons.caretRight(),
+                                  color: colors.muted,
+                                  size: 18,
+                                )),
               ],
             ),
           ),

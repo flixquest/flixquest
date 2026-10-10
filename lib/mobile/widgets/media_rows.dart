@@ -10,6 +10,7 @@ import '../../design/app_tokens.dart';
 import '../../design/media_badge.dart';
 import '../../design/top_ten_rank.dart';
 import '../../widgets/common_widgets.dart' show AppStreamingService;
+import '../../widgets/playback_action.dart';
 import '../playback.dart';
 import 'media_art.dart';
 import 'pill_button.dart';
@@ -179,6 +180,22 @@ class ContinueCard extends StatelessWidget {
     final accent = Theme.of(context).colorScheme.primary;
     final progress = (item.progress ?? 0).clamp(0.0, 1.0);
     final subtitle = continueSubtitle(item);
+    return PlaybackAction(
+      onStart: () => MobilePlayback.play(context, item),
+      builder: (context, busy, start) => _buildCard(
+        context,
+        palette,
+        accent,
+        progress,
+        subtitle,
+        busy,
+        start,
+      ),
+    );
+  }
+
+  Widget _buildCard(BuildContext context, AppPalette palette, Color accent,
+      double progress, String subtitle, bool busy, VoidCallback start) {
     return SizedBox(
       width: width,
       child: Column(
@@ -186,7 +203,7 @@ class ContinueCard extends StatelessWidget {
         children: <Widget>[
           Pressable(
             semanticLabel: '${item.title}, $subtitle',
-            onTap: () => MobilePlayback.play(context, item),
+            onTap: start,
             onLongPress: () => showContinueSheet(context, item),
             child: AspectRatio(
               aspectRatio: 16 / 9,
@@ -226,11 +243,19 @@ class ContinueCard extends StatelessWidget {
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(9),
-                          child: PlaybackIcon(
-                            PhosphorIcons.play(PhosphorIconsStyle.fill),
-                            size: 18,
-                            color: const Color(0xFFFFFFFF),
-                          ),
+                          child: busy
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : PlaybackIcon(
+                                  PhosphorIcons.play(PhosphorIconsStyle.fill),
+                                  size: 18,
+                                  color: const Color(0xFFFFFFFF),
+                                ),
                         ),
                       ),
                     ),

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome version of assets/images/fq_svg.svg, centered in a 24 dp icon. -->
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="531.6"
+    android:viewportHeight="531.6">
+
+    <group
+        android:translateX="121.3"
+        android:translateY="44.3">
+
+        <path
+            android:fillColor="#FFFFFF"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="20"
+            android:strokeLineJoin="round"
+            android:pathData="M16,123.8 L200,17.5 L263.1,54 L16,196.7 Z" />
+
+        <path
+            android:fillColor="#FFFFFF"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="20"
+            android:strokeLineJoin="round"
+            android:pathData="M16,255.8 L162,171.5 L225.1,207.9 L16,328.7 Z" />
+
+        <path
+            android:fillColor="#FFFFFF"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="20"
+            android:strokeLineJoin="round"
+            android:pathData="M26,380 L94,340.7 L94,419.3 Z" />
+
+    </group>
+</vector>

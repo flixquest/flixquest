@@ -16,6 +16,7 @@ import androidx.media3.exoplayer.offline.DownloadService
 import androidx.media3.exoplayer.scheduler.Scheduler
 import androidx.media3.exoplayer.scheduler.PlatformScheduler
 import dev.beamlak.flixquest_v2.MainActivity
+import dev.beamlak.flixquest_v2.R
 import java.util.Locale
 
 @UnstableApi
@@ -68,7 +69,7 @@ class StreamDownloadService : DownloadService(
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(heading)
             .setContentText(details)
             .setStyle(NotificationCompat.BigTextStyle().bigText(details))

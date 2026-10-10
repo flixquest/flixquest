@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../../widgets/playback_action.dart';
 
 import '../app/tv_design.dart';
 import '../focus/tv_focusable.dart';
@@ -27,7 +31,7 @@ class TvPillButton extends StatefulWidget {
 
   final String label;
   final IconData? icon;
-  final VoidCallback onActivate;
+  final FutureOr<void> Function() onActivate;
   final FocusNode? focusNode;
   final bool autofocus;
   final bool enabled;
@@ -48,7 +52,12 @@ class _TvPillButtonState extends State<TvPillButton> {
   bool _focused = false;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => PlaybackAction(
+        onStart: widget.onActivate,
+        builder: (context, busy, start) => _buildButton(context, busy, start),
+      );
+
+  Widget _buildButton(BuildContext context, bool busy, VoidCallback start) {
     final palette = TvPalette.of(context);
     final foreground = !widget.enabled
         ? palette.mutedText.withValues(alpha: 0.5)
@@ -61,7 +70,7 @@ class _TvPillButtonState extends State<TvPillButton> {
       semanticLabel: widget.semanticLabel ?? widget.label,
       autofocus: widget.autofocus,
       enabled: widget.enabled,
-      onActivate: widget.onActivate,
+      onActivate: busy ? () {} : start,
       onFocusChanged: (hasFocus) {
         widget.onFocusChanged?.call(hasFocus);
         if (hasFocus != _focused) setState(() => _focused = hasFocus);
@@ -85,8 +94,17 @@ class _TvPillButtonState extends State<TvPillButton> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            if (icon != null) ...<Widget>[
-              Icon(icon, color: foreground, size: 20),
+            if (busy || icon != null) ...<Widget>[
+              if (busy)
+                SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: foreground,
+                  ),
+                )
+              else
+                Icon(icon, color: foreground, size: 20),
               const SizedBox(width: 8),
             ],
             Text(

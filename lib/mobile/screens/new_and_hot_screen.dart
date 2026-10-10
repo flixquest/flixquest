@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
+import '../../widgets/playback_action.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
@@ -435,11 +436,15 @@ class _WatchingCard extends StatelessWidget {
             runSpacing: AppSpace.sm,
             children: <Widget>[
               if (MobilePlayback.canPlay(context))
-                PillButton(
-                  label: tr('play'),
-                  icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
-                  primary: true,
-                  onPressed: () => MobilePlayback.play(context, item),
+                PlaybackAction(
+                  onStart: () => MobilePlayback.play(context, item),
+                  builder: (context, busy, start) => PillButton(
+                    label: tr('play'),
+                    icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
+                    primary: true,
+                    busy: busy,
+                    onPressed: start,
+                  ),
                 ),
               _MyListButton(item: item),
             ],

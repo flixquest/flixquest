@@ -14,6 +14,7 @@ import '../../models/tv.dart';
 import '../../provider/recently_watched_provider.dart';
 import '../../screens/tv/tv_episode_picker_sheet.dart';
 import '../../screens/tv/tv_video_loader.dart';
+import '../../widgets/playback_action.dart';
 import '../playback.dart';
 import 'media_art.dart';
 import 'pill_button.dart';
@@ -102,16 +103,18 @@ class _ContinueSheet extends StatelessWidget {
       series: item.series ?? TV(id: item.id, name: item.title),
     );
     if (picked == null || !host.mounted) return;
-    if (!await checkConnection() || !host.mounted) return;
-    if (!await AdsterraPlaybackAdsService.instance.beforeLoader(host) ||
-        !host.mounted) {
-      return;
-    }
-    await Navigator.of(host).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => TVVideoLoader(download: false, metadata: picked),
-      ),
-    );
+    await PlaybackAction.run(host, () async {
+      if (!await checkConnection() || !host.mounted) return;
+      if (!await AdsterraPlaybackAdsService.instance.beforeLoader(host) ||
+          !host.mounted) {
+        return;
+      }
+      await Navigator.of(host).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => TVVideoLoader(download: false, metadata: picked),
+        ),
+      );
+    });
   }
 
   @override
@@ -204,14 +207,21 @@ class _ContinueSheet extends StatelessWidget {
             if (canPlay)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: PillButton(
-                  primary: true,
-                  icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
-                  label: continueAction(item),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    MobilePlayback.play(host, item);
-                  },
+                child: PlaybackAction(
+                  onStart: () => MobilePlayback.play(host, item, onReady: () {
+                    if (!context.mounted) return false;
+                    final route = ModalRoute.of(context);
+                    if (route?.isCurrent != true) return false;
+                    Navigator.of(context).removeRoute(route!);
+                    return true;
+                  }),
+                  builder: (context, busy, start) => PillButton(
+                    primary: true,
+                    busy: busy,
+                    icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
+                    label: continueAction(item),
+                    onPressed: start,
+                  ),
                 ),
               ),
             if (item.kind == MediaKind.series && canPlay)

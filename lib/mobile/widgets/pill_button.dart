@@ -56,7 +56,7 @@ class PillButton extends StatelessWidget {
     final icon = this.icon;
     return Semantics(
       button: true,
-      enabled: onPressed != null,
+      enabled: onPressed != null && !busy,
       // Unavailable reads as such, without changing the button's shape.
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 160),
