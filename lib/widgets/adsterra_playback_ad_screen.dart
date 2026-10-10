@@ -319,12 +319,18 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   /// Until then its own redirects may navigate the script WebView.
   bool _hostedPageLoaded = false;
   bool _automaticMonetagInstalled = false;
-  bool _automaticMonetagAttempted = false;
+  bool _automaticContinueAttempted = false;
+  bool _waitingForAutomaticPopup = false;
+  bool _tagScriptLoaded = false;
 
-  bool get _automaticMonetag =>
-      widget.placement.network == AdNetwork.monetag &&
+  bool get _automaticContinue =>
+      const {AdNetwork.clickadu, AdNetwork.monetag}
+          .contains(widget.placement.network) &&
       widget.stage == PlaybackAdStage.streamFound &&
       !widget.placement.isSmartlink;
+
+  bool get _automaticMonetag =>
+      widget.placement.network == AdNetwork.monetag && _automaticContinue;
 
   // The Social Bar page keeps an immediate close. Every other surface waits
   // for its ad to be seen, or for the placement's fallback.
@@ -347,8 +353,6 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     } else {
       // The tag page's own Play button leads on; Skip is the fallback.
       if (widget.stage == PlaybackAdStage.streamFound) _holdClose();
-      _loadTimer =
-          Timer(widget.placement.loadTimeout, () => _finish('load_timeout'));
       unawaited(_loadScript());
     }
   }
@@ -363,6 +367,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   }
 
   Future<void> _loadScript() async {
+    final setupTime = Stopwatch()..start();
     try {
       final hostedPage = widget.placement.pageUrl;
       _log(hostedPage != null
@@ -379,8 +384,12 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           _log('script console ${message.level.name}: ${message.message}'));
       await controller.setNavigationDelegate(NavigationDelegate(
         onNavigationRequest: _onScriptNavigation,
-        onPageStarted: (url) => _log('script document started ${_origin(url)}'),
+        onPageStarted: (url) {
+          if (!mounted || _finished) return;
+          _log('script document started ${_origin(url)}');
+        },
         onPageFinished: (url) {
+          if (!mounted || _finished) return;
           _log('script document finished ${_origin(url)}');
           if (Uri.tryParse(url)?.host == hostedPage?.host) {
             _hostedPageLoaded = true;
@@ -401,6 +410,13 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       ));
       if (!mounted || _finished) return;
       setState(() {});
+      _log('requesting tag document after ${setupTime.elapsedMilliseconds}ms '
+          'of WebView setup; load timeout starts now');
+      _loadTimer = Timer(widget.placement.loadTimeout, () {
+        _log('tag load timed out: scriptLoaded=$_tagScriptLoaded '
+            'waitingForAdRequest=${widget.placement.network == AdNetwork.clickadu && _tagScriptLoaded}');
+        _finish('load_timeout');
+      });
       if (hostedPage != null) {
         await controller.loadRequest(hostedPage);
       } else {
@@ -434,17 +450,19 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     }
   }
 
-  Future<void> _tapMonetagContinue() async {
+  Future<void> _tapAutomaticContinue() async {
     final controller = _script;
-    if (!_automaticMonetag ||
-        _automaticMonetagAttempted ||
+    if (!_automaticContinue ||
+        _automaticContinueAttempted ||
         controller == null ||
         !mounted ||
         _finished ||
         _page != null) {
       return;
     }
-    _automaticMonetagAttempted = true;
+    _automaticContinueAttempted = true;
+    _waitingForAutomaticPopup = true;
+    final network = widget.placement.network.name;
     final document = widget.placement.pageUrl ??
         Uri.parse(NetworkBannerWidget.documentBaseUrl);
     var tapped = false;
@@ -452,13 +470,13 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       tapped = await (widget.continueTap ?? tapPlaybackContinue)(
           controller, document);
     } catch (error) {
-      _log('native Monetag touch unavailable ($error)');
+      _log('native $network touch unavailable ($error)');
     }
     if (!mounted || _finished || _page != null) return;
     if (tapped) {
-      _log('Monetag Continue tapped automatically via Android WebView; '
+      _log('$network Continue tapped automatically via Android WebView; '
           'waiting for its URL');
-    } else {
+    } else if (_automaticMonetag) {
       _log('native Monetag touch unavailable; trying the tag trigger once');
       try {
         await controller.runJavaScript(monetagTriggerPlaybackScript);
@@ -466,6 +484,9 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         _log('Monetag trigger unavailable ($error)');
         _finish('automatic_activation_error');
       }
+    } else {
+      _waitingForAutomaticPopup = false;
+      _log('native $network touch unavailable; Continue remains available');
     }
   }
 
@@ -481,7 +502,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
               'script failure: ${payload['detail'] ?? 'script or page error'}');
           _finish('script_failed');
         case 'done':
-          if (_automaticMonetag && _automaticMonetagAttempted) {
+          if (_waitingForAutomaticPopup) {
             // The hosted button reports done after 750 ms. Keep its tag
             // alive for a delayed popup, bounded by the existing load timer.
             _log('Continue callback received; waiting for the popup URL');
@@ -489,33 +510,39 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
             _finish('continue_control');
           }
         case 'script':
+          _tagScriptLoaded = true;
           _log('tag script loaded; waiting for the tag to fetch its ad');
         case 'request':
           // The tag's own requests, to see where it stops before arming.
           _log('tag request ${payload['url']} ${payload['detail']}');
         case 'loaded':
-          // A loaded script is not proof of an impression. Monetag starts
-          // automatically once its options request finishes; the other tags
-          // wait for the viewer's Continue tap.
-          if (_automaticMonetag) {
+          _tagScriptLoaded = true;
+          // A loaded script is not proof of an impression. Clickadu sends
+          // loaded after its ad request; Monetag checks its options separately.
+          if (_automaticContinue && !_automaticContinueAttempted) {
             // Give the tag's asynchronous offer request its own load window,
             // just as advertiser redirects reset the page's load window.
             _loadTimer?.cancel();
             _loadTimer = Timer(widget.placement.loadTimeout,
                 () => _finish('automatic_popup_timeout'));
-          } else if (widget.stage == PlaybackAdStage.streamFound) {
+          } else if (!_automaticContinue &&
+              widget.stage == PlaybackAdStage.streamFound) {
             _loadTimer?.cancel();
           }
           final script = _script;
           if (script != null) unawaited(_activateMonetag(script));
+          if (_automaticContinue &&
+              widget.placement.network == AdNetwork.clickadu) {
+            unawaited(_tapAutomaticContinue());
+          }
           _log(widget.placement.network == AdNetwork.clickadu
-              ? 'tag fetched its ad; Continue enabled'
+              ? 'tag fetched its ad; attempting automatic Continue'
               : 'script loaded');
         case 'activated':
           _log('Monetag popup triggered automatically; waiting for its URL');
         case 'activation_ready':
           _log('Monetag tag ready; attempting one automatic Continue touch');
-          unawaited(_tapMonetagContinue());
+          if (_automaticMonetag) unawaited(_tapAutomaticContinue());
         case 'input':
           _log('Monetag Continue input trusted=${payload['trusted']} '
               'userActivation=${payload['active']}');
@@ -628,8 +655,6 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     }
     _page = page;
     _loadTimer?.cancel();
-    _loadTimer =
-        Timer(widget.placement.loadTimeout, () => _finish('page_load_timeout'));
     // The ad page starts its own wait, whatever the tag page allowed.
     _pageReady = false;
     _revealed = false;
@@ -692,6 +717,8 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       if (!mounted || _finished) return;
       setState(() => _phase = _Phase.page);
       if (preload == null) {
+        _loadTimer = Timer(
+            widget.placement.loadTimeout, () => _finish('page_load_timeout'));
         await page.loadRequest(uri);
       } else {
         final pendingTimer = preload.attach(delegate,
@@ -1523,9 +1550,9 @@ const monetagTriggerPlaybackScript = r'''
 
 /// Reports rendering only
 /// when a creative occupies visible space. The Continue control is a real DOM
-/// button that stays disabled until the Popunder tag has loaded, so the
-/// viewer's tap is the gesture the tag opens its popup from. Nothing clicks it
-/// programmatically. Its tap is caught on the window in the capture phase,
+/// button that stays disabled until the Popunder tag is ready. Clickadu and
+/// Monetag use one native Android touch to activate it automatically. Its
+/// click is caught on the window in the capture phase,
 /// registered before the tag, so a tag that stops the click cannot leave
 /// Continue dead. Defer the head script so document.body and the controls
 /// exist when it runs.

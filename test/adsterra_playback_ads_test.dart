@@ -1329,6 +1329,86 @@ void main() {
       ..setPopunderAdsConfig(parseClickadu(clickadu, enabled: true))
       ..setPlaybackPopunderNetwork(AdNetwork.clickadu);
 
+    testWidgets('cold WebView setup does not consume the tag loading budget',
+        (tester) async {
+      final setup = Completer<void>();
+      platform.setupGate = setup;
+      var taps = 0;
+      service = AdsterraPlaybackAdsService(continueTap: (_, __) async {
+        taps++;
+        return true;
+      });
+      selectClickadu();
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      await tester.pump(const Duration(seconds: 11));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      expect(opener.htmlLoads, isEmpty);
+      expect(taps, 0);
+      setup.complete();
+      await tester.pump();
+      await tester.pump();
+      expect(opener.htmlLoads, hasLength(1));
+      await tester.pump(const Duration(seconds: 9));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      opener.send('{"event":"script"}');
+      opener.send('{"event":"loaded"}');
+      await tester.pump();
+      expect(taps, 1);
+      await opener.delegate!.onNavigationRequest!(NavigationRequest(
+          url: 'https://clickadu.example/offer', isMainFrame: true));
+      await tester.pump();
+      await tester.pump();
+      final page = platform.controllers.last;
+      expect(page.requests, [Uri.parse('https://clickadu.example/offer')]);
+      page.delegate!.onPageFinished!('https://advertiser.example/');
+      await tester.pump();
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }, variant: android);
+
+    testWidgets('an ad closed during WebView setup never loads the tag later',
+        (tester) async {
+      final setup = Completer<void>();
+      platform.setupGate = setup;
+      selectClickadu();
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      await tester.pump(closeFallback);
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+      setup.complete();
+      await tester.pump();
+      await tester.pump();
+      expect(opener.htmlLoads, isEmpty);
+      expect(platform.controllers, hasLength(1));
+    }, variant: android);
+
+    testWidgets('stalled WebView setup is bounded by the screen duration',
+        (tester) async {
+      final setup = Completer<void>();
+      platform.setupGate = setup;
+      selectClickadu();
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+      setup.complete();
+      await tester.pump();
+      await tester.pump();
+      expect(opener.htmlLoads, isEmpty);
+    }, variant: android);
+
     test('the published catalog runs the onclick tag for zone 2150355', () {
       final config = parseClickadu(clickadu, enabled: true);
       final popunder = config.activePopunder!;
@@ -1422,8 +1502,87 @@ void main() {
       expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
     }, variant: android);
 
-    testWidgets('an armed tag waits for the viewer past the load timeout',
+    testWidgets('one automatic touch opens a delayed popup after the tag arms',
         (tester) async {
+      var taps = 0;
+      service =
+          AdsterraPlaybackAdsService(continueTap: (controller, document) async {
+        taps++;
+        expect(controller.platform, same(platform.controllers.single));
+        expect(document,
+            Uri.parse('https://appassets.androidplatform.net/adsterra/'));
+        return true;
+      });
+      selectClickadu();
+      await pumpHost(tester);
+      expect(service.preloadStreamFound(host), isNull);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      opener.send('{"event":"script"}');
+      opener.delegate!
+          .onPageFinished!('https://appassets.androidplatform.net/adsterra/');
+      await tester.pump();
+      expect(taps, 0);
+      opener.send('{"event":"loaded"}');
+      opener.send('{"event":"loaded"}');
+      await tester.pump();
+      expect(taps, 1);
+      expect(opener.evaluatedScripts, isEmpty);
+      opener.send('{"event":"done"}');
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      expect(opener.javaScriptMode, JavaScriptMode.unrestricted);
+      await opener.delegate!.onNavigationRequest!(NavigationRequest(
+          url: 'https://clickadu.example/delayed', isMainFrame: true));
+      await tester.pump();
+      await tester.pump();
+      final page = platform.controllers.last;
+      expect(page.requests, [Uri.parse('https://clickadu.example/delayed')]);
+      expect(opener.javaScriptMode, JavaScriptMode.disabled);
+      page.delegate!.onPageFinished!('https://advertiser.example/');
+      await tester.pump();
+      expect(find.byTooltip('Close ad'), findsNothing);
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+      expect(taps, 1);
+    }, variant: android);
+
+    testWidgets('an automatic touch without a popup has a bounded wait',
+        (tester) async {
+      var taps = 0;
+      service = AdsterraPlaybackAdsService(continueTap: (_, __) async {
+        taps++;
+        return true;
+      });
+      selectClickadu();
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      opener.send('{"event":"loaded"}');
+      await tester.pump(const Duration(seconds: 4));
+      opener.send('{"event":"loaded"}');
+      opener.send('{"event":"done"}');
+      await tester.pump(const Duration(seconds: 5));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+      expect(taps, 1);
+      expect(opener.javaScriptMode, JavaScriptMode.disabled);
+      expect(platform.controllers, hasLength(1));
+    }, variant: android);
+
+    testWidgets('unavailable native input retains manual Continue',
+        (tester) async {
+      var taps = 0;
+      service = AdsterraPlaybackAdsService(continueTap: (_, __) async {
+        taps++;
+        return false;
+      });
       selectClickadu();
       await pumpHost(tester);
       final result = service.streamFound(host);
@@ -1431,9 +1590,69 @@ void main() {
       final opener = platform.controllers.single
         ..send('{"event":"script"}')
         ..send('{"event":"loaded"}');
-      await tester.pump(const Duration(seconds: 12));
+      await tester.pump();
+      expect(taps, 1);
+      expect(opener.evaluatedScripts, isEmpty);
+      await tester.pump(const Duration(seconds: 2));
       expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
       opener.send('{"event":"done"}');
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }, variant: android);
+
+    testWidgets('disabling during native input prevents a late popup',
+        (tester) async {
+      final input = Completer<bool>();
+      service =
+          AdsterraPlaybackAdsService(continueTap: (_, __) => input.future);
+      selectClickadu();
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      opener.send('{"event":"loaded"}');
+      await tester.pump();
+      provider.setPopunderAdsConfig(parseClickadu(clickadu, enabled: false));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+      expect(opener.javaScriptMode, JavaScriptMode.disabled);
+      input.complete(true);
+      opener.send('{"event":"loaded"}');
+      await tester.pump();
+      expect(opener.evaluatedScripts, isEmpty);
+      expect(platform.controllers, hasLength(1));
+    }, variant: android);
+
+    testWidgets('a TV tag also opens with one automatic native touch',
+        (tester) async {
+      final tv = jsonDecode(clickadu) as Map<String, dynamic>;
+      tv['tv_popunder'] = tv.remove('popunder');
+      provider
+        ..setPopunderAdsConfig(parseClickadu(jsonEncode(tv), enabled: true))
+        ..setPlaybackPopunderNetwork(AdNetwork.clickadu);
+      var taps = 0;
+      service = AdsterraPlaybackAdsService(continueTap: (_, __) async {
+        taps++;
+        return true;
+      });
+      await pumpHost(tester);
+      final result = service.streamFound(host, television: true);
+      await pumpAd(tester);
+      final opener = platform.controllers.single;
+      expect(opener.htmlLoads.single, contains('data-clocid="2150355"'));
+      opener.send('{"event":"loaded"}');
+      await tester.pump();
+      expect(taps, 1);
+      await opener.delegate!.onNavigationRequest!(NavigationRequest(
+          url: 'https://clickadu.example/tv', isMainFrame: true));
+      await tester.pump();
+      await tester.pump();
+      final page = platform.controllers.last;
+      expect(page.requests, [Uri.parse('https://clickadu.example/tv')]);
+      page.delegate!.onPageFinished!('https://advertiser.example/');
+      await tester.pump();
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+      await tester.tap(find.byTooltip('Close ad'));
       await tester.pumpAndSettle();
       expect(await result, isTrue);
     }, variant: android);
@@ -1469,7 +1688,7 @@ void main() {
       await pumpAd(tester);
       final opener = platform.controllers.single;
       expect(opener.htmlLoads.single, contains('data-clocid="2150355"'));
-      // The tag opens its window from the viewer's tap on Continue.
+      // A URL returned by the tag is shown in the same ad page.
       expect(
           await opener.delegate!.onNavigationRequest!(NavigationRequest(
               url: 'https://driverhugoverblown.com/click', isMainFrame: true)),
@@ -1535,6 +1754,32 @@ void main() {
     void selectExoclick() => provider
       ..setPopunderAdsConfig(parseExoclick(exoclick))
       ..setPlaybackPopunderNetwork(AdNetwork.exoclick);
+
+    testWidgets('a direct link gets its full loading budget after cold setup',
+        (tester) async {
+      final setup = Completer<void>();
+      platform.setupGate = setup;
+      selectExoclick();
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final page = platform.controllers.single;
+      await tester.pump(const Duration(seconds: 11));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      expect(page.requests, isEmpty);
+      setup.complete();
+      await tester.pump();
+      await tester.pump();
+      expect(page.requests, [redirect]);
+      await tester.pump(const Duration(seconds: 9));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      page.delegate!.onPageFinished!('https://advertiser.example/');
+      await tester.pump();
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }, variant: android);
 
     test('the catalog uses the generated redirect on mobile and TV', () {
       final config = parseExoclick(exoclick);

@@ -56,6 +56,11 @@ class _FlixQuestState extends State<FlixQuest>
   Future<void> _initConfig() async {
     try {
       await AppRemoteConfig.configure(_remoteConfig);
+      await _remoteConfig.ensureInitialized();
+      if (!mounted) return;
+      // A slow fetch must not leave playback using the disabled defaults
+      // while the last activated settings are already stored on the device.
+      AppRemoteConfig.apply(_remoteConfig, widget.appDependencyProvider);
       await _fetchConfig();
     } catch (error) {
       if (kDebugMode) {

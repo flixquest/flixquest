@@ -62,6 +62,71 @@ class ContinueButtonTouchTest {
         assertTrue(web.actions.isEmpty())
     }
 
+    @Test fun inlineTagWithBlankNativeUrlReceivesOneTouch() {
+        val web = attachedWebView()
+        val inline = "https://appassets.androidplatform.net/adsterra/"
+        web.currentUrl = "about:blank"
+        web.currentOriginalUrl = "data:text/html;charset=utf-8;base64,"
+        web.buttonLocation = JSONObject.quote("""{"url":"$inline","x":0.5,"y":0.5}""")
+        val touch = ContinueButtonTouch()
+        var result: Boolean? = null
+        touch.tap(web, inline) { result = it }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(80))
+        assertTrue(result == true)
+        assertEquals(listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP), web.actions)
+        touch.tap(web, inline) { result = it }
+        assertFalse(result == true)
+        assertEquals(2, web.actions.size)
+    }
+
+    @Test fun blankNativeUrlDoesNotAcceptAnAdvertiserOrUnverifiedDocument() {
+        val web = attachedWebView()
+        val inline = "https://appassets.androidplatform.net/adsterra/"
+        web.currentUrl = "about:blank"
+        web.currentOriginalUrl = "data:text/html;charset=utf-8;base64,"
+        var result = true
+        ContinueButtonTouch().tap(web, document) { result = it }
+        assertFalse(result)
+        assertEquals(0, web.lookupCount)
+        web.buttonLocation = JSONObject.quote("""{"url":"https://advertiser.example/offer","x":0.5,"y":0.5}""")
+        ContinueButtonTouch().tap(web, inline) { result = it }
+        assertFalse(result)
+        assertTrue(web.actions.isEmpty())
+        web.currentOriginalUrl = "about:blank"
+        web.buttonLocation = JSONObject.quote("""{"url":"$inline","x":0.5,"y":0.5}""")
+        ContinueButtonTouch().tap(web, inline) { result = it }
+        assertFalse(result)
+        assertTrue(web.actions.isEmpty())
+    }
+
+    @Test fun replacingInlineDocumentWithBlankPageCancelsTheRelease() {
+        val web = attachedWebView()
+        val inline = "https://appassets.androidplatform.net/adsterra/"
+        web.currentUrl = "about:blank"
+        web.currentOriginalUrl = "data:text/html;charset=utf-8;base64,"
+        web.buttonLocation = JSONObject.quote("""{"url":"$inline","x":0.5,"y":0.5}""")
+        var result = true
+        ContinueButtonTouch().tap(web, inline) { result = it }
+        // getUrl stays about:blank, but this is now a different document.
+        web.currentOriginalUrl = "about:blank"
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(80))
+        assertFalse(result)
+        assertEquals(listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_CANCEL), web.actions)
+    }
+
+    @Test fun replacingInlineDocumentDuringLookupReceivesNoTouch() {
+        val web = attachedWebView()
+        val inline = "https://appassets.androidplatform.net/adsterra/"
+        web.currentUrl = "about:blank"
+        web.currentOriginalUrl = "data:text/html;charset=utf-8;base64,"
+        web.buttonLocation = JSONObject.quote("""{"url":"$inline","x":0.5,"y":0.5}""")
+        web.beforeLookup = { web.currentOriginalUrl = "about:blank" }
+        var result = true
+        ContinueButtonTouch().tap(web, inline) { result = it }
+        assertFalse(result)
+        assertTrue(web.actions.isEmpty())
+    }
+
     @Test fun changedDocumentDuringButtonLookupReceivesNoTouch() {
         val web = attachedWebView()
         web.beforeLookup = { web.currentUrl = "https://flix.quest/other" }
@@ -108,12 +173,14 @@ class ContinueButtonTouchTest {
 
     private class RecordingWebView(context: Context) : WebView(context) {
         var currentUrl: String? = null
+        var currentOriginalUrl: String? = null
         var buttonLocation = "null"
         var beforeLookup: (() -> Unit)? = null
         var lookupCount = 0
         val actions = mutableListOf<Int>()
         val sources = mutableListOf<Int>()
         override fun getUrl(): String? = currentUrl
+        override fun getOriginalUrl(): String? = currentOriginalUrl
         override fun evaluateJavascript(script: String, callback: ValueCallback<String>?) {
             lookupCount++
             beforeLookup?.invoke()

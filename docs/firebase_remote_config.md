@@ -4,6 +4,11 @@ This file documents the Remote Config values used by the feature toggles and by
 the occasional-theme system. The theme catalog is intentionally one JSON string
 so a single publish activates a consistent catalog on every client.
 
+At startup, the app loads and applies Firebase's last activated values before
+refreshing them over the network. A slow refresh therefore keeps the cached ad
+selection usable for the first playback attempt. A fresh install still uses
+the disabled ad defaults until its first successful fetch.
+
 ## Feature toggles
 
 | Parameter | Firebase type | Default | Purpose |
@@ -670,12 +675,12 @@ Per-stage fields:
 
 ### Playback ads on Android TV
 
-A remote cannot give the touch that Adsterra's Popunder and Clickadu's onclick
-tags open their popup from. TV therefore uses its own placement in each popup
+A remote cannot give the touch that Adsterra's Popunder opens its popup from.
+TV therefore uses its own placement in each popup
 catalog, `tv_popunder`, with the same fields as `popunder`. Only formats that
 open without a touch are accepted: `mode: "smartlink"` (Adsterra Smartlink, a
-Clickadu or Monetag Direct Link) or Monetag's tag (`page` or `script`), which
-FlixQuest starts itself. Any other `tv_popunder` is ignored. Without one, TV
+Clickadu or Monetag Direct Link), or Clickadu's and Monetag's tags (`page` or
+`script`), which FlixQuest starts itself on Android. Any other `tv_popunder` is ignored. Without one, TV
 shows no popup; the selected `playback_popunder_network` still decides which
 catalog is read. The Social Bar and the experiment never run on TV.
 
@@ -688,8 +693,8 @@ catalog is read. The Social Bar and the experiment never run on TV.
 
 The supplied Adsterra catalog has a `tv_popunder` with its Smartlink and
 `sub_id` `fqsmarttvv1`, so TV traffic reports separately. The Monetag catalog
-reuses its hosted page. The Clickadu catalog has none: ask your Clickadu
-manager for a Direct Link and add it as above.
+reuses its hosted page. The Clickadu catalog has none: add a `tv_popunder` with
+its zoned tag or a Direct Link from your Clickadu manager to enable it on TV.
 
 On TV the ad page uses larger type and overscan margins. The remote stays on
 FlixQuest's controls: the arrows never move into the page, OK before the way
@@ -784,15 +789,37 @@ into `clickadu_playback_ads`, publish `clickadu_playback_enabled=true`, then set
 `playback_popunder_network=clickadu`. Switching back is just
 `playback_popunder_network=adsterra`.
 
-The supplied catalog runs Clickadu's onclick tag (zone 2150355) like the
-Adsterra Popunder script above. The page shows **Play now**. Unlike
-Adsterra's, it stays disabled until the tag has fetched its ad (its `/adx/get/`
-request), usually 1–3 seconds after the script loads: a tap before that opens
-nothing. If the tag hasn't fetched an ad within `load_timeout_ms`, playback
-continues without one. The viewer's tap lets the tag open its window, and the app
-loads that URL in the ad page, with the same held **Play now** and redirect
-handling as the Smartlink. It never opens an external browser. A tap that
-opens nothing continues to the player after 750 ms.
+The supplied catalog runs Clickadu's onclick tag (zone 2150355). On Android,
+the app activates Continue automatically once the tag's `/adx/get/` request
+finishes and its initialization grace period ends. Loading `on.js` alone does
+not trigger it. The existing native input bridge sends one touch to the enabled
+`fq-continue` button in the original tag document; it never taps an advertiser
+link. A returned popup loads in the app's ad page, with the same held **Play
+now** and redirect handling as the Smartlink.
+
+Android can report `about:blank` as the native URL for this inline document,
+even though JavaScript sees its HTTPS base URL. The input bridge verifies that
+base URL and the original inline document before sending the touch. Rebuild
+and reinstall the app for this Kotlin change; hot restart cannot update an
+installed native bridge. Logs include `PlaybackAdInput` rejection reasons or
+`Continue touch sent: accepted=true inline=true` when the touch is dispatched.
+
+The tag starts when this screen is shown. Only Clickadu Direct Links can be
+preloaded. If the tag never becomes ready, or the automatic touch opens no
+ad within `load_timeout_ms`, playback continues without one. Duplicate
+readiness signals cannot trigger a second touch or extend that waiting period.
+Closing the screen disables the tag and prevents late activation. When native
+input is unavailable, including on iOS, the enabled **Play now** button remains
+available for a manual tap; it continues after 750 ms if no popup opens.
+Use a provider-issued Direct Link in `smartlink` mode for automatic opening on
+both Android and iOS.
+
+The tag's loading window starts when the document is requested, after native
+WebView setup. Cold WebView initialization no longer consumes
+`load_timeout_ms`; `max_duration_seconds` still bounds the entire screen,
+including setup. Direct-link pages use the same timing rule. Timeout logs
+include `scriptLoaded` and `waitingForAdRequest`, distinguishing an unloaded
+`on.js` from a loaded tag whose ad request has not completed.
 
 `popunder` takes the per-stage fields above, with two differences:
 
@@ -899,11 +926,11 @@ attempt: its advertiser URL may arrive later. If native input is unavailable
 (including iOS), the app invokes `onClickTrigger` once as a fallback. Missing
 controls, a stalled tag or an activation that emits no URL is bounded by
 `load_timeout_ms`. An options response with HTTP 204 still continues playback
-immediately. Other networks retain their existing activation behavior.
+immediately.
 
 Rebuild and reinstall the Android app for this native bridge; hot reload or
 hot restart alone cannot add it to an already installed build. Debug logs
-report `Monetag Continue tapped automatically via Android WebView`, and the
+report `monetag Continue tapped automatically via Android WebView`, and the
 page reports `Monetag Continue input trusted=true userActivation=true` when
 its click listener receives the input. Live delivery requires a device test.
 

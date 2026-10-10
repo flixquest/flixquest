@@ -125,7 +125,7 @@ class PlaybackAdPlacement {
   /// A page FlixQuest hosts with the network's tags, such as
   /// `https://flix.quest/a/...`, so they run on the site their zone is
   /// registered to. It supplies the same signals as the page the app builds
-  /// for [scriptUrl]; Monetag's stream-found tag is activated automatically.
+  /// for [scriptUrl]; Clickadu and Monetag are activated automatically on Android.
   final Uri? pageUrl;
 
   String get mode => isSmartlink
@@ -147,10 +147,12 @@ class PlaybackAdPlacement {
   /// 15 seconds.
   final Duration closeFallback;
 
-  /// Opens with no tap in the page: a Smartlink or Direct Link, or Monetag's
-  /// tag, which FlixQuest starts itself. The other tags open their popup only
-  /// from a touch, which a TV remote cannot give.
-  bool get playsWithoutTouch => isSmartlink || network == AdNetwork.monetag;
+  /// Opens without a viewer tap: a direct link, or a Clickadu/Monetag tag
+  /// started by FlixQuest. Android TV uses the same native Continue touch.
+  bool get playsWithoutTouch =>
+      isSmartlink ||
+      network == AdNetwork.monetag ||
+      network == AdNetwork.clickadu;
 
   Uri? get trackedSmartlinkUrl => smartlinkUrl == null || subId == null
       ? smartlinkUrl
