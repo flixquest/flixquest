@@ -111,8 +111,10 @@ Future<DevicePresentation> appInitialize({
   // matches the binary instead of a hardcoded string that drifts.
   currentAppVersion = (await PackageInfo.fromPlatform()).version;
   sharedPrefsSingleton = await SharedPreferencesSingleton.getInstance();
+  await settingsProvider.getCurrentAppMode();
   DevicePresentationService.instance.isTelevision =
-      devicePresentation == DevicePresentation.television;
+      settingsProvider.appMode.resolve(devicePresentation) ==
+          DevicePresentation.television;
   await clearVideoPlaybackCache();
   FirebaseMessaging.onBackgroundMessage(_messageHandler);
   await FlutterDownloader.initialize(debug: true, ignoreSsl: true);

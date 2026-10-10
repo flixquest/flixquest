@@ -122,12 +122,17 @@ class AdsterraPlaybackAdScreen extends StatefulWidget {
       this.television = false,
       this.preload,
       this.continueTap,
+      this.onAdShown,
       super.key});
   final PlaybackAdPlacement placement;
   final PlaybackAdStage stage;
   final StoreLauncher? storeLauncher;
   final PlaybackAdPreload? preload;
   final PlaybackContinueTap? continueTap;
+
+  /// Called once when advertiser content first becomes visible. This is a
+  /// local presentation signal, not a network-confirmed paid impression.
+  final VoidCallback? onAdShown;
 
   /// Whether the ad page hides its close control until the ad is served.
   /// False for a page the viewer opened themselves, such as a video ad's
@@ -182,6 +187,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
 
   /// The ad page has been shown; later redirects keep it on screen.
   bool _revealed = false;
+  bool _adShown = false;
 
   /// Back was pressed before the way on appeared.
   bool _waitHint = false;
@@ -837,6 +843,10 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       _revealed = true;
       _secondsLeft = AdsterraPlaybackAdScreen.minimumView.inSeconds;
     });
+    if (!_adShown) {
+      _adShown = true;
+      widget.onAdShown?.call();
+    }
     // The ad is final only if no further redirect starts in the settle
     // window, and the viewer moves on once it has been up [minimumView].
     _settleTimer?.cancel();

@@ -21,9 +21,16 @@ import 'package:flutter/widgets.dart';
 /// order they registered, and this one has to be asked before the
 /// navigator's.
 class TvBackKeyGuard extends StatefulWidget {
-  const TvBackKeyGuard({required this.child, super.key});
+  const TvBackKeyGuard({
+    required this.child,
+    this.enabled = true,
+    super.key,
+  });
 
   final Widget child;
+
+  /// Keeps the app's navigator mounted while switching to or from mobile mode.
+  final bool enabled;
 
   @override
   State<TvBackKeyGuard> createState() => _TvBackKeyGuardState();
@@ -59,6 +66,19 @@ class _TvBackKeyGuardState extends State<TvBackKeyGuard>
   }
 
   @override
+  void didUpdateWidget(TvBackKeyGuard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.enabled && !widget.enabled) {
+      _recentPressTimer?.cancel();
+      _heldSystemBack?.cancel();
+      _heldSystemBack = null;
+      _recentPressHandled = null;
+      _keyDown = false;
+      _keyReachedRoot = false;
+    }
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(_trackBackKey);
@@ -71,6 +91,7 @@ class _TvBackKeyGuardState extends State<TvBackKeyGuard>
 
   // Runs for every key before the focus tree sees it; never consumes.
   bool _trackBackKey(KeyEvent event) {
+    if (!widget.enabled) return false;
     if (!_backKeys.contains(event.logicalKey)) return false;
     if (event is KeyDownEvent) {
       _keyDown = true;
@@ -90,6 +111,7 @@ class _TvBackKeyGuardState extends State<TvBackKeyGuard>
 
   // Sees only the keys nothing below it handled.
   KeyEventResult _handleUnhandledKey(FocusNode node, KeyEvent event) {
+    if (!widget.enabled) return KeyEventResult.ignored;
     if (!_backKeys.contains(event.logicalKey)) return KeyEventResult.ignored;
     if (event is KeyDownEvent) {
       _keyReachedRoot = true;
@@ -105,6 +127,7 @@ class _TvBackKeyGuardState extends State<TvBackKeyGuard>
 
   @override
   Future<bool> didPopRoute() async {
+    if (!widget.enabled) return false;
     if (_replaying) return false;
     if (_keyDown) return _pressHandledByApp;
     final recentPressHandled = _recentPressHandled;
@@ -127,7 +150,7 @@ class _TvBackKeyGuardState extends State<TvBackKeyGuard>
   Future<void> _releaseHeldSystemBack() async {
     _heldSystemBack?.cancel();
     _heldSystemBack = null;
-    if (!mounted) return;
+    if (!mounted || !widget.enabled) return;
     _replaying = true;
     try {
       // Replays the held Back through every observer exactly as the platform

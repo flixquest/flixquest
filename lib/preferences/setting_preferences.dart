@@ -1,8 +1,18 @@
 // ignore_for_file: constant_identifier_names
 import 'package:flixquest/constants/app_constants.dart';
+import 'package:flixquest/models/app_mode.dart';
 import 'package:flixquest/models/default_home.dart';
 
 class SettingsPreferences {
+  static const APP_MODE = 'app_mode';
+
+  Future<void> setAppMode(AppMode mode) async {
+    await sharedPrefsSingleton.setString(APP_MODE, mode.id);
+  }
+
+  Future<AppMode> getAppMode() async =>
+      AppMode.fromId(sharedPrefsSingleton.getString(APP_MODE));
+
   static const ADULT_MODE_STATUS = 'adultStatus-v2';
 
   setAdultMode(bool value) async {

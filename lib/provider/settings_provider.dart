@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../functions/subtitle_style.dart';
+import '../models/app_mode.dart';
 import '../models/default_home.dart';
 import '../preferences/setting_preferences.dart';
 import '../services/analytics_service.dart';
@@ -7,6 +8,22 @@ import '../video_providers/names.dart';
 
 class SettingsProvider with ChangeNotifier {
   final SettingsPreferences _settingsPreferences = SettingsPreferences();
+
+  AppMode _appMode = AppMode.automatic;
+  AppMode get appMode => _appMode;
+
+  Future<void> getCurrentAppMode() async {
+    _appMode = await _settingsPreferences.getAppMode();
+    notifyListeners();
+  }
+
+  set appMode(AppMode value) {
+    if (_appMode == value) return;
+    _appMode = value;
+    _settingsPreferences.setAppMode(value);
+    _trackSetting('App Mode', value.id);
+    notifyListeners();
+  }
 
   bool _isAdult = false;
   bool get isAdult => _isAdult;

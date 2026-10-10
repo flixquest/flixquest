@@ -576,9 +576,10 @@ parameter `adsterra_playback_ads`. It contains the Social Bar script and the
 Smartlink supplied for FlixQuest. Publish `adsterra_playback_enabled=true` to
 enable configured stages. Each stage also requires its own `enabled=true`. The
 supplied catalog enables both stages. It opens the Smartlink in FlixQuest's
-ad page on every stream-found attempt, with `psid=fqsmartpagev1`. It has no
-experiment. There is no app cooldown: old `cooldown_seconds`
-fields are ignored by the updated app. Only overlapping active ads are blocked.
+ad page on every stream-found attempt by default, with `psid=fqsmartpagev1`. It
+has no experiment. Set `playback_popup_frequency_minutes` to space out these
+popups as described below. Old per-placement `cooldown_seconds` fields remain
+ignored. Overlapping active ads are always blocked.
 
 - `interstitial`: shows Social Bar immediately before entering the movie/episode
   media loader. The loader is not constructed or started until the ad closes or
@@ -772,7 +773,7 @@ A script download is not an interstitial-ready callback: the Social Bar view
 waits for a visible creative element, otherwise the load timeout continues
 playback. Adsterra chooses the Social Bar subformat and has its own frequency
 limits; ask your Adsterra manager for interstitial-only delivery and approved
-in-app placement. Removing the app cooldown does not override network limits or guarantee
+in-app placement. The app's popup frequency does not override network limits or guarantee
 fill/CPM. See [Adsterra's Social Bar publisher guide](https://adsterra.com/blog/publishers-guide-to-social-bar/)
 and [Popunder guide](https://adsterra.com/blog/popunder-traffic-monetization/).
 
@@ -817,6 +818,7 @@ The Social Bar before the loader is Adsterra-only and stays controlled by
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `playback_popunder_network` | String | `adsterra` | `adsterra` uses `adsterra_playback_ads` (its `popunder` or experiment). `clickadu` uses `clickadu_playback_ads`. `monetag` uses `monetag_playback_ads`. `exoclick` uses `exoclick_playback_ads`. `none`, or any other value, shows no stream-found popup. Case-insensitive. |
+| `playback_popup_frequency_minutes` | Number | `0` | Minimum whole minutes between visible stream-found popup ads, shared by all networks and mobile/TV placements. `0` allows every eligible playback; positive values set an interval. |
 | `clickadu_playback_enabled` | Boolean | `false` | Clickadu's own switch. Must be published remotely. |
 | `clickadu_playback_ads` | String (JSON) | `{}` | Clickadu's `popunder` placement. |
 | `monetag_playback_enabled` | Boolean | `false` | Monetag's own switch. Must be published remotely. |
@@ -830,6 +832,47 @@ To switch to Clickadu, copy [clickadu_playback_ads.json](clickadu_playback_ads.j
 into `clickadu_playback_ads`, publish `clickadu_playback_enabled=true`, then set
 `playback_popunder_network=clickadu`. Switching back is just
 `playback_popunder_network=adsterra`.
+
+### Popup frequency
+
+Create the **Number** parameter `playback_popup_frequency_minutes` in Firebase
+Remote Config and publish a whole-minute value:
+
+| Value | Frequency |
+| --- | --- |
+| `0` | Every eligible playback (default) |
+| `15` | At most once every 15 minutes |
+| `30` | At most once every 30 minutes |
+| `45` | At most once every 45 minutes |
+| `60` | At most once every hour |
+| `120` | At most once every two hours |
+
+Other positive whole-minute values work too. Missing, invalid or negative
+values fall back to `0`. Existing network and placement enable switches still
+apply.
+
+The first eligible popup can show immediately. Its interval starts when the
+advertiser page first shows visible content and is saved on the device, so
+restarting FlixQuest or switching ad networks does not reset it. This local
+visibility check is not a network-confirmed paid impression. Ads that fail,
+stay empty or are cancelled before showing advertiser content do not start an
+interval. While the interval is active, playback
+continues without opening a popup or advancing experiment rotation. Empty
+WebView preparation after a restart may be discarded once the saved timestamp
+is read; it makes no ad request. If storage is unavailable, the interval still
+works for the current app session.
+
+Once the interval expires, the next eligible playback can show a popup; this
+does not schedule a popup during a movie or episode. Movies, episodes and Live
+TV channel entry share the same timestamp, including mobile and TV modes on
+the same installation. Devices do not share it. The Social Bar before the
+media loader, banners and VAST pre-roll keep their existing behavior.
+
+Activated Remote Config updates apply immediately, using the saved timestamp
+with the new interval. Publishing `0` restores every-playback eligibility.
+A future timestamp after a device clock correction does not block popup ads.
+
+### Clickadu popup delivery
 
 The supplied catalog runs Clickadu's onclick tag (zone 2150355). On Android,
 the app activates Continue automatically once the tag's `/adx/get/` request

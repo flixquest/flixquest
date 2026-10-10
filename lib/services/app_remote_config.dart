@@ -34,6 +34,8 @@ class AppRemoteConfig {
   static const adsterraPlaybackEnabledKey = 'adsterra_playback_enabled';
   static const adsterraPlaybackAdsKey = 'adsterra_playback_ads';
   static const playbackPopunderNetworkKey = 'playback_popunder_network';
+  static const playbackPopupFrequencyMinutesKey =
+      'playback_popup_frequency_minutes';
   static const clickaduPlaybackEnabledKey = 'clickadu_playback_enabled';
   static const clickaduPlaybackAdsKey = 'clickadu_playback_ads';
   static const monetagPlaybackEnabledKey = 'monetag_playback_enabled';
@@ -86,6 +88,7 @@ class AppRemoteConfig {
       adsterraPlaybackEnabledKey: false,
       adsterraPlaybackAdsKey: '{}',
       playbackPopunderNetworkKey: 'adsterra',
+      playbackPopupFrequencyMinutesKey: 0,
       clickaduPlaybackEnabledKey: false,
       clickaduPlaybackAdsKey: '{}',
       monetagPlaybackEnabledKey: false,
@@ -201,6 +204,8 @@ class AppRemoteConfig {
     }
     provider.setPlaybackPopunderNetwork(
         AdNetwork.parse(remoteConfig.getString(playbackPopunderNetworkKey)));
+    provider.setPlaybackPopupFrequencyMinutes(
+        remoteConfig.getValue(playbackPopupFrequencyMinutesKey).asInt());
     if (kDebugMode) {
       final network = provider.playbackPopunderNetwork;
       final catalogKey = switch (network) {
@@ -228,6 +233,7 @@ class AppRemoteConfig {
               null;
       debugPrint('[PlaybackAdConfig] selected=${network?.name ?? 'none'} '
           'catalog=${catalogKey ?? 'none'} source=$source '
+          'popupFrequencyMinutes=${provider.playbackPopupFrequencyMinutes} '
           'enabled=$enabled interstitialEnabled=$interstitialEnabled '
           'mode=${placement?.mode ?? 'disabled/invalid'} '
           'target=${target == null ? 'none' : '${target.origin}${target.path}'}');

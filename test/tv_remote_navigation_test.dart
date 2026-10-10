@@ -1,6 +1,8 @@
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
 import 'package:flixquest/constants/app_constants.dart';
+import 'package:flixquest/models/app_mode.dart';
+import 'package:flixquest/preferences/setting_preferences.dart';
 import 'package:flixquest/tv/app/tv_design.dart';
 import 'package:flixquest/tv/focus/tv_focus_memory.dart';
 import 'package:flixquest/tv/focus/tv_screen_focus_controller.dart';
@@ -199,6 +201,68 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('app mode can be changed in both directions with a remote',
+      (tester) async {
+    tester.view.physicalSize = const Size(960, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final settings = SettingsProvider()..appMode = AppMode.television;
+    final focusController = TvScreenFocusController()..requestFocus();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider(create: (_) => AppDependencyProvider()),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: TvSettingsScreen(
+              metrics: metrics,
+              focusController: focusController,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (var index = 0; index < 3; index++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+    }
+    expect(FocusManager.instance.primaryFocus?.debugLabel, 'App mode, TV');
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    expect(FocusManager.instance.primaryFocus?.debugLabel, 'TV');
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    expect(settings.appMode, AppMode.mobile);
+    expect(
+        sharedPrefsSingleton.getString(SettingsPreferences.APP_MODE), 'mobile');
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    expect(FocusManager.instance.primaryFocus?.debugLabel, 'Mobile');
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    expect(settings.appMode, AppMode.television);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    expect(settings.appMode, AppMode.automatic);
+    expect(sharedPrefsSingleton.getString(SettingsPreferences.APP_MODE),
+        'automatic');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('subtitle settings are D-pad navigable and persist choices',
       (tester) async {
     tester.view.physicalSize = const Size(960, 540);
@@ -227,7 +291,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    for (var index = 0; index < 6; index++) {
+    for (var index = 0; index < 7; index++) {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pump();
     }

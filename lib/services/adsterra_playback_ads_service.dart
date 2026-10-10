@@ -21,13 +21,18 @@ class AdsterraPlaybackAdsService {
     Future<SharedPreferences> Function()? preferences,
     this.storeLauncher,
     this.continueTap,
-  }) : _preferences = preferences ?? SharedPreferences.getInstance;
+    DateTime Function()? now,
+  })  : _preferences = preferences ?? SharedPreferences.getInstance,
+        _now = now ?? DateTime.now;
   static final instance = AdsterraPlaybackAdsService();
+  static const _lastPopupShownKey = 'playback_ads.last_popup_shown_at';
 
   final Future<SharedPreferences> Function() _preferences;
+  final DateTime Function() _now;
   final StoreLauncher? storeLauncher;
   final PlaybackContinueTap? continueTap;
   final Map<String, int> _rotation = {};
+  DateTime? _lastPopupShownAt;
   bool _busy = false;
 
   /// Lets route builders omit the waiting frame when no interstitial can run.
@@ -84,6 +89,7 @@ class AdsterraPlaybackAdsService {
     final selection = provider?.playbackAdsSelection;
     final tv = television || DevicePresentationService.instance.isTelevision;
     if (provider == null || selection == null) return null;
+    if (_popupCoolingDown(selection.popupFrequencyMinutes)) return null;
     final placement = switch (selection.network) {
       AdNetwork.adsterra => selection.adsterra
           .forStage(PlaybackAdStage.streamFound, television: tv),
@@ -156,6 +162,25 @@ class AdsterraPlaybackAdsService {
     _busy = true;
     final host = ModalRoute.of(context);
     try {
+      if (stage == PlaybackAdStage.streamFound &&
+          selection!.popupFrequencyMinutes > 0) {
+        await _loadPopupHistory();
+        // A config update or navigation while reading storage must not hand
+        // playback to an obsolete loader, even when the popup would be skipped.
+        if (!context.mounted) return false;
+        if (provider.playbackAdsSelection != selection ||
+            (host != null && !host.isCurrent)) {
+          return false;
+        }
+        final state = WidgetsBinding.instance.lifecycleState;
+        if (state != null && state != AppLifecycleState.resumed) return true;
+        if (_popupCoolingDown(selection.popupFrequencyMinutes)) {
+          preload?.dispose();
+          _logSkip(stage,
+              'popup frequency=${selection.popupFrequencyMinutes} minutes');
+          return true;
+        }
+      }
       String? variantId;
       final experiment = stage == PlaybackAdStage.streamFound &&
               network == AdNetwork.adsterra &&
@@ -198,6 +223,9 @@ class AdsterraPlaybackAdsService {
           television: tv,
           preload: prepared,
           continueTap: continueTap,
+          onAdShown: stage == PlaybackAdStage.streamFound
+              ? () => unawaited(_recordPopupShown())
+              : null,
         ),
       );
       // Compare the catalogs and network, not the chosen arm: unrelated
@@ -225,6 +253,46 @@ class AdsterraPlaybackAdsService {
       return context.mounted && (host == null || host.isCurrent);
     } finally {
       _busy = false;
+    }
+  }
+
+  bool _popupCoolingDown(int minutes) {
+    final lastShown = _lastPopupShownAt;
+    if (minutes <= 0 || lastShown == null) return false;
+    final elapsed = _now().difference(lastShown);
+    // A clock correction must not leave the viewer capped by a future date.
+    return !elapsed.isNegative && elapsed.inMinutes < minutes;
+  }
+
+  Future<void> _loadPopupHistory() async {
+    try {
+      final preferences = await _preferences();
+      final timestamp = preferences.getInt(_lastPopupShownKey);
+      if (timestamp == null || timestamp <= 0) return;
+      final persisted = DateTime.fromMillisecondsSinceEpoch(timestamp);
+      if (persisted.isAfter(_now())) return;
+      if (_lastPopupShownAt == null || persisted.isAfter(_lastPopupShownAt!)) {
+        _lastPopupShownAt = persisted;
+      }
+    } catch (error) {
+      debugPrint(
+          '[AdsterraPlayback] popup frequency uses session storage ($error)');
+    }
+  }
+
+  Future<void> _recordPopupShown() async {
+    final shownAt = _now();
+    _lastPopupShownAt = shownAt;
+    try {
+      final preferences = await _preferences();
+      if (!await preferences.setInt(
+          _lastPopupShownKey, shownAt.millisecondsSinceEpoch)) {
+        debugPrint(
+            '[AdsterraPlayback] popup frequency persistence unavailable');
+      }
+    } catch (error) {
+      debugPrint(
+          '[AdsterraPlayback] popup frequency uses session storage ($error)');
     }
   }
 

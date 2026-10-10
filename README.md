@@ -243,6 +243,11 @@ better_player_plus:
      flutter run -d <tv-device-id>
      ```
 
+   The app detects TV or mobile mode automatically by default. If a custom ROM
+   reports the wrong device type, choose **Settings → Appearance → App mode →
+   TV** or **Mobile**. The interface switches immediately and the choice is saved
+   across launches. Choose **Automatic** to return to device detection.
+
 6. **Build Release APK**:
 
    ```bash

@@ -122,15 +122,29 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Minimum minutes between visible stream-found popups; zero allows every
+  /// playback. Shared by all popup networks, including their TV placements.
+  int _playbackPopupFrequencyMinutes = 0;
+  int get playbackPopupFrequencyMinutes => _playbackPopupFrequencyMinutes;
+
+  void setPlaybackPopupFrequencyMinutes(int minutes) {
+    final normalized = minutes < 0 ? 0 : minutes;
+    if (_playbackPopupFrequencyMinutes == normalized) return;
+    _playbackPopupFrequencyMinutes = normalized;
+    notifyListeners();
+  }
+
   /// Everything that decides a playback ad. A change closes an active one.
   ({
     AdNetwork? network,
     AdsterraPlaybackAdsConfig adsterra,
     Map<AdNetwork, PopunderAdsConfig> popunders,
+    int popupFrequencyMinutes,
   }) get playbackAdsSelection => (
         network: _playbackPopunderNetwork,
         adsterra: _adsterraPlaybackAds,
         popunders: _popunderAds,
+        popupFrequencyMinutes: _playbackPopupFrequencyMinutes,
       );
 
   VastPrerollConfig _vastPreroll = const VastPrerollConfig();

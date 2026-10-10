@@ -873,6 +873,294 @@ void main() {
         isNull);
   });
 
+  group('popup frequency', () {
+    const timestampKey = 'playback_ads.last_popup_shown_at';
+    late DateTime now;
+
+    setUp(() {
+      now = DateTime.utc(2026, 10, 10, 9);
+      provider
+        ..setPlaybackPopupFrequencyMinutes(15)
+        ..setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse(
+            slowSmartlinkCatalog,
+            enabled: true));
+      service = AdsterraPlaybackAdsService(now: () => now);
+    });
+
+    Future<void> showVisiblePopup(WidgetTester tester,
+        {bool television = false}) async {
+      final result = service.streamFound(host, television: television);
+      await pumpAd(tester);
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      final page = platform.controllers.last;
+      page.delegate!.onPageStarted!('https://advertiser.example/offer');
+      page.delegate!.onPageFinished!('https://advertiser.example/offer');
+      await tester.pump();
+      expect(find.text('Sponsored · advertiser.example'), findsOneWidget);
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }
+
+    test(
+        'Remote Config defaults to every playback and accepts minute intervals',
+        () async {
+      final remote = FakeFirebaseRemoteConfig();
+      await AppRemoteConfig.configure(remote);
+      expect(
+          remote.defaults[AppRemoteConfig.playbackPopupFrequencyMinutesKey], 0);
+      AppRemoteConfig.apply(remote, provider);
+      expect(provider.playbackPopupFrequencyMinutes, 0);
+      for (final minutes in [0, 15, 30, 45, 60, 120]) {
+        remote.setMockInt(
+            AppRemoteConfig.playbackPopupFrequencyMinutesKey, minutes);
+        AppRemoteConfig.apply(remote, provider);
+        expect(provider.playbackPopupFrequencyMinutes, minutes);
+      }
+      remote.setMockInt(AppRemoteConfig.playbackPopupFrequencyMinutesKey, -15);
+      AppRemoteConfig.apply(remote, provider);
+      expect(provider.playbackPopupFrequencyMinutes, 0);
+      for (final invalid in ['everytime', '', '15.5', 'not-a-number']) {
+        remote.setMockString(
+            AppRemoteConfig.playbackPopupFrequencyMinutesKey, invalid);
+        AppRemoteConfig.apply(remote, provider);
+        expect(provider.playbackPopupFrequencyMinutes, 0);
+      }
+    });
+
+    for (final minutes in [15, 30, 45, 60, 120]) {
+      testWidgets('$minutes minute interval permits the exact boundary',
+          (tester) async {
+        provider.setPlaybackPopupFrequencyMinutes(minutes);
+        await pumpHost(tester);
+        await showVisiblePopup(tester);
+        final shownAt = now;
+        expect(sharedPrefsSingleton.getInt(timestampKey),
+            shownAt.millisecondsSinceEpoch);
+
+        now = shownAt
+            .add(Duration(minutes: minutes))
+            .subtract(const Duration(milliseconds: 1));
+        expect(service.preloadStreamFound(host), isNull);
+        expect(await service.streamFound(host), isTrue);
+        expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+        expect(platform.controllers, hasLength(1));
+        expect(sharedPrefsSingleton.getInt(timestampKey),
+            shownAt.millisecondsSinceEpoch);
+
+        now = shownAt.add(Duration(minutes: minutes));
+        await showVisiblePopup(tester);
+        expect(platform.controllers, hasLength(2));
+        expect(sharedPrefsSingleton.getInt(timestampKey),
+            now.millisecondsSinceEpoch);
+      },
+          variant: const TargetPlatformVariant(
+              {TargetPlatform.android, TargetPlatform.iOS}));
+    }
+
+    testWidgets('zero allows immediate repeat even after service recreation',
+        (tester) async {
+      provider.setPlaybackPopupFrequencyMinutes(0);
+      await pumpHost(tester);
+      await showVisiblePopup(tester);
+      service = AdsterraPlaybackAdsService(now: () => now);
+      await showVisiblePopup(tester);
+      expect(platform.controllers, hasLength(2));
+      // An activated positive interval uses history from every-playback mode.
+      provider.setPlaybackPopupFrequencyMinutes(15);
+      expect(await service.streamFound(host), isTrue);
+      expect(platform.controllers, hasLength(2));
+    }, variant: android);
+
+    testWidgets('saved interval survives network and mobile/TV mode switches',
+        (tester) async {
+      await pumpHost(tester);
+      await showVisiblePopup(tester);
+      service = AdsterraPlaybackAdsService(now: () => now);
+      provider.setAdsterraPlaybackAdsConfig(
+          AdsterraPlaybackAdsConfig.parse(tvCatalog, enabled: true));
+      for (final network in AdNetwork.values) {
+        if (network != AdNetwork.adsterra) {
+          provider.setPopunderAdsConfig(PopunderAdsConfig.parse(tvCatalog,
+              enabled: true, network: network));
+        }
+        provider.setPlaybackPopunderNetwork(network);
+        for (final television in [false, true]) {
+          expect(
+              await service.streamFound(host, television: television), isTrue);
+          expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+          expect(platform.controllers, hasLength(1));
+        }
+      }
+    }, variant: android);
+
+    testWidgets(
+        'a saved interval discards empty preparation without an ad request',
+        (tester) async {
+      await pumpHost(tester);
+      await showVisiblePopup(tester);
+      service = AdsterraPlaybackAdsService(now: () => now);
+      final preload = service.preloadStreamFound(host)!;
+      await tester.pump();
+      final prepared = platform.controllers.last;
+      expect(prepared.requests, isEmpty);
+      expect(prepared.htmlLoads, isEmpty);
+      expect(await service.streamFound(host, preload: preload), isTrue);
+      await tester.pumpAndSettle();
+      expect(preload.unavailable, isTrue);
+      expect(prepared.requests, everyElement(Uri.parse('about:blank')));
+      expect(prepared.htmlLoads, isEmpty);
+      expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+    }, variant: android);
+
+    testWidgets('empty ads do not consume an interval', (tester) async {
+      platform.pageHasContent = false;
+      await pumpHost(tester);
+      final empty = service.streamFound(host);
+      await pumpAd(tester);
+      final page = platform.controllers.single;
+      page.delegate!.onPageStarted!('https://advertiser.example/empty');
+      page.delegate!.onPageFinished!('https://advertiser.example/empty');
+      await tester.pump();
+      expect(sharedPrefsSingleton.getInt(timestampKey), isNull);
+      await tester.pump(const Duration(seconds: 10));
+      await tester.pumpAndSettle();
+      expect(await empty, isTrue);
+      expect(sharedPrefsSingleton.getInt(timestampKey), isNull);
+      platform.pageHasContent = true;
+      await showVisiblePopup(tester);
+      expect(platform.controllers, hasLength(2));
+      expect(sharedPrefsSingleton.getInt(timestampKey),
+          now.millisecondsSinceEpoch);
+    }, variant: android);
+
+    testWidgets('cooldown skips do not advance experiment rotation',
+        (tester) async {
+      await pumpHost(tester);
+      await showVisiblePopup(tester);
+      provider.setAdsterraPlaybackAdsConfig(
+          AdsterraPlaybackAdsConfig.parse(experimentCatalog, enabled: true));
+      expect(await service.streamFound(host), isTrue);
+      expect(
+          sharedPrefsSingleton.getInt('adsterra_playback.rotation.formats_v1'),
+          isNull);
+      expect(platform.controllers, hasLength(1));
+
+      now = now.add(const Duration(minutes: 15));
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      expect(platform.controllers.last.htmlLoads.single,
+          contains('https://ads.example/pop'));
+      expect(
+          sharedPrefsSingleton.getInt('adsterra_playback.rotation.formats_v1'),
+          1);
+      platform.controllers.last.send('{"event":"done"}');
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }, variant: android);
+
+    testWidgets(
+        'frequency changes during a storage read cancel the old request',
+        (tester) async {
+      final preferences = Completer<SharedPreferences>();
+      service = AdsterraPlaybackAdsService(
+          preferences: () => preferences.future, now: () => now);
+      await pumpHost(tester);
+      final pending = service.streamFound(host);
+      expect(await service.streamFound(host), isFalse);
+      provider.setPlaybackPopupFrequencyMinutes(0);
+      preferences.complete(sharedPrefsSingleton);
+      await tester.pumpAndSettle();
+      expect(await pending, isFalse);
+      expect(platform.controllers, isEmpty);
+      await showVisiblePopup(tester);
+    }, variant: android);
+
+    testWidgets('new intervals apply immediately using the original timestamp',
+        (tester) async {
+      await pumpHost(tester);
+      await showVisiblePopup(tester);
+      now = now.add(const Duration(minutes: 20));
+      provider.setPlaybackPopupFrequencyMinutes(30);
+      expect(await service.streamFound(host), isTrue);
+      expect(platform.controllers, hasLength(1));
+      provider.setPlaybackPopupFrequencyMinutes(15);
+      await showVisiblePopup(tester);
+      expect(platform.controllers, hasLength(2));
+    }, variant: android);
+
+    testWidgets('storage failures retain frequency for the current session',
+        (tester) async {
+      service = AdsterraPlaybackAdsService(
+          preferences: () async => throw StateError('storage unavailable'),
+          now: () => now);
+      await pumpHost(tester);
+      await showVisiblePopup(tester);
+      expect(sharedPrefsSingleton.getInt(timestampKey), isNull);
+      expect(await service.streamFound(host), isTrue);
+      expect(platform.controllers, hasLength(1));
+      now = now.add(const Duration(minutes: 15));
+      await showVisiblePopup(tester);
+      expect(platform.controllers, hasLength(2));
+    }, variant: android);
+
+    testWidgets(
+        'a clock correction does not cap popups with a future timestamp',
+        (tester) async {
+      await pumpHost(tester);
+      await showVisiblePopup(tester);
+      now = now.subtract(const Duration(hours: 1));
+      service = AdsterraPlaybackAdsService(now: () => now);
+      await showVisiblePopup(tester);
+      expect(platform.controllers, hasLength(2));
+      expect(sharedPrefsSingleton.getInt(timestampKey),
+          now.millisecondsSinceEpoch);
+    }, variant: android);
+
+    testWidgets('redirects record only the first visible page', (tester) async {
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final firstShown = now;
+      final page = platform.controllers.single;
+      page.delegate!.onPageStarted!('https://advertiser.example/intermediate');
+      page.delegate!.onPageFinished!('https://advertiser.example/intermediate');
+      await tester.pump();
+      expect(sharedPrefsSingleton.getInt(timestampKey),
+          firstShown.millisecondsSinceEpoch);
+
+      now = now.add(const Duration(minutes: 1));
+      page.delegate!.onPageStarted!('https://advertiser.example/final');
+      page.delegate!.onPageFinished!('https://advertiser.example/final');
+      await tester.pump();
+      expect(sharedPrefsSingleton.getInt(timestampKey),
+          firstShown.millisecondsSinceEpoch);
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }, variant: android);
+
+    testWidgets('popup frequency leaves the Social Bar eligible',
+        (tester) async {
+      await pumpHost(tester);
+      await showVisiblePopup(tester);
+      provider.setAdsterraPlaybackAdsConfig(
+          AdsterraPlaybackAdsConfig.parse(catalog, enabled: true));
+      expect(service.needsBeforeLoader(host), isTrue);
+      final interstitial = service.beforeLoader(host);
+      await pumpAd(tester);
+      expect(platform.controllers.last.htmlLoads.single,
+          contains('https://ads.example/social'));
+      await tester.tap(find.byTooltip('Close ad'));
+      await tester.pumpAndSettle();
+      expect(await interstitial, isTrue);
+      expect(await service.streamFound(host), isTrue);
+      expect(platform.controllers, hasLength(2));
+    }, variant: android);
+  });
+
   test('pop script receives a real DOM button with no fabricated clicks', () {
     final config = AdsterraPlaybackAdsConfig.parse(catalog, enabled: true);
     final html = playbackAdHtml(config.popunder!, PlaybackAdStage.streamFound);

@@ -1,4 +1,5 @@
-/// The presentation detected at startup, also used by deep links and banners.
+/// The active presentation, including the user's override, used by deep links
+/// and banners.
 /// Keep device routing independent of any advertising SDK.
 class DevicePresentationService {
   DevicePresentationService._();

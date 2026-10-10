@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flixquest/models/app_colors.dart';
+import 'package:flixquest/models/app_mode.dart';
 import 'package:flixquest/models/default_home.dart';
 import 'package:flixquest/services/globle_method.dart';
 
@@ -158,6 +159,18 @@ class _SettingsState extends State<Settings> {
                   },
                   onChanged: (value) =>
                       setState(() => settingsValues.appTheme = value),
+                ),
+                ChoiceRow<AppMode>(
+                  icon: PhosphorIcons.monitor(),
+                  label: tr('app_mode'),
+                  subtitle: tr('app_mode_description'),
+                  value: settingsValues.appMode,
+                  options: {
+                    AppMode.automatic: tr('automatic'),
+                    AppMode.television: tr('app_mode_tv'),
+                    AppMode.mobile: tr('app_mode_mobile'),
+                  },
+                  onChanged: (value) => settingsValues.appMode = value,
                 ),
                 SwitchRow(
                   value: appDependencies.ambientModeEnabled,
