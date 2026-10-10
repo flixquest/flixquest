@@ -115,6 +115,18 @@ void main() {
 
   final android = const TargetPlatformVariant({TargetPlatform.android});
 
+  test('the landing check waits for complete loading and reports its URL',
+      () async {
+    final process = await Process.start(
+        'node', ['test/support/playback_ad_content_fixture.js']);
+    final output = process.stdout.transform(utf8.decoder).join();
+    final errors = process.stderr.transform(utf8.decoder).join();
+    process.stdin.write(playbackAdContentScript);
+    await process.stdin.close();
+    expect(await process.exitCode, 0,
+        reason: '${await output}\n${await errors}');
+  });
+
   testWidgets('native JSON content reports reveal the preloaded advertiser',
       (tester) async {
     provider.setAdsterraPlaybackAdsConfig(
@@ -1741,6 +1753,250 @@ void main() {
       expect(platform.controllers, isEmpty);
     }, variant: android);
   });
+
+  for (final network in [AdNetwork.exoclick, AdNetwork.monetag]) {
+    group('${network.name} redirect completion', () {
+      const intermediate = 'https://tracker.example/redirect';
+      const landing = 'https://advertiser.example/offer';
+
+      Future<({FakeAdsterraWebViewController page, Future<bool> result})>
+          openAd(WidgetTester tester) async {
+        provider
+          ..setPopunderAdsConfig(PopunderAdsConfig.parse(slowSmartlinkCatalog,
+              enabled: true, network: network))
+          ..setPlaybackPopunderNetwork(network);
+        await pumpHost(tester);
+        final result = service.streamFound(host);
+        await pumpAd(tester);
+        return (page: platform.controllers.single, result: result);
+      }
+
+      String report(String url, {String state = 'complete'}) => jsonEncode({
+            'ready': true,
+            'url': url,
+            'readyState': state,
+            'type': 'text/html',
+            'textLength': 80,
+            'visibleElements': 1,
+          });
+
+      testWidgets('stale page finishes cannot serve the next redirect',
+          (tester) async {
+        final ad = await openAd(tester);
+        final delegate = ad.page.delegate!;
+        delegate.onPageStarted!(intermediate);
+        delegate.onPageFinished!(intermediate);
+        await tester.pump(const Duration(seconds: 1));
+        delegate.onPageStarted!(landing);
+        delegate.onPageFinished!(intermediate);
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        expect(find.byTooltip('Close ad'), findsNothing);
+        expect(find.text('Ad loading'), findsOneWidget);
+        delegate.onPageFinished!(landing);
+        await tester.pump();
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        await tester.tap(find.byTooltip('Close ad'));
+        await tester.pumpAndSettle();
+        expect(await ad.result, isTrue);
+      }, variant: android);
+
+      testWidgets('visible content in an unfinished document cannot serve it',
+          (tester) async {
+        final ad = await openAd(tester);
+        ad.page.contentReport = report(landing, state: 'interactive');
+        ad.page.delegate!.onPageStarted!(landing);
+        ad.page.delegate!.onPageFinished!(landing);
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        expect(find.byTooltip('Close ad'), findsNothing);
+        ad.page.contentReport = report(landing);
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        await tester.tap(find.byTooltip('Close ad'));
+        await tester.pumpAndSettle();
+        expect(await ad.result, isTrue);
+      }, variant: android);
+
+      testWidgets('content from a replacement document cannot serve an old URL',
+          (tester) async {
+        final ad = await openAd(tester);
+        ad.page.contentReport = report(landing);
+        ad.page.delegate!.onPageStarted!(intermediate);
+        ad.page.delegate!.onPageFinished!(intermediate);
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        expect(find.byTooltip('Close ad'), findsNothing);
+        ad.page.delegate!.onPageStarted!(landing);
+        ad.page.delegate!.onPageFinished!(landing);
+        await tester.pump();
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        await tester.tap(find.byTooltip('Close ad'));
+        await tester.pumpAndSettle();
+        expect(await ad.result, isTrue);
+      }, variant: android);
+
+      testWidgets(
+          'an automatic redirect holds close as soon as it is requested',
+          (tester) async {
+        final ad = await openAd(tester);
+        final delegate = ad.page.delegate!;
+        delegate.onPageStarted!(intermediate);
+        delegate.onPageFinished!(intermediate);
+        await tester.pump();
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        expect(find.byTooltip('Close ad'), findsOneWidget);
+        expect(
+            await delegate.onNavigationRequest!(
+                NavigationRequest(url: landing, isMainFrame: true)),
+            NavigationDecision.navigate);
+        await tester.pump();
+        expect(find.byTooltip('Close ad'), findsNothing);
+        await tester.binding.handlePopRoute();
+        await tester.pump();
+        expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+        delegate.onPageStarted!(landing);
+        delegate.onPageFinished!(landing);
+        await tester.pump();
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        await tester.tap(find.byTooltip('Close ad'));
+        await tester.pumpAndSettle();
+        expect(await ad.result, isTrue);
+      }, variant: android);
+
+      testWidgets('redirects preserve the original close fallback deadline',
+          (tester) async {
+        final started = tester.binding.clock.now();
+        final ad = await openAd(tester);
+        final delegate = ad.page.delegate!;
+        delegate.onPageStarted!(intermediate);
+        delegate.onPageFinished!(intermediate);
+        await tester.pump();
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        await delegate.onNavigationRequest!(
+            NavigationRequest(url: landing, isMainFrame: true));
+        delegate.onPageStarted!(landing);
+        delegate.onPageFinished!(landing);
+        await tester.pump();
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        await delegate.onNavigationRequest!(const NavigationRequest(
+            url: 'https://advertiser.example/later', isMainFrame: true));
+        await tester.pump();
+        expect(find.byTooltip('Close ad'), findsNothing);
+        final elapsed = tester.binding.clock.now().difference(started);
+        await tester.pump(closeFallback - elapsed);
+        expect(find.byTooltip('Close ad'), findsOneWidget);
+        expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+        await tester.tap(find.byTooltip('Close ad'));
+        await tester.pumpAndSettle();
+        expect(await ad.result, isTrue);
+      }, variant: android);
+
+      testWidgets('late redirects keep close available after the fallback',
+          (tester) async {
+        final ad = await openAd(tester);
+        final delegate = ad.page.delegate!;
+        delegate.onPageStarted!(intermediate);
+        delegate.onPageFinished!(intermediate);
+        await tester.pump();
+        await tester.pump(closeFallback);
+        await delegate.onNavigationRequest!(
+            NavigationRequest(url: landing, isMainFrame: true));
+        delegate.onPageStarted!(landing);
+        await tester.pump();
+        expect(find.byTooltip('Close ad'), findsOneWidget);
+        await tester.tap(find.byTooltip('Close ad'));
+        await tester.pumpAndSettle();
+        expect(await ad.result, isTrue);
+      }, variant: android);
+
+      testWidgets('a viewer following a link can still close the ad',
+          (tester) async {
+        final ad = await openAd(tester);
+        final delegate = ad.page.delegate!;
+        delegate.onPageStarted!(intermediate);
+        delegate.onPageFinished!(intermediate);
+        await tester.pump();
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        await tester.tap(find.byKey(const ValueKey('fake-webview')),
+            warnIfMissed: false);
+        await delegate.onNavigationRequest!(
+            NavigationRequest(url: landing, isMainFrame: true));
+        delegate.onPageStarted!(landing);
+        await tester.pump();
+        expect(find.byTooltip('Close ad'), findsOneWidget);
+        await tester.tap(find.byTooltip('Close ad'));
+        await tester.pumpAndSettle();
+        expect(await ad.result, isTrue);
+      }, variant: android);
+
+      testWidgets('errors from an earlier hop do not cancel the current page',
+          (tester) async {
+        final ad = await openAd(tester);
+        final delegate = ad.page.delegate!;
+        delegate.onPageStarted!(intermediate);
+        delegate.onPageStarted!(landing);
+        delegate.onWebResourceError!(const WebResourceError(
+            errorCode: -1,
+            description: 'Previous redirect cancelled',
+            isForMainFrame: true,
+            url: intermediate));
+        await tester.pump();
+        expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+        delegate.onPageFinished!(landing);
+        await tester.pump();
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        await tester.tap(find.byTooltip('Close ad'));
+        await tester.pumpAndSettle();
+        expect(await ad.result, isTrue);
+      }, variant: android);
+
+      testWidgets('failed inspections cannot enable close as a served ad',
+          (tester) async {
+        final ad = await openAd(tester);
+        ad.page.contentError = StateError('Document inspection unavailable');
+        ad.page.delegate!.onPageStarted!(landing);
+        ad.page.delegate!.onPageFinished!(landing);
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        expect(find.byTooltip('Close ad'), findsNothing);
+        expect(find.text('Ad loading'), findsOneWidget);
+        ad.page.contentError = null;
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        await tester.tap(find.byTooltip('Close ad'));
+        await tester.pumpAndSettle();
+        expect(await ad.result, isTrue);
+      }, variant: android);
+
+      testWidgets('a fragment change preserves the current landing countdown',
+          (tester) async {
+        final ad = await openAd(tester);
+        ad.page.delegate!.onPageStarted!(landing);
+        ad.page.delegate!.onPageFinished!(landing);
+        await tester.pump(const Duration(seconds: 1));
+        await ad.page.delegate!.onNavigationRequest!(
+            NavigationRequest(url: '$landing#details', isMainFrame: true));
+        await tester.pump(const Duration(seconds: 2));
+        expect(find.byTooltip('Close ad'), findsOneWidget);
+        await tester.tap(find.byTooltip('Close ad'));
+        await tester.pumpAndSettle();
+        expect(await ad.result, isTrue);
+      }, variant: android);
+
+      testWidgets(
+          'the final redirect can finish without its own start callback',
+          (tester) async {
+        final ad = await openAd(tester);
+        ad.page.delegate!.onPageStarted!(intermediate);
+        ad.page.currentPageUrl = landing;
+        ad.page.contentReport = report(landing);
+        ad.page.delegate!.onPageFinished!(landing);
+        await tester.pump();
+        expect(find.text('Sponsored · advertiser.example'), findsOneWidget);
+        await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+        await tester.tap(find.byTooltip('Close ad'));
+        await tester.pumpAndSettle();
+        expect(await ad.result, isTrue);
+      }, variant: android);
+    });
+  }
 
   group('ExoClick popup', () {
     final exoclick = File('docs/exoclick_playback_ads.json').readAsStringSync();

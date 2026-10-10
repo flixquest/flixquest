@@ -294,6 +294,8 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   _Phase _phase = _Phase.script;
   bool _pageReady = false;
   bool _closeAllowed = false;
+  bool _fallbackReached = false;
+  Uri? _pageDocument;
 
   /// The current document has been served and stopped redirecting.
   bool _served = false;
@@ -673,7 +675,9 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       void onHttpError(HttpResponseError error) {
         final failedUrl = error.request?.uri ?? error.response?.uri;
         final status = error.response?.statusCode ?? 0;
-        if (failedUrl == mainUrl && status >= 400) {
+        if (!_finished &&
+            _samePageDocument(failedUrl, _pageDocument ?? mainUrl) &&
+            status >= 400) {
           _log('page HTTP $status ${_origin(failedUrl.toString())}');
           _finish('page_http_error');
         }
@@ -682,13 +686,21 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       final delegate = NavigationDelegate(
         onNavigationRequest: (request) {
           if (request.url == 'about:blank') return NavigationDecision.navigate;
+          if (_finished) return NavigationDecision.prevent;
           final target = Uri.tryParse(request.url);
           if (request.isMainFrame && isNoAdFallback(target)) {
             _onNoAd(target!);
             return NavigationDecision.prevent;
           }
           if (_webUrl(target)) {
-            if (request.isMainFrame) mainUrl = target!;
+            if (request.isMainFrame) {
+              mainUrl = target!;
+              // Stop the previous document's countdown when navigation is
+              // accepted, before the later page-start callback arrives.
+              final fragmentOnly = _samePageDocument(target, _pageDocument) &&
+                  target.fragment != _pageDocument?.fragment;
+              if (!fragmentOnly) _beginPageNavigation(request.url);
+            }
             return NavigationDecision.navigate;
           }
           if (request.isMainFrame && target != null) {
@@ -705,7 +717,15 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         },
         onPageFinished: (url) => _inspectPage(page, url),
         onWebResourceError: (error) {
-          if (error.isForMainFrame == true) {
+          if (!_finished && error.isForMainFrame == true) {
+            final failed = Uri.tryParse(error.url ?? '');
+            if (_webUrl(failed) &&
+                _pageDocument != null &&
+                !_samePageDocument(failed, _pageDocument)) {
+              _log('ignored error from an earlier redirect '
+                  '${_origin(error.url!)}');
+              return;
+            }
             _log(
                 'page error code=${error.errorCode} ${error.description} origin=${_origin(error.url ?? '')}');
             _finish('page_main_frame_error');
@@ -743,6 +763,12 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       _onNoAd(started!);
       return;
     }
+    _beginPageNavigation(url);
+  }
+
+  void _beginPageNavigation(String url) {
+    if (_finished) return;
+    _pageDocument = Uri.tryParse(url);
     // A new document means the redirect chain is still moving: its ad, not
     // the previous page's, is the one the viewer must see.
     _documentGeneration++;
@@ -755,7 +781,16 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     _loadTimer?.cancel();
     _loadTimer =
         Timer(widget.placement.loadTimeout, () => _finish('page_load_timeout'));
-    if (mounted) setState(() => _pageReady = false);
+    if (mounted) {
+      setState(() {
+        _pageReady = false;
+        // An automatic redirect can start after an intermediate page showed
+        // enough content to enable close. Hold it for the new landing page,
+        // using the original fallback deadline. A viewer following a link
+        // keeps their existing way back to the video.
+        if (!_fallbackReached && !_tappedRecently) _closeAllowed = false;
+      });
+    }
   }
 
   /// Trackers send traffic they will not pay for to a search engine's home
@@ -767,35 +802,61 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
 
   void _inspectPage(WebViewController page, String url) {
     if (_finished || url == 'about:blank') return;
+    final document = Uri.tryParse(url);
+    if (_pageDocument != null && !_samePageDocument(document, _pageDocument)) {
+      // Some WebViews report only the first start and the final finish of
+      // an HTTP redirect chain. Check the native URL before accepting that
+      // finish; a stale earlier-hop callback must not replace the current one.
+      unawaited(_inspectUnreportedRedirect(page, url, _documentGeneration));
+      return;
+    }
+    _pageDocument ??= document;
     _log('page finished ${_origin(url)}; checking content');
     final host = Uri.tryParse(url)?.host;
     if (host != null && host.isNotEmpty) {
       _advertiserHost = host.startsWith('www.') ? host.substring(4) : host;
     }
     final generation = _documentGeneration;
-    unawaited(_checkContent(page, generation));
+    unawaited(_checkContent(page, generation, url));
     _contentTimer?.cancel();
     _contentTimer = Timer.periodic(const Duration(milliseconds: 500),
-        (_) => unawaited(_checkContent(page, generation)));
+        (_) => unawaited(_checkContent(page, generation, url)));
   }
 
-  Future<void> _checkContent(WebViewController page, int generation) async {
-    if (!mounted || _finished || _checkingContent) return;
+  Future<void> _inspectUnreportedRedirect(
+      WebViewController page, String url, int generation) async {
+    try {
+      final current = await page
+          .currentUrl()
+          .timeout(AdsterraPlaybackAdScreen.contentCheckTimeout);
+      if (!mounted || _finished || generation != _documentGeneration) return;
+      if (_samePageDocument(Uri.tryParse(current ?? ''), Uri.tryParse(url))) {
+        _log(
+            'confirmed final redirect without a start callback ${_origin(url)}');
+        _beginPageNavigation(url);
+        _inspectPage(page, url);
+      } else {
+        _log('ignored page finish from an earlier redirect ${_origin(url)}');
+      }
+    } catch (error) {
+      _log('could not verify redirect finish ($error)');
+    }
+  }
+
+  Future<void> _checkContent(
+      WebViewController page, int generation, String url) async {
+    if (!mounted ||
+        _finished ||
+        _checkingContent ||
+        generation != _documentGeneration) {
+      return;
+    }
     _checkingContent = true;
     try {
       // DOM presence is a loading diagnostic, never a paid-impression signal.
-      final result = await page.runJavaScriptReturningResult('''
-(function(){var b=document.body;
-function visible(el){var r=el.getBoundingClientRect(),s=getComputedStyle(el);
-return r.width>=40&&r.height>=24&&r.bottom>0&&r.right>0&&r.top<innerHeight&&r.left<innerWidth&&
-s.display!=='none'&&s.visibility!=='hidden'&&Number(s.opacity)>0;}
-var text=b?b.innerText.trim().length:0;
-var media=b?Array.from(b.querySelectorAll('img,iframe,video,canvas,svg,object,embed,input,button')).filter(visible).length:0;
-var background=b&&visible(b)&&getComputedStyle(b).backgroundImage!=='none';
-return JSON.stringify({ready:!!(b&&((text>20&&visible(b))||media>0||background)),
-textLength:text,visibleElements:media,title:document.title.substring(0,80),
-type:document.contentType});})()
-''').timeout(AdsterraPlaybackAdScreen.contentCheckTimeout);
+      final result = await page
+          .runJavaScriptReturningResult(playbackAdContentScript)
+          .timeout(AdsterraPlaybackAdScreen.contentCheckTimeout);
       if (!mounted || _finished || generation != _documentGeneration) return;
       // The script returns JSON.stringify(...). Android evaluateJavascript
       // wraps that string in another JSON string, while WKWebView returns it
@@ -803,6 +864,15 @@ type:document.contentType});})()
       Object? report = result;
       for (var encoding = 0; report is String && encoding < 2; encoding++) {
         report = jsonDecode(report);
+      }
+      // Page callbacks and JS results can cross during a redirect. Content
+      // must belong to this finished document, with its load event complete.
+      final actualUrl = report is Map ? report['url'] : null;
+      final readyState = report is Map ? report['readyState'] : null;
+      if ((actualUrl is String &&
+              !_samePageDocument(Uri.tryParse(actualUrl), Uri.tryParse(url))) ||
+          (readyState is String && readyState != 'complete')) {
+        return;
       }
       // A link that answers with XML, JSON or text (such as an ad server's
       // empty VAST response) has no page to show; leave instead of waiting.
@@ -826,11 +896,10 @@ type:document.contentType});})()
       // Dropped while the document was replaced: the next tick asks again.
       _log('content check timed out');
     } catch (error) {
-      // Some landing pages disable script inspection. Treat the finished
-      // document as shown rather than rejecting a potentially valid page.
+      // A failed inspection cannot confirm a loaded landing page. Retry
+      // within the existing loading budget and close fallback.
       if (mounted && !_finished && generation == _documentGeneration) {
         _log('content inspection unavailable ($error)');
-        _onContentVisible(generation);
       }
     } finally {
       _checkingContent = false;
@@ -876,19 +945,23 @@ type:document.contentType});})()
   /// been seen, or the placement's fallback if it never loads.
   void _holdClose() {
     _closeAllowed = false;
+    _fallbackReached = false;
     _served = false;
     _minimumViewDone = false;
     _visibleGeneration = null;
     _fallbackTimer?.cancel();
     _minimumViewTimer?.cancel();
     _countdownTimer?.cancel();
-    _fallbackTimer = Timer(
-        widget.placement.closeFallback, () => _allowClose('fallback_reached'));
+    _fallbackTimer = Timer(widget.placement.closeFallback, () {
+      _fallbackReached = true;
+      _allowClose('fallback_reached');
+    });
   }
 
   void _allowClose(String reason) {
     if (!mounted || _finished || _closeAllowed) return;
-    _fallbackTimer?.cancel();
+    // Keep the original deadline running after an early successful page:
+    // subsequent redirects must never extend the maximum wait to close.
     _minimumViewTimer?.cancel();
     _countdownTimer?.cancel();
     _log('close enabled reason=$reason');
@@ -940,6 +1013,7 @@ type:document.contentType});})()
     if (link.web != null) {
       _log(
           'loading web fallback ${_origin(link.web.toString())} for scheme=${target.scheme}');
+      _beginPageNavigation(link.web.toString());
       await page.loadRequest(link.web!);
     } else {
       _log('blocked navigation scheme=${target.scheme}; no web fallback');
@@ -958,6 +1032,14 @@ type:document.contentType});})()
       uri != null &&
       const {'https', 'http'}.contains(uri.scheme) &&
       uri.host.isNotEmpty;
+
+  bool _samePageDocument(Uri? actual, Uri? expected) =>
+      actual != null &&
+      expected != null &&
+      actual.replace(
+              path: actual.path.isEmpty ? '/' : actual.path, fragment: '') ==
+          expected.replace(
+              path: expected.path.isEmpty ? '/' : expected.path, fragment: '');
 
   String _origin(String url) {
     final uri = Uri.tryParse(url);
@@ -1396,6 +1478,23 @@ bool _isPlaybackWebUrl(Uri? uri) =>
     uri != null &&
     const {'https', 'http'}.contains(uri.scheme) &&
     uri.host.isNotEmpty;
+
+/// A loaded document with visible content is a landing-page diagnostic, not
+/// confirmation that the network credited an impression.
+@visibleForTesting
+const playbackAdContentScript = r'''
+(function(){var b=document.body;
+function visible(el){var r=el.getBoundingClientRect(),s=getComputedStyle(el);
+return r.width>=40&&r.height>=24&&r.bottom>0&&r.right>0&&r.top<innerHeight&&r.left<innerWidth&&
+s.display!=='none'&&s.visibility!=='hidden'&&Number(s.opacity)>0;}
+var text=b?b.innerText.trim().length:0;
+var media=b?Array.from(b.querySelectorAll('img,iframe,video,canvas,svg,object,embed,input,button')).filter(visible).length:0;
+var background=b&&visible(b)&&getComputedStyle(b).backgroundImage!=='none';
+return JSON.stringify({ready:!!(document.readyState==='complete'&&b&&((text>20&&visible(b))||media>0||background)),
+url:location.href,readyState:document.readyState,
+textLength:text,visibleElements:media,title:document.title.substring(0,80),
+type:document.contentType});})()
+''';
 
 Future<void> _preparePlaybackController(
     WebViewController controller, void Function(String) log) async {

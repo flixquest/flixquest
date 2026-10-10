@@ -95,6 +95,12 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
   /// The JSON returned by the content-check script, before native encoding.
   /// When null, build a report from [pageHasContent].
   String? contentReport;
+  Object? contentError;
+  String? currentPageUrl;
+
+  @override
+  Future<String?> currentUrl() async =>
+      currentPageUrl ?? (requests.isEmpty ? null : requests.last.toString());
 
   /// The next inspections that never answer, as when the document is
   /// replaced while one runs.
@@ -113,6 +119,7 @@ class FakeAdsterraWebViewController extends PlatformWebViewController {
   @override
   Future<Object> runJavaScriptReturningResult(String javaScript) {
     evaluatedScripts.add(javaScript);
+    if (contentError != null) return Future.error(contentError!);
     if (hangingChecks > 0) {
       hangingChecks--;
       return Completer<Object>().future;

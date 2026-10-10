@@ -732,6 +732,25 @@ eligible playback attempts, and playback completion. App logs and DOM readiness
 are diagnostics, not billable-impression counters. The old `browser` field is
 ignored, so catalogs that still set it keep working.
 
+All popup networks, including ExoClick and Monetag, keep HTTP, JavaScript and
+intent-link web redirects in the advertiser WebView. A landing page must have
+visible content and `document.readyState=complete`, and its actual document URL
+must match the finished navigation, before its 3-second view countdown starts.
+Older page-finished callbacks and errors from earlier hops do not complete or
+cancel the current landing page. If a WebView reports only the first start and
+the final finish of an HTTP chain, the app verifies the final native URL before
+inspecting it. An accepted automatic navigation immediately cancels the prior
+countdown and holds close again until the new landing page is ready. The
+original close fallback deadline is preserved across redirects; a viewer
+following an advertiser link keeps their existing way back.
+
+The app still uses the configured loading and total-duration limits for stalled
+chains. No client can prove that a landing page will never redirect again or
+that an impression was credited. Monetag explicitly says that ad pages closed
+before they finish loading may not count; use the provider dashboards to check
+credited impressions and revenue after testing on a physical device. See
+[Monetag's impression guidance](https://help.monetag.com/en/articles/6738513-why-are-my-impressions-so-low-compared-to-the-number-of-visitors-on-my-site).
+
 Both WebViews use Hybrid Composition on Android to avoid the SurfaceTexture
 path when coming from video playback. Script loading, popup URLs, page
 starts/finishes, visible content, `close enabled reason=ad_served` or
