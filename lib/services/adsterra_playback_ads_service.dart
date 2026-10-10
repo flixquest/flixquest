@@ -9,6 +9,7 @@ import '../models/adsterra_playback_ads_config.dart';
 import '../provider/app_dependency_provider.dart';
 import '../widgets/adsterra_playback_ad_screen.dart';
 import 'device_presentation_service.dart';
+import 'playback_ad_input_service.dart';
 
 export '../widgets/adsterra_playback_ad_screen.dart' show PlaybackAdPreload;
 
@@ -19,11 +20,14 @@ class AdsterraPlaybackAdsService {
   AdsterraPlaybackAdsService({
     Future<SharedPreferences> Function()? preferences,
     this.storeLauncher,
+    this.continueTap,
   }) : _preferences = preferences ?? SharedPreferences.getInstance;
   static final instance = AdsterraPlaybackAdsService();
+  static const _preloadNetworks = {AdNetwork.adsterra, AdNetwork.clickadu};
 
   final Future<SharedPreferences> Function() _preferences;
   final StoreLauncher? storeLauncher;
+  final PlaybackContinueTap? continueTap;
   final Map<String, int> _rotation = {};
   bool _busy = false;
 
@@ -61,8 +65,9 @@ class AdsterraPlaybackAdsService {
       show(context, PlaybackAdStage.streamFound,
           download: download, television: television, preload: preload);
 
-  /// Preload direct links once per loader. Experiments keep selecting their arm
-  /// at presentation, so cancelled source lookups do not advance the rotation.
+  /// Preload Adsterra and Clickadu direct links once per loader. ExoClick and
+  /// Monetag start their requests when presented. Experiments keep selecting
+  /// their arm at presentation, so cancelled lookups do not advance rotation.
   PlaybackAdPreload? preloadStreamFound(BuildContext context,
       {bool download = false, bool television = false}) {
     final lifecycle = WidgetsBinding.instance.lifecycleState;
@@ -78,7 +83,11 @@ class AdsterraPlaybackAdsService {
     final provider = context.read<AppDependencyProvider?>();
     final selection = provider?.playbackAdsSelection;
     final tv = television || DevicePresentationService.instance.isTelevision;
-    if (provider == null || selection == null) return null;
+    if (provider == null ||
+        selection == null ||
+        !_preloadNetworks.contains(selection.network)) {
+      return null;
+    }
     if (!tv &&
         selection.network == AdNetwork.adsterra &&
         selection.adsterra.streamFoundExperiment != null) {
@@ -88,9 +97,10 @@ class AdsterraPlaybackAdsService {
       AdNetwork.adsterra => selection.adsterra
           .forStage(PlaybackAdStage.streamFound, television: tv),
       AdNetwork.clickadu ||
-      AdNetwork.monetag =>
+      AdNetwork.monetag ||
+      AdNetwork.exoclick =>
         selection.popunders[selection.network]?.activeFor(television: tv),
-      AdNetwork.exoclick || null => null,
+      null => null,
     };
     if (placement == null || !placement.isSmartlink) return null;
     late final PlaybackAdPreload preload;
@@ -142,9 +152,10 @@ class AdsterraPlaybackAdsService {
     var placement = switch (network) {
       AdNetwork.adsterra => config?.forStage(stage, television: tv),
       AdNetwork.clickadu ||
-      AdNetwork.monetag =>
+      AdNetwork.monetag ||
+      AdNetwork.exoclick =>
         selection?.popunders[network]?.activeFor(television: tv),
-      AdNetwork.exoclick || null => null,
+      null => null,
     };
     if (provider == null || placement == null) {
       _logSkip(stage,
@@ -174,7 +185,11 @@ class AdsterraPlaybackAdsService {
       final state = WidgetsBinding.instance.lifecycleState;
       if (state != null && state != AppLifecycleState.resumed) return true;
       final selectedPlacement = placement;
-      final prepared = preload?.placement == selectedPlacement ? preload : null;
+      final allowPreload = _preloadNetworks.contains(network);
+      if (!allowPreload) preload?.dispose();
+      final prepared = allowPreload && preload?.placement == selectedPlacement
+          ? preload
+          : null;
       if (prepared?.unavailable == true) {
         _logSkip(stage, 'preloaded ad unavailable');
         return true;
@@ -190,6 +205,7 @@ class AdsterraPlaybackAdsService {
           storeLauncher: storeLauncher,
           television: tv,
           preload: prepared,
+          continueTap: continueTap,
         ),
       );
       // Compare the catalogs and network, not the chosen arm: unrelated
@@ -201,7 +217,7 @@ class AdsterraPlaybackAdsService {
       }
 
       debugPrint(
-          '[AdsterraPlayback] ${stage.name}: presenting ${selectedPlacement.network.name} ${selectedPlacement.mode} variant=${variantId ?? 'legacy'} television=$tv');
+          '[AdsterraPlayback] ${stage.name}: presenting ${selectedPlacement.network.name} ${selectedPlacement.mode} variant=${variantId ?? 'legacy'} television=$tv preloaded=${prepared != null}');
       provider.addListener(onConfigChanged);
       try {
         await navigator.push(route);

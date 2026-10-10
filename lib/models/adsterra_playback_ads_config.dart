@@ -233,9 +233,9 @@ class PlaybackAdPlacement {
       value is num && value.isFinite ? value.toInt().clamp(min, max) : fallback;
 }
 
-/// Clickadu's or Monetag's popup for the stream-found stage: the network's
-/// onclick tag (`script`) or a Direct Link (`smartlink`). Missing or malformed
-/// values disable it.
+/// A network's popup for the stream-found stage: an onclick tag (`script`),
+/// hosted tag (`page`) or Direct Link / Popunder Redirect URL (`smartlink`).
+/// Missing or malformed values disable it.
 class PopunderAdsConfig {
   const PopunderAdsConfig(this.network,
       {this.enabled = false, this.popunder, this.tvPopunder});

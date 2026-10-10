@@ -38,6 +38,8 @@ class AppRemoteConfig {
   static const clickaduPlaybackAdsKey = 'clickadu_playback_ads';
   static const monetagPlaybackEnabledKey = 'monetag_playback_enabled';
   static const monetagPlaybackAdsKey = 'monetag_playback_ads';
+  static const exoclickPlaybackEnabledKey = 'exoclick_playback_enabled';
+  static const exoclickPlaybackAdsKey = 'exoclick_playback_ads';
   static const vastPrerollEnabledKey = 'vast_preroll_enabled';
   static const vastPrerollKey = 'vast_preroll';
   static const vastPrerollNetworkKey = 'vast_preroll_network';
@@ -88,6 +90,8 @@ class AppRemoteConfig {
       clickaduPlaybackAdsKey: '{}',
       monetagPlaybackEnabledKey: false,
       monetagPlaybackAdsKey: '{}',
+      exoclickPlaybackEnabledKey: false,
+      exoclickPlaybackAdsKey: '{}',
       vastPrerollEnabledKey: false,
       vastPrerollKey: '{}',
       vastPrerollNetworkKey: 'clickadu',
@@ -187,6 +191,7 @@ class AppRemoteConfig {
     for (final (network, enabledKey, catalogKey) in [
       (AdNetwork.clickadu, clickaduPlaybackEnabledKey, clickaduPlaybackAdsKey),
       (AdNetwork.monetag, monetagPlaybackEnabledKey, monetagPlaybackAdsKey),
+      (AdNetwork.exoclick, exoclickPlaybackEnabledKey, exoclickPlaybackAdsKey),
     ]) {
       provider.setPopunderAdsConfig(PopunderAdsConfig.parse(
         remoteConfig.getString(catalogKey),
@@ -202,7 +207,8 @@ class AppRemoteConfig {
         AdNetwork.adsterra => adsterraPlaybackAdsKey,
         AdNetwork.clickadu => clickaduPlaybackAdsKey,
         AdNetwork.monetag => monetagPlaybackAdsKey,
-        AdNetwork.exoclick || null => null,
+        AdNetwork.exoclick => exoclickPlaybackAdsKey,
+        null => null,
       };
       final placement = network == AdNetwork.adsterra
           ? provider.adsterraPlaybackAds.forStage(PlaybackAdStage.streamFound)

@@ -1,0 +1,16 @@
+{
+  "popunder": {
+    "enabled": true,
+    "mode": "smartlink",
+    "url": "https://s.pemsrv.com/v1/link.php?cat=&idzone=6050984&type=8",
+    "load_timeout_ms": 10000,
+    "max_duration_seconds": 30
+  },
+  "tv_popunder": {
+    "enabled": true,
+    "mode": "smartlink",
+    "url": "https://s.pemsrv.com/v1/link.php?cat=&idzone=6050984&type=8",
+    "load_timeout_ms": 10000,
+    "max_duration_seconds": 30
+  }
+}

@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.webkit.WebView
 import android.widget.Toast
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -12,13 +13,24 @@ import io.flutter.plugin.common.MethodChannel
 import dev.beamlak.flixquest_v2.downloads.StreamDownloadsBridge
 import dev.beamlak.flixquest_v2.downloads.StreamOfflinePlayerFactory
 import dev.beamlak.flixquest_v2.links.MediaLinkBridge
+import dev.beamlak.flixquest_v2.ads.PlaybackAdInputBridge
+import io.flutter.plugins.webviewflutter.WebViewFlutterPlugin
 
 class MainActivity: FlutterActivity() {
     private var downloadsBridge: StreamDownloadsBridge? = null
     private var linkBridge: MediaLinkBridge? = null
+    private var playbackAdInputBridge: PlaybackAdInputBridge? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        playbackAdInputBridge = PlaybackAdInputBridge(
+            flutterEngine.dartExecutor.binaryMessenger,
+        ) { identifier ->
+            val plugin = flutterEngine.plugins.get(WebViewFlutterPlugin::class.java)
+                as? WebViewFlutterPlugin
+            plugin?.instanceManager?.getInstance<WebView>(identifier)
+        }
 
         val bridge = StreamDownloadsBridge(
             this,
@@ -67,6 +79,8 @@ class MainActivity: FlutterActivity() {
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        playbackAdInputBridge?.dispose()
+        playbackAdInputBridge = null
         linkBridge?.dispose()
         linkBridge = null
         super.cleanUpFlutterEngine(flutterEngine)

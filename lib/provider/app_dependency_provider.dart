@@ -100,7 +100,7 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Clickadu's and Monetag's popup catalogs, whichever one is selected.
+  /// Clickadu's, Monetag's and ExoClick's popup catalogs, whichever is selected.
   Map<AdNetwork, PopunderAdsConfig> _popunderAds = const {};
 
   PopunderAdsConfig popunderAdsFor(AdNetwork network) =>

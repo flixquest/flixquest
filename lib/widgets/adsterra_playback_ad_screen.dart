@@ -9,6 +9,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../models/adsterra_playback_ads_config.dart';
+import '../services/playback_ad_input_service.dart';
 import 'network_banner_widget.dart';
 
 /// Hands a Play Store link to a store app and reports whether one opened.
@@ -245,11 +246,13 @@ class AdsterraPlaybackAdScreen extends StatefulWidget {
       this.holdClose = true,
       this.television = false,
       this.preload,
+      this.continueTap,
       super.key});
   final PlaybackAdPlacement placement;
   final PlaybackAdStage stage;
   final StoreLauncher? storeLauncher;
   final PlaybackAdPreload? preload;
+  final PlaybackContinueTap? continueTap;
 
   /// Whether the ad page hides its close control until the ad is served.
   /// False for a page the viewer opened themselves, such as a video ad's
@@ -316,6 +319,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   /// Until then its own redirects may navigate the script WebView.
   bool _hostedPageLoaded = false;
   bool _automaticMonetagInstalled = false;
+  bool _automaticMonetagAttempted = false;
 
   bool get _automaticMonetag =>
       widget.placement.network == AdNetwork.monetag &&
@@ -430,6 +434,41 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     }
   }
 
+  Future<void> _tapMonetagContinue() async {
+    final controller = _script;
+    if (!_automaticMonetag ||
+        _automaticMonetagAttempted ||
+        controller == null ||
+        !mounted ||
+        _finished ||
+        _page != null) {
+      return;
+    }
+    _automaticMonetagAttempted = true;
+    final document = widget.placement.pageUrl ??
+        Uri.parse(NetworkBannerWidget.documentBaseUrl);
+    var tapped = false;
+    try {
+      tapped = await (widget.continueTap ?? tapPlaybackContinue)(
+          controller, document);
+    } catch (error) {
+      _log('native Monetag touch unavailable ($error)');
+    }
+    if (!mounted || _finished || _page != null) return;
+    if (tapped) {
+      _log('Monetag Continue tapped automatically via Android WebView; '
+          'waiting for its URL');
+    } else {
+      _log('native Monetag touch unavailable; trying the tag trigger once');
+      try {
+        await controller.runJavaScript(monetagTriggerPlaybackScript);
+      } catch (error) {
+        _log('Monetag trigger unavailable ($error)');
+        _finish('automatic_activation_error');
+      }
+    }
+  }
+
   void _onScriptMessage(JavaScriptMessage message) {
     if (!mounted || _finished || _phase != _Phase.script || _page != null) {
       return;
@@ -442,7 +481,13 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
               'script failure: ${payload['detail'] ?? 'script or page error'}');
           _finish('script_failed');
         case 'done':
-          _finish('continue_control');
+          if (_automaticMonetag && _automaticMonetagAttempted) {
+            // The hosted button reports done after 750 ms. Keep its tag
+            // alive for a delayed popup, bounded by the existing load timer.
+            _log('Continue callback received; waiting for the popup URL');
+          } else {
+            _finish('continue_control');
+          }
         case 'script':
           _log('tag script loaded; waiting for the tag to fetch its ad');
         case 'request':
@@ -468,6 +513,12 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
               : 'script loaded');
         case 'activated':
           _log('Monetag popup triggered automatically; waiting for its URL');
+        case 'activation_ready':
+          _log('Monetag tag ready; attempting one automatic Continue touch');
+          unawaited(_tapMonetagContinue());
+        case 'input':
+          _log('Monetag Continue input trusted=${payload['trusted']} '
+              'userActivation=${payload['active']}');
         case 'empty':
           _log('Monetag options returned HTTP 204 No Content; '
               'no advertiser URL and no activation attempted '
@@ -1309,7 +1360,9 @@ bool isNoAdFallback(Uri? uri) {
   final host = uri.host.toLowerCase();
   return RegExp(r'^(www\.)?google\.[a-z]{2,3}(\.[a-z]{2})?$').hasMatch(host) ||
       host == 'bing.com' ||
-      host == 'www.bing.com';
+      host == 'www.bing.com' ||
+      host == 'yahoo.com' ||
+      host == 'www.yahoo.com';
 }
 
 bool _isPlaybackWebUrl(Uri? uri) =>
@@ -1363,10 +1416,8 @@ Future<void> _stopPlaybackController(WebViewController? controller) async {
   } catch (_) {}
 }
 
-/// The current Onclick tag exposes onClickTrigger after loading its script,
-/// before its asynchronous `/5/<zone>/` options request finishes. Wait for that
-/// request and a short initialization grace period, then invoke the trigger
-/// once. This does not dispatch a click or claim a trusted user gesture.
+/// Wait for the tag's options and its Continue button, then ask Dart to send
+/// one native Android touch. Other platforms retain the tag-hook fallback.
 /// The screen's load timer bounds a missing hook/request; disabling JavaScript
 /// on close cancels this document and prevents late activation.
 @visibleForTesting
@@ -1374,6 +1425,11 @@ const monetagAutomaticPlaybackScript = r'''
 (function(){
  if(window.fqMonetagAutomatic)return;
  window.fqMonetagAutomatic=true;
+ window.addEventListener('click',function(e){
+  if(e.target&&e.target.id==='fq-continue')PlaybackAd.postMessage(JSON.stringify({
+   event:'input',trusted:e.isTrusted,active:!!(navigator.userActivation&&navigator.userActivation.isActive)
+  }));
+ },true);
  var readyAt=null;
  var timer=setInterval(function(){
   var requests=performance.getEntriesByType('resource').filter(function(entry){
@@ -1387,14 +1443,28 @@ const monetagAutomaticPlaybackScript = r'''
    PlaybackAd.postMessage(JSON.stringify({event:'empty',url:request.name}));
    return;
   }
-  if(typeof window.onClickTrigger!=='function')return;
+  var button=document.getElementById('fq-continue');
+  if(!button||button.disabled)return;
   if(readyAt===null){readyAt=Date.now()+500;return;}
   if(Date.now()<readyAt)return;
   clearInterval(timer);
-  PlaybackAd.postMessage(JSON.stringify({event:'activated'}));
-  try{window.onClickTrigger();}
-  catch(e){PlaybackAd.postMessage(JSON.stringify({event:'failed',detail:String(e)}));}
+  PlaybackAd.postMessage(JSON.stringify({event:'activation_ready'}));
  },100);
+})();
+''';
+
+@visibleForTesting
+const monetagTriggerPlaybackScript = r'''
+(function(){
+ if(window.fqMonetagTriggerAttempted)return;
+ window.fqMonetagTriggerAttempted=true;
+ if(typeof window.onClickTrigger!=='function'){
+  PlaybackAd.postMessage(JSON.stringify({event:'failed',detail:'Monetag trigger missing'}));
+  return;
+ }
+ PlaybackAd.postMessage(JSON.stringify({event:'activated'}));
+ try{window.onClickTrigger();}
+ catch(e){PlaybackAd.postMessage(JSON.stringify({event:'failed',detail:String(e)}));}
 })();
 ''';
 
