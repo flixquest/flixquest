@@ -11,6 +11,7 @@ import '../../../models/tv_stream_metadata.dart';
 import '../../../services/external_subtitle_service.dart';
 import '../../../ui_components/app_ui_components.dart';
 import 'player_sheet_ui.dart';
+import 'player_feedback_ui.dart';
 import '../../../mobile/widgets/page_kit.dart';
 
 class PlayerExternalSubtitles {
@@ -270,7 +271,6 @@ class PlayerExternalSubtitles {
           SnackBar(
             content: Text(tr('failed_load_subtitles',
                 namedArgs: {'error': e.toString()})),
-            backgroundColor: Theme.of(context).colorScheme.error,
             duration: const Duration(seconds: 3),
           ),
         );
@@ -310,37 +310,13 @@ class PlayerExternalSubtitles {
     if (_selectedExternalSubtitles.isEmpty) {
       return;
     }
-    // Read before the first await so the failure snackbar below needs no
-    // BuildContext afterwards.
-    final errorColor = Theme.of(scaffoldMessenger.context).colorScheme.error;
-
     // Show loading indicator
     scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                tr('downloading_processing_subtitles',
-                    namedArgs: {
-                      'count': '${_selectedExternalSubtitles.length}',
-                    }),
-                style: const TextStyle(fontFamily: 'Figtree'),
-              ),
-            ),
-          ],
+      playerProgressSnackBar(
+        message: tr(
+          'downloading_processing_subtitles',
+          namedArgs: {'count': '${_selectedExternalSubtitles.length}'},
         ),
-        backgroundColor: BetterPlayerColors.panelRaised,
-        duration: const Duration(seconds: 30),
       ),
     );
 
@@ -418,7 +394,6 @@ class PlayerExternalSubtitles {
         SnackBar(
           content: Text(
               tr('failed_add_subtitles', namedArgs: {'error': e.toString()})),
-          backgroundColor: errorColor,
           duration: const Duration(seconds: 3),
         ),
       );

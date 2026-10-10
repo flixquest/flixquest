@@ -69,7 +69,6 @@ class PlayerMovieRecommendations {
           SnackBar(
             content: Text(
                 tr('failed_load_movie', namedArgs: {'error': e.toString()})),
-            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }

@@ -25,6 +25,7 @@ import '../../services/daddylive_service.dart';
 import '../../services/stream_intro_service.dart';
 import 'player/player_preroll_ad.dart';
 import 'player/player_sheet_ui.dart';
+import 'player/player_feedback_ui.dart';
 import 'player/player_watch_page.dart';
 import 'player/player_strings.dart';
 
@@ -344,6 +345,7 @@ class _LivePlayerState extends State<LivePlayer> {
         .defaultSeekDuration;
 
     return BetterPlayerControlsConfiguration(
+      emphasisFontFamily: AppType.semiBold,
       gestureConfiguration: BetterPlayerGestureConfiguration(
         enableVolumeSwipe: !widget.useTvControls,
         enableBrightnessSwipe: !widget.useTvControls,
@@ -1919,99 +1921,24 @@ class _LivePlayerErrorOverlay extends StatelessWidget {
         ),
       );
     }
-    return PlayerTheme(
-      onVideo: true,
-      child: ColoredBox(
-        color: Colors.black.withValues(alpha: .86),
-        child: SafeArea(
-          minimum: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxHeight < 300;
-              final titleSize = compact ? 18.0 : 22.0;
-              final messageLines = compact ? 2 : 3;
-              final gapAfterIcon = compact ? 10.0 : 18.0;
-              final gapAfterTitle = compact ? 4.0 : 8.0;
-              final gapBeforeActions = compact ? 10.0 : 22.0;
-              return Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      BetterPlayerIconSurface(
-                        icon: PhosphorIcons.warningCircle(),
-                        color: Colors.white,
-                      ),
-                      SizedBox(height: gapAfterIcon),
-                      Text(
-                        tr('player_channel_unavailable'),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontFamily: 'FigtreeSB',
-                          fontSize: titleSize,
-                        ),
-                      ),
-                      SizedBox(height: gapAfterTitle),
-                      Text(
-                        message,
-                        maxLines: messageLines,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: BetterPlayerColors.muted,
-                          fontSize: 14,
-                          height: 1.4,
-                        ),
-                      ),
-                      SizedBox(height: gapBeforeActions),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          FilledButton.icon(
-                            onPressed: onRetry,
-                            style: compact
-                                ? FilledButton.styleFrom(
-                                    visualDensity: VisualDensity.compact,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                  )
-                                : null,
-                            icon: Icon(PhosphorIcons.arrowClockwise(),
-                                size: 18),
-                            label: Text(tr('retry')),
-                          ),
-                          if (onChannels != null)
-                            OutlinedButton.icon(
-                              onPressed: onChannels,
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: compact
-                                    ? VisualDensity.compact
-                                    : VisualDensity.standard,
-                                padding: compact
-                                    ? const EdgeInsets.symmetric(horizontal: 12)
-                                    : null,
-                              ),
-                              icon: Icon(
-                                PhosphorIcons.televisionSimple(),
-                                size: 18,
-                              ),
-                              label: Text(tr('player_choose_channel')),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
+    return PlayerErrorView(
+      title: tr('player_channel_unavailable'),
+      message: message,
+      icon: PhosphorIcons.warningCircle(),
+      actions: [
+        PlayerActionButton(
+          label: tr('retry'),
+          icon: PhosphorIcons.arrowClockwise(),
+          primary: true,
+          onPressed: onRetry,
         ),
-      ),
+        if (onChannels != null)
+          PlayerActionButton(
+            label: tr('player_choose_channel'),
+            icon: PhosphorIcons.list(),
+            onPressed: onChannels!,
+          ),
+      ],
     );
   }
 }

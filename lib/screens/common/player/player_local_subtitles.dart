@@ -272,7 +272,6 @@ class PlayerLocalSubtitles {
           SnackBar(
             content: Text(tr('failed_upload_subtitle',
                 namedArgs: {'error': e.toString()})),
-            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }

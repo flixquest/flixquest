@@ -1101,6 +1101,8 @@
   "player_stretch_description": "ملء الشاشة دون قص",
   "player_live": "مباشر",
   "player_playback_failed": "تعذّر التشغيل",
+  "player_playback_failed_hint": "تعذّر تشغيل هذا البث. جرّب مزوّدًا آخر أو أعد المحاولة.",
+  "player_playback_retry_hint": "تعذّر تشغيل هذا الفيديو. أعد المحاولة.",
   "player_backup_streams": "بثوث احتياطية",
   "player_now_playing": "قيد التشغيل",
   "player_switching_to": "جارٍ التبديل إلى {name}…",

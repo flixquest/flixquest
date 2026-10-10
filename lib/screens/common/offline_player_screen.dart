@@ -17,7 +17,7 @@ import '../../constants/app_constants.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../provider/wellness_provider.dart';
-import 'player/player_sheet_ui.dart';
+import 'player/player_feedback_ui.dart';
 import 'player/player_strings.dart';
 import 'player/player_external_subtitles.dart';
 
@@ -322,57 +322,17 @@ class _OfflinePlaybackError extends StatelessWidget {
   final VoidCallback onClose;
 
   @override
-  Widget build(BuildContext context) {
-    return PlayerTheme(
-      onVideo: true,
-      child: Builder(builder: (context) {
-        final colors = BetterPlayerPanelColors.of(context);
-        return ColoredBox(
-          color: Colors.black,
-          child: Center(
-            // A 16:9 playback area is short; scrolling keeps the button
-            // reachable instead of overflowing.
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    BetterPlayerIconSurface(icon: PhosphorIcons.fileX()),
-                    const SizedBox(height: 18),
-                    Text(
-                      tr('offline_play_failed'),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: colors.foreground,
-                        fontSize: 17,
-                        fontFamily: 'FigtreeSB',
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      tr('offline_play_failed_hint'),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: colors.secondary,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    FilledButton.icon(
-                      onPressed: onClose,
-                      icon: Icon(PhosphorIcons.arrowLeft(), size: 18),
-                      label: Text(tr('go_back')),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+  Widget build(BuildContext context) => PlayerErrorView(
+        title: tr('offline_play_failed'),
+        message: tr('offline_play_failed_hint'),
+        icon: PhosphorIcons.fileX(),
+        actions: [
+          PlayerActionButton(
+            label: tr('go_back'),
+            icon: PhosphorIcons.arrowLeft(),
+            primary: true,
+            onPressed: onClose,
           ),
-        );
-      }),
-    );
-  }
+        ],
+      );
 }

@@ -45,12 +45,15 @@ import 'player/player_data_management.dart';
 import 'player/player_preroll_ad.dart';
 import 'player/player_completion_detector.dart';
 import 'player/tv_subtitle_timing_panel.dart';
+import 'player/player_subtitle_timing_sheet.dart';
 import 'player/player_external_subtitles.dart';
 import 'player/player_local_subtitles.dart';
 import 'player/player_episode_selection.dart';
 import 'player/player_movie_recommendations.dart';
 import 'player/player_next_episode_policy.dart';
 import 'player/player_sheet_ui.dart';
+import 'player/player_feedback_ui.dart';
+import '../../design/app_tokens.dart';
 import 'player/player_watch_page.dart';
 import 'player/player_strings.dart';
 import 'download_selection_sheets.dart';
@@ -465,8 +468,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
             showPlaceholderUntilPlay: true,
             allowedScreenSleep: false,
             autoDetectFullscreenAspectRatio: !widget.useTvControls,
-            errorBuilder: (context, errorMessage) =>
-                _buildCustomPlayerErrorWidget(context, errorMessage),
+            errorBuilder: (context, _) =>
+                _buildCustomPlayerErrorWidget(context),
             subtitlesConfiguration: buildPlayerSubtitleConfiguration(
               backgroundColor: widget.settings.subtitleBackgroundColor,
               foregroundColor: widget.settings.subtitleForegroundColor,
@@ -3699,177 +3702,55 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   void _showSubtitleTimingAdjuster() {
-    const initialSize = .52;
-    const minSize = .42;
-    const maxSize = .72;
-    final dragController = DraggableScrollableController();
-
-    void updateFromHeader(DragUpdateDetails details) {
-      if (!dragController.isAttached) return;
-      final viewportHeight = MediaQuery.sizeOf(context).height;
-      final nextSize = (dragController.size - details.delta.dy / viewportHeight)
-          .clamp(minSize, maxSize);
-      dragController.jumpTo(nextSize);
-    }
-
-    void settleFromHeader(DragEndDetails details) {
-      if (!dragController.isAttached) return;
-      final velocity = details.primaryVelocity ?? 0;
-      final current = dragController.size;
-      final target = velocity < -250
-          ? maxSize
-          : velocity > 250
-              ? minSize
-              : (current < (initialSize + minSize) / 2)
-                  ? minSize
-                  : (current > (initialSize + maxSize) / 2)
-                      ? maxSize
-                      : initialSize;
-      unawaited(
-        dragController.animateTo(
-          target,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-        ),
-      );
-    }
-
     showPlayerSheet<void>(
       context: context,
-      builder: (sheetContext) => DraggableScrollableSheet(
-        controller: dragController,
-        initialChildSize: initialSize,
-        minChildSize: minSize,
-        maxChildSize: maxSize,
-        expand: false,
-        snap: true,
-        builder: (context, scrollController) => PlayerSheetScaffold(
-          title: tr('subtitle_timing'),
-          subtitle: tr('subtitle_timing_help'),
-          showDragHandle: true,
-          onHeaderVerticalDragUpdate: updateFromHeader,
-          onHeaderVerticalDragEnd: settleFromHeader,
-          actions: [
-            IconButton(
-              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-              onPressed: () => Navigator.pop(sheetContext),
-              icon: Icon(PhosphorIcons.x()),
-            ),
-          ],
-          child: SingleChildScrollView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-            child: _SubtitleTimingControl(
-              controller: _betterPlayerController,
-            ),
-          ),
-        ),
+      builder: (sheetContext) => PlayerSubtitleTimingSheet(
+        controller: _betterPlayerController,
+        onClose: () => Navigator.pop(sheetContext),
       ),
-    ).whenComplete(dragController.dispose);
+    );
   }
 
-  String _sanitizeError(dynamic error) {
-    if (error == null) return tr('switch_provider_error');
-    String msg = error.toString();
-    final isDeveloperError = RegExp(
-      r'(PlatformException|IndexOutOfBoundsException|MethodChannel|SourceFile:|java\.|android\.|io\.flutter|\n\s*at\s)',
-      caseSensitive: false,
-    ).hasMatch(msg);
-    if (isDeveloperError) return tr('switch_provider_error');
-
-    msg = msg.replaceAll(RegExp(r'https?://[^\s]+'), '').trim();
-    msg = msg
-        .replaceAll(
-          RegExp(
-              r'^(Exception|SocketException|FormatException|ScraperApiException):\s*'),
-          '',
-        )
-        .trim();
-    // Player surfaces are intentionally compact. Multi-line or very long
-    // errors are diagnostics, not useful recovery guidance for the viewer.
-    if (msg.isEmpty || msg.contains('\n') || msg.length > 160) {
-      return tr('switch_provider_error');
-    }
-    return msg;
-  }
-
-  Widget _buildCustomPlayerErrorWidget(
-      BuildContext context, String? errorText) {
-    final cleanError = _sanitizeError(errorText);
-    final hasProviders = widget.availableProviders != null &&
-        widget.availableProviders!.isNotEmpty;
-    return PlayerTheme(
-      onVideo: true,
-      child: ColoredBox(
-        color: Colors.black,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: Center(
-            // A 16:9 playback area is short; scrolling keeps the message and
-            // its actions reachable instead of overflowing the Column.
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const BetterPlayerIconSurface(
-                    icon: PhosphorIconsRegular.warningCircle,
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    cleanError,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontFamily: 'FigtreeSB',
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    alignment: WrapAlignment.center,
-                    children: [
-                      if (hasProviders)
-                        FilledButton.icon(
-                          onPressed: () {
-                            if (widget.useTvControls) {
-                              _showTvProviderMenu();
-                            } else {
-                              _showProviderSwitcher();
-                            }
-                          },
-                          icon: Icon(PhosphorIcons.hardDrives(), size: 18),
-                          label: Text(tr('switch_provider')),
-                        ),
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          final currentSource = _currentProviderCode;
-                          if (currentSource != null) {
-                            _switchToProvider(
-                              currentSource,
-                              closeMenu: () {},
-                              refreshMenu: () {},
-                            );
-                          }
-                        },
-                        icon: Icon(PhosphorIcons.arrowClockwise(), size: 18),
-                        label: Text(tr('retry')),
-                      ),
-                      IconButton(
-                        onPressed: _exitPlayer,
-                        icon: Icon(PhosphorIcons.x()),
-                        tooltip: tr('close'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+  Widget _buildCustomPlayerErrorWidget(BuildContext context) {
+    final hasProviders = widget.availableProviders?.isNotEmpty == true;
+    return PlayerErrorView(
+      title: tr('player_playback_failed'),
+      message: tr(hasProviders
+          ? 'player_playback_failed_hint'
+          : 'player_playback_retry_hint'),
+      icon: PhosphorIcons.warningCircle(),
+      onClose: _exitPlayer,
+      closeLabel: tr('close'),
+      actions: [
+        if (hasProviders)
+          PlayerActionButton(
+            label: tr('switch_provider'),
+            icon: PhosphorIcons.hardDrives(),
+            primary: true,
+            autofocus: widget.useTvControls,
+            onPressed: widget.useTvControls
+                ? _showTvProviderMenu
+                : _showProviderSwitcher,
           ),
+        PlayerActionButton(
+          label: tr('retry'),
+          icon: PhosphorIcons.arrowClockwise(),
+          primary: !hasProviders,
+          autofocus: widget.useTvControls && !hasProviders,
+          onPressed: () {
+            final currentSource = _currentProviderCode;
+            if (currentSource != null) {
+              unawaited(_switchToProvider(
+                currentSource,
+                closeMenu: () {},
+                refreshMenu: () {},
+              ));
+            } else {
+              _betterPlayerController.retryDataSource();
+            }
+          },
         ),
-      ),
+      ],
     );
   }
 }
@@ -3925,149 +3806,158 @@ class _TvNextEpisodeOverlay extends StatelessWidget {
     final placeholder = tv == null
         ? const Color(0xff1b1c1c)
         : Color.alphaBlend(tv.idleFill, shade.withValues(alpha: 1));
-    return Focus(
-      onKeyEvent: (_, event) {
-        if (event is KeyDownEvent &&
-            (event.logicalKey == LogicalKeyboardKey.escape ||
-                event.logicalKey == LogicalKeyboardKey.goBack ||
-                event.logicalKey == LogicalKeyboardKey.browserBack)) {
-          onCancel();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-        // Only the corner the card sits in is shaded, and the shade takes no
-        // taps: the picture and its controls stay usable around the card.
-        IgnorePointer(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: AlignmentDirectional.bottomEnd,
-                radius: 1.1,
-                colors: [shade, shade.withValues(alpha: 0)],
+    return PlayerTheme(
+      onVideo: touch,
+      child: Focus(
+        onKeyEvent: (_, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.escape ||
+                  event.logicalKey == LogicalKeyboardKey.goBack ||
+                  event.logicalKey == LogicalKeyboardKey.browserBack)) {
+            onCancel();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Only the corner the card sits in is shaded, and the shade takes no
+            // taps: the picture and its controls stay usable around the card.
+            IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: AlignmentDirectional.bottomEnd,
+                    radius: 1.1,
+                    colors: [shade, shade.withValues(alpha: 0)],
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-        AnimatedPadding(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          padding: EdgeInsets.only(bottom: liftedBy),
-          child: SafeArea(
-          minimum: touch
-              ? const EdgeInsets.fromLTRB(20, 16, 20, 20)
-              : const EdgeInsets.fromLTRB(48, 30, 48, 36),
-          child: Align(
-            alignment: AlignmentDirectional.bottomEnd,
-            child: SizedBox(
-              width: touch ? 380 : 440,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(5),
-                        child: SizedBox(
-                          width: touch ? 128 : 160,
-                          height: touch ? 72 : 90,
-                          child: episode.stillPath == null
-                              ? ColoredBox(
-                                  color: placeholder,
-                                  child: Icon(
-                                    PhosphorIconsRegular.filmStrip,
-                                    color: tv?.disabled ?? Colors.white54,
-                                    size: 30,
-                                  ),
-                                )
-                              : Image.network(
-                                  'https://image.tmdb.org/t/p/w300${episode.stillPath}',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      ColoredBox(color: placeholder),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
+            AnimatedPadding(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              padding: EdgeInsets.only(bottom: liftedBy),
+              child: SafeArea(
+                minimum: touch
+                    ? const EdgeInsets.fromLTRB(20, 16, 20, 20)
+                    : const EdgeInsets.fromLTRB(48, 30, 48, 36),
+                child: Align(
+                  alignment: AlignmentDirectional.bottomEnd,
+                  child: SizedBox(
+                    width: touch ? 380 : 440,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              tr('next_episode').toUpperCase(),
-                              style: TextStyle(
-                                color: muted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.4,
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(5),
+                              child: SizedBox(
+                                width: touch ? 128 : 160,
+                                height: touch ? 72 : 90,
+                                child: episode.stillPath == null
+                                    ? ColoredBox(
+                                        color: placeholder,
+                                        child: Icon(
+                                          PhosphorIconsRegular.filmStrip,
+                                          color: tv?.disabled ?? Colors.white54,
+                                          size: 30,
+                                        ),
+                                      )
+                                    : Image.network(
+                                        'https://image.tmdb.org/t/p/w300${episode.stillPath}',
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            ColoredBox(color: placeholder),
+                                      ),
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'S${episode.seasonNumber}:E${episode.episodeNumber}  '
-                              '${episode.episodeName}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: foreground,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                height: 1.2,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    tr('next_episode').toUpperCase(),
+                                    style: TextStyle(
+                                      color: muted,
+                                      fontSize: 12,
+                                      fontFamily: AppType.semiBold,
+                                      letterSpacing: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'S${episode.seasonNumber}:E${episode.episodeNumber}  '
+                                    '${episode.episodeName}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: foreground,
+                                      fontSize: 18,
+                                      fontFamily: AppType.semiBold,
+                                      height: 1.2,
+                                    ),
+                                  ),
+                                  if (episode.overview?.trim().isNotEmpty ==
+                                      true) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      episode.overview!.trim(),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: muted,
+                                        fontSize: 13,
+                                        fontFamily: AppType.regular,
+                                        height: 1.3,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
-                            if (episode.overview?.trim().isNotEmpty ==
-                                true) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                episode.overview!.trim(),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: muted,
-                                  fontSize: 13,
-                                  height: 1.3,
-                                ),
-                              ),
-                            ],
                           ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: _TvPromptButton(
+                                label: seconds == null
+                                    ? tr('next_episode')
+                                    : '${tr('next_episode')}  $seconds',
+                                icon:
+                                    PhosphorIcons.play(PhosphorIconsStyle.fill),
+                                progress: elapsed,
+                                autofocus: !touch,
+                                colors: tv,
+                                onPressed: onPlay,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Flexible(
+                              child: _TvPromptButton(
+                                label: cancelLabel,
+                                icon: PhosphorIcons.x(),
+                                colors: tv,
+                                onPressed: onCancel,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      _TvPromptButton(
-                        label: seconds == null
-                            ? tr('next_episode')
-                            : '${tr('next_episode')}  $seconds',
-                        icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
-                        progress: elapsed,
-                        autofocus: !touch,
-                        colors: tv,
-                        onPressed: onPlay,
-                      ),
-                      const SizedBox(width: 10),
-                      _TvPromptButton(
-                        label: cancelLabel,
-                        icon: PhosphorIcons.x(),
-                        colors: tv,
-                        onPressed: onCancel,
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
-        ),
-        ],
       ),
     );
   }
@@ -4136,12 +4026,12 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
         onTapUp: (_) => _press(false),
         onTapCancel: () => _press(false),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(5),
+          borderRadius: BorderRadius.circular(AppRadii.button),
           child: Stack(
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 120),
-                height: 44,
+                height: 48,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 color: colors == null
                     ? (lit ? const Color(0xf2ffffff) : const Color(0x40ffffff))
@@ -4151,13 +4041,17 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
                   children: [
                     Icon(widget.icon, color: foreground, size: 20),
                     const SizedBox(width: 8),
-                    Text(
-                      widget.label,
-                      style: TextStyle(
-                        color: foreground,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                    Flexible(
+                      child: Text(
+                        widget.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: foreground,
+                          fontSize: 15,
+                          fontFamily: AppType.semiBold,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
                     ),
                   ],
@@ -4189,8 +4083,7 @@ class _TvPromptButtonState extends State<_TvPromptButton> {
   }
 }
 
-/// IntroDB's skip action: a white-edged pill over the picture that fills
-/// white under focus or a finger.
+/// IntroDB's intro, recap, credits and preview share one playback action.
 class _TvSkipButton extends StatelessWidget {
   const _TvSkipButton({required this.label, required this.onPressed});
 
@@ -4198,41 +4091,11 @@ class _TvSkipButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(PhosphorIcons.skipForward(PhosphorIconsStyle.fill), size: 18),
-      label: Text(label),
-      style: ButtonStyle(
-        minimumSize: const WidgetStatePropertyAll(Size(0, 44)),
-        padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(horizontal: 18),
-        ),
-        textStyle: const WidgetStatePropertyAll(
-          TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-        ),
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        ),
-        side: const WidgetStatePropertyAll(
-          BorderSide(color: Colors.white, width: 1.5),
-        ),
-        backgroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.focused) ||
-                  states.contains(WidgetState.pressed)
-              ? const Color(0xf2ffffff)
-              : const Color(0x99000000),
-        ),
-        foregroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.focused) ||
-                  states.contains(WidgetState.pressed)
-              ? Colors.black
-              : Colors.white,
-        ),
-        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => PlayerActionButton(
+        label: label,
+        icon: PhosphorIcons.skipForward(PhosphorIconsStyle.fill),
+        onPressed: onPressed,
+      );
 }
 
 /// Audio and subtitles in one panel, as Netflix has it: soundtracks beside
@@ -4532,159 +4395,4 @@ class _SubtitleTools extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SubtitleTimingControl extends StatefulWidget {
-  const _SubtitleTimingControl({required this.controller});
-
-  final BetterPlayerController controller;
-
-  @override
-  State<_SubtitleTimingControl> createState() => _SubtitleTimingControlState();
-}
-
-class _SubtitleTimingControlState extends State<_SubtitleTimingControl> {
-  static const _step = Duration(milliseconds: 500);
-  static const _minimum = Duration(seconds: -10);
-  static const _limit = Duration(seconds: 10);
-
-  late Duration _offset;
-
-  @override
-  void initState() {
-    super.initState();
-    _offset = widget.controller.subtitleOffset;
-  }
-
-  @override
-  void didUpdateWidget(_SubtitleTimingControl oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.controller, widget.controller)) {
-      _offset = widget.controller.subtitleOffset;
-    }
-  }
-
-  void _setOffset(Duration offset) {
-    final milliseconds = offset.inMilliseconds.clamp(
-      -_limit.inMilliseconds,
-      _limit.inMilliseconds,
-    );
-    widget.controller.setSubtitleOffset(Duration(milliseconds: milliseconds));
-    setState(() => _offset = widget.controller.subtitleOffset);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = BetterPlayerPanelColors.of(context);
-    final offset = _offset;
-    final isSynced = offset == Duration.zero;
-    final status = isSynced
-        ? tr('subtitle_timing_synced')
-        : tr(offset.isNegative ? 'subtitle_earlier' : 'subtitle_later');
-    Widget step(Key key, IconData icon, String tooltip, VoidCallback? onTap) =>
-        IconButton.filledTonal(
-          key: key,
-          tooltip: tooltip,
-          onPressed: onTap,
-          style: IconButton.styleFrom(
-            backgroundColor: colors.raised,
-            foregroundColor: colors.foreground,
-            disabledBackgroundColor: colors.selectedFill,
-            disabledForegroundColor: colors.muted.withValues(alpha: .5),
-            fixedSize: const Size(48, 48),
-          ),
-          icon: Icon(icon, size: 20),
-        );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // The offset, large, with what it means under it.
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 160),
-          child: Text(
-            _subtitleOffsetValue(offset),
-            key: ValueKey(offset.inMilliseconds),
-            style: TextStyle(
-              color: colors.foreground,
-              fontFamily: 'FigtreeBold',
-              fontSize: 40,
-              height: 1.1,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          status,
-          key: const Key('subtitle_timing_value'),
-          style: TextStyle(color: colors.muted, fontSize: 14),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            step(
-              const Key('subtitle_timing_earlier'),
-              PhosphorIcons.minus(),
-              '${tr('subtitle_earlier')} 0.5s',
-              offset <= _minimum ? null : () => _setOffset(offset - _step),
-            ),
-            Expanded(
-              child: Slider(
-                key: const Key('subtitle_timing_slider'),
-                value: offset.inMilliseconds
-                    .clamp(-_limit.inMilliseconds, _limit.inMilliseconds)
-                    .toDouble(),
-                min: -_limit.inMilliseconds.toDouble(),
-                max: _limit.inMilliseconds.toDouble(),
-                divisions: 80,
-                semanticFormatterCallback: (_) => _subtitleOffsetLabel(offset),
-                onChanged: (value) =>
-                    _setOffset(Duration(milliseconds: value.round())),
-              ),
-            ),
-            step(
-              const Key('subtitle_timing_later'),
-              PhosphorIcons.plus(),
-              '${tr('subtitle_later')} 0.5s',
-              offset >= _limit ? null : () => _setOffset(offset + _step),
-            ),
-          ],
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 60),
-          child: DefaultTextStyle(
-            style: TextStyle(color: colors.muted, fontSize: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [Text('−10s'), Text('0s'), Text('+10s')],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextButton.icon(
-          key: const Key('subtitle_timing_reset'),
-          onPressed: isSynced ? null : () => _setOffset(Duration.zero),
-          icon: Icon(PhosphorIcons.arrowCounterClockwise(), size: 18),
-          label: Text(tr('subtitle_timing_reset')),
-        ),
-      ],
-    );
-  }
-}
-
-String _subtitleOffsetValue(Duration offset) {
-  if (offset == Duration.zero) return '0.0s';
-  final seconds = offset.inMilliseconds / 1000;
-  final sign = seconds > 0 ? '+' : '−';
-  return '$sign${seconds.abs().toStringAsFixed(1)}s';
-}
-
-String _subtitleOffsetLabel(Duration offset) {
-  if (offset == Duration.zero) return tr('subtitle_timing_synced');
-  final seconds = (offset.inMilliseconds.abs() / 1000).toStringAsFixed(2);
-  final compactSeconds = seconds.replaceFirst(RegExp(r'\.?0+$'), '');
-  return tr(
-    offset.isNegative ? 'subtitle_offset_earlier' : 'subtitle_offset_later',
-    namedArgs: {'offset': compactSeconds},
-  );
 }

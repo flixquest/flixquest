@@ -412,7 +412,6 @@ class PlayerEpisodeSelection {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(tr('failed_load_season_episodes')),
-            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }

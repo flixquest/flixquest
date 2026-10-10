@@ -1069,6 +1069,8 @@
   "player_stretch_description": "Llena la pantalla sin recortar",
   "player_live": "EN VIVO",
   "player_playback_failed": "No se pudo reproducir",
+  "player_playback_failed_hint": "No se pudo reproducir este contenido. Prueba otro proveedor o vuelve a intentarlo.",
+  "player_playback_retry_hint": "No se pudo reproducir este vídeo. Vuelve a intentarlo.",
   "player_backup_streams": "Transmisiones alternativas",
   "player_now_playing": "Reproduciendo",
   "player_switching_to": "Cambiando a {name}…",

@@ -1,4 +1,5 @@
 import 'package:flixquest/models/movie_stream_metadata.dart';
+import 'package:flixquest/models/recently_watched.dart';
 import 'package:flixquest/models/tv_stream_metadata.dart';
 import 'package:flixquest/provider/recently_watched_provider.dart';
 import 'package:flixquest/screens/common/player/player_episode_selection.dart';
@@ -55,8 +56,8 @@ void main() {
       (tester) async {
     late BuildContext pageContext;
     await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => RecentProvider(),
+      ChangeNotifierProvider<RecentProvider>(
+        create: (_) => _RecentProvider(),
         child: MaterialApp(
           home: Builder(
             builder: (context) {
@@ -109,4 +110,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await closed;
   });
+}
+
+// Route rendering only needs watch progress. Avoid initializing Firebase and
+// cloud sync just to supply an empty episode history to this widget test.
+class _RecentProvider extends ChangeNotifier implements RecentProvider {
+  @override
+  List<RecentEpisode> get episodes => const [];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
