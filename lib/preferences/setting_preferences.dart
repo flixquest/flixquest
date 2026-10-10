@@ -292,6 +292,16 @@ class SettingsPreferences {
     return sharedPrefsSingleton.getBool(PLAYER_AMBIENT_GLOW_ENABLED) ?? false;
   }
 
+  static const AUTO_PIP_ON_LEAVE = 'auto_pip_on_leave';
+
+  setAutoPipOnLeave(bool value) {
+    sharedPrefsSingleton.setBool(AUTO_PIP_ON_LEAVE, value);
+  }
+
+  Future<bool> getAutoPipOnLeave() async {
+    return sharedPrefsSingleton.getBool(AUTO_PIP_ON_LEAVE) ?? true;
+  }
+
   static const AUTO_LOAD_SOURCES = 'auto_load_sources_v1';
 
   setAutoLoadSources(bool value) {

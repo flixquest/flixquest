@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The wide layout: poster column on the left, one fact per text row on the right. Every row is
-  filled from a different field, so nothing here ever shows the same value twice.
+  The wide layout, laid out like the app's hero card: backdrop full bleed, shaded towards the foot,
+  with the poster and the facts sitting on the bottom edge.
+
+  Every text slot is an ImageView. The launcher inflates widgets with a restricted context, and a
+  TextView there drops @font resources and falls back to the system font, so the provider draws
+  the text in Figtree itself and hands it over as bitmaps (see WidgetText).
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/widget_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:layout_margin="4dp"
+    android:layout_margin="@dimen/widget_margin"
     android:background="@drawable/flixquest_widget_background"
     android:clipToOutline="true">
 
@@ -38,11 +42,23 @@
         tools:visibility="visible" />
 
     <ImageView
+        android:id="@+id/widget_scrim_side"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/flixquest_widget_scrim_side"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+    <ImageView
         android:id="@+id/widget_scrim"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:importantForAccessibility="no"
+        android:scaleType="fitXY"
         android:src="@drawable/flixquest_widget_scrim"
         android:visibility="gone"
         tools:visibility="visible" />
@@ -50,16 +66,15 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="center_vertical"
+        android:gravity="bottom"
         android:orientation="horizontal"
-        android:padding="14dp">
+        android:padding="@dimen/widget_padding">
 
         <ImageView
             android:id="@+id/widget_poster"
             android:layout_width="@dimen/widget_poster_width"
             android:layout_height="@dimen/widget_poster_height"
-            android:layout_gravity="center_vertical"
-            android:layout_marginEnd="14dp"
+            android:layout_marginEnd="@dimen/widget_padding"
             android:background="@drawable/flixquest_widget_poster_background"
             android:clipToOutline="true"
             android:contentDescription="@null"
@@ -72,72 +87,25 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/widget_eyebrow"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="@font/figtree_family"
-                android:letterSpacing="0.09"
-                android:maxLines="1"
-                android:textColor="#FFF57C00"
-                android:textSize="10sp"
-                android:textStyle="bold"
-                tools:text="MOVIE OF THE DAY" />
+            <include layout="@layout/flixquest_widget_kicker" />
 
-            <TextView
+            <ImageView
                 android:id="@+id/widget_title"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:ellipsize="end"
-                android:fontFamily="@font/figtree_family"
-                android:lineSpacingMultiplier="0.95"
-                android:maxLines="2"
-                android:textColor="#FFFFFFFF"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                tools:text="Dune: Part Two" />
+                style="@style/FlixQuestWidgetText"
+                android:layout_marginTop="6dp" />
 
-            <TextView
+            <ImageView
                 android:id="@+id/widget_subtitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:ellipsize="end"
-                android:fontFamily="@font/figtree_family"
-                android:maxLines="1"
-                android:textColor="#E6FFFFFF"
-                android:textSize="12sp"
-                tools:text="2024  ·  8.1 rating" />
+                style="@style/FlixQuestWidgetText"
+                android:layout_marginTop="5dp" />
 
-            <!-- The only place a completion ratio is expressed. -->
-            <ProgressBar
-                android:id="@+id/widget_progress"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="4dp"
-                android:layout_marginTop="9dp"
-                android:indeterminate="false"
-                android:max="100"
-                android:progressBackgroundTint="#40FFFFFF"
-                android:progressDrawable="@drawable/flixquest_widget_progress"
-                android:progressTint="#FFF57C00"
-                android:visibility="gone"
-                tools:progress="45"
-                tools:visibility="visible" />
-
-            <TextView
+            <ImageView
                 android:id="@+id/widget_meta"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="7dp"
-                android:ellipsize="end"
-                android:fontFamily="@font/figtree_family"
-                android:maxLines="2"
-                android:textColor="#B3FFFFFF"
-                android:textSize="11sp"
-                tools:text="Paul Atreides unites with the Fremen to wage war." />
+                style="@style/FlixQuestWidgetText"
+                android:layout_marginTop="4dp" />
         </LinearLayout>
     </LinearLayout>
+
+    <!-- The only place a completion ratio is expressed. -->
+    <include layout="@layout/flixquest_widget_progress" />
 </FrameLayout>

@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.os.Bundle
 import android.webkit.WebView
 import android.widget.Toast
 import io.flutter.embedding.android.FlutterActivity
@@ -20,6 +21,10 @@ class MainActivity: FlutterActivity() {
     private var downloadsBridge: StreamDownloadsBridge? = null
     private var linkBridge: MediaLinkBridge? = null
     private var playbackAdInputBridge: PlaybackAdInputBridge? = null
+
+    // Starting an activity of our own (a file picker, an external player, a full-screen ad) also
+    // reports the user as leaving, which would send a playing video into picture in picture.
+    private var launchingOwnActivity = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -84,6 +89,30 @@ class MainActivity: FlutterActivity() {
         linkBridge?.dispose()
         linkBridge = null
         super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+        launchingOwnActivity = true
+        try {
+            super.startActivityForResult(intent, requestCode, options)
+        } catch (e: RuntimeException) {
+            launchingOwnActivity = false
+            throw e
+        }
+    }
+
+    // Only a real departure, such as the home button, reaches the plugins listening for it.
+    override fun onUserLeaveHint() {
+        if (launchingOwnActivity) {
+            launchingOwnActivity = false
+            return
+        }
+        super.onUserLeaveHint()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        launchingOwnActivity = false
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

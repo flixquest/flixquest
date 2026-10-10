@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The narrow layout. There is no room for a poster column, so the backdrop carries the artwork and
-  the facts stack vertically. Same ids as the wide layout, minus the poster, which the provider
-  simply never touches in this bucket.
+  The narrow layout. There is no room for a poster column, so the artwork fills the card and the
+  facts stack at its foot. Same ids as the wide layout, minus the poster and the side shade, which
+  the provider never touches in this bucket. Text slots are bitmaps for the reason given in
+  flixquest_widget.xml.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/widget_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:layout_margin="4dp"
+    android:layout_margin="@dimen/widget_margin"
     android:background="@drawable/flixquest_widget_background"
     android:clipToOutline="true">
 
@@ -39,6 +40,7 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:importantForAccessibility="no"
+        android:scaleType="fitXY"
         android:src="@drawable/flixquest_widget_scrim"
         android:visibility="gone"
         tools:visibility="visible" />
@@ -46,74 +48,27 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="center_vertical"
+        android:gravity="bottom"
         android:orientation="vertical"
-        android:padding="12dp">
+        android:padding="@dimen/widget_padding_compact">
 
-        <TextView
-            android:id="@+id/widget_eyebrow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:fontFamily="@font/figtree_family"
-            android:letterSpacing="0.08"
-            android:maxLines="1"
-            android:textColor="#FFF57C00"
-            android:textSize="9sp"
-            android:textStyle="bold"
-            tools:text="MOVIE OF THE DAY" />
+        <include layout="@layout/flixquest_widget_kicker" />
 
-        <TextView
+        <ImageView
             android:id="@+id/widget_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:ellipsize="end"
-            android:fontFamily="@font/figtree_family"
-            android:lineSpacingMultiplier="0.95"
-            android:maxLines="3"
-            android:textColor="#FFFFFFFF"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            tools:text="Dune: Part Two" />
+            style="@style/FlixQuestWidgetText"
+            android:layout_marginTop="5dp" />
 
-        <TextView
+        <ImageView
             android:id="@+id/widget_subtitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:ellipsize="end"
-            android:fontFamily="@font/figtree_family"
-            android:maxLines="1"
-            android:textColor="#E6FFFFFF"
-            android:textSize="11sp"
-            tools:text="2024  ·  8.1 rating" />
+            style="@style/FlixQuestWidgetText"
+            android:layout_marginTop="4dp" />
 
-        <ProgressBar
-            android:id="@+id/widget_progress"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="3dp"
-            android:layout_marginTop="8dp"
-            android:indeterminate="false"
-            android:max="100"
-            android:progressBackgroundTint="#40FFFFFF"
-            android:progressDrawable="@drawable/flixquest_widget_progress"
-            android:progressTint="#FFF57C00"
-            android:visibility="gone"
-            tools:progress="45"
-            tools:visibility="visible" />
-
-        <TextView
+        <ImageView
             android:id="@+id/widget_meta"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:ellipsize="end"
-            android:fontFamily="@font/figtree_family"
-            android:maxLines="2"
-            android:textColor="#B3FFFFFF"
-            android:textSize="10sp"
-            tools:text="18m left" />
+            style="@style/FlixQuestWidgetText"
+            android:layout_marginTop="3dp" />
     </LinearLayout>
+
+    <include layout="@layout/flixquest_widget_progress" />
 </FrameLayout>

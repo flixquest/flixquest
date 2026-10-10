@@ -1168,5 +1168,21 @@
   "offline_play_failed_hint": "قد يكون الملف غير مكتمل أو تالفًا. احذفه ثم نزّله مرة أخرى.",
   "up_next": "التالي",
   "player_next_up": "التالي: {title}",
-  "player_reload": "إعادة التحميل"
+  "player_reload": "إعادة التحميل",
+  "auto_pip_on_leave": "صورة داخل صورة عند المغادرة",
+  "auto_pip_on_leave_description": "تابع المشاهدة في نافذة صغيرة عند الانتقال إلى الشاشة الرئيسية",
+  "streaming_from": "البث من {provider}",
+  "update_new_version_kicker": "إصدار جديد متاح",
+  "update_installed": "المثبت",
+  "update_latest": "الأحدث",
+  "update_required_note": "هذا التحديث مطلوب لمواصلة استخدام FlixQuest.",
+  "update_link_unavailable": "رابط التنزيل غير متاح بعد. يرجى المحاولة لاحقًا.",
+  "update_whats_new": "الجديد",
+  "update_up_to_date": "تطبيقك محدّث",
+  "update_up_to_date_message": "FlixQuest {v} هو أحدث إصدار.",
+  "update_download": "تنزيل التحديث",
+  "update_install_hint": "إذا طلب Android ذلك، اسمح لـ FlixQuest بتثبيت التطبيقات، ثم اضغط تثبيت مرة أخرى.",
+  "update_download_failed": "لم يكتمل التنزيل. تحقق من اتصالك وحاول مرة أخرى.",
+  "update_downloading": "جارٍ التنزيل…",
+  "update_paused": "متوقف مؤقتًا"
 }

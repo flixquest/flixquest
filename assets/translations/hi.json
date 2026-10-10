@@ -1136,5 +1136,21 @@
   "offline_play_failed_hint": "फ़ाइल अधूरी या खराब हो सकती है। इसे हटाकर फिर से डाउनलोड करें।",
   "up_next": "आगे",
   "player_next_up": "अगला: {title}",
-  "player_reload": "फिर से लोड करें"
+  "player_reload": "फिर से लोड करें",
+  "auto_pip_on_leave": "ऐप छोड़ने पर पिक्चर-इन-पिक्चर",
+  "auto_pip_on_leave_description": "होम स्क्रीन पर जाने पर छोटी विंडो में देखते रहें",
+  "streaming_from": "{provider} से स्ट्रीमिंग",
+  "update_new_version_kicker": "नया संस्करण उपलब्ध है",
+  "update_installed": "इंस्टॉल किया गया",
+  "update_latest": "नवीनतम",
+  "update_required_note": "FlixQuest का उपयोग जारी रखने के लिए यह अपडेट ज़रूरी है।",
+  "update_link_unavailable": "डाउनलोड लिंक अभी उपलब्ध नहीं है। कृपया बाद में फिर कोशिश करें।",
+  "update_whats_new": "नया क्या है",
+  "update_up_to_date": "आपका ऐप अप-टू-डेट है",
+  "update_up_to_date_message": "FlixQuest {v} नवीनतम संस्करण है।",
+  "update_download": "अपडेट डाउनलोड करें",
+  "update_install_hint": "अगर Android पूछे, तो FlixQuest को ऐप इंस्टॉल करने की अनुमति दें, फिर से इंस्टॉल पर टैप करें।",
+  "update_download_failed": "डाउनलोड पूरा नहीं हुआ। अपना कनेक्शन जाँचें और फिर कोशिश करें।",
+  "update_downloading": "डाउनलोड हो रहा है…",
+  "update_paused": "रोका गया"
 }

@@ -145,6 +145,7 @@ Future<DevicePresentation> appInitialize({
   await settingsProvider.getEnableNextEpisodeButton();
   await settingsProvider.getIntroDbSettings();
   await settingsProvider.getPlayerAmbientGlowEnabled();
+  await settingsProvider.getAutoPipOnLeave();
   await settingsProvider.getAutoLoadSources();
   settingsProvider.completeHydration();
   await recentProvider.fetchMovies();

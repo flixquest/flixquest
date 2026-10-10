@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -26,11 +27,15 @@ private const val TAG = "FlixQuestWidget"
 /** Under this width the poster column is dropped and everything stacks vertically. */
 private const val COMPACT_WIDTH_DP = 190
 
+/** What a launcher that reports no size gets: a 4x2 phone widget. */
+private const val FALLBACK_WIDTH_DP = 320
+private const val FALLBACK_HEIGHT_DP = 170
+
 /**
  * Widget bitmaps are parcelled across to the launcher and the whole RemoteViews payload has to fit
  * in roughly a megabyte of Binder buffer, so each image is decoded down to the size its view
  * actually needs. The hero sits under a scrim where RGB_565 banding is invisible; the poster is the
- * focal artwork and stays ARGB_8888.
+ * focal artwork and stays ARGB_8888. The text is drawn as ALPHA_8 masks (see [WidgetText]).
  */
 private const val HERO_TARGET_PX = 420
 private const val POSTER_TARGET_PX = 240
@@ -44,14 +49,48 @@ private const val HOME_DEEP_LINK = "flixquest://home"
 private const val SYNC_TITLE = "Open FlixQuest"
 private const val SYNC_SUBTITLE = "Tap to sync this widget"
 
-private const val ON_HERO_TITLE = 0xFFFFFFFF.toInt()
-private const val ON_HERO_SUBTITLE = 0xE6FFFFFF.toInt()
-private const val ON_HERO_META = 0xB3FFFFFF.toInt()
+/** The app hero card's text over artwork: white, its facts line at 85%. */
+private const val ON_ART_TITLE = 0xFFFFFFFF.toInt()
+private const val ON_ART_SUBTITLE = 0xD9FFFFFF.toInt()
+private const val ON_ART_META = 0xB3FFFFFF.toInt()
 
+/** The app's Dark palette, until the app has synced the theme it is actually running. */
 private const val DEFAULT_PRIMARY = 0xFFF57C00.toInt()
-private const val DEFAULT_SURFACE = 0xFF1D2023.toInt()
-private const val DEFAULT_FOREGROUND = 0xFFFFFFFF.toInt()
-private const val DEFAULT_MUTED = 0xA6FFFFFF.toInt()
+private const val DEFAULT_SURFACE = 0xFF202120.toInt()
+private const val DEFAULT_FOREGROUND = 0xFFF7F7F7.toInt()
+private const val DEFAULT_MUTED = 0xFFA7A8A8.toInt()
+
+/** Supporting copy on the plain surface: the foreground, stepped back like [ON_ART_SUBTITLE]. */
+private const val SUBTITLE_ALPHA = 0xD9
+
+/**
+ * The app's type scale (AppType) brought down to widget size: the kicker in tracked caps, the
+ * title in ExtraBold with the hero title's tight tracking, and the facts in Medium.
+ */
+private class SlotStyles(
+    val eyebrow: WidgetTextStyle,
+    val title: WidgetTextStyle,
+    val subtitle: WidgetTextStyle,
+    val meta: WidgetTextStyle,
+)
+
+private val WIDE_STYLES = SlotStyles(
+    eyebrow = WidgetTextStyle(R.font.figtree_extrabold, 10f, tracking = 0.2f),
+    title = WidgetTextStyle(
+        R.font.figtree_extrabold, 19f, maxLines = 2, tracking = -0.02f, lineSpacing = 0.95f,
+    ),
+    subtitle = WidgetTextStyle(R.font.figtree_medium, 12f),
+    meta = WidgetTextStyle(R.font.figtree_medium, 11f, maxLines = 2),
+)
+
+private val COMPACT_STYLES = SlotStyles(
+    eyebrow = WidgetTextStyle(R.font.figtree_extrabold, 9f, tracking = 0.18f),
+    title = WidgetTextStyle(
+        R.font.figtree_extrabold, 16f, maxLines = 3, tracking = -0.015f, lineSpacing = 0.95f,
+    ),
+    subtitle = WidgetTextStyle(R.font.figtree_medium, 11f),
+    meta = WidgetTextStyle(R.font.figtree_medium, 10f, maxLines = 2),
+)
 
 /**
  * One slot of the widget carries one fact. No field may restate a value another field already
@@ -81,6 +120,9 @@ abstract class FlixQuestWidgetProvider : HomeWidgetProvider() {
         val muted: Int,
     )
 
+    /** In dp: the portrait width and height, which is how a phone widget is nearly always seen. */
+    private data class WidgetSize(val width: Int, val height: Int)
+
     override fun onAppWidgetOptionsChanged(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -109,17 +151,21 @@ abstract class FlixQuestWidgetProvider : HomeWidgetProvider() {
             foreground = widgetData.safeInt("theme_foreground", DEFAULT_FOREGROUND),
             muted = widgetData.safeInt("theme_muted", DEFAULT_MUTED),
         )
-        // Only the width bucket changes what is rendered, so decode the bitmaps once per bucket
-        // instead of once per placed widget.
-        val byBucket = HashMap<Boolean, RemoteViews>(2)
+        val text = WidgetText(context)
+        // The text is wrapped to the widget's size, so the views are built once per size rather
+        // than once per placed widget; same-sized copies share their bitmaps.
+        val bySize = HashMap<WidgetSize, RemoteViews>(2)
         appWidgetIds.forEach { widgetId ->
             try {
-                val width = appWidgetManager
-                    .getAppWidgetOptions(widgetId)
-                    .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 320)
-                val compact = width < COMPACT_WIDTH_DP
-                val views = byBucket.getOrPut(compact) {
-                    buildViews(context, content, theme, compact)
+                val options = appWidgetManager.getAppWidgetOptions(widgetId)
+                val size = WidgetSize(
+                    width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
+                        .takeIf { it > 0 } ?: FALLBACK_WIDTH_DP,
+                    height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
+                        .takeIf { it > 0 } ?: FALLBACK_HEIGHT_DP,
+                )
+                val views = bySize.getOrPut(size) {
+                    buildViews(context, text, content, theme, size)
                 }
                 appWidgetManager.updateAppWidget(widgetId, views)
             } catch (error: Exception) {
@@ -130,36 +176,55 @@ abstract class FlixQuestWidgetProvider : HomeWidgetProvider() {
 
     private fun buildViews(
         context: Context,
+        text: WidgetText,
         content: WidgetContent,
         theme: WidgetTheme,
-        compact: Boolean,
+        size: WidgetSize,
     ): RemoteViews {
+        val res = context.resources
+        val density = res.displayMetrics.density
+        val compact = size.width < COMPACT_WIDTH_DP
         val layout = if (compact) R.layout.flixquest_widget_compact else R.layout.flixquest_widget
+        val styles = if (compact) COMPACT_STYLES else WIDE_STYLES
+
+        val margin = res.getDimensionPixelSize(R.dimen.widget_margin)
+        val padding = res.getDimensionPixelSize(
+            if (compact) R.dimen.widget_padding_compact else R.dimen.widget_padding,
+        )
+        val innerWidth = (size.width * density).roundToInt() - 2 * (margin + padding)
+        val innerHeight = (size.height * density).roundToInt() - 2 * (margin + padding)
+
         return RemoteViews(context.packageName, layout).apply {
             // The rounded card behind everything, tinted to whatever theme the app is running.
             setInt(R.id.widget_surface, "setColorFilter", theme.surface)
 
-            val hero = content.heroPath?.let { decodeScaled(it, HERO_TARGET_PX, Bitmap.Config.RGB_565) }
+            // The compact card has no poster column, so its poster can stand in for a missing
+            // backdrop without the widget ever showing one image twice.
+            val heroPath = content.heroPath ?: content.posterPath.takeIf { compact }
+            val hero = heroPath?.let { decodeScaled(it, HERO_TARGET_PX, Bitmap.Config.RGB_565) }
+            val onArt = hero != null
+            val shades = if (compact) {
+                intArrayOf(R.id.widget_scrim)
+            } else {
+                intArrayOf(R.id.widget_scrim, R.id.widget_scrim_side)
+            }
             if (hero == null) {
                 setViewVisibility(R.id.widget_hero, View.GONE)
-                setViewVisibility(R.id.widget_scrim, View.GONE)
-                setTextColor(R.id.widget_title, theme.foreground)
-                setTextColor(R.id.widget_subtitle, theme.muted)
-                setTextColor(R.id.widget_meta, theme.muted)
+                shades.forEach { setViewVisibility(it, View.GONE) }
             } else {
                 setImageViewBitmap(R.id.widget_hero, hero)
                 setViewVisibility(R.id.widget_hero, View.VISIBLE)
-                setViewVisibility(R.id.widget_scrim, View.VISIBLE)
-                // Theme colours stop being legible over artwork, so pin to the scrim's own ramp.
-                setTextColor(R.id.widget_title, ON_HERO_TITLE)
-                setTextColor(R.id.widget_subtitle, ON_HERO_SUBTITLE)
-                setTextColor(R.id.widget_meta, ON_HERO_META)
+                shades.forEach { setViewVisibility(it, View.VISIBLE) }
             }
-            // The accent reads on both the themed surface and the scrim, so it never changes.
-            setTextColor(R.id.widget_eyebrow, theme.primary)
 
+            var textWidth = innerWidth
             if (!compact) {
+                val posterWidth = res.getDimensionPixelSize(R.dimen.widget_poster_width)
+                val posterHeight = res.getDimensionPixelSize(R.dimen.widget_poster_height)
+                // A poster taller than the card would be cropped to a sliver, so it steps aside
+                // and the text takes the whole width.
                 val poster = content.posterPath
+                    ?.takeIf { posterHeight <= innerHeight }
                     ?.let { decodeScaled(it, POSTER_TARGET_PX, Bitmap.Config.ARGB_8888) }
                 if (poster == null) {
                     setViewVisibility(R.id.widget_poster, View.GONE)
@@ -170,13 +235,64 @@ abstract class FlixQuestWidgetProvider : HomeWidgetProvider() {
                         R.id.widget_poster,
                         context.getString(R.string.widget_poster_description, content.title),
                     )
+                    textWidth -= posterWidth + padding
                 }
             }
 
-            setTextViewText(R.id.widget_eyebrow, content.eyebrow)
-            setTextViewText(R.id.widget_title, content.title)
-            setOptionalText(R.id.widget_subtitle, content.subtitle)
-            setOptionalText(R.id.widget_meta, content.meta)
+            // Theme colours stop being legible over artwork, so there the text keeps the hero
+            // card's own white ramp. The accent mark reads on both and never changes.
+            setInt(R.id.widget_mark, "setColorFilter", theme.primary)
+            val colors = if (onArt) {
+                intArrayOf(ON_ART_TITLE, ON_ART_TITLE, ON_ART_SUBTITLE, ON_ART_META)
+            } else {
+                intArrayOf(
+                    theme.muted,
+                    theme.foreground,
+                    withAlpha(theme.foreground, SUBTITLE_ALPHA),
+                    theme.muted,
+                )
+            }
+            val markWidth = res.getDimensionPixelSize(R.dimen.widget_mark_width) +
+                res.getDimensionPixelSize(R.dimen.widget_mark_gap)
+            val eyebrow = text.render(
+                content.eyebrow, styles.eyebrow, textWidth - markWidth, Color.alpha(colors[0]),
+            )
+            var title = text.render(
+                content.title, styles.title, textWidth, Color.alpha(colors[1]),
+            )
+            var subtitle = text.render(
+                content.subtitle, styles.subtitle, textWidth, Color.alpha(colors[2]),
+            )
+            var meta = text.render(
+                content.meta, styles.meta, textWidth, Color.alpha(colors[3]),
+            )
+
+            // A short card gives up its least important lines rather than clipping the kicker
+            // off the top: the meta first, then the subtitle, then the title's second line.
+            fun stackHeight(): Int {
+                val kicker = maxOf(
+                    eyebrow?.height ?: 0,
+                    (res.getDimension(R.dimen.widget_mark_width) * 431f / 277f).roundToInt(),
+                )
+                val gap = (5 * density).roundToInt()
+                return kicker +
+                    listOfNotNull(title, subtitle, meta).sumOf { it.height + gap }
+            }
+            if (meta != null && stackHeight() > innerHeight) meta = null
+            if (subtitle != null && stackHeight() > innerHeight) subtitle = null
+            if (styles.title.maxLines > 1 && stackHeight() > innerHeight) {
+                title = text.render(
+                    content.title,
+                    styles.title.copy(maxLines = 1),
+                    textWidth,
+                    Color.alpha(colors[1]),
+                )
+            }
+
+            setTextBitmap(R.id.widget_eyebrow, content.eyebrow, eyebrow, colors[0])
+            setTextBitmap(R.id.widget_title, content.title, title, colors[1])
+            setTextBitmap(R.id.widget_subtitle, content.subtitle, subtitle, colors[2])
+            setTextBitmap(R.id.widget_meta, content.meta, meta, colors[3])
 
             // A bar at zero is noise rather than information, so it only appears once there is
             // something to show. It is also the only place a percentage is expressed.
@@ -206,15 +322,23 @@ abstract class FlixQuestWidgetProvider : HomeWidgetProvider() {
         }
     }
 
-    /** Blank means "this widget has nothing to say here", which is quieter than an empty line. */
-    private fun RemoteViews.setOptionalText(viewId: Int, value: String) {
-        if (value.isBlank()) {
+    /**
+     * Shows a line drawn by [WidgetText], or hides the slot when there is nothing to say there,
+     * which is quieter than an empty line. The mask already carries [color]'s alpha, so the filter
+     * only supplies the colour; the words go on as the description for screen readers.
+     */
+    private fun RemoteViews.setTextBitmap(viewId: Int, value: String, bitmap: Bitmap?, color: Int) {
+        if (bitmap == null) {
             setViewVisibility(viewId, View.GONE)
         } else {
-            setTextViewText(viewId, value)
+            setImageViewBitmap(viewId, bitmap)
+            setInt(viewId, "setColorFilter", withAlpha(color, 0xFF))
+            setContentDescription(viewId, value)
             setViewVisibility(viewId, View.VISIBLE)
         }
     }
+
+    private fun withAlpha(color: Int, alpha: Int): Int = (color and 0x00FFFFFF) or (alpha shl 24)
 
     private fun decodeScaled(path: String, targetWidth: Int, config: Bitmap.Config): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }

@@ -520,7 +520,15 @@ class _DownloadActions extends StatelessWidget {
       }
     } catch (error) {
       if (context.mounted) {
-        _track(context, analyticsAction, 'error', error: error);
+        _track(
+          context,
+          analyticsAction,
+          'error',
+          // Analytics truncates long errors; keep the code and the cause.
+          error: error is PlatformException
+              ? '${error.code}: ${error.details ?? error.message}'
+              : error,
+        );
       }
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)

@@ -8,10 +8,36 @@ import 'package:flixquest/screens/common/download_selection_sheets.dart';
 import 'package:flixquest/services/offline_download_service.dart';
 import 'package:flixquest/video_providers/names.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  group('offlineEnqueueErrorMessage', () {
+    test('names the title when it is already downloaded', () {
+      final error = PlatformException(
+        code: 'ALREADY_DOWNLOADED',
+        message: 'This title is already downloaded.',
+      );
+
+      expect(isAlreadyDownloaded(error), isTrue);
+      expect(
+        offlineEnqueueErrorMessage(error, title: 'Example'),
+        'Example is already in your downloads. Open Downloads to watch it.',
+      );
+    });
+
+    test('never shows the raw platform exception', () {
+      final message = offlineEnqueueErrorMessage(
+        PlatformException(code: 'ENQUEUE_FAILED', message: 'boom'),
+        title: 'Example',
+      );
+
+      expect(message, isNot(contains('PlatformException')));
+      expect(isAlreadyDownloaded(StateError('boom')), isFalse);
+    });
+  });
+
   group('OfflineDownload', () {
     test('decodes progress, metadata, and state from the platform map', () {
       final item = OfflineDownload.fromMap({

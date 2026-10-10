@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Sits between the backdrop and the text. It stays above 0.7 alpha everywhere so white text clears
-  contrast over any artwork, and deepens towards the bottom to give the card some depth.
+  The app hero card's shade: the top of the artwork stays clear and it deepens towards the foot,
+  where the text sits.
 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <gradient
         android:angle="270"
-        android:centerColor="#CC000000"
-        android:endColor="#E6000000"
-        android:startColor="#B3000000"
+        android:centerColor="#8C000000"
+        android:centerY="0.45"
+        android:endColor="#EB000000"
+        android:startColor="#26000000"
         android:type="linear" />
-    <corners android:radius="20dp" />
+    <corners android:radius="@dimen/widget_radius" />
 </shape>

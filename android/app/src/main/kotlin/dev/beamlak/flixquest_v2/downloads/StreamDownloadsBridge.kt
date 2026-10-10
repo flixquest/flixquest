@@ -10,6 +10,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadManager
 import androidx.media3.exoplayer.offline.DownloadService
+import androidx.media3.transformer.ExportException
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -184,7 +185,11 @@ class StreamDownloadsBridge(
                         }
                     },
                     onFailure = { error ->
-                        result.error("EXPORT_FAILED", error.message, null)
+                        result.error(
+                            (error as? StreamDownloadExportException)?.code ?: "EXPORT_FAILED",
+                            error.message,
+                            causeSummary(error),
+                        )
                     },
                 )
             }
@@ -249,6 +254,13 @@ class StreamDownloadsBridge(
             result.error("DOWNLOAD_ERROR", error.message, null)
         }
     }
+
+    /** The cause chain, so error reports say why an export failed. */
+    private fun causeSummary(error: Throwable): String? =
+        error.causes().drop(1).joinToString(" <- ") { cause ->
+            val code = (cause as? ExportException)?.let { "[${it.errorCodeName}]" }.orEmpty()
+            "${cause.javaClass.simpleName}$code: ${cause.message}"
+        }.ifEmpty { null }
 
     private fun downloadMaps(): List<Map<String, Any?>> =
         store.getDownloads().map(store::downloadToMap)

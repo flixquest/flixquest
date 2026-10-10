@@ -37,6 +37,7 @@ import '../../api/endpoints.dart';
 import '../../ui_components/app_ui_components.dart';
 import '../../services/stream_intro_service.dart';
 import '../../services/introdb_service.dart';
+import '../../services/offline_download_service.dart';
 import '../../services/stream_size_estimator.dart';
 import '../movie/movie_video_loader.dart';
 import '../tv/tv_video_loader.dart';
@@ -413,7 +414,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         quickActions: [
           if (widget.availableProviders?.isNotEmpty == true)
             BetterPlayerOverflowMenuItem(
-              PhosphorIcons.arrowsLeftRight(),
+              PhosphorIcons.hardDrives(),
               tr('switch_provider'),
               widget.useTvControls
                   ? _showTvProviderMenu
@@ -487,6 +488,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     }
     settings.addListener(_syncAmbientGlowSetting);
     _syncAmbientGlowSetting();
+    settings.addListener(_syncAutoPipSetting);
+    _syncAutoPipSetting();
     _betterPlayerController.setBetterPlayerGlobalKey(_betterPlayerKey);
     _betterPlayerController.addEventsListener(_onAnalyticsPlayerEvent);
     // Attach listeners before setup so native initialization and pre-roll
@@ -523,6 +526,16 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   void _syncAmbientGlowSetting() {
     _betterPlayerController.setAmbientGlowEnabled(
       !widget.useTvControls && settings.playerAmbientGlowEnabled,
+    );
+  }
+
+  // Leaving the app (home button) moves a playing video into picture in
+  // picture, whether or not the player is full screen.
+  void _syncAutoPipSetting() {
+    unawaited(
+      _betterPlayerController.setAutoPictureInPicture(
+        !widget.useTvControls && settings.autoPipOnLeave,
+      ),
     );
   }
 
@@ -1299,7 +1312,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     _phoneNextEpisodeCountdown = _endCountdown;
     _nextEpisodeOverlay = OverlayEntry(builder: _buildPhoneNextEpisodeCard);
     Overlay.of(context, rootOverlay: true).insert(_nextEpisodeOverlay!);
-    _phoneNextEpisodeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _phoneNextEpisodeTimer =
+        Timer.periodic(const Duration(seconds: 1), (timer) {
       final countdown = _phoneNextEpisodeCountdown;
       if (!mounted || countdown == null) {
         timer.cancel();
@@ -1781,8 +1795,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     return navigator.overlay?.context ?? context;
   }
 
-  MovieStreamMetadata? get _movieMetadataForContentMenu =>
-      widget.movieMetadata;
+  MovieStreamMetadata? get _movieMetadataForContentMenu => widget.movieMetadata;
 
   TVStreamMetadata? get _tvMetadataForContentMenu {
     final metadata = widget.tvMetadata;
@@ -2028,6 +2041,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     _betterPlayerControllerInitialized = false;
     _prerollAd.dispose();
     settings.removeListener(_syncAmbientGlowSetting);
+    settings.removeListener(_syncAutoPipSetting);
     final suppressionId = _occasionalEffectsSuppressionId;
     if (suppressionId != null) {
       _occasionalEffectsSuppressionId = null;
@@ -3335,8 +3349,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                                 Icon(PhosphorIcons.television()),
                           ),
                   ),
-                  onTap: () =>
-                      Navigator.pop(sheetContext, season.seasonNumber),
+                  onTap: () => Navigator.pop(sheetContext, season.seasonNumber),
                 );
               },
             ),
@@ -3470,7 +3483,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
 
   Future<void> _downloadFromCurrentProvider() async {
     if (_activeSources.isEmpty) return;
-    await _startActiveProviderEnrichment();
     if (!mounted || _activeSources.isEmpty) return;
     final providerName = _currentProviderName();
     final sources = Map<String, String>.of(_activeSources);
@@ -3576,14 +3588,22 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       settings.analytics.trackDownload(
         action: 'enqueue_from_player',
         mediaType: _analyticsMediaType,
-        outcome: 'error',
+        outcome: isAlreadyDownloaded(error) ? 'already_downloaded' : 'error',
         provider: providerName,
         quality: resolution,
         error: error.toString(),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not start download: $error')),
+        SnackBar(
+          content: Text(
+            offlineEnqueueErrorMessage(
+              error,
+              title:
+                  isMovie ? movie?.movieName ?? 'This movie' : 'This episode',
+            ),
+          ),
+        ),
       );
     }
   }
@@ -3820,8 +3840,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                               _showProviderSwitcher();
                             }
                           },
-                          icon:
-                              Icon(PhosphorIcons.arrowsLeftRight(), size: 18),
+                          icon: Icon(PhosphorIcons.hardDrives(), size: 18),
                           label: Text(tr('switch_provider')),
                         ),
                       OutlinedButton.icon(
@@ -4347,8 +4366,7 @@ class _SubtitleSwitcherSheetState extends State<_SubtitleSwitcherSheet> {
         BetterPlayerSelectionTile(
           title: _audioTrackTitle(track, index),
           subtitle: _audioTrackSubtitle(track),
-          selected:
-              selected == track || (selected == null && track.isDefault),
+          selected: selected == track || (selected == null && track.isDefault),
           onTap: () {
             widget.controller.setAudioTrack(track);
             widget.onClose();
@@ -4388,7 +4406,9 @@ class _SubtitleSwitcherSheetState extends State<_SubtitleSwitcherSheet> {
   Widget build(BuildContext context) {
     final audio = _audioRows();
     final withAudio = audio.length > 1;
-    final subtitles = [for (final option in widget.options) _subtitleRow(option)];
+    final subtitles = [
+      for (final option in widget.options) _subtitleRow(option)
+    ];
     return DraggableScrollableSheet(
       initialChildSize: .82,
       minChildSize: .5,
@@ -4396,7 +4416,8 @@ class _SubtitleSwitcherSheetState extends State<_SubtitleSwitcherSheet> {
       expand: false,
       snap: true,
       builder: (context, scrollController) => PlayerSheetScaffold(
-        title: withAudio ? tr('player_audio_subtitles') : tr('player_subtitles'),
+        title:
+            withAudio ? tr('player_audio_subtitles') : tr('player_subtitles'),
         subtitle: tr('choose_subtitle_language'),
         actions: [
           PlayerSheetAction(

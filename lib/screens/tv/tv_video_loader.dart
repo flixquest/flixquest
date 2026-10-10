@@ -11,6 +11,7 @@ import 'package:flixquest/models/provider_video_source.dart';
 import 'package:flixquest/constants/app_constants.dart' show MediaType;
 import 'package:flixquest/models/provider_load_state.dart';
 import 'package:flixquest/services/globle_method.dart';
+import 'package:flixquest/services/offline_download_service.dart';
 import 'package:flixquest/widgets/playback_loading_screen.dart';
 import 'package:flixquest/services/stream_size_estimator.dart';
 import 'package:flixquest/video_providers/provider_loader.dart';
@@ -397,7 +398,6 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
           seasonNumber: widget.metadata.seasonNumber!,
           episodeNumber: widget.metadata.episodeNumber!,
           scraperApiUrl: _scraperApiUrl,
-          full: widget.download,
         );
       },
       onResult: (index, provider, result) {
@@ -567,14 +567,18 @@ class _TVVideoLoaderState extends State<TVVideoLoader> {
       settings.analytics.trackDownload(
         action: 'enqueue',
         mediaType: 'tv',
-        outcome: 'error',
+        outcome: isAlreadyDownloaded(error) ? 'already_downloaded' : 'error',
         provider: providerName,
         quality: quality,
         error: error.toString(),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not start download: $error')),
+        SnackBar(
+          content: Text(
+            offlineEnqueueErrorMessage(error, title: 'This episode'),
+          ),
+        ),
       );
       Navigator.pop(context, false);
     }

@@ -108,10 +108,8 @@ class ScraperApi {
   }) {
     return _loadStream(
       '/stream-movie',
-      _buildQueryParams(providerId, {
-        'tmdbId': '$movieId',
-        if (full) 'full': 'true',
-      }),
+      _buildQueryParams(providerId, {'tmdbId': '$movieId'}),
+      full: full,
     );
   }
 
@@ -128,8 +126,8 @@ class ScraperApi {
         'tmdbId': '$tvId',
         'season': '$seasonNumber',
         'episode': '$episodeNumber',
-        if (full) 'full': 'true',
       }),
+      full: full,
     );
   }
 
@@ -209,7 +207,38 @@ class ScraperApi {
     };
   }
 
+  /// Loads [path], asking for every server when [full] is set. A server with
+  /// full collection turned off refuses such a request outright, so it is
+  /// retried for the first working server instead.
   Future<ProviderLoadResult> _loadStream(
+    String path,
+    Map<String, String> queryParameters, {
+    bool full = false,
+  }) async {
+    try {
+      if (full) {
+        final result =
+            await _fetchStream(path, {...queryParameters, 'full': 'true'});
+        if (!_isFullCollectionDisabled(result)) return result;
+        if (kDebugMode) {
+          debugPrint(
+            '[ScraperApi] Full collection is disabled for $path '
+            '(provider=${queryParameters['provider']}); retrying without full',
+          );
+        }
+      }
+      return await _fetchStream(path, queryParameters);
+    } finally {
+      if (_ownsClient) _client.close();
+    }
+  }
+
+  static bool _isFullCollectionDisabled(ProviderLoadResult result) =>
+      !result.success &&
+      (result.errorMessage?.toLowerCase().contains('full stream collection') ??
+          false);
+
+  Future<ProviderLoadResult> _fetchStream(
     String path,
     Map<String, String> queryParameters,
   ) async {
@@ -288,8 +317,6 @@ class ScraperApi {
           errorMessage: 'Scraper request timed out');
     } catch (error) {
       return ProviderLoadResult(errorMessage: error.toString());
-    } finally {
-      if (_ownsClient) _client.close();
     }
   }
 

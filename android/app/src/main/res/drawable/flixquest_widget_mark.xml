@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The FlixQuest mark from assets/images/fq_mark.svg, which leads the kicker the way it does on the
+  app's hero card. Tinted to the theme's accent at update time.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="@dimen/widget_mark_width"
+    android:height="14dp"
+    android:viewportWidth="277"
+    android:viewportHeight="431">
+    <group
+        android:translateX="-6"
+        android:translateY="-6">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M6,118 L200,6 L283.1,54 L6,214 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M6,250 L162,159.9 L245.1,207.9 L6,346 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M6,380 L104,323.4 L104,436.6 Z" />
+    </group>
+</vector>
