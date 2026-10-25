@@ -7,8 +7,20 @@ import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../mobile/widgets/page_kit.dart';
 import '../../models/offline_download.dart';
+import '../../provider/settings_provider.dart';
 import '../../video_providers/names.dart';
 import 'player/player_sheet_ui.dart';
+
+/// The download qualities, by height: ask every time, the best a source has,
+/// or one height.
+Map<int, String> downloadQualityOptions() => {
+      SettingsProvider.downloadQualityAsk: tr('download_quality_ask'),
+      0: tr('download_quality_best'),
+      360: '360p',
+      480: '480p',
+      720: '720p',
+      1080: '1080p',
+    };
 
 /// The choices before a download or a manual playback: which provider, then
 /// which resolution and audio track. Plain rows in the app's palette, so they follow the
@@ -27,6 +39,81 @@ abstract final class DownloadSelectionSheets {
         ? showPlayerSheet<DownloadAudioSelection>(
             context: context, builder: builder)
         : showAppSheet<DownloadAudioSelection>(context, builder: builder);
+  }
+
+  /// The height downloads use, asked the first time and kept in settings.
+  /// Null means cancelled; [SettingsProvider.downloadQualityAsk] means the
+  /// provider and resolution are picked for each download.
+  static Future<int?> preferredQuality(
+    BuildContext context,
+    SettingsProvider settings,
+  ) async {
+    final saved = settings.downloadQuality;
+    if (saved != null) return saved;
+    final chosen = await chooseQuality(context);
+    if (chosen != null) settings.downloadQuality = chosen;
+    return chosen;
+  }
+
+  /// A download quality picked from [downloadQualityOptions]; without
+  /// [includeAsk], for one batch of downloads that can't stop to ask.
+  static Future<int?> chooseQuality(
+    BuildContext context, {
+    bool includeAsk = true,
+  }) {
+    return showAppSheet<int>(
+      context,
+      builder: (context) => _ChoiceSheet<int>(
+        title: tr('download_quality_prompt_title'),
+        subtitle: tr(includeAsk
+            ? 'download_quality_prompt_description'
+            : 'download_quality_batch_description'),
+        choices: [
+          for (final option in downloadQualityOptions().entries)
+            if (includeAsk || option.key != SettingsProvider.downloadQualityAsk)
+              _Choice(
+                value: option.key,
+                title: option.value,
+                subtitle: option.key > 0
+                    ? _resolutionDescription(option.value)
+                    : option.key == 0
+                        ? tr('download_quality_best_description')
+                        : tr('download_quality_ask_description'),
+                icon: PhosphorIcons.monitorPlay(),
+              ),
+        ],
+      ),
+    );
+  }
+
+  /// Whether to download every season (true) or only [seasonName] (false).
+  static Future<bool?> chooseSeasonScope(
+    BuildContext context, {
+    required String seasonName,
+    required int seasonCount,
+  }) {
+    return showAppSheet<bool>(
+      context,
+      builder: (context) => _ChoiceSheet<bool>(
+        title: tr('download_series_title'),
+        subtitle: tr('download_series_description'),
+        choices: [
+          _Choice(
+            value: false,
+            title: seasonName,
+            subtitle: tr('download_this_season_description'),
+            icon: PhosphorIcons.listNumbers(),
+          ),
+          _Choice(
+            value: true,
+            title: tr('download_all_seasons'),
+            subtitle: tr('download_all_seasons_description',
+                namedArgs: {'count': '$seasonCount'}),
+            icon: PhosphorIcons.stack(),
+          ),
+        ],
+      ),
+    );
   }
 
   static Future<VideoProvider?> showProvider(

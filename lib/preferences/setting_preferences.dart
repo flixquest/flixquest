@@ -321,6 +321,27 @@ class SettingsPreferences {
     return sharedPrefsSingleton.getBool(AUTO_LOAD_SOURCES) ?? true;
   }
 
+  static const SHOW_SUBTITLES_BY_DEFAULT = 'show_subtitles_by_default';
+
+  setShowSubtitlesByDefault(bool value) {
+    sharedPrefsSingleton.setBool(SHOW_SUBTITLES_BY_DEFAULT, value);
+  }
+
+  Future<bool> getShowSubtitlesByDefault() async {
+    return sharedPrefsSingleton.getBool(SHOW_SUBTITLES_BY_DEFAULT) ?? true;
+  }
+
+  static const DOWNLOAD_QUALITY = 'download_quality';
+
+  setDownloadQuality(int value) {
+    sharedPrefsSingleton.setInt(DOWNLOAD_QUALITY, value);
+  }
+
+  /// Null until the user first chooses, so the first download can ask.
+  Future<int?> getDownloadQuality() async {
+    return sharedPrefsSingleton.getInt(DOWNLOAD_QUALITY);
+  }
+
   static const RECENT_SEARCHES = 'recent_searches';
 
   Future<List<String>> getRecentSearches() async {

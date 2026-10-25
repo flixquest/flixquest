@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../catalog/details_controller.dart';
 import '../../catalog/details_play.dart';
@@ -36,6 +37,7 @@ class EpisodesSection extends StatefulWidget {
     required this.onDownload,
     required this.onOpen,
     required this.onSeasonInfo,
+    this.onDownloadSeason,
     this.now,
     super.key,
   });
@@ -59,6 +61,9 @@ class EpisodesSection extends StatefulWidget {
 
   /// The season's own page.
   final void Function(Seasons season) onSeasonInfo;
+
+  /// Downloads the season, or every season; shown with [canDownload].
+  final void Function(Seasons season)? onDownloadSeason;
   final DateTime Function()? now;
 
   @override
@@ -133,6 +138,20 @@ class _EpisodesSectionState extends State<EpisodesSection> {
                     style: AppType.metadata.copyWith(color: palette.mutedText),
                   ),
                 ),
+                if (widget.canDownload && widget.onDownloadSeason != null)
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: palette.mutedText,
+                      minimumSize: const Size(48, 48),
+                    ),
+                    onPressed: () => widget.onDownloadSeason!(current),
+                    icon: Icon(PhosphorIcons.downloadSimple(), size: 18),
+                    label: Text(
+                      tr('download_season'),
+                      style:
+                          AppType.metadata.copyWith(color: palette.mutedText),
+                    ),
+                  ),
               ],
             ),
           ),

@@ -1902,5 +1902,31 @@ abstract class  LocaleKeys {
   static const playlist_copy_saved = 'playlist_copy_saved';
   static const tv_playlist_browse = 'tv_playlist_browse';
   static const tv_playlist_share_scan = 'tv_playlist_share_scan';
+  static const stop = 'stop';
+  static const show_subtitles_by_default = 'show_subtitles_by_default';
+  static const show_subtitles_by_default_description = 'show_subtitles_by_default_description';
+  static const download_quality = 'download_quality';
+  static const download_quality_ask = 'download_quality_ask';
+  static const download_quality_best = 'download_quality_best';
+  static const download_quality_ask_description = 'download_quality_ask_description';
+  static const download_quality_best_description = 'download_quality_best_description';
+  static const download_quality_prompt_title = 'download_quality_prompt_title';
+  static const download_quality_prompt_description = 'download_quality_prompt_description';
+  static const download_quality_batch_description = 'download_quality_batch_description';
+  static const download_quality_unavailable = 'download_quality_unavailable';
+  static const download_season = 'download_season';
+  static const download_series_title = 'download_series_title';
+  static const download_series_description = 'download_series_description';
+  static const download_this_season_description = 'download_this_season_description';
+  static const download_all_seasons = 'download_all_seasons';
+  static const download_all_seasons_description = 'download_all_seasons_description';
+  static const season_download_progress = 'season_download_progress';
+  static const season_download_finding = 'season_download_finding';
+  static const season_download_done = 'season_download_done';
+  static const season_download_stopped = 'season_download_stopped';
+  static const season_download_queued = 'season_download_queued';
+  static const season_download_skipped = 'season_download_skipped';
+  static const season_download_not_found = 'season_download_not_found';
+  static const season_download_lower_quality = 'season_download_lower_quality';
 
 }

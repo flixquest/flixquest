@@ -168,6 +168,15 @@ class SettingsProvider with ChangeNotifier {
   bool _autoLoadSources = true;
   bool get autoLoadSources => _autoLoadSources;
 
+  bool _showSubtitlesByDefault = true;
+  bool get showSubtitlesByDefault => _showSubtitlesByDefault;
+
+  /// The height downloads use: [downloadQualityAsk] keeps the provider and
+  /// resolution pickers, 0 takes the best a source has, null is not chosen yet.
+  int? _downloadQuality;
+  int? get downloadQuality => _downloadQuality;
+  static const downloadQualityAsk = -1;
+
   // theme change
   Future<void> getCurrentThemeMode() async {
     appTheme = await _settingsPreferences.getThemeMode();
@@ -516,6 +525,30 @@ class SettingsProvider with ChangeNotifier {
     _autoLoadSources = value;
     _settingsPreferences.setAutoLoadSources(value);
     _trackSetting('Auto Load Sources', value);
+    notifyListeners();
+  }
+
+  Future<void> getShowSubtitlesByDefault() async {
+    _showSubtitlesByDefault =
+        await _settingsPreferences.getShowSubtitlesByDefault();
+  }
+
+  set showSubtitlesByDefault(bool value) {
+    _showSubtitlesByDefault = value;
+    _settingsPreferences.setShowSubtitlesByDefault(value);
+    _trackSetting('Show Subtitles By Default', value);
+    notifyListeners();
+  }
+
+  Future<void> getDownloadQuality() async {
+    _downloadQuality = await _settingsPreferences.getDownloadQuality();
+  }
+
+  set downloadQuality(int? value) {
+    if (value == null) return;
+    _downloadQuality = value;
+    _settingsPreferences.setDownloadQuality(value);
+    _trackSetting('Download Quality', value);
     notifyListeners();
   }
 }

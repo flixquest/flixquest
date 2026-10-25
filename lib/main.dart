@@ -181,6 +181,8 @@ Future<DevicePresentation> appInitialize({
   await settingsProvider.getAutoPipOnLeave();
   await settingsProvider.getStreamingDnd();
   await settingsProvider.getAutoLoadSources();
+  await settingsProvider.getShowSubtitlesByDefault();
+  await settingsProvider.getDownloadQuality();
   settingsProvider.completeHydration();
   await recentProvider.fetchMovies();
   await recentProvider.fetchEpisodes();

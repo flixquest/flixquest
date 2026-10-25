@@ -22,6 +22,7 @@ import '../../provider/settings_provider.dart';
 import '../../screens/common/photoview.dart';
 import '../../services/ambient_theme_service.dart';
 import '../episode_playback.dart';
+import '../season_download.dart';
 import '../widgets/details_header.dart';
 import '../widgets/details_parts.dart';
 import '../widgets/episode_row.dart';
@@ -402,10 +403,36 @@ class _SeasonScreenState extends State<SeasonScreen>
         children: <Widget>[
           Padding(
             padding: EdgeInsetsDirectional.fromSTEB(gutter, 0, gutter, 0),
-            child: Text(
-              tr('episodes'),
-              style: AppType.scaled(context, AppType.sectionHeader)
-                  .copyWith(color: palette.foreground),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    tr('episodes'),
+                    style: AppType.scaled(context, AppType.sectionHeader)
+                        .copyWith(color: palette.foreground),
+                  ),
+                ),
+                if (dependencies?.displayDownloadButton ?? false)
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: palette.mutedText,
+                      minimumSize: const Size(48, 48),
+                    ),
+                    onPressed: () => downloadSeasons(
+                      context,
+                      series: widget.series,
+                      season: _current,
+                      seasons: widget.seasons,
+                      loadSeason: _seasonEpisodes,
+                    ),
+                    icon: Icon(PhosphorIcons.downloadSimple(), size: 18),
+                    label: Text(
+                      tr('download_season'),
+                      style:
+                          AppType.metadata.copyWith(color: palette.mutedText),
+                    ),
+                  ),
+              ],
             ),
           ),
           FutureBuilder<List<EpisodeList>>(

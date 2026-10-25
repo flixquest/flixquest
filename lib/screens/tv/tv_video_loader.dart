@@ -185,8 +185,26 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
     try {
       await _loadProviders();
       VideoProvider? selectedDownloadProvider;
+      int? downloadHeight;
       if (widget.download) {
         if (!mounted) return;
+        downloadHeight =
+            await DownloadSelectionSheets.preferredQuality(context, settings);
+        if (!mounted) return;
+        if (downloadHeight == null) {
+          settings.analytics.trackDownload(
+            action: 'quality_selection',
+            mediaType: 'tv',
+            outcome: 'cancelled',
+          );
+          Navigator.pop(context, false);
+          return;
+        }
+        if (downloadHeight == SettingsProvider.downloadQualityAsk) {
+          downloadHeight = null;
+        }
+      }
+      if (widget.download && downloadHeight == null) {
         selectedDownloadProvider = await DownloadSelectionSheets.showProvider(
           context,
           providers: videoProviders,
@@ -269,10 +287,21 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
         }
       } else {
         // Try sources one at a time until one returns playable links.
+        // A download with a preferred quality goes to the first provider in
+        // order that has it.
+        final height = downloadHeight;
         selection = await _fetchSelection(
           providers: selectedDownloadProvider == null
               ? videoProviders
               : [selectedDownloadProvider],
+          accept: height == null
+              ? null
+              : (result) =>
+                  VideoUtils.downloadSource(
+                    VideoUtils.convertVideoLinksToMap(result.videoLinks!),
+                    height,
+                  )?.exact ==
+                  true,
         );
       }
 
@@ -324,6 +353,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
             videoSizeTokens: videoSizeTokens,
             providerName: selection?.provider.displayName,
             downloadProvider: selection?.provider,
+            preferredHeight: downloadHeight,
           );
           return;
         }
@@ -413,9 +443,11 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
   /// Tries [providers] in configured order until one returns playable links.
   Future<ProviderSelection?> _fetchSelection({
     required List<VideoProvider> providers,
+    bool Function(ProviderLoaderResult result)? accept,
   }) {
     return ProviderLoader.loadFirstSuccessful(
       providers: providers,
+      accept: accept,
       load: (provider) {
         _providerStopwatches[provider.codeName] = Stopwatch()..start();
         // Only the current provider shows as loading; the rest wait their turn.
@@ -521,35 +553,11 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
     required Map<String, String> videoSizeTokens,
     String? providerName,
     VideoProvider? downloadProvider,
+    int? preferredHeight,
   }) async {
-    final estimatedSizes = ValueNotifier<Map<String, int?>>({
-      for (final entry in videoSizeTokens.entries)
-        if (_streamSizeCacheByToken.containsKey(entry.value))
-          entry.key: _streamSizeCacheByToken[entry.value],
-    });
-    var sizePickerOpen = true;
-    unawaited(StreamSizeEstimator.load(
-      scraperApiUrl: _scraperApiUrl,
-      tokens: videoSizeTokens,
-      cacheByToken: _streamSizeCacheByToken,
-      onEstimate: (token, bytes) {
-        if (!sizePickerOpen) return;
-        final next = Map<String, int?>.of(estimatedSizes.value);
-        for (final entry in videoSizeTokens.entries) {
-          if (entry.value == token) next[entry.key] = bytes;
-        }
-        estimatedSizes.value = next;
-      },
-    ));
-    if (!mounted) return;
-    final quality = await DownloadSelectionSheets.showResolution(
-      context,
-      resolutions: sources.keys.toList(),
-      providerName: providerName,
-      estimatedSizesListenable: estimatedSizes,
-    );
-    sizePickerOpen = false;
-    estimatedSizes.dispose();
+    final quality = preferredHeight == null
+        ? await _askResolution(sources, videoSizeTokens, providerName)
+        : _preferredResolution(sources, preferredHeight);
     if (!mounted) return;
     if (quality == null) {
       settings.analytics.trackDownload(
@@ -570,6 +578,11 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
             : url.toLowerCase().contains('.mpd')
                 ? 'dash'
                 : 'hls';
+    // An adaptive stream has no height of its own; the preference caps it.
+    final maxVideoHeight = _qualityHeight(quality) ??
+        (preferredHeight != null && preferredHeight > 0
+            ? preferredHeight
+            : null);
     final posterPath = widget.metadata.posterPath;
     final season = widget.metadata.seasonNumber ?? 0;
     final episode = widget.metadata.episodeNumber ?? 0;
@@ -584,7 +597,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           url: url,
           format: format,
           headers: downloadHeaders,
-          maxVideoHeight: _qualityHeight(quality),
+          maxVideoHeight: maxVideoHeight,
         ),
       );
       if (!mounted) return;
@@ -607,7 +620,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
               posterUrl: posterPath == null
                   ? null
                   : '${TMDB_BASE_IMAGE_URL}w500$posterPath',
-              maxVideoHeight: _qualityHeight(quality),
+              maxVideoHeight: maxVideoHeight,
               headers: downloadHeaders,
               audioTrack: audioSelection.track,
               source: OfflineDownloadSource.forSelection(
@@ -654,6 +667,60 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
       );
       Navigator.pop(context, false);
     }
+  }
+
+  /// The resolution closest to [height], saying so when it isn't [height].
+  String _preferredResolution(Map<String, String> sources, int height) {
+    final pick = VideoUtils.downloadSource(sources, height)!;
+    if (!pick.exact) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            tr('download_quality_unavailable', namedArgs: {
+              'quality': '${height}p',
+              'chosen': pick.entry.key,
+            }),
+          ),
+        ),
+      );
+    }
+    return pick.entry.key;
+  }
+
+  Future<String?> _askResolution(
+    Map<String, String> sources,
+    Map<String, String> videoSizeTokens,
+    String? providerName,
+  ) async {
+    final estimatedSizes = ValueNotifier<Map<String, int?>>({
+      for (final entry in videoSizeTokens.entries)
+        if (_streamSizeCacheByToken.containsKey(entry.value))
+          entry.key: _streamSizeCacheByToken[entry.value],
+    });
+    var sizePickerOpen = true;
+    unawaited(StreamSizeEstimator.load(
+      scraperApiUrl: _scraperApiUrl,
+      tokens: videoSizeTokens,
+      cacheByToken: _streamSizeCacheByToken,
+      onEstimate: (token, bytes) {
+        if (!sizePickerOpen) return;
+        final next = Map<String, int?>.of(estimatedSizes.value);
+        for (final entry in videoSizeTokens.entries) {
+          if (entry.value == token) next[entry.key] = bytes;
+        }
+        estimatedSizes.value = next;
+      },
+    ));
+    if (!mounted) return null;
+    final quality = await DownloadSelectionSheets.showResolution(
+      context,
+      resolutions: sources.keys.toList(),
+      providerName: providerName,
+      estimatedSizesListenable: estimatedSizes,
+    );
+    sizePickerOpen = false;
+    estimatedSizes.dispose();
+    return quality;
   }
 
   int? _qualityHeight(String quality) => VideoUtils.videoQualityHeight(quality);

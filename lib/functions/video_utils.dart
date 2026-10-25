@@ -107,6 +107,44 @@ class VideoUtils {
         .entry;
   }
 
+  /// The source a download at [preferredHeight] takes; 0 means the tallest.
+  /// [exact] is whether that height is on offer: labelled, or inside an
+  /// adaptive stream the download caps at it. Otherwise the source is the
+  /// nearest below, as for playback.
+  static ({MapEntry<String, T> entry, bool exact})? downloadSource<T>(
+    Map<String, T> sources,
+    int preferredHeight,
+  ) {
+    if (sources.isEmpty) return null;
+    final measured = <({MapEntry<String, T> entry, int height})>[];
+    MapEntry<String, T>? adaptive;
+    for (final entry in sources.entries) {
+      final height = videoQualityHeight(entry.key);
+      if (height == null) {
+        adaptive ??= entry;
+      } else {
+        measured.add((entry: entry, height: height));
+      }
+    }
+    if (preferredHeight == 0) {
+      if (measured.isEmpty) return (entry: adaptive!, exact: true);
+      final tallest = measured.reduce(
+        (best, source) => source.height > best.height ? source : best,
+      );
+      return (entry: tallest.entry, exact: true);
+    }
+    for (final source in measured) {
+      if (source.height == preferredHeight) {
+        return (entry: source.entry, exact: true);
+      }
+    }
+    if (adaptive != null) return (entry: adaptive, exact: true);
+    return (
+      entry: preferredVideoSource(sources, preferredHeight)!,
+      exact: false
+    );
+  }
+
   /// Convert video links to a map format for the player
   static Map<String, String> convertVideoLinksToMap(
       List<RegularVideoLinks> vids) {
