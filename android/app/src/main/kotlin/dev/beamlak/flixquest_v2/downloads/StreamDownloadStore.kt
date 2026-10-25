@@ -294,6 +294,26 @@ class StreamDownloadStore private constructor(context: Context) {
         .setUpstreamDataSourceFactory(null)
         .setCacheWriteDataSinkFactory(null)
 
+    /** Better Player calls this by reflection with no arguments (see proguard-rules.pro), so it
+     * can't name the request. Each key resolves to whichever download's namespace holds it.
+     */
+    fun readOnlyCacheFactory(): CacheDataSource.Factory {
+        val namespaces = getDownloads()
+            .map { DownloadRecoveryState.namespace(it.request) }
+            .filter { it.isNotEmpty() }
+            .distinct()
+        return CacheDataSource.Factory()
+            .setCache(cache)
+            .setCacheKeyFactory { spec ->
+                val key = spec.key ?: spec.uri.toString()
+                if (namespaces.any { key.startsWith(it) }) key
+                else namespaces.firstOrNull { cache.getCachedSpans(it + key).isNotEmpty() }
+                    ?.let { it + key } ?: key
+            }
+            .setUpstreamDataSourceFactory(null)
+            .setCacheWriteDataSinkFactory(null)
+    }
+
     fun downloadToMap(download: Download): Map<String, Any?> {
         val metadata = requestMetadata(download.request)
         val state = when (download.state) {
