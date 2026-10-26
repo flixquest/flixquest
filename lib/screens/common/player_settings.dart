@@ -10,6 +10,7 @@ import '../../services/streaming_dnd_service.dart';
 import '../../mobile/widgets/page_kit.dart';
 import '../../mobile/widgets/settings_kit.dart';
 import '/provider/settings_provider.dart';
+import 'download_selection_sheets.dart';
 import 'provider_choose.dart';
 import 'sublanguage_choose.dart';
 
@@ -252,6 +253,15 @@ class _PlayerSettingsState extends State<PlayerSettings>
                     onTap: () => _push(const SubLangChoose()),
                   ),
                   SwitchRow(
+                    icon: PhosphorIcons.subtitles(),
+                    label: tr('show_subtitles_by_default'),
+                    subtitle: tr('show_subtitles_by_default_description'),
+                    value: settingValues.showSubtitlesByDefault,
+                    onChanged: (value) => setState(
+                      () => settingValues.showSubtitlesByDefault = value,
+                    ),
+                  ),
+                  SwitchRow(
                     icon: PhosphorIcons.translate(),
                     label: tr('fetch_all_subs'),
                     value: settingValues.fetchSpecificLangSubs,
@@ -328,6 +338,22 @@ class _PlayerSettingsState extends State<PlayerSettings>
                     value: settingValues.enableIntroDbSkipButtons,
                     onChanged: (value) => setState(
                       () => settingValues.enableIntroDbSkipButtons = value,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpace.xxl),
+              SettingsGroup(
+                title: tr('downloads'),
+                children: [
+                  ChoiceRow<int>(
+                    icon: PhosphorIcons.downloadSimple(),
+                    label: tr('download_quality'),
+                    value: settingValues.downloadQuality ??
+                        SettingsProvider.downloadQualityAsk,
+                    options: downloadQualityOptions(),
+                    onChanged: (value) => setState(
+                      () => settingValues.downloadQuality = value,
                     ),
                   ),
                 ],

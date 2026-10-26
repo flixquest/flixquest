@@ -167,8 +167,12 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
                   urls: [savedSubtitle],
                   name: widget.download.offlineSubtitleName ??
                       'Downloaded subtitle',
-                  selectedByDefault: true,
+                  selectedByDefault: settings.showSubtitlesByDefault,
                 ),
+                if (!settings.showSubtitlesByDefault)
+                  BetterPlayerSubtitlesSource(
+                    type: BetterPlayerSubtitlesSourceType.none,
+                  ),
               ]
             : const [],
       ),

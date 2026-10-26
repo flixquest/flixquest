@@ -1446,10 +1446,15 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     };
     final resolutionDescriptions = _resolutionDescriptions(sources);
 
+    final showSubtitles = widget.settings.showSubtitlesByDefault;
     final appSuppliedSubtitles = <BetterPlayerSubtitlesSource>[
-      ...subtitles,
+      if (showSubtitles) ...subtitles else ...subtitles.map(_notByDefault),
       ..._localSubtitles.appliedSubtitles,
       ..._externalSubtitles.appliedSubtitles,
+      // With nothing flagged the player applies the list's last entry, so
+      // "subtitles off by default" needs off to be that entry.
+      if (!showSubtitles)
+        BetterPlayerSubtitlesSource(type: BetterPlayerSubtitlesSourceType.none),
     ];
 
     return BetterPlayerDataSource(
@@ -1501,6 +1506,21 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       bufferingConfiguration: betterPlayerBufferingConfiguration,
     );
   }
+
+  BetterPlayerSubtitlesSource _notByDefault(
+    BetterPlayerSubtitlesSource source,
+  ) =>
+      BetterPlayerSubtitlesSource(
+        type: source.type,
+        name: source.name,
+        urls: source.urls,
+        content: source.content,
+        selectedByDefault: false,
+        headers: source.headers,
+        asmsIsSegmented: source.asmsIsSegmented,
+        asmsSegmentsTime: source.asmsSegmentsTime,
+        asmsSegments: source.asmsSegments,
+      );
 
   String _resolutionDisplayName(String sourceKey) {
     final separator = sourceKey.indexOf(' · ');

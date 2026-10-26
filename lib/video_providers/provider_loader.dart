@@ -26,11 +26,16 @@ class ProviderSelection {
 abstract final class ProviderLoader {
   /// Tries providers one at a time in configured order, starting the next only
   /// after the current provider fails or returns no playable links.
+  ///
+  /// With [accept], a working provider it rejects is passed over for a later
+  /// one it takes; if none is taken, the first working provider is returned.
   static Future<ProviderSelection?> loadFirstSuccessful({
     required List<VideoProvider> providers,
     required Future<ProviderLoadResult> Function(VideoProvider provider) load,
     ProviderResultCallback? onResult,
+    bool Function(ProviderLoadResult result)? accept,
   }) async {
+    ProviderSelection? fallback;
     for (var index = 0; index < providers.length; index++) {
       final provider = providers[index];
       ProviderLoadResult result;
@@ -42,14 +47,16 @@ abstract final class ProviderLoader {
 
       onResult?.call(index, provider, result);
       if (result.success && result.videoLinks?.isNotEmpty == true) {
-        return ProviderSelection(
+        final selection = ProviderSelection(
           index: index,
           provider: provider,
           result: result,
         );
+        if (accept == null || accept(result)) return selection;
+        fallback ??= selection;
       }
     }
-    return null;
+    return fallback;
   }
 
   static Future<ProviderLoaderResult> loadMovieFromProvider({

@@ -139,4 +139,31 @@ void main() {
 
     expect(selection, isNull);
   });
+
+  test('accept passes over working providers for one it takes', () async {
+    final started = <String>[];
+    final selection = await ProviderLoader.loadFirstSuccessful(
+      providers: providers,
+      load: (provider) async {
+        started.add(provider.apiId!);
+        return playableResult();
+      },
+      accept: (_) => started.length == 3,
+    );
+
+    expect(selection?.index, 2);
+    expect(started, ['0', '1', '2']);
+  });
+
+  test('accept falls back to the first working provider', () async {
+    final selection = await ProviderLoader.loadFirstSuccessful(
+      providers: providers,
+      load: (provider) async => provider.apiId == '0'
+          ? const ProviderLoadResult(errorMessage: 'down')
+          : playableResult(),
+      accept: (_) => false,
+    );
+
+    expect(selection?.index, 1);
+  });
 }

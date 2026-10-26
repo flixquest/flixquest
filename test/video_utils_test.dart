@@ -72,6 +72,41 @@ void main() {
     });
   });
 
+  group('VideoUtils.downloadSource', () {
+    const sources = {
+      '360p': 'a',
+      '480p': 'b',
+      '1080p': 'c',
+    };
+
+    test('takes an exact height', () {
+      final pick = VideoUtils.downloadSource(sources, 480)!;
+      expect(pick.entry.key, '480p');
+      expect(pick.exact, isTrue);
+    });
+
+    test('takes the tallest for best', () {
+      final pick = VideoUtils.downloadSource(sources, 0)!;
+      expect(pick.entry.key, '1080p');
+      expect(pick.exact, isTrue);
+    });
+
+    test('falls back below a missing height and says so', () {
+      final pick = VideoUtils.downloadSource(sources, 720)!;
+      expect(pick.entry.key, '480p');
+      expect(pick.exact, isFalse);
+    });
+
+    test('counts an adaptive stream as having the height', () {
+      final pick = VideoUtils.downloadSource(
+        const {'360p': 'a', 'Auto': 'm'},
+        720,
+      )!;
+      expect(pick.entry.key, 'Auto');
+      expect(pick.exact, isTrue);
+    });
+  });
+
   group('VideoUtils.reverseVideoQualityMap', () {
     test('sorts measured qualities and leaves host labels at the end', () {
       final ordered = VideoUtils.reverseVideoQualityMap({

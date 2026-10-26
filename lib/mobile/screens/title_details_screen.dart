@@ -41,6 +41,7 @@ import '../../services/ambient_theme_service.dart';
 import '../../services/media_link.dart';
 import '../collections.dart';
 import '../episode_playback.dart';
+import '../season_download.dart';
 import '../../provider/playlist_provider.dart';
 import '../my_list.dart';
 import '../playlists.dart';
@@ -914,11 +915,9 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
 
   Widget _actions(BuildContext context) {
     final saved = MyList.contains(context, _item);
-    final inList = context
-            .watch<PlaylistProvider?>()
-            ?.listsContaining(_item)
-            .isNotEmpty ??
-        false;
+    final inList =
+        context.watch<PlaylistProvider?>()?.listsContaining(_item).isNotEmpty ??
+            false;
     return FutureBuilder<Videos>(
       future: _videos,
       builder: (context, snapshot) {
@@ -1020,6 +1019,13 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
             }),
             onOpen: _openEpisode,
             onSeasonInfo: _openSeason,
+            onDownloadSeason: (season) => downloadSeasons(
+              context,
+              series: _item,
+              season: season,
+              seasons: seasons,
+              loadSeason: _seasonEpisodes,
+            ),
             now: widget.now,
           );
         }
