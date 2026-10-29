@@ -37,9 +37,9 @@ class HostedAdsRepository {
     if (!AdsPolicy.adFree) await _laravel?.reportClick(id);
   }
 
-  /// Plus members get no catalog, so no ad image is ever fetched for them.
+  /// The catalog includes app announcements for every tier. The banner widget
+  /// filters advertising before requesting any creative for an ad-free viewer.
   Future<List<BannerAd>> load(String apiUrl) {
-    if (AdsPolicy.adFree) return Future.value(const <BannerAd>[]);
     if (_laravel != null) return _laravel!.load();
     final cached = _entries[apiUrl];
     if (cached != null && !cached.isStale) return cached.ads;

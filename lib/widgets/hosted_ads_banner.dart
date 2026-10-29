@@ -39,7 +39,8 @@ enum HostedBannerVariant {
 /// picks the network (Adsterra, Clickadu or ExoClick), with optional per-slot
 /// `banner_ad_network_overrides`. [HostedBannerMode] decides what
 /// happens when both are live in the same slot. A remotely configured
-/// `banner_ad_network=none` still hides everything.
+/// `banner_ad_network=none` hides advertising. App announcements are delivered
+/// independently of these ad switches and the viewer's Plus entitlement.
 class RemoteHostedAdsBanner extends StatefulWidget {
   const RemoteHostedAdsBanner({
     required this.placement,
@@ -69,29 +70,26 @@ class _RemoteHostedAdsBannerState extends State<RemoteHostedAdsBanner> {
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<bool>(
         valueListenable: AdsPolicy.listenable,
-        // Plus, or a Kids or Family title's screen, collapses the slot
-        // before anything is requested, and a banner already on screen
-        // goes the moment either applies.
-        builder: (context, adFree, _) =>
-            adFree || ContentAdScope.adFreeAt(context, listen: true)
-                ? const SizedBox.shrink()
-                : _slot(context),
+        builder: (context, adFree, _) => _slot(context,
+            allowAds:
+                !adFree && !ContentAdScope.adFreeAt(context, listen: true)),
       );
 
-  Widget _slot(BuildContext context) {
+  Widget _slot(BuildContext context, {required bool allowAds}) {
     final dependencies = context.watch<AppDependencyProvider?>();
-    if (dependencies == null || dependencies.bannerAdNetwork == 'none') {
+    if (dependencies == null) {
       return const SizedBox.shrink();
     }
     final television = DevicePresentationService.instance.isTelevision;
-    final hostedActive = dependencies.isHostedBannerActive;
+    final hostedActive = allowAds && dependencies.isHostedBannerActive;
     // Both sources can show on Android TV; their widgets stay display-only.
-    final networkActive = dependencies.bannerAdsForPlacement(widget.placement,
-            television: television) !=
-        null;
-    if (!hostedActive) return _network(dependencies, widget.padding);
+    final networkActive = allowAds &&
+        dependencies.bannerAdsForPlacement(widget.placement,
+                television: television) !=
+            null;
     final ads = _ads ??= _load(dependencies);
-    final priority = dependencies.hostedBannerMode == HostedBannerMode.priority;
+    final priority = hostedActive &&
+        dependencies.hostedBannerMode == HostedBannerMode.priority;
 
     return FutureBuilder<List<BannerAd>>(
       future: ads,
@@ -101,6 +99,7 @@ class _RemoteHostedAdsBannerState extends State<RemoteHostedAdsBanner> {
             .where(
               (ad) =>
                   ad.appliesTo(widget.placement, television: television) &&
+                  (ad.isAnnouncement || hostedActive) &&
                   dependencies.isBannerEnabled(ad.key, widget.placement),
             )
             .toList(growable: false);
@@ -219,15 +218,17 @@ class HostedAdsBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<bool>(
         valueListenable: AdsPolicy.listenable,
-        builder: (context, adFree, _) =>
-            adFree || ContentAdScope.adFreeAt(context, listen: true)
-                ? const SizedBox.shrink()
-                : _banner(context),
+        builder: (context, adFree, _) => _banner(context,
+            allowAds:
+                !adFree && !ContentAdScope.adFreeAt(context, listen: true)),
       );
 
-  Widget _banner(BuildContext context) {
+  Widget _banner(BuildContext context, {required bool allowAds}) {
     final validAds = ads
-        .where((ad) => ad.imageUrl.isNotEmpty && ad.targetUrl.isNotEmpty)
+        .where((ad) =>
+            (ad.isAnnouncement || allowAds) &&
+            ad.imageUrl.isNotEmpty &&
+            ad.targetUrl.isNotEmpty)
         .toList(growable: false);
     if (validAds.isEmpty) return const SizedBox.shrink();
     var shownAds = validAds;

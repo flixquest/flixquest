@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flixquest/data/ads/ads_policy.dart';
 import 'package:flixquest/models/banner_ad.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/services/hosted_ads_repository.dart';
@@ -14,14 +15,20 @@ import 'support/fake_adsterra_webview.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
-BannerAd _ad({List<String> placements = const <String>[]}) => BannerAd(
-      key: 'announcement',
-      id: '1',
+BannerAd _ad({
+  List<String> placements = const <String>[],
+  bool isAnnouncement = false,
+  String key = 'announcement',
+}) =>
+    BannerAd(
+      key: key,
+      id: key,
       name: 'Announcement',
       imageUrl: 'https://example.test/ad.png',
       targetUrl: 'https://example.test/join',
       altText: 'Join our channel',
       placements: placements,
+      isAnnouncement: isAnnouncement,
     );
 
 void main() {
@@ -37,8 +44,11 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
   });
 
   setUp(() {
+    AdsPolicy.update(adFree: false);
     WebViewPlatform.instance = FakeAdsterraWebViewPlatform();
   });
+
+  tearDown(() => AdsPolicy.update(adFree: false));
 
   group('BannerAd.appliesTo', () {
     test('an ad with no placements applies everywhere on a phone', () {
@@ -141,6 +151,77 @@ FLIXQUEST_API_URL=https://test.flixquest.api/
       await tester.pump();
       await tester.pump();
     }
+
+    testWidgets(
+      'announcements show for guests when hosted and network ads are off',
+      (tester) async {
+        provider.setHostedBannerMode(HostedBannerMode.off);
+        provider.setBannerAdNetwork('none');
+        await pumpSlot(tester, placement: 'home_all_hero', ads: [
+          _ad(isAnnouncement: true, placements: ['home_all_hero'])
+        ]);
+
+        expect(find.byType(HostedAdsBanner), findsOneWidget);
+        expect(find.byType(NetworkBannerWidget), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Plus sees announcements while sponsored and network banners stay hidden',
+      (tester) async {
+        AdsPolicy.update(adFree: true);
+        provider.setHostedBannerMode(HostedBannerMode.off);
+        await pumpSlot(tester, ads: [
+          _ad(key: 'sponsor'),
+          _ad(isAnnouncement: true),
+        ]);
+
+        final banner =
+            tester.widget<HostedAdsBanner>(find.byType(HostedAdsBanner));
+        expect(banner.ads.map((ad) => ad.key), ['announcement']);
+        expect(find.byType(NetworkBannerWidget), findsNothing);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
+
+    testWidgets(
+      'starting Plus keeps announcements and removes sponsored banners',
+      (tester) async {
+        await pumpSlot(tester, ads: [
+          _ad(key: 'sponsor'),
+          _ad(isAnnouncement: true),
+        ]);
+        expect(tester.widget<HostedAdsBanner>(find.byType(HostedAdsBanner)).ads,
+            hasLength(2));
+
+        AdsPolicy.update(adFree: true);
+        await tester.pump();
+
+        final banner =
+            tester.widget<HostedAdsBanner>(find.byType(HostedAdsBanner));
+        expect(banner.ads.map((ad) => ad.key), ['announcement']);
+        expect(find.byType(NetworkBannerWidget), findsNothing);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
+
+    testWidgets(
+      'TV Plus announcements show as a display-only banner with hosted ads off',
+      (tester) async {
+        AdsPolicy.update(adFree: true);
+        DevicePresentationService.instance.isTelevision = true;
+        provider.setHostedBannerMode(HostedBannerMode.off);
+        await pumpSlot(tester, placement: 'title_detail', ads: [
+          _ad(isAnnouncement: true, placements: ['title_detail_tv']),
+        ]);
+
+        final banner =
+            tester.widget<HostedAdsBanner>(find.byType(HostedAdsBanner));
+        expect(banner.interactive, isFalse);
+        expect(find.byType(NetworkBannerWidget), findsNothing);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.android}),
+    );
 
     testWidgets(
       'stack shows the announcement and the Adsterra banner',

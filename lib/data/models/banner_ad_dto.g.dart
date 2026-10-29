@@ -22,6 +22,7 @@ _$BannerAdDtoImpl _$$BannerAdDtoImplFromJson(Map<String, dynamic> json) =>
               ?.map((e) => e as String)
               .toList() ??
           const [],
+      isAnnouncement: json['isAnnouncement'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$BannerAdDtoImplToJson(_$BannerAdDtoImpl instance) =>
@@ -37,4 +38,5 @@ Map<String, dynamic> _$$BannerAdDtoImplToJson(_$BannerAdDtoImpl instance) =>
       'width': instance.width,
       'height': instance.height,
       'placements': instance.placements,
+      'isAnnouncement': instance.isAnnouncement,
     };

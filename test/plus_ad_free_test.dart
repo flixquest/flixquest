@@ -145,7 +145,7 @@ void main() {
     expect(find.byType(Dialog), findsNothing);
   });
 
-  testWidgets('banner slots collapse without loading or rendering an ad',
+  testWidgets('empty announcement slots collapse without rendering advertising',
       (tester) async {
     var loads = 0;
     await pumpHost(tester,
@@ -158,7 +158,7 @@ void main() {
         ));
     await tester.pump();
 
-    expect(loads, 0);
+    expect(loads, 1);
     expect(find.byType(NetworkBannerWidget), findsNothing);
     expect(platform.controllers, isEmpty);
     expect(tester.getSize(find.byType(RemoteHostedAdsBanner)), Size.zero);
@@ -185,8 +185,7 @@ void main() {
     expect(find.byType(PageView), findsNothing);
   });
 
-  test('the hosted catalog is not fetched and no ad event is recorded',
-      () async {
+  test('Plus can fetch the catalog for app announcements', () async {
     var fetches = 0;
     HostedAdsRepository.instance.useFetcherForTesting((_) async {
       fetches++;
@@ -195,7 +194,7 @@ void main() {
 
     expect(
         await HostedAdsRepository.instance.load('https://api.test'), isEmpty);
-    expect(fetches, 0);
+    expect(fetches, 1);
     HostedAdsRepository.instance.clear();
   });
 
