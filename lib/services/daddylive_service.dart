@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/live_tv.dart';
 import 'dlhd_playback_proxy.dart';
+import 'live_hls_probe.dart';
 
 /// Traces DLHD stream extraction to the console so a failing channel shows
 /// which step broke. Disabled in release builds: the logged URLs carry
@@ -109,7 +110,7 @@ class DaddyLiveService implements LiveTvService {
       '(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
   static const String _siteReferer = 'https://dlhd.st/';
   static const Duration _pageTimeout = Duration(seconds: 15);
-  static const int _maxEmbedDepth = 2;
+  static const int _maxEmbedDepth = 3;
 
   final String _baseUrl;
   final http.Client _client;
@@ -222,7 +223,7 @@ class DaddyLiveService implements LiveTvService {
 
   /// Resolves the first locally playable DLHD player for [channelId].
   ///
-  /// DLHD currently exposes Player 1 through Player 6 on each watch page. Its
+  /// DLHD exposes several player buttons on each watch page. Its
   /// signed playlists are bound to the IP that opened the final embed, so URLs
   /// extracted by the metadata API are intentionally not trusted here. The
   /// device fetches the watch page, follows every player/iframe chain, and
@@ -262,8 +263,7 @@ class DaddyLiveService implements LiveTvService {
       final embedUrl = metadata.embedUrl.trim();
       _log(
         'channel $channelId: scraper returned '
-        'embedUrl=${embedUrl.isEmpty ? '<empty>' : embedUrl} '
-        'url=${metadata.url.isEmpty ? '<empty>' : metadata.url}',
+        'embedUrl=${embedUrl.isEmpty ? '<empty>' : embedUrl}',
       );
       if (embedUrl.isNotEmpty) {
         final resolved = await _resolvePlayer(
@@ -279,35 +279,6 @@ class DaddyLiveService implements LiveTvService {
           return _streamFromResolvedPlayers(<_ResolvedDlhdPlayer>[resolved]);
         }
         _log('channel $channelId: scraper embed yielded no playable m3u8');
-      }
-      // A same-egress development setup can occasionally use the server URL,
-      // but only after the device itself proves that the manifest is valid.
-      final headers = _playbackHeaders(metadata.headers);
-      if (metadata.url.isNotEmpty && await _isPlayable(metadata.url, headers)) {
-        final variant = LiveStreamVariant(
-          url: metadata.url,
-          headers: headers,
-          mediaType: metadata.mediaType,
-          clearKey: metadata.clearKey,
-          title: 'Stream 1',
-        );
-        _log(
-          'channel $channelId: OK via scraper URL in '
-          '${stopwatch.elapsedMilliseconds}ms',
-        );
-        return DaddyLiveStream(
-          url: variant.url,
-          headers: variant.headers,
-          embedUrl: embedUrl,
-          expiresAt: _streamExpiry(variant.url),
-          mediaType: variant.mediaType,
-          clearKey: variant.clearKey,
-          title: variant.title,
-          variants: <LiveStreamVariant>[variant],
-        );
-      }
-      if (metadata.url.isNotEmpty) {
-        _log('channel $channelId: scraper URL is not playable from here');
       }
     } catch (error) {
       // The local page walk already failed. Surface one stable message below.
@@ -339,7 +310,10 @@ class DaddyLiveService implements LiveTvService {
   Future<DaddyLiveStream?> _resolveFromWatchPage(String watchUrl) async {
     try {
       final response = await _getHtml(watchUrl, referer: _siteReferer);
-      final finalWatchUrl = response.request?.url.toString() ?? watchUrl;
+      final finalWatchUrl = _canonicalWatchUrl(
+        response.body,
+        response.request?.url.toString() ?? watchUrl,
+      );
       final players = _extractPlayers(response.body, finalWatchUrl);
       _log(
         'watch page ${response.statusCode}'
@@ -398,7 +372,7 @@ class DaddyLiveService implements LiveTvService {
       (url: player.url, referer: referer, depth: 0),
     ];
     final visited = <String>{};
-    while (queue.isNotEmpty) {
+    while (queue.isNotEmpty && visited.length < 16) {
       if (_closed || cancelled?.call() == true) return null;
       final page = queue.removeAt(0);
       if (!visited.add(page.url)) continue;
@@ -453,13 +427,14 @@ class DaddyLiveService implements LiveTvService {
         );
         for (final candidate in candidates) {
           if (_closed || cancelled?.call() == true) return null;
-          if (await _isPlayable(candidate, headers)) {
+          final playableUrl = await _playableUrl(candidate, headers);
+          if (playableUrl != null) {
             if (_closed || cancelled?.call() == true) return null;
             _log('${player.label}: playable $candidate');
             return _ResolvedDlhdPlayer(
               embedUrl: finalUrl,
               variant: LiveStreamVariant(
-                url: candidate,
+                url: playableUrl,
                 headers: headers,
                 mediaType: 'hls',
                 title: player.label,
@@ -536,6 +511,20 @@ class DaddyLiveService implements LiveTvService {
       throw DaddyLiveException('DLHD page returned ${response.statusCode}.');
     }
     return response;
+  }
+
+  String _canonicalWatchUrl(String html, String responseUrl) {
+    for (final match
+        in RegExp(r'<link\b[^>]*>', caseSensitive: false).allMatches(html)) {
+      final tag = match.group(0)!;
+      if (_htmlAttribute(tag, 'rel')?.toLowerCase() != 'canonical') continue;
+      final href = _htmlAttribute(tag, 'href');
+      final canonical = href == null
+          ? null
+          : _absoluteHttpUrl(_decodeHtml(href), responseUrl);
+      if (canonical != null) return canonical;
+    }
+    return responseUrl;
   }
 
   List<_DlhdPlayer> _extractPlayers(String html, String pageUrl) {
@@ -632,29 +621,20 @@ class DaddyLiveService implements LiveTvService {
     };
   }
 
-  Future<bool> _isPlayable(
+  Future<String?> _playableUrl(
     String url,
     Map<String, String> headers,
   ) async {
     try {
-      final response = await _client
-          .get(Uri.parse(url), headers: headers)
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        _log('m3u8 rejected, HTTP ${response.statusCode}: $url');
-        return false;
-      }
-      final body = utf8.decode(response.bodyBytes);
-      final trimmed = body.trimLeft();
-      final playable = trimmed.startsWith('#EXTM3U') &&
-          (body.contains('#EXT-X-STREAM-INF') || body.contains('#EXTINF'));
-      if (!playable) {
-        _log('m3u8 rejected, not a playlist: $url -> ${_snippet(body)}');
-      }
-      return playable;
+      final playable = await probeLiveHls(
+        Uri.parse(url),
+        client: _client,
+        headers: headers,
+      );
+      return playable.toString();
     } catch (error) {
       _log('m3u8 rejected, $error: $url');
-      return false;
+      return null;
     }
   }
 

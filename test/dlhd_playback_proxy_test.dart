@@ -52,7 +52,7 @@ void main() {
             request.response.write('#EXTM3U\n#EXT-X-TARGETDURATION:6\n'
                 '#EXT-X-KEY:METHOD=AES-128,URI="../key"\n'
                 '#EXT-X-MAP:URI="../init"\n'
-                '#EXTINF:6,\n../segment.png\n');
+                '#EXT-X-KEY:METHOD=NONE\n#EXTINF:6,\n../segment.png\n');
           }
         case '/segment.png':
           request.response.add([
@@ -83,10 +83,9 @@ void main() {
     expect(master.body, isNot(contains('viewer-')));
     expect(master.headers['cache-control'], 'no-store');
     expect(tokenRequests, 2, reason: 'a refused token must renew once');
-    final variantPath = const LineSplitter()
-        .convert(master.body)
-        .firstWhere((line) => line.startsWith('/media/'));
-    final variant = await client.get(local.resolve(variantPath));
+    // The relay exposes the rendition whose media passed validation, so a
+    // native player cannot choose a broken rendition from the original master.
+    final variant = master;
     expect(variant.statusCode, 200);
     expect(seen.last.queryParameters['quality'], 'hd');
     expect(seen.last.queryParameters['t'], 'viewer-2');
@@ -177,6 +176,75 @@ void main() {
     final playlist = await client.get(Uri.parse(stream.url));
     expect(playlist.statusCode, 200);
     expect(playlist.body, contains('/media/'));
+  });
+
+  test('renews tokens before expiry and rejects broken signed media', () async {
+    final upstream = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => upstream.close(force: true));
+    final origin = 'http://127.0.0.1:${upstream.port}';
+    var tokens = 0;
+    var broken = true;
+    upstream.listen((request) async {
+      if (request.uri.path == '/api/playlist-token') {
+        request.response
+            .write(jsonEncode({'token': 'token-${++tokens}', 'ttl': 1}));
+      } else if (request.uri.path.endsWith('.m3u8')) {
+        request.response.write('#EXTM3U\n#EXTINF:6,\nsegment.ts\n');
+      } else if (broken) {
+        request.response.statusCode = 403;
+      } else {
+        request.response.add(_ts());
+      }
+      await request.response.close();
+    });
+    final client = http.Client();
+    addTearDown(client.close);
+    final proxy = DlhdPlaybackProxy.fromEmbed(_embed(origin),
+        headers: {}, client: client)!;
+    addTearDown(proxy.close);
+    await expectLater(proxy.start(), throwsStateError);
+    broken = false;
+    final local = Uri.parse(await proxy.start());
+    final initialTokens = tokens;
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    expect((await client.get(local)).statusCode, 200);
+    expect(tokens, initialTokens + 1,
+        reason: 'the advertised TTL must trigger renewal without a 403');
+  });
+
+  test('keeps AES media encrypted for the native HLS player', () async {
+    final upstream = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => upstream.close(force: true));
+    final origin = 'http://127.0.0.1:${upstream.port}';
+    final encrypted =
+        Uint8List.fromList(List.generate(16 * 40, (i) => i % 251));
+    upstream.listen((request) async {
+      if (request.uri.path == '/api/playlist-token') {
+        request.response.write('{"token":"viewer","ttl":120}');
+      } else if (request.uri.path.endsWith('.m3u8')) {
+        request.response.write('#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="key"\n'
+            '#EXTINF:6,\nsegment.ts\n');
+      } else if (request.uri.path.endsWith('/key')) {
+        request.response.add(List.filled(16, 7));
+      } else {
+        request.response.add(encrypted);
+      }
+      await request.response.close();
+    });
+    final client = http.Client();
+    addTearDown(client.close);
+    final proxy = DlhdPlaybackProxy.fromEmbed(_embed(origin),
+        headers: {}, client: client)!;
+    addTearDown(proxy.close);
+    final local = Uri.parse(await proxy.start());
+    final playlist = await client.get(local);
+    final path = const LineSplitter()
+        .convert(playlist.body)
+        .lastWhere((line) => line.startsWith('/media/'));
+    final response = await client.get(local.resolve(path));
+    expect(response.statusCode, 200);
+    expect(response.bodyBytes, encrypted,
+        reason: 'ciphertext must reach the native AES loader unchanged');
   });
 
   group('DLHD media wrappers', () {
