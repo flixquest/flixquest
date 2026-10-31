@@ -26,7 +26,10 @@ class AppRemoteConfig {
   static const enableWatchNowKey = 'enable_stream';
   static const enableDownloadKey = 'enable_download';
   static const enableLiveTvKey = 'enable_live_tv';
-  static const adBlockGateEnabledKey = 'ad_block_gate_enabled';
+  /// The ad-blocker check that judges only live Adsterra/ExoClick hosts and
+  /// popups. Builds before it read `ad_block_gate_enabled`, whose generic
+  /// probes stopped viewers who still saw ads; that key stays off for them.
+  static const adBlockGateEnabledKey = 'ad_block_gate_v2_enabled';
   static const bannersKey = 'banners';
   static const bannerAdNetworkKey = 'banner_ad_network';
   static const bannerAdNetworkTestKey = 'banner_ad_network_test';

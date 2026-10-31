@@ -777,34 +777,59 @@ overlaps, selection, priorities, and global effect controls.
 
 | Parameter | Firebase type | Default | Purpose |
 | --- | --- | --- | --- |
-| `ad_block_gate_enabled` | Boolean | `false` | Asks viewers to turn off their ad blocker when they press **Play** or **Download**. Browsing is never blocked. |
+| `ad_block_gate_v2_enabled` | Boolean | `false` | Asks viewers to turn off their ad blocker when they press **Play** or **Download**. Browsing is never blocked. |
+
+Builds from 4.3.1 read only `ad_block_gate_v2_enabled`. Older builds read
+`ad_block_gate_enabled`, whose generic Google/PubMatic, HTTPS and WebView
+probes stopped viewers (especially on Android TV) who still saw Adsterra and
+ExoClick ads. Keep `ad_block_gate_enabled` at `false`.
 
 Android apps have no browser extensions: ads are blocked through DNS, by
 Private DNS (AdGuard DNS, NextDNS), local VPN blockers (AdGuard, Blokada,
-RethinkDNS), hosts files (AdAway) or a network filter such as Pi-hole. When
-The app warms the checks while viewers browse, then Play or Download uses
-that result. Three layers run in parallel under a six-second background
-deadline:
+RethinkDNS), hosts files (AdAway) or a network filter such as Pi-hole.
 
-- **DNS:** `doubleclick.net`, `pagead2.googlesyndication.com`,
-  `ads.pubmatic.com`, plus the live banner catalogs (including slot overrides),
-  Adsterra placements, selected mobile/TV popup networks and enabled VAST tags.
-  Sinkholes (including IPv4-mapped IPv6) count only when a neutral DNS control
-  resolves normally. Failed ad lookups must fail again while an independent
-  public DNS resolver confirms an A or AAAA record. Cloudflare and Google are
-  queried in parallel; unreadable or negative replies do not override a
-  positive answer from another resolver.
-- **HTTPS:** HEAD requests to static `robots.txt` files on two independent
-  ad hosts. Both must repeatedly refuse, reset or close connections while two
-  independent non-ad controls respond normally. HTTP responses, including
-  404/405/5xx, prove connectivity; TLS errors, redirects and timeouts are
-  inconclusive. No publisher tag or smartlink is fetched.
-- **WebView:** an invisible, non-interactive system WebView loads local bait
-  elements and the same static HEAD probes. Healthy controls plus explicit
-  `ERR_BLOCKED_BY_CLIENT` errors, two selectively hidden bait elements, or
-  repeated failures on two ad hosts that native HTTPS can reach count as
-  filtering. Missing WebView support, malformed reports and a 4.5-second
-  timeout allow playback; the temporary view is removed after the check.
+The check never requests anything from an ad network, so it adds no traffic
+the networks could mistake for bots. Only the hosts the device's live ads
+load from are judged: banner catalogs (including slot overrides) and VAST tags
+switched on for that device (`tv_enabled` on TV), Adsterra's Social Bar on
+phones, and the selected mobile or TV popup network with its fallbacks
+(`tv_popunder` only on TV). Blocking an ad domain FlixQuest does not use, such
+as Google's, never stops playback, and with no ad live nothing is checked.
+
+Banners and the Social Bar each count on their own. A popup counts as blocked
+only when every network in its fallback chain (`playback_popunder_network`,
+then `playback_popunder_fallback`) is, because the next network serves when
+one cannot; VAST tags form the same kind of chain.
+
+Two kinds of evidence, combined under a six-second background deadline:
+
+- **DNS:** the device resolves each live ad host. A sinkhole answer
+  (`0.0.0.0`, `::`, loopback, including IPv4-mapped IPv6) counts only when a
+  neutral DNS control resolves normally. A failed lookup must fail again while
+  an independent public DNS-over-HTTPS resolver (Cloudflare and Google, in
+  parallel) confirms an A or AAAA record, so a retired domain is never
+  blamed. No blocker's addresses are listed.
+- **The viewer's own popups:** when an Adsterra or ExoClick popup loads, the
+  ad screen watches its network's delivery host: the tag's script host, or a
+  direct link's first host after FlixQuest. Any answer from that host (an
+  ad, a redirect, an HTTP error, the network's no-ad page) means it was
+  reached, which settles that ad even if DNS looked odd. A failure blockers
+  cause (name not resolved, connection refused/reset/closed, invalid address,
+  `ERR_BLOCKED_BY_CLIENT`, a certificate for another host, an SSL protocol
+  error from a block page) counts once public DNS shows the host exists and
+  local DNS is healthy. Timeouts, offline errors and untrusted certificate
+  authorities (old devices) count as neither. An outcome stands for 30
+  minutes, until the network changes, or until the viewer taps **I turned it
+  off**.
+
+Popups served through FlixQuest's redirectors (`flix.quest/api/exoclick-popup`,
+whose ExoClick delivery domain rotates, and `flix.quest/api/adsterra-popup`)
+are resolved with a HEAD request to flix.quest that does not follow the
+redirect, so the current delivery host is checked without reaching the
+network. The host is reused for an hour.
+
+`FQ_ADGUARD_DNS=94.140.14.14 flutter test test/ad_block_adguard_dns_test.dart`
+runs the DNS check against the live hosts through AdGuard DNS.
 
 Warmup never displays a prompt while browsing. On Play or Download, an already
 confirmed positive triggers the prompt without waiting for stalled checks.
@@ -830,25 +855,27 @@ Active players refresh the checks every 30 seconds after a completed scan,
 and on resume. Timeouts and inconclusive results do not stop playback. No
 real-device average or native teardown latency has been measured yet.
 
-When troubleshooting, publish `ad_block_gate_enabled = true` and confirm the
+When troubleshooting, publish `ad_block_gate_v2_enabled = true` and confirm the
 phone has fetched and activated that value. `[AdBlockGate]` logs show whether
 the gate is disabled and the foreground wait in milliseconds; `[AdBlockDetector]`
-logs identify the blocked host or a timeout. Changing a Firebase value without
+logs identify the blocked host or a timeout, and `[AdsterraPage] ... delivery
+host <host> reached|blocked` shows a popup's outcome. Changing a Firebase value without
 the device receiving it does not enable the gate on that device.
 
 Detection is behavioral and best effort. It does not enumerate installed
 apps, label every VPN/Private DNS service a blocker, or guarantee detection
-of allowlisted probes, arbitrary custom block pages, modified clients, or
-filters that act only on a particular creative. Browser extensions that do
-not affect the app's WebView cannot affect or be identified by this check.
+of a block page before a popup has loaded, modified clients, or filters that
+act only on a particular creative. Browser extensions that do not affect the
+app's WebView cannot affect or be identified by this check.
 
-Tests include the actual embedded JavaScript, Flutter WebView lifecycle
-tests, and real HTTP against `postman/simulations/ad-block-probes.sim.yaml`.
+Tests cover the popup outcomes through the WebView fake
+(`test/ad_delivery_test.dart`) and real DNS JSON against
+`postman/simulations/ad-block-probes.sim.yaml`.
 Start it with `postman simulation run postman/simulations/ad-block-probes.sim.yaml
 --port 4936 --output ndjson`, then run
 `FQ_AD_BLOCK_SIMULATION_URL=http://127.0.0.1:4936/probes .fvm/flutter_sdk/bin/flutter
-test test/ad_block_network_simulation_test.dart`. The mock models HEAD status,
-redirect and timeout behavior and Google's DNS JSON response schema. No
+test test/ad_block_network_simulation_test.dart`. The mock models Google's DNS
+JSON response schema and stalled resolvers. No
 published owner mock was used because the Postman CLI was signed out. Actual
 AdGuard/NextDNS/local-VPN testing on a device is still required for release.
 

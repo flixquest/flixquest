@@ -8,11 +8,15 @@ import 'package:flixquest/models/adsterra_playback_ads_config.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/services/ad_block_detector.dart';
 import 'package:flixquest/services/ad_block_check_cache.dart';
+import 'package:flixquest/services/ad_delivery.dart';
+import 'package:flixquest/services/ad_redirect_resolver.dart';
 import 'package:flixquest/widgets/ad_block_gate.dart';
 import 'package:flixquest/widgets/ad_block_warmup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -62,7 +66,7 @@ void main() {
         '127.0.0.1',
         '::1',
         '::ffff:127.0.0.1',
-        '::ffff:0.0.0.0'
+        '::ffff:0.0.0.0',
       ]) {
         final result = await detector({
           'ads.example': [
@@ -70,6 +74,29 @@ void main() {
           ],
         }).isBlocking({'ads.example'});
         expect(result, isTrue, reason: sinkhole);
+      }
+    });
+
+    test('a popup blocked on a live host counts once public DNS knows it',
+        () async {
+      for (final (known, expected) in [
+        (true, true),
+        (false, false),
+        (null, false)
+      ]) {
+        final check = AdBlockDetector(
+          lookup: lookupFrom({
+            'ads.example': [
+              [real]
+            ],
+          }),
+          publicLookup: (_) async => known,
+        );
+        expect(
+            await check
+                .isBlocking({'ads.example'}, observedBlocked: {'ads.example'}),
+            expected,
+            reason: 'public DNS: $known');
       }
     });
 
@@ -177,6 +204,66 @@ void main() {
           isTrue);
     });
 
+    test('a fallback chain is blocked only when every network in it is',
+        () async {
+      final check = detector({
+        'exo.example': [
+          [InternetAddress('0.0.0.0')]
+        ],
+        'adsterra.example': [
+          [real]
+        ],
+        'other.example': [
+          [InternetAddress('0.0.0.0')]
+        ],
+      });
+      expect(
+          await check.isBlocking({}, alternatives: [
+            {'exo.example', 'adsterra.example'}
+          ]),
+          isFalse);
+      expect(
+          await check.isBlocking({}, alternatives: [
+            {'exo.example', 'other.example'}
+          ]),
+          isTrue);
+    });
+
+    test('popup and VAST fallbacks form chains; banners stand alone', () {
+      final provider = AppDependencyProvider()
+        ..setBannerAdsConfig(testAdsterraConfig())
+        ..setPlaybackPopunderNetwork(AdNetwork.exoclick)
+        ..setTvPlaybackPopunderNetwork(AdNetwork.exoclick)
+        ..setPlaybackPopunderFallbackNetworks([AdNetwork.adsterra])
+        ..setPopunderAdsConfig(PopunderAdsConfig.parse('''{
+          "popunder":{"enabled":true,"mode":"smartlink","url":"https://flix.quest/api/exoclick-popup"},
+          "tv_popunder":{"enabled":true,"mode":"smartlink","url":"https://flix.quest/api/exoclick-popup"}
+        }''', network: AdNetwork.exoclick, enabled: true))
+        ..setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse('''{
+          "interstitial":{"enabled":true,"script_url":"https://social.example/s"},
+          "popunder":{"enabled":true,"mode":"smartlink","url":"https://smart.example/l"},
+          "tv_popunder":{"enabled":true,"mode":"smartlink","url":"https://smart.example/tv"}
+        }''', enabled: true));
+      final phone = AdBlockDetector.adSources(provider);
+      expect(phone.required, {
+        for (final unit in testAdsterraConfig().units.values) unit.scriptUrl,
+        Uri.parse('https://social.example/s'),
+      });
+      expect(phone.alternatives, [
+        {
+          Uri.parse('https://flix.quest/api/exoclick-popup'),
+          Uri.parse('https://smart.example/l'),
+        }
+      ]);
+      final tv = AdBlockDetector.adSources(provider, television: true);
+      expect(tv.alternatives, [
+        {
+          Uri.parse('https://flix.quest/api/exoclick-popup'),
+          Uri.parse('https://smart.example/tv'),
+        }
+      ]);
+    });
+
     test('no ad hosts means nothing to check', () async {
       expect(await detector({}).isBlocking({}), isFalse);
     });
@@ -190,6 +277,9 @@ void main() {
         }''', enabled: true));
       expect(AdBlockDetector.adHosts(provider),
           {'ads.example', 'social.example', 'smart.example'});
+      // TV shows neither the Social Bar nor the phone popup.
+      expect(
+          AdBlockDetector.adHosts(provider, television: true), {'ads.example'});
 
       provider
         ..setBannerAdNetwork('none')
@@ -201,7 +291,9 @@ void main() {
     test('selected popup networks are checked on mobile and TV', () {
       final provider = AppDependencyProvider()
         ..setPlaybackPopunderNetwork(AdNetwork.monetag)
-        ..setTvPlaybackPopunderNetwork(AdNetwork.exoclick);
+        ..setTvPlaybackPopunderNetwork(AdNetwork.exoclick)
+        ..setPopupTrigger(PlaybackAdStage.download,
+            enabled: true, frequencyMinutes: 0);
       for (final network in [
         AdNetwork.monetag,
         AdNetwork.exoclick,
@@ -209,19 +301,47 @@ void main() {
       ]) {
         provider.setPopunderAdsConfig(PopunderAdsConfig.parse('''{
           "popunder":{"enabled":true,"mode":"smartlink","url":"https://${network.name}.example/ad"},
+          "tv_popunder":{"enabled":true,"mode":"smartlink","url":"https://tv.${network.name}.example/ad"},
           "download":{"enabled":true,"mode":"script","script_url":"https://download.${network.name}.example/ad"}
         }''', network: network, enabled: true));
       }
-      expect(AdBlockDetector.adHosts(provider), {
-        'monetag.example',
-        'download.monetag.example',
-        'exoclick.example',
-        'download.exoclick.example',
-      });
+      expect(AdBlockDetector.adHosts(provider),
+          {'monetag.example', 'download.monetag.example'});
+      expect(AdBlockDetector.adHosts(provider, television: true),
+          {'tv.exoclick.example'});
+
+      provider.setPlaybackPopunderFallbackNetworks([AdNetwork.clickadu]);
+      expect(AdBlockDetector.adHosts(provider, television: true),
+          {'tv.exoclick.example', 'tv.clickadu.example'});
+
       provider
         ..setPlaybackPopunderNetwork(null)
-        ..setTvPlaybackPopunderNetwork(null);
+        ..setTvPlaybackPopunderNetwork(null)
+        ..setPlaybackPopunderFallbackNetworks(const []);
       expect(AdBlockDetector.adHosts(provider), isEmpty);
+      expect(AdBlockDetector.adHosts(provider, television: true), isEmpty);
+    });
+
+    test('FlixQuest redirectors are resolved, not probed as ad hosts', () {
+      final provider = AppDependencyProvider()
+        ..setPlaybackPopunderNetwork(AdNetwork.exoclick)
+        ..setPopunderAdsConfig(PopunderAdsConfig.parse('''{
+          "popunder":{"enabled":true,"mode":"smartlink","url":"https://flix.quest/api/exoclick-popup"},
+          "tv_popunder":{"enabled":true,"mode":"smartlink","url":"https://flix.quest/api/exoclick-popup"}
+        }''', network: AdNetwork.exoclick, enabled: true));
+      for (final television in [false, true]) {
+        expect(
+            AdBlockDetector.adHosts(provider, television: television), isEmpty);
+        expect(AdBlockDetector.adRedirects(provider, television: television),
+            {Uri.parse('https://flix.quest/api/exoclick-popup')});
+      }
+    });
+
+    test('TV only probes banners switched on for TV', () {
+      final provider = AppDependencyProvider()
+        ..setBannerAdsConfig(testAdsterraConfig(tvEnabled: false));
+      expect(AdBlockDetector.adHosts(provider), {'ads.example'});
+      expect(AdBlockDetector.adHosts(provider, television: true), isEmpty);
     });
 
     test('banner slot overrides contribute their active domains', () {
@@ -297,7 +417,12 @@ void main() {
       await pumpHost(tester);
       final check = AdBlockGate(
         detector: AdBlockDetector(lookup: (_) async => [real]),
-        additionalChecks: [(_) async => true],
+        additionalChecks: [
+          (_, ads) async {
+            expect(ads.all, {'ads.example'});
+            return true;
+          }
+        ],
       );
       await check.warmUp(host);
       final result = check.allowPlayback(host);
@@ -316,7 +441,7 @@ void main() {
       final shared = AdBlockGate(
         detector: AdBlockDetector(lookup: (_) async => [real]),
         cache: AdBlockCheckCache(now: tester.binding.clock.now),
-        additionalChecks: [(_) => pending.future],
+        additionalChecks: [(_, __) => pending.future],
       );
       final first = shared.allowPlayback(host);
       await tester.pump();
@@ -348,11 +473,17 @@ void main() {
       expect(await result, isFalse);
     });
 
-    testWidgets('DNS probe detects filtering when ad domains still resolve',
+    testWidgets('blocked ad domains FlixQuest does not use are not evidence',
         (tester) async {
       final lookedUp = <String>[];
+      var webChecks = 0;
       final probe = AdBlockGate(
-        additionalChecks: const [],
+        additionalChecks: [
+          (_, __) async {
+            webChecks++;
+            return false;
+          }
+        ],
         detector: AdBlockDetector(lookup: (host) async {
           lookedUp.add(host);
           return [
@@ -362,25 +493,179 @@ void main() {
       );
       await pumpHost(tester);
       await probe.warmUp(host);
-      final result = probe.allowPlayback(host);
+      expect(await probe.allowPlayback(host), isTrue);
+      expect(lookedUp, contains('ads.example'));
+      expect(lookedUp, isNot(contains('doubleclick.net')));
+      expect(webChecks, 1);
+      expect(find.byType(Dialog), findsNothing);
+    });
+
+    testWidgets('nothing is checked while no ad is live', (tester) async {
+      provider.setBannerAdNetwork('none');
+      var webChecks = 0;
+      final probe = AdBlockGate(
+        additionalChecks: [
+          (_, __) async {
+            webChecks++;
+            return true;
+          }
+        ],
+        detector: AdBlockDetector(lookup: (_) async {
+          checks++;
+          return [InternetAddress('0.0.0.0')];
+        }),
+      );
+      await pumpHost(tester);
+      expect(await probe.allowPlayback(host), isTrue);
+      expect(checks, 0);
+      expect(webChecks, 0);
+      expect(find.byType(Dialog), findsNothing);
+    });
+
+    testWidgets('a TV is not stopped over a phone-only ad host',
+        (tester) async {
+      provider
+        ..setBannerAdNetwork('none')
+        ..setTvPlaybackPopunderNetwork(AdNetwork.adsterra)
+        ..setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse('''{
+          "interstitial":{"enabled":true,"script_url":"https://social.example/s"},
+          "tv_popunder":{"enabled":true,"mode":"smartlink","url":"https://tv.example/l"}
+        }''', enabled: true));
+      final lookedUp = <String>[];
+      final probe = AdBlockGate(
+        cache: AdBlockCheckCache(
+            foregroundWait: const Duration(milliseconds: 700)),
+        additionalChecks: const [],
+        detector: AdBlockDetector(lookup: (host) async {
+          if (AdBlockDetector.dnsControlHosts.contains(host)) return [real];
+          lookedUp.add(host);
+          return [host == 'social.example' ? InternetAddress('0.0.0.0') : real];
+        }),
+      );
+      await pumpHost(tester);
+      expect(await probe.allowPlayback(host, television: true), isTrue);
+      expect(lookedUp, ['tv.example']);
+      expect(find.byType(Dialog), findsNothing);
+    });
+
+    testWidgets('a blocked ExoClick popup is fine while Adsterra falls back',
+        (tester) async {
+      provider
+        ..setBannerAdNetwork('none')
+        ..setPlaybackPopunderNetwork(AdNetwork.exoclick)
+        ..setPlaybackPopunderFallbackNetworks([AdNetwork.adsterra])
+        ..setPopunderAdsConfig(PopunderAdsConfig.parse('''{
+          "popunder":{"enabled":true,"mode":"smartlink","url":"https://exo.example/l"}
+        }''', network: AdNetwork.exoclick, enabled: true))
+        ..setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse('''{
+          "popunder":{"enabled":true,"mode":"smartlink","url":"https://smart.example/l"}
+        }''', enabled: true));
+      var adsterraBlocked = false;
+      AdBlockGate probe() => AdBlockGate(
+            cache: AdBlockCheckCache(
+                foregroundWait: const Duration(milliseconds: 700)),
+            additionalChecks: const [],
+            detector: AdBlockDetector(lookup: (host) async {
+              if (AdBlockDetector.dnsControlHosts.contains(host)) return [real];
+              final blocked = host == 'exo.example' ||
+                  (adsterraBlocked && host == 'smart.example');
+              return [blocked ? InternetAddress('0.0.0.0') : real];
+            }),
+          );
+      await pumpHost(tester);
+      expect(await probe().allowPlayback(host), isTrue);
+      expect(find.byType(Dialog), findsNothing);
+
+      adsterraBlocked = true;
+      final result = probe().allowPlayback(host);
       await tester.pumpAndSettle();
-      expect(lookedUp, containsAll(['doubleclick.net', 'ads.example']));
       expect(find.text('Turn off your ad blocker'), findsOneWidget);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(await result, isFalse);
     });
 
-    testWidgets('DNS probe still runs without configured ad hosts',
+    testWidgets('ExoClick\'s rotating delivery domain is what gets checked',
         (tester) async {
-      provider.setBannerAdNetwork('none');
+      provider
+        ..setBannerAdNetwork('none')
+        ..setPlaybackPopunderNetwork(AdNetwork.exoclick)
+        ..setPopunderAdsConfig(PopunderAdsConfig.parse('''{
+          "popunder":{"enabled":true,"mode":"smartlink","url":"https://flix.quest/api/exoclick-popup"}
+        }''', network: AdNetwork.exoclick, enabled: true));
+      final requests = <http.BaseRequest>[];
+      final lookedUp = <String>[];
+      final probe = AdBlockGate(
+        cache: AdBlockCheckCache(
+            foregroundWait: const Duration(milliseconds: 700)),
+        additionalChecks: const [],
+        redirects: AdRedirectResolver(
+          clientFactory: () => MockClient((request) async {
+            requests.add(request);
+            return http.Response('', 302, headers: {
+              'location': 'https://s.rotating.example/v1/link.php?idzone=1'
+            });
+          }),
+        ),
+        detector: AdBlockDetector(lookup: (host) async {
+          lookedUp.add(host);
+          if (AdBlockDetector.dnsControlHosts.contains(host)) return [real];
+          return [
+            host == 's.rotating.example' ? InternetAddress('0.0.0.0') : real
+          ];
+        }),
+      );
       await pumpHost(tester);
-      final result = gate().allowPlayback(host);
+      final result = probe.allowPlayback(host);
       await tester.pumpAndSettle();
+      expect(requests.single.method, 'HEAD');
+      expect(lookedUp, contains('s.rotating.example'));
+      expect(lookedUp, isNot(contains('flix.quest')));
       expect(find.text('Turn off your ad blocker'), findsOneWidget);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(await result, isFalse);
+    });
+
+    testWidgets('a blocked popup stops playback; a no-fill popup does not',
+        (tester) async {
+      blocked = false;
+      await pumpHost(tester);
+      final now = DateTime(2026, 10, 31);
+      final shared = AdBlockGate(
+        cache: AdBlockCheckCache(
+            foregroundWait: const Duration(milliseconds: 700)),
+        now: () => now,
+        detector: AdBlockDetector(
+          lookup: (host) async => [real],
+          publicLookup: (_) async => true,
+        ),
+      );
+      expect(await shared.allowPlayback(host), isTrue);
+
+      // The network answered with no ad: not a blocker.
+      shared.observeDelivery('ads.example', AdDelivery.reached);
+      expect(await shared.allowPlayback(host), isTrue);
+      expect(shared.blocksPlayback(provider), isFalse);
+
+      shared.observeDelivery('ads.example', AdDelivery.blocked);
+      final result = shared.allowPlayback(host);
+      await tester.pumpAndSettle();
+      expect(shared.blocksPlayback(provider), isTrue);
+      expect(find.text('Turn off your ad blocker'), findsOneWidget);
+
+      // "I turned it off" forgets the popup and checks DNS again.
+      await tester.tap(find.text('I turned it off'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    });
+
+    testWidgets('a popup that reached its network outweighs a DNS sinkhole',
+        (tester) async {
+      await pumpHost(tester);
+      final shared = gate()..observeDelivery('ads.example', AdDelivery.reached);
+      expect(await shared.allowPlayback(host), isTrue);
+      expect(checks, 0);
     });
 
     testWidgets('waits for the blocker to go, then continues', (tester) async {

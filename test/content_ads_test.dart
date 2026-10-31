@@ -246,7 +246,7 @@ void main() {
     final gate = AdBlockGate(
       cache: AdBlockCheckCache(),
       additionalChecks: [
-        (_) async {
+        (_, __) async {
           lookups++;
           return true;
         }

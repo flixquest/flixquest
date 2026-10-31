@@ -12,6 +12,8 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../models/adsterra_playback_ads_config.dart';
 import '../provider/app_dependency_provider.dart';
+import '../services/ad_block_detector.dart';
+import '../services/ad_delivery.dart';
 import '../services/playback_ad_browser_service.dart';
 import '../services/playback_ad_input_service.dart';
 import 'network_banner_widget.dart';
@@ -130,6 +132,7 @@ class AdsterraPlaybackAdScreen extends StatefulWidget {
       this.onAdShown,
       this.alreadyOpenFor = Duration.zero,
       this.onNoFill,
+      this.onDelivery,
       super.key});
   final PlaybackAdPlacement placement;
   final PlaybackAdStage stage;
@@ -151,6 +154,13 @@ class AdsterraPlaybackAdScreen extends StatefulWidget {
   /// and nothing was shown. Returns whether the caller took over, for example
   /// by loading the next network; otherwise the screen closes as usual.
   final bool Function()? onNoFill;
+
+  /// Called at most once with the network's own delivery host (the tag's
+  /// script host, or a direct link's first host past FlixQuest) and whether
+  /// it answered (an ad or no-fill alike) or failed the way ad blockers make
+  /// requests fail. This observes the viewer's own popup; nothing extra is
+  /// requested from the network.
+  final void Function(String host, AdDelivery delivery)? onDelivery;
 
   /// Closing reasons that mean the network had no ad for this request, as
   /// opposed to the viewer moving on, the app leaving the foreground or the
@@ -234,6 +244,9 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   int _documentGeneration = 0;
   DateTime? _lastPointer;
   bool _finished = false;
+  String? _deliveryHost;
+  bool _deliveryFailed = false;
+  bool _deliveryReported = false;
   bool _openingPage = false;
   bool _launchingBrowser = false;
   bool _popupAutoClose = false;
@@ -307,6 +320,10 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       }
     });
     final smartlink = widget.placement.trackedSmartlinkUrl;
+    // A FlixQuest redirector's target is learned from its redirect; a hosted
+    // tag page loads its network out of sight, so it reports nothing.
+    _noteNavigation(
+        widget.placement.smartlinkUrl ?? widget.placement.scriptUrl);
     _log(
         'starting mode=${widget.placement.mode} loadTimeoutMs=${widget.placement.loadTimeout.inMilliseconds}');
     if (smartlink != null) {
@@ -316,6 +333,46 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       if (widget.stage != PlaybackAdStage.beforeLoader) _holdClose();
       unawaited(_loadScript());
     }
+  }
+
+  /// A main-frame address: the first host past FlixQuest is the network's;
+  /// moving on from it means it answered.
+  void _noteNavigation(Uri? target) {
+    if (!_webUrl(target) || AdBlockDetector.isFirstPartyHost(target!.host)) {
+      return;
+    }
+    if (_deliveryHost == null) {
+      _deliveryHost = target.host;
+    } else if (target.host != _deliveryHost) {
+      _reportDelivery(AdDelivery.reached);
+    }
+  }
+
+  void _noteLoadError(WebResourceError error) {
+    if (Uri.tryParse(error.url ?? '')?.host != _deliveryHost) return;
+    _deliveryFailed = true;
+    if (isBlockingLoadError(error.description)) {
+      _reportDelivery(AdDelivery.blocked);
+    }
+  }
+
+  /// Any HTTP answer, even an error page, came from the network itself.
+  void _noteResponse(Uri? from) {
+    if (from != null && from.host == _deliveryHost) {
+      _reportDelivery(AdDelivery.reached);
+    }
+  }
+
+  void _notePageFinished(String url) {
+    if (!_deliveryFailed) _noteResponse(Uri.tryParse(url));
+  }
+
+  void _reportDelivery(AdDelivery delivery) {
+    final host = _deliveryHost;
+    if (_deliveryReported || host == null) return;
+    _deliveryReported = true;
+    _log('delivery host $host ${delivery.name}');
+    widget.onDelivery?.call(host, delivery);
   }
 
   @override
@@ -420,6 +477,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           if (url != 'about:blank') unawaited(_activateMonetag(controller));
         },
         onWebResourceError: (error) {
+          _noteLoadError(error);
           _log(
               'script resource error code=${error.errorCode} ${error.description} origin=${_origin(error.url ?? '')} path=${Uri.tryParse(error.url ?? '')?.path ?? ''} mainFrame=${error.isForMainFrame}');
           if (error.isForMainFrame == true) _finish('script_main_frame_error');
@@ -535,12 +593,14 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           }
         case 'script':
           _tagScriptLoaded = true;
+          _reportDelivery(AdDelivery.reached);
           _log('tag script loaded; waiting for the tag to fetch its ad');
         case 'request':
           // The tag's own requests, to see where it stops before arming.
           _log('tag request ${payload['url']} ${payload['detail']}');
         case 'loaded':
           _tagScriptLoaded = true;
+          _reportDelivery(AdDelivery.reached);
           // A loaded script is not proof of an impression. Clickadu sends
           // loaded after its ad request; Monetag checks its options separately.
           if (_automaticContinue && !_automaticContinueAttempted) {
@@ -687,6 +747,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       void onHttpError(HttpResponseError error) {
         final failedUrl = error.request?.uri ?? error.response?.uri;
         final status = error.response?.statusCode ?? 0;
+        if (status > 0) _noteResponse(failedUrl);
         if (!_finished &&
             _samePageDocument(failedUrl, _pageDocument ?? mainUrl) &&
             status >= 400) {
@@ -700,6 +761,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           if (request.url == 'about:blank') return NavigationDecision.navigate;
           if (_finished) return NavigationDecision.prevent;
           final target = Uri.tryParse(request.url);
+          if (request.isMainFrame) _noteNavigation(target);
           if (request.isMainFrame && isNoAdFallback(target)) {
             _onNoAd(target!);
             return NavigationDecision.prevent;
@@ -725,10 +787,15 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         onPageStarted: (url) {
           final started = Uri.tryParse(url);
           if (_webUrl(started)) mainUrl = started!;
+          _noteNavigation(started);
           _onPageStarted(url);
         },
-        onPageFinished: (url) => _inspectPage(page, url),
+        onPageFinished: (url) {
+          _notePageFinished(url);
+          _inspectPage(page, url);
+        },
         onWebResourceError: (error) {
+          if (error.isForMainFrame == true) _noteLoadError(error);
           if (!_finished && error.isForMainFrame == true) {
             final failed = Uri.tryParse(error.url ?? '');
             if (_webUrl(failed) &&
@@ -1509,6 +1576,7 @@ class PlaybackAdChainScreen extends StatefulWidget {
       this.preload,
       this.continueTap,
       this.onAdShown,
+      this.onDelivery,
       super.key})
       : assert(placements.length > 0);
 
@@ -1523,6 +1591,9 @@ class PlaybackAdChainScreen extends StatefulWidget {
   final PlaybackAdPreload? preload;
   final PlaybackContinueTap? continueTap;
   final VoidCallback? onAdShown;
+
+  /// Each network's [AdsterraPlaybackAdScreen.onDelivery].
+  final void Function(String host, AdDelivery delivery)? onDelivery;
 
   @override
   State<PlaybackAdChainScreen> createState() => _PlaybackAdChainScreenState();
@@ -1566,6 +1637,7 @@ class _PlaybackAdChainScreenState extends State<PlaybackAdChainScreen> {
         preload: _index == 0 ? widget.preload : null,
         continueTap: widget.continueTap,
         onAdShown: widget.onAdShown,
+        onDelivery: widget.onDelivery,
         alreadyOpenFor: _openFor,
         // The last network closes, or offers the way on, as it always has.
         onNoFill: _index + 1 < widget.placements.length ? _next : null,

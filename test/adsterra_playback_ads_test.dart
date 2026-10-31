@@ -901,7 +901,9 @@ void main() {
         enabled: true);
     expect(supplied.streamFoundExperiment, isNull);
     final smartlink = supplied.forStage(PlaybackAdStage.streamFound)!;
-    expect(smartlink.smartlinkUrl!.host, 'directyp.org');
+    // FlixQuest redirects to the current Smartlink, passing the sub-ID on.
+    expect(smartlink.smartlinkUrl,
+        Uri.parse('https://flix.quest/api/adsterra-popup'));
     expect(smartlink.trackedSmartlinkUrl!.queryParameters['psid'],
         'fqsmartpagev1');
     // Each trigger reports under its own sub-ID on the same Smartlink.

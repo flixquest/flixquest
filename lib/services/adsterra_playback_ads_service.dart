@@ -504,6 +504,7 @@ class AdsterraPlaybackAdsService {
           television: tv,
           preload: prepared,
           continueTap: continueTap,
+          onDelivery: AdBlockGate.instance.observeDelivery,
           onAdShown: stage == PlaybackAdStage.beforeLoader
               ? null
               : () {

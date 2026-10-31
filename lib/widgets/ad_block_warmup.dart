@@ -32,7 +32,7 @@ class _AdBlockWarmupState extends State<AdBlockWarmup>
     WidgetsBinding.instance.addObserver(this);
     _network = (widget.networkChanges ?? Connectivity().onConnectivityChanged)
         .listen((_) {
-      _gate.invalidate();
+      _gate.invalidate(forgetPopups: true);
       _schedule();
     }, onError: (Object _) {});
   }
