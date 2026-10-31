@@ -44,6 +44,7 @@ class AppRemoteConfig {
   static const adsterraPlaybackEnabledKey = 'adsterra_playback_enabled';
   static const adsterraPlaybackAdsKey = 'adsterra_playback_ads';
   static const playbackPopunderNetworkKey = 'playback_popunder_network';
+  static const playbackPopunderFallbackKey = 'playback_popunder_fallback';
   static const playbackPopupFrequencyMinutesKey =
       'playback_popup_frequency_minutes';
   static const playbackPopupAutoCloseEnabledKey =
@@ -141,6 +142,8 @@ class AppRemoteConfig {
         adsterraPlaybackEnabledKey: false,
         adsterraPlaybackAdsKey: '{}',
         playbackPopunderNetworkKey: 'adsterra',
+        // Empty: a network with no popup for the viewer leaves none.
+        playbackPopunderFallbackKey: '',
         playbackPopupFrequencyMinutesKey: 0,
         playbackPopupAutoCloseEnabledKey: false,
         playbackPopupExternalBrowserOnTapKey: true,
@@ -342,6 +345,10 @@ class AppRemoteConfig {
     }
     provider.setPlaybackPopunderNetwork(
         AdNetwork.parse(remoteConfig.getString(playbackPopunderNetworkKey)));
+    // A separate key, so builds without fallbacks keep reading one network
+    // from `playback_popunder_network`.
+    provider.setPlaybackPopunderFallbackNetworks(AdNetwork.parseList(
+        remoteConfig.getString(playbackPopunderFallbackKey)));
     provider.setPlaybackPopupFrequencyMinutes(
         remoteConfig.getValue(playbackPopupFrequencyMinutesKey).asInt());
     provider.setPlaybackPopupBrowserBehavior(

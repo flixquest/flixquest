@@ -343,8 +343,9 @@ class AdsterraPlaybackAdsService {
     if (_popupCoolingDown(resolved, _frequencyFor(provider, resolved, tv))) {
       return null;
     }
-    final placement = _placementFor(
-        provider, resolved, tv ? selection.tvNetwork : selection.network, tv);
+    final placement = _placementsFor(provider, resolved,
+            tv ? selection.tvNetwork : selection.network, tv)
+        .firstOrNull;
     if (placement == null) return null;
     late final PlaybackAdPreload preload;
     void onConfigChanged() {
@@ -414,8 +415,10 @@ class AdsterraPlaybackAdsService {
             ? selection?.tvNetwork
             : selection?.network;
     final config = selection?.adsterra;
-    var placement =
-        provider == null ? null : _placementFor(provider, stage, network, tv);
+    final placements = provider == null
+        ? const <PlaybackAdPlacement>[]
+        : _placementsFor(provider, stage, network, tv);
+    var placement = placements.firstOrNull;
     if (provider == null || placement == null) {
       _logSkip(stage,
           'network=${network?.name ?? 'none'} television=$tv trigger=${provider?.popupTrigger(stage)} adsterraEnabled=${config?.enabled ?? false} popupEnabled=${selection?.popunders[network]?.enabled ?? false}; stage disabled or invalid/missing ${tv ? 'tv_popunder' : 'config'}');
@@ -457,6 +460,7 @@ class AdsterraPlaybackAdsService {
       String? variantId;
       final experiment = stage == PlaybackAdStage.streamFound &&
               network == AdNetwork.adsterra &&
+              placement.network == AdNetwork.adsterra &&
               !tv
           ? config?.streamFoundExperiment
           : null;
@@ -492,8 +496,8 @@ class AdsterraPlaybackAdsService {
       final route = MaterialPageRoute<void>(
         settings: RouteSettings(
             name: '/${selectedPlacement.network.name}/${stage.name}'),
-        builder: (_) => AdsterraPlaybackAdScreen(
-          placement: selectedPlacement,
+        builder: (_) => PlaybackAdChainScreen(
+          placements: [selectedPlacement, ...placements.skip(1)],
           stage: stage,
           storeLauncher: storeLauncher,
           browserLauncher: browserLauncher,
@@ -548,6 +552,22 @@ class AdsterraPlaybackAdsService {
       stage.isSwitch && (tv || provider?.popupTrigger(stage) == null)
           ? PlaybackAdStage.streamFound
           : stage;
+
+  /// The selected network's placement for [stage], then each fallback
+  /// network's, skipping networks that have none. The Social Bar stays with
+  /// Adsterra alone.
+  List<PlaybackAdPlacement> _placementsFor(AppDependencyProvider provider,
+      PlaybackAdStage stage, AdNetwork? network, bool tv) {
+    if (network == null) return const [];
+    final networks = stage == PlaybackAdStage.beforeLoader
+        ? {network}
+        : {network, ...provider.playbackAdsSelection.fallbackNetworks};
+    return [
+      for (final candidate in networks)
+        if (_placementFor(provider, stage, candidate, tv) case final placement?)
+          placement,
+    ];
+  }
 
   PlaybackAdPlacement? _placementFor(AppDependencyProvider provider,
       PlaybackAdStage stage, AdNetwork? network, bool tv) {

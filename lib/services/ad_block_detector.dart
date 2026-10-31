@@ -59,14 +59,15 @@ class AdBlockDetector {
   };
   static const dnsControlHosts = {'example.com', 'www.wikipedia.org'};
 
-  /// The live banner catalog, Adsterra placements, selected popup networks
-  /// and enabled VAST tags. FlixQuest-hosted pages are not ad hosts.
+  /// The live banner catalog, Adsterra placements, selected and fallback popup
+  /// networks and enabled VAST tags. FlixQuest-hosted pages are not ad hosts.
   static Set<String> adHosts(AppDependencyProvider provider) {
     final playback = provider.adsterraPlaybackAds;
     final popups = [
       for (final network in {
         provider.playbackPopunderNetwork,
         provider.tvPlaybackPopunderNetwork,
+        ...provider.playbackPopunderFallbackNetworks,
       })
         if (network != null && network != AdNetwork.adsterra)
           provider.popunderAdsFor(network),
