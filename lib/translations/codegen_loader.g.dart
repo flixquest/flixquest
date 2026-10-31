@@ -2085,7 +2085,18 @@ class CodegenLoader extends AssetLoader{
   "plus_tv_patreon_step3": "Each Patreon charge adds to your balance; this TV updates by itself",
   "plus_tv_patreon_consent": "Plus starts from your balance when it covers {}, then renews every {} days. You can turn this off anytime.",
   "plus_tv_crypto_instead": "Pay with crypto instead",
-  "plus_patreon_open_failed": "No browser opened the link. Try again."
+  "plus_patreon_open_failed": "No browser opened the link. Try again.",
+  "tv_phone_sign_in": "Sign in with your phone",
+  "tv_phone_sign_in_step1": "Scan this code with your phone's camera",
+  "tv_phone_sign_in_step2": "Sign in, create an account, or continue with Google",
+  "tv_phone_sign_in_step3": "This TV signs in by itself",
+  "tv_phone_sign_in_or_visit": "No camera? Go to {} and enter",
+  "tv_phone_sign_in_renews": "The code renews by itself every 10 minutes.",
+  "tv_phone_sign_in_new_code": "New code",
+  "tv_phone_sign_in_use_remote": "Use the remote instead",
+  "tv_phone_sign_in_signing_in": "Signing in…",
+  "tv_phone_sign_in_denied": "The sign-in was cancelled on the phone. Here is a new code.",
+  "tv_phone_sign_in_failed": "Couldn't get a code. Check your connection and try again."
 };
 static const Map<String,dynamic> _hi = {
   "popularity_descending": "लोकप्रियता घटती",
@@ -4158,7 +4169,18 @@ static const Map<String,dynamic> _hi = {
   "plus_tv_patreon_step3": "Patreon का हर शुल्क आपके बैलेंस में जुड़ता है; यह टीवी अपने आप अपडेट होगा",
   "plus_tv_patreon_consent": "बैलेंस {} होते ही Plus शुरू होगा, फिर हर {} दिन में रिन्यू होगा। आप इसे कभी भी बंद कर सकते हैं।",
   "plus_tv_crypto_instead": "क्रिप्टो से भुगतान करें",
-  "plus_patreon_open_failed": "किसी ब्राउज़र ने लिंक नहीं खोला। फिर कोशिश करें।"
+  "plus_patreon_open_failed": "किसी ब्राउज़र ने लिंक नहीं खोला। फिर कोशिश करें।",
+  "tv_phone_sign_in": "अपने फ़ोन से साइन इन करें",
+  "tv_phone_sign_in_step1": "अपने फ़ोन के कैमरे से यह कोड स्कैन करें",
+  "tv_phone_sign_in_step2": "साइन इन करें, खाता बनाएँ, या Google से जारी रखें",
+  "tv_phone_sign_in_step3": "यह टीवी अपने आप साइन इन हो जाएगा",
+  "tv_phone_sign_in_or_visit": "कैमरा नहीं है? {} पर जाएँ और डालें",
+  "tv_phone_sign_in_renews": "कोड हर 10 मिनट में अपने आप बदल जाता है।",
+  "tv_phone_sign_in_new_code": "नया कोड",
+  "tv_phone_sign_in_use_remote": "इसके बजाय रिमोट का उपयोग करें",
+  "tv_phone_sign_in_signing_in": "साइन इन हो रहा है…",
+  "tv_phone_sign_in_denied": "फ़ोन पर साइन इन रद्द कर दिया गया। यह रहा नया कोड।",
+  "tv_phone_sign_in_failed": "कोड नहीं मिल सका। अपना कनेक्शन जाँचें और फिर से कोशिश करें।"
 };
 static const Map<String,dynamic> _es = {
   "popularity_descending": "Popularidad descendiente",
@@ -6231,7 +6253,18 @@ static const Map<String,dynamic> _es = {
   "plus_tv_patreon_step3": "Cada cobro de Patreon se suma a tu saldo; esta TV se actualiza sola",
   "plus_tv_patreon_consent": "Plus empieza con tu saldo cuando cubra {} y se renueva cada {} días. Puedes desactivarlo cuando quieras.",
   "plus_tv_crypto_instead": "Pagar con cripto",
-  "plus_patreon_open_failed": "Ningún navegador abrió el enlace. Inténtalo de nuevo."
+  "plus_patreon_open_failed": "Ningún navegador abrió el enlace. Inténtalo de nuevo.",
+  "tv_phone_sign_in": "Inicia sesión con tu teléfono",
+  "tv_phone_sign_in_step1": "Escanea este código con la cámara de tu teléfono",
+  "tv_phone_sign_in_step2": "Inicia sesión, crea una cuenta o continúa con Google",
+  "tv_phone_sign_in_step3": "Este televisor inicia sesión solo",
+  "tv_phone_sign_in_or_visit": "¿Sin cámara? Ve a {} e introduce",
+  "tv_phone_sign_in_renews": "El código se renueva solo cada 10 minutos.",
+  "tv_phone_sign_in_new_code": "Nuevo código",
+  "tv_phone_sign_in_use_remote": "Usar el control remoto",
+  "tv_phone_sign_in_signing_in": "Iniciando sesión…",
+  "tv_phone_sign_in_denied": "Se canceló el inicio de sesión en el teléfono. Aquí tienes un código nuevo.",
+  "tv_phone_sign_in_failed": "No se pudo obtener un código. Revisa tu conexión e inténtalo de nuevo."
 };
 static const Map<String,dynamic> _ar = {
   "popularity_descending": "ترتيب تنازلي حسب الشعبية",
@@ -8375,7 +8408,18 @@ static const Map<String,dynamic> _ar = {
   "plus_tv_patreon_step3": "كل عملية خصم من Patreon تُضاف إلى رصيدك، وسيتحدّث هذا التلفاز تلقائيًا",
   "plus_tv_patreon_consent": "يبدأ Plus من رصيدك عندما يغطي {}، ثم يتجدّد كل {} يومًا. يمكنك إيقافه في أي وقت.",
   "plus_tv_crypto_instead": "الدفع بالعملات الرقمية بدلًا من ذلك",
-  "plus_patreon_open_failed": "لم يفتح أي متصفح الرابط. حاول مرة أخرى."
+  "plus_patreon_open_failed": "لم يفتح أي متصفح الرابط. حاول مرة أخرى.",
+  "tv_phone_sign_in": "سجّل الدخول بهاتفك",
+  "tv_phone_sign_in_step1": "امسح هذا الرمز بكاميرا هاتفك",
+  "tv_phone_sign_in_step2": "سجّل الدخول أو أنشئ حسابًا أو تابع باستخدام Google",
+  "tv_phone_sign_in_step3": "يسجّل هذا التلفاز الدخول تلقائيًا",
+  "tv_phone_sign_in_or_visit": "لا توجد كاميرا؟ انتقل إلى {} وأدخل",
+  "tv_phone_sign_in_renews": "يتجدد الرمز تلقائيًا كل 10 دقائق.",
+  "tv_phone_sign_in_new_code": "رمز جديد",
+  "tv_phone_sign_in_use_remote": "استخدم جهاز التحكم بدلًا من ذلك",
+  "tv_phone_sign_in_signing_in": "جارٍ تسجيل الدخول…",
+  "tv_phone_sign_in_denied": "أُلغي تسجيل الدخول من الهاتف. إليك رمزًا جديدًا.",
+  "tv_phone_sign_in_failed": "تعذّر الحصول على رمز. تحقق من اتصالك وحاول مرة أخرى."
 };
 static const Map<String, Map<String,dynamic>> mapLocales = {"en": _en, "hi": _hi, "es": _es, "ar": _ar};
 }

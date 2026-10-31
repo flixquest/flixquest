@@ -14,6 +14,7 @@ import '../widgets/tv_device_limit_picker.dart';
 import '../widgets/tv_dialog.dart';
 import '../widgets/tv_poster_wall.dart';
 import 'tv_auth_screen.dart';
+import 'tv_phone_sign_in_screen.dart';
 import '../../widgets/app_logo.dart';
 
 class LaravelTvLandingScreen extends StatefulWidget {
@@ -219,13 +220,15 @@ class _TvLandingScreenState extends State<LaravelTvLandingScreen> {
                 final compact = constraints.maxHeight < 650;
                 return Row(
                   children: <Widget>[
+                    // Compact screens give the actions half the width, so
+                    // their labels stay on one line.
                     Expanded(
-                      flex: 6,
+                      flex: compact ? 5 : 6,
                       child: _TvLandingIntro(compact: compact),
                     ),
-                    const SizedBox(width: 54),
+                    SizedBox(width: compact ? 40 : 54),
                     Flexible(
-                      flex: 4,
+                      flex: compact ? 5 : 4,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 460),
                         child: DecoratedBox(
@@ -276,38 +279,54 @@ class _TvLandingScreenState extends State<LaravelTvLandingScreen> {
                                       height: 1.3,
                                     ),
                                   ),
-                                  SizedBox(height: compact ? 20 : 28),
+                                  SizedBox(height: compact ? 16 : 28),
+                                  // The phone covers signing in, signing up
+                                  // and Google without typing on the remote.
+                                  _TvLandingAction(
+                                    label: tr('tv_phone_sign_in'),
+                                    icon: PhosphorIcons.qrCode(),
+                                    autofocus: true,
+                                    primary: true,
+                                    compact: compact,
+                                    enabled: !_isGoogleSigningIn &&
+                                        !_isEnteringAsGuest,
+                                    onActivate: () => _open(
+                                      const TvPhoneSignInScreen(),
+                                    ),
+                                  ),
+                                  SizedBox(height: compact ? 8 : 12),
                                   _TvLandingAction(
                                     label: tr('tv_create_free_account'),
                                     icon: PhosphorIcons.userPlus(),
-                                    autofocus: true,
-                                    primary: true,
+                                    compact: compact,
                                     enabled: !_isGoogleSigningIn &&
                                         !_isEnteringAsGuest,
                                     onActivate: () => _open(
                                       const TvAuthScreen.createAccount(),
                                     ),
                                   ),
-                                  const SizedBox(height: 12),
+                                  SizedBox(height: compact ? 8 : 12),
                                   _TvLandingAction(
                                     label: tr('tv_sign_in'),
                                     icon: PhosphorIcons.signIn(),
+                                    compact: compact,
                                     enabled: !_isGoogleSigningIn &&
                                         !_isEnteringAsGuest,
                                     onActivate: () =>
                                         _open(const TvAuthScreen.signIn()),
                                   ),
-                                  const SizedBox(height: 12),
+                                  SizedBox(height: compact ? 8 : 12),
                                   _TvLandingAction(
                                     label: _isGoogleSigningIn
                                         ? tr('tv_signing_in_with_google')
                                         : tr('continue_with_google'),
                                     icon: PhosphorIcons.googleLogo(),
+                                    compact: compact,
                                     enabled: !_isGoogleSigningIn &&
                                         !_isEnteringAsGuest,
                                     onActivate: _continueWithGoogle,
                                   ),
-                                  SizedBox(height: compact ? 14 : 20),
+                                  SizedBox(height: compact ? 12 : 20),
                                   _TvGuestLink(
                                     label: _isEnteringAsGuest
                                         ? tr('tv_starting_guest_session')
@@ -502,6 +521,7 @@ class _TvLandingAction extends StatefulWidget {
     this.autofocus = false,
     this.primary = false,
     this.enabled = true,
+    this.compact = false,
   });
 
   final String label;
@@ -510,6 +530,9 @@ class _TvLandingAction extends StatefulWidget {
   final bool autofocus;
   final bool primary;
   final bool enabled;
+
+  /// Shorter, so four actions fit a 540-high screen.
+  final bool compact;
 
   @override
   State<_TvLandingAction> createState() => _TvLandingActionState();
@@ -541,7 +564,7 @@ class _TvLandingActionState extends State<_TvLandingAction> {
         opacity: widget.enabled ? 1 : 0.58,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 130),
-          height: 56,
+          height: widget.compact ? 50 : 56,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
             color: _focused
@@ -561,7 +584,7 @@ class _TvLandingActionState extends State<_TvLandingAction> {
                   style: TextStyle(
                     color: foreground,
                     fontFamily: 'FigtreeSB',
-                    fontSize: 19,
+                    fontSize: widget.compact ? 17 : 19,
                   ),
                 ),
               ),

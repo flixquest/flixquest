@@ -2069,5 +2069,16 @@
   "plus_tv_patreon_step3": "Cada cobro de Patreon se suma a tu saldo; esta TV se actualiza sola",
   "plus_tv_patreon_consent": "Plus empieza con tu saldo cuando cubra {} y se renueva cada {} días. Puedes desactivarlo cuando quieras.",
   "plus_tv_crypto_instead": "Pagar con cripto",
-  "plus_patreon_open_failed": "Ningún navegador abrió el enlace. Inténtalo de nuevo."
+  "plus_patreon_open_failed": "Ningún navegador abrió el enlace. Inténtalo de nuevo.",
+  "tv_phone_sign_in": "Inicia sesión con tu teléfono",
+  "tv_phone_sign_in_step1": "Escanea este código con la cámara de tu teléfono",
+  "tv_phone_sign_in_step2": "Inicia sesión, crea una cuenta o continúa con Google",
+  "tv_phone_sign_in_step3": "Este televisor inicia sesión solo",
+  "tv_phone_sign_in_or_visit": "¿Sin cámara? Ve a {} e introduce",
+  "tv_phone_sign_in_renews": "El código se renueva solo cada 10 minutos.",
+  "tv_phone_sign_in_new_code": "Nuevo código",
+  "tv_phone_sign_in_use_remote": "Usar el control remoto",
+  "tv_phone_sign_in_signing_in": "Iniciando sesión…",
+  "tv_phone_sign_in_denied": "Se canceló el inicio de sesión en el teléfono. Aquí tienes un código nuevo.",
+  "tv_phone_sign_in_failed": "No se pudo obtener un código. Revisa tu conexión e inténtalo de nuevo."
 }

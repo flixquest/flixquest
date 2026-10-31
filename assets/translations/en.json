@@ -2069,5 +2069,16 @@
   "plus_tv_patreon_step3": "Each Patreon charge adds to your balance; this TV updates by itself",
   "plus_tv_patreon_consent": "Plus starts from your balance when it covers {}, then renews every {} days. You can turn this off anytime.",
   "plus_tv_crypto_instead": "Pay with crypto instead",
-  "plus_patreon_open_failed": "No browser opened the link. Try again."
+  "plus_patreon_open_failed": "No browser opened the link. Try again.",
+  "tv_phone_sign_in": "Sign in with your phone",
+  "tv_phone_sign_in_step1": "Scan this code with your phone's camera",
+  "tv_phone_sign_in_step2": "Sign in, create an account, or continue with Google",
+  "tv_phone_sign_in_step3": "This TV signs in by itself",
+  "tv_phone_sign_in_or_visit": "No camera? Go to {} and enter",
+  "tv_phone_sign_in_renews": "The code renews by itself every 10 minutes.",
+  "tv_phone_sign_in_new_code": "New code",
+  "tv_phone_sign_in_use_remote": "Use the remote instead",
+  "tv_phone_sign_in_signing_in": "Signing in…",
+  "tv_phone_sign_in_denied": "The sign-in was cancelled on the phone. Here is a new code.",
+  "tv_phone_sign_in_failed": "Couldn't get a code. Check your connection and try again."
 }

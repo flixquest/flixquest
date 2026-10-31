@@ -1969,5 +1969,16 @@ abstract class  LocaleKeys {
   static const plus_tv_patreon_consent = 'plus_tv_patreon_consent';
   static const plus_tv_crypto_instead = 'plus_tv_crypto_instead';
   static const plus_patreon_open_failed = 'plus_patreon_open_failed';
+  static const tv_phone_sign_in = 'tv_phone_sign_in';
+  static const tv_phone_sign_in_step1 = 'tv_phone_sign_in_step1';
+  static const tv_phone_sign_in_step2 = 'tv_phone_sign_in_step2';
+  static const tv_phone_sign_in_step3 = 'tv_phone_sign_in_step3';
+  static const tv_phone_sign_in_or_visit = 'tv_phone_sign_in_or_visit';
+  static const tv_phone_sign_in_renews = 'tv_phone_sign_in_renews';
+  static const tv_phone_sign_in_new_code = 'tv_phone_sign_in_new_code';
+  static const tv_phone_sign_in_use_remote = 'tv_phone_sign_in_use_remote';
+  static const tv_phone_sign_in_signing_in = 'tv_phone_sign_in_signing_in';
+  static const tv_phone_sign_in_denied = 'tv_phone_sign_in_denied';
+  static const tv_phone_sign_in_failed = 'tv_phone_sign_in_failed';
 
 }

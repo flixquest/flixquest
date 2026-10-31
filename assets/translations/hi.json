@@ -2069,5 +2069,16 @@
   "plus_tv_patreon_step3": "Patreon का हर शुल्क आपके बैलेंस में जुड़ता है; यह टीवी अपने आप अपडेट होगा",
   "plus_tv_patreon_consent": "बैलेंस {} होते ही Plus शुरू होगा, फिर हर {} दिन में रिन्यू होगा। आप इसे कभी भी बंद कर सकते हैं।",
   "plus_tv_crypto_instead": "क्रिप्टो से भुगतान करें",
-  "plus_patreon_open_failed": "किसी ब्राउज़र ने लिंक नहीं खोला। फिर कोशिश करें।"
+  "plus_patreon_open_failed": "किसी ब्राउज़र ने लिंक नहीं खोला। फिर कोशिश करें।",
+  "tv_phone_sign_in": "अपने फ़ोन से साइन इन करें",
+  "tv_phone_sign_in_step1": "अपने फ़ोन के कैमरे से यह कोड स्कैन करें",
+  "tv_phone_sign_in_step2": "साइन इन करें, खाता बनाएँ, या Google से जारी रखें",
+  "tv_phone_sign_in_step3": "यह टीवी अपने आप साइन इन हो जाएगा",
+  "tv_phone_sign_in_or_visit": "कैमरा नहीं है? {} पर जाएँ और डालें",
+  "tv_phone_sign_in_renews": "कोड हर 10 मिनट में अपने आप बदल जाता है।",
+  "tv_phone_sign_in_new_code": "नया कोड",
+  "tv_phone_sign_in_use_remote": "इसके बजाय रिमोट का उपयोग करें",
+  "tv_phone_sign_in_signing_in": "साइन इन हो रहा है…",
+  "tv_phone_sign_in_denied": "फ़ोन पर साइन इन रद्द कर दिया गया। यह रहा नया कोड।",
+  "tv_phone_sign_in_failed": "कोड नहीं मिल सका। अपना कनेक्शन जाँचें और फिर से कोशिश करें।"
 }

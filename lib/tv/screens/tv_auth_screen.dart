@@ -15,6 +15,7 @@ import '../focus/tv_focusable.dart';
 import '../widgets/tv_device_limit_picker.dart';
 import '../widgets/tv_form_keyboard.dart';
 import '../widgets/tv_pill_button.dart';
+import 'tv_phone_sign_in_screen.dart';
 
 enum TvAuthMode { signIn, createAccount }
 
@@ -487,6 +488,15 @@ class _TvAuthScreenState extends State<LaravelTvAuthScreen> {
                   enabled: !_submitting,
                   height: compact ? 46 : 52,
                   onActivate: _signInWithGoogle,
+                ),
+                TvPillButton(
+                  label: tr('tv_phone_sign_in'),
+                  icon: PhosphorIcons.qrCode(),
+                  enabled: !_submitting,
+                  height: compact ? 46 : 52,
+                  onActivate: () => Navigator.of(context)
+                      .pushReplacement<void, void>(MaterialPageRoute<void>(
+                          builder: (_) => const TvPhoneSignInScreen())),
                 ),
               ],
             ),

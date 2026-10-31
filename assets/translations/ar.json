@@ -2140,5 +2140,16 @@
   "plus_tv_patreon_step3": "كل عملية خصم من Patreon تُضاف إلى رصيدك، وسيتحدّث هذا التلفاز تلقائيًا",
   "plus_tv_patreon_consent": "يبدأ Plus من رصيدك عندما يغطي {}، ثم يتجدّد كل {} يومًا. يمكنك إيقافه في أي وقت.",
   "plus_tv_crypto_instead": "الدفع بالعملات الرقمية بدلًا من ذلك",
-  "plus_patreon_open_failed": "لم يفتح أي متصفح الرابط. حاول مرة أخرى."
+  "plus_patreon_open_failed": "لم يفتح أي متصفح الرابط. حاول مرة أخرى.",
+  "tv_phone_sign_in": "سجّل الدخول بهاتفك",
+  "tv_phone_sign_in_step1": "امسح هذا الرمز بكاميرا هاتفك",
+  "tv_phone_sign_in_step2": "سجّل الدخول أو أنشئ حسابًا أو تابع باستخدام Google",
+  "tv_phone_sign_in_step3": "يسجّل هذا التلفاز الدخول تلقائيًا",
+  "tv_phone_sign_in_or_visit": "لا توجد كاميرا؟ انتقل إلى {} وأدخل",
+  "tv_phone_sign_in_renews": "يتجدد الرمز تلقائيًا كل 10 دقائق.",
+  "tv_phone_sign_in_new_code": "رمز جديد",
+  "tv_phone_sign_in_use_remote": "استخدم جهاز التحكم بدلًا من ذلك",
+  "tv_phone_sign_in_signing_in": "جارٍ تسجيل الدخول…",
+  "tv_phone_sign_in_denied": "أُلغي تسجيل الدخول من الهاتف. إليك رمزًا جديدًا.",
+  "tv_phone_sign_in_failed": "تعذّر الحصول على رمز. تحقق من اتصالك وحاول مرة أخرى."
 }
