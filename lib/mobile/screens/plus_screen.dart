@@ -16,6 +16,7 @@ import '../../services/flixquest_auth_service.dart';
 import '../../widgets/plus/plus_format.dart';
 import '../../widgets/plus/plus_visuals.dart';
 import '../widgets/page_kit.dart';
+import '../widgets/patreon_sheet.dart';
 import '../widgets/pill_button.dart';
 import '../widgets/plus_sheets.dart';
 import '../widgets/settings_kit.dart';
@@ -144,6 +145,7 @@ class _PlusScreenState extends State<PlusScreen> {
                   plus: plus,
                   working: _working,
                   onGetPlus: () => unawaited(showAddFundsSheet(context)),
+                  onPatreon: () => unawaited(showPatreonSheet(context)),
                   onStartFromBalance: () => unawaited(_enable(plus)),
                   onSignIn: () => unawaited(_signIn()),
                 ),
@@ -202,6 +204,18 @@ class _PlusScreenState extends State<PlusScreen> {
                             ? null
                             : () => unawaited(showAddFundsSheet(context)),
                       ),
+                      if (plus.patreon?.linked == true ||
+                          plus.patreonOffer.enabled)
+                        ListRow(
+                          icon: PhosphorIcons.heart(),
+                          label: plus.patreon?.linked == true
+                              ? tr('plus_patreon')
+                              : tr('plus_patreon_use'),
+                          subtitle: plus.patreon?.linked == true
+                              ? patreonStatusLine(plus.patreon!)
+                              : tr('plus_patreon_row_offer'),
+                          onTap: () => unawaited(showPatreonSheet(context)),
+                        ),
                       ListRow(
                         icon: PhosphorIcons.ticket(),
                         label: tr('plus_redeem_code'),
@@ -336,6 +350,34 @@ class _PlusScreenState extends State<PlusScreen> {
     final notices = <Widget>[];
     void add(Widget notice) =>
         notices.addAll(<Widget>[const SizedBox(height: AppSpace.lg), notice]);
+    final patreon = plus.patreon;
+    final patreonLink = plus.patreonLink;
+    if (patreonLink != null && patreonLink.isOpen) {
+      add(_Notice(
+        icon: PhosphorIcons.heart(),
+        title: tr('plus_patreon_waiting_title'),
+        body: tr('plus_patreon_waiting_body'),
+        action: tr('plus_view'),
+        onAction: () => unawaited(showPatreonSheet(context)),
+      ));
+    } else if (patreon?.linked == true && patreon!.needsReauthorization) {
+      add(_Notice(
+        icon: PhosphorIcons.heartBreak(),
+        title: tr('plus_patreon_reconnect_title'),
+        body: tr('plus_patreon_reconnect_body'),
+        action: tr('plus_patreon_reconnect'),
+        onAction: () => unawaited(showPatreonSheet(context)),
+        warning: true,
+      ));
+    } else if (patreon?.linked == true && patreon!.declined) {
+      add(_Notice(
+        icon: PhosphorIcons.heartBreak(),
+        title: tr('plus_patreon_declined'),
+        body: tr('plus_patreon_disclosure_manage'),
+        action: tr('plus_patreon_manage_pledge'),
+        onAction: () => unawaited(showPatreonSheet(context)),
+      ));
+    }
     if (wallet?.frozen == true) {
       add(_Notice(
         icon: PhosphorIcons.lockKey(),
@@ -394,6 +436,7 @@ class _Hero extends StatelessWidget {
     required this.plus,
     required this.working,
     required this.onGetPlus,
+    required this.onPatreon,
     required this.onStartFromBalance,
     required this.onSignIn,
   });
@@ -401,6 +444,7 @@ class _Hero extends StatelessWidget {
   final PlusController plus;
   final bool working;
   final VoidCallback onGetPlus;
+  final VoidCallback onPatreon;
   final VoidCallback onStartFromBalance;
   final VoidCallback onSignIn;
 
@@ -514,15 +558,25 @@ class _Hero extends StatelessWidget {
                   busy: working,
                   onPressed: onStartFromBalance,
                 )
-              else if (open)
+              else if (open) ...<Widget>[
                 PillButton(
                   label: tr('plus_get_plus'),
                   leading: const PlusMark(),
                   primary: true,
                   onArtwork: true,
                   onPressed: onGetPlus,
-                )
-              else
+                ),
+                if (plus.patreonOffer.enabled &&
+                    plus.patreon?.linked != true) ...<Widget>[
+                  const SizedBox(height: 10),
+                  PillButton(
+                    label: tr('plus_patreon_use'),
+                    icon: PhosphorIcons.heart(),
+                    onArtwork: true,
+                    onPressed: onPatreon,
+                  ),
+                ],
+              ] else
                 Text(
                   tr('plus_not_on_sale'),
                   style: const TextStyle(
@@ -549,6 +603,12 @@ class _Hero extends StatelessWidget {
                     label: tr('plus_balance_chip',
                         args: [formatUsd(plus.wallet?.spendableCents ?? 0)]),
                   ),
+                  if (plus.patreon?.activePatron == true)
+                    PlusChip(
+                      icon: PhosphorIcons.heart(),
+                      label: tr('plus_patreon_chip',
+                          args: [formatUsd(plus.patreon!.monthlyCents)]),
+                    ),
                   if (plus.showingCached)
                     PlusChip(
                       icon: PhosphorIcons.cloudSlash(),

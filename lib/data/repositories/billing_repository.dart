@@ -178,6 +178,61 @@ class BillingRepository {
     return _parse(() => PlusAccount.fromJson(body));
   }
 
+  // ---- Patreon -----------------------------------------------------------
+
+  /// The account's Patreon link and membership.
+  Future<PatreonMembership> patreon() async {
+    final body = await _request('billing/patreon');
+    return _parse(() => PatreonMembership.fromJson(
+        Map<String, dynamic>.from(body['patreon'] as Map)));
+  }
+
+  /// A short link that signs in to Patreon and links it to this account.
+  /// With [activatePlus] the viewer agrees, under [termsVersion], to start
+  /// Plus from the balance once a charge covers a period. Only an HTTPS
+  /// link is accepted.
+  Future<PatreonLink> startPatreonLink(
+      {bool activatePlus = false, String? termsVersion}) async {
+    final body = await _request('billing/patreon/link', method: 'POST', data: {
+      if (activatePlus) ...{
+        'activate_plus': true,
+        'terms_version': termsVersion
+      },
+    });
+    return _parse(() {
+      final link =
+          PatreonLink.fromJson(Map<String, dynamic>.from(body['link'] as Map));
+      final url = Uri.parse(link.url ?? '');
+      if (url.scheme != 'https' || url.host.isEmpty) {
+        throw const FormatException('Insecure Patreon link');
+      }
+      return link;
+    });
+  }
+
+  /// Where a link the app opened has got to, and the membership.
+  Future<(PatreonLink, PatreonMembership)> patreonLink(String id) async {
+    final body =
+        await _request('billing/patreon/link/${Uri.encodeComponent(id)}');
+    return _parse(() => (
+          PatreonLink.fromJson(Map<String, dynamic>.from(body['link'] as Map)),
+          PatreonMembership.fromJson(
+              Map<String, dynamic>.from(body['patreon'] as Map)),
+        ));
+  }
+
+  /// Asks Laravel to read the membership from Patreon now.
+  Future<PlusAccount> syncPatreon() async {
+    final body = await _request('billing/patreon/sync', method: 'POST');
+    return _parse(() => PlusAccount.fromJson(body));
+  }
+
+  /// Stops the pledge funding this account; credit already added stays.
+  Future<PlusAccount> unlinkPatreon() async {
+    final body = await _request('billing/patreon', method: 'DELETE');
+    return _parse(() => PlusAccount.fromJson(body));
+  }
+
   Future<(PlusAccount, CouponRedemption)> redeemCoupon(String code) async {
     final body = await _request('billing/coupons/redeem',
         method: 'POST', data: {'code': code.trim()});
