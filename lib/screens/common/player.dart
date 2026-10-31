@@ -462,13 +462,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                 BetterPlayerOverflowMenuItem(
                   PhosphorIcons.fileArrowUp(),
                   tr('upload_subtitles'),
-                  () {
-                    _localSubtitles.showLocalSubtitlesUpload(
+                  () => unawaited(
+                    _localSubtitles.pickAndApply(
                       context: context,
-                      colors: widget.colors,
                       betterPlayerController: _betterPlayerController,
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ]
             // Subtitle timing, searching online and uploading live in the
