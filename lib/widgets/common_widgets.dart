@@ -1,5 +1,3 @@
-import 'package:better_player_plus/better_player.dart';
-import 'package:clipboard/clipboard.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -10,8 +8,6 @@ import '../constants/app_constants.dart';
 import '../design/app_palette.dart';
 import '../design/app_tokens.dart';
 import '../mobile/widgets/page_kit.dart';
-import '../screens/common/player/player_sheet_ui.dart';
-import '../services/globle_method.dart';
 
 class AppStreamingService {
   const AppStreamingService(this.imagePath, this.name, this.providerId);
@@ -165,72 +161,5 @@ class ReportErrorWidget extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class ExternalPlay extends StatelessWidget {
-  const ExternalPlay(
-      {super.key, required this.videoSources, required this.subtitleSources});
-
-  final Map<String, String> videoSources;
-  final List<BetterPlayerSubtitlesSource> subtitleSources;
-
-  @override
-  Widget build(BuildContext context) {
-    final entries = videoSources.entries.toList();
-    final colors = BetterPlayerPanelColors.of(context);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(8, 8, 8, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tr('open_external'),
-                  style: TextStyle(
-                    color: colors.foreground,
-                    fontFamily: 'FigtreeBold',
-                    fontSize: 19,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  tr('video_source'),
-                  style: TextStyle(color: colors.muted, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          for (final entry in entries)
-            PlayerChoiceCard(
-              title: entry.key,
-              subtitle: tr('video_source'),
-              thumbnail: PlayerThumbnail(
-                width: 44,
-                height: 44,
-                child: Icon(PhosphorIcons.arrowSquareOut()),
-              ),
-              onTap: () => _openExternally(context, entry.value),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _openExternally(BuildContext context, String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
-      return;
-    }
-    await FlutterClipboard.copy(url);
-    if (!context.mounted) return;
-    GlobalMethods.showScaffoldMessage(tr('video_link_copied'), context);
   }
 }

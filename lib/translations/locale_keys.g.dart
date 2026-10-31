@@ -538,7 +538,6 @@ abstract class  LocaleKeys {
   static const telegram_prompt_dont_show_again = 'telegram_prompt_dont_show_again';
   static const telegram_prompt_scan = 'telegram_prompt_scan';
   static const check_connection = 'check_connection';
-  static const open_external = 'open_external';
   static const no_channels = 'no_channels';
   static const cleared_cache = 'cleared_cache';
   static const cache_doesnt_exist = 'cache_doesnt_exist';
@@ -553,7 +552,6 @@ abstract class  LocaleKeys {
   static const skip_recap = 'skip_recap';
   static const skip_credits = 'skip_credits';
   static const skip_preview = 'skip_preview';
-  static const video_link_copied = 'video_link_copied';
   static const select_season = 'select_season';
   static const season_episodes = 'season_episodes';
   static const playing = 'playing';
