@@ -202,6 +202,11 @@ class TvSpotlightData {
 /// Title, facts and synopsis for the tile in the spotlight.
 ///
 /// [featured] is the billboard treatment: a larger title and more synopsis.
+///
+/// It fits the height it is given. A short TV (or a page whose rows sit
+/// high) leaves little room above the rows, so the synopsis gives up lines
+/// first, then the facts, then the kicker; the title stays, its logo
+/// shrinking only when nothing else is left to give.
 class TvSpotlightInfo extends StatelessWidget {
   const TvSpotlightInfo({
     required this.data,
@@ -214,21 +219,37 @@ class TvSpotlightInfo extends StatelessWidget {
   final bool featured;
   final bool compact;
 
-  Widget _buildTitle(BuildContext context) {
+  /// Room held back from the budget, so rounding never tips it over.
+  static const _slack = 2.0;
+
+  double get _titleSize => switch ((featured, compact)) {
+        (true, true) => 34,
+        (true, false) => 46,
+        (false, true) => 26,
+        (false, false) => 34,
+      };
+
+  double get _logoHeight => switch ((featured, compact)) {
+        (true, true) => 92,
+        (true, false) => 124,
+        (false, true) => 56,
+        (false, false) => 72,
+      };
+
+  Widget _buildTitle(
+    BuildContext context, {
+    required double logoHeight,
+    required int maxLines,
+  }) {
     final palette = TvPalette.of(context);
     final text = Text(
       data.title,
-      maxLines: featured ? 2 : 1,
+      maxLines: maxLines,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         color: palette.foreground,
         fontFamily: 'FigtreeBold',
-        fontSize: switch ((featured, compact)) {
-          (true, true) => 34,
-          (true, false) => 46,
-          (false, true) => 26,
-          (false, false) => 34,
-        },
+        fontSize: _titleSize,
         height: 1.02,
         letterSpacing: -0.6,
       ),
@@ -237,12 +258,7 @@ class TvSpotlightInfo extends StatelessWidget {
     if (item == null) return text;
     return TvTitleLogo(
       item: item,
-      maxHeight: switch ((featured, compact)) {
-        (true, true) => 92,
-        (true, false) => 124,
-        (false, true) => 56,
-        (false, false) => 72,
-      },
+      maxHeight: logoHeight,
       // The billboard's title is looked up at once; a card's waits for focus
       // to settle, so sweeping a row does not fire a lookup per card.
       settleDelay: featured ? Duration.zero : const Duration(milliseconds: 250),
@@ -253,15 +269,56 @@ class TvSpotlightInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Localizations.localeOf(context);
+    return LayoutBuilder(
+      builder: (context, constraints) =>
+          _buildFitted(context, constraints.maxHeight),
+    );
+  }
+
+  Widget _buildFitted(BuildContext context, double available) {
     final palette = TvPalette.of(context);
     final colors = Theme.of(context).colorScheme;
+    final scaler = MediaQuery.textScalerOf(context);
+    double lines(double fontSize, double height, int count) =>
+        scaler.scale(fontSize) * height * count;
+
+    final kickerSize = compact ? 11.0 : 12.0;
+    final overviewSize = compact ? 13.0 : 15.0;
+    final overviewGap = compact ? 8.0 : 10.0;
     final kicker = data.kicker;
+
+    // Every line has a set height, so what fits can be worked out up front.
+    var budget = available - _slack;
+    var titleLines = featured ? 2 : 1;
+    var logoHeight = _logoHeight;
+    if (data.item == null) {
+      logoHeight = lines(_titleSize, 1.02, titleLines);
+    }
+    final kickerHeight =
+        kicker == null ? 0.0 : math.max(18.0, lines(kickerSize, 1.2, 1)) + 8;
+    final showKicker = kicker != null && budget >= kickerHeight + logoHeight;
+    if (showKicker) budget -= kickerHeight;
+    if (budget < logoHeight) {
+      // Too little room even for the title: one line of it, as large as
+      // fits, and nothing else.
+      titleLines = 1;
+      logoHeight = math.max(lines(_titleSize, 1.02, 1), budget);
+    }
+    budget -= logoHeight;
+    final factsHeight = 8 + lines(14, 1.1, 1);
+    final showFacts = data.facts.isNotEmpty && budget >= factsHeight;
+    if (showFacts) budget -= factsHeight;
+    final overviewLines = data.overview.isEmpty
+        ? 0
+        : ((budget - overviewGap) / lines(overviewSize, 1.3, 1))
+            .floor()
+            .clamp(0, featured && !compact ? 3 : 2);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        if (kicker != null) ...<Widget>[
+        if (showKicker) ...<Widget>[
           Row(
             children: <Widget>[
               if (data.kickerIcon case final icon?) ...<Widget>[
@@ -273,7 +330,8 @@ class TvSpotlightInfo extends StatelessWidget {
                 style: TextStyle(
                   color: colors.primary,
                   fontFamily: 'FigtreeSB',
-                  fontSize: compact ? 11 : 12,
+                  fontSize: kickerSize,
+                  height: 1.2,
                   letterSpacing: 1.5,
                 ),
               ),
@@ -281,8 +339,8 @@ class TvSpotlightInfo extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        _buildTitle(context),
-        if (data.facts.isNotEmpty) ...<Widget>[
+        _buildTitle(context, logoHeight: logoHeight, maxLines: titleLines),
+        if (showFacts) ...<Widget>[
           const SizedBox(height: 8),
           Text(
             data.facts.join('   '),
@@ -296,15 +354,15 @@ class TvSpotlightInfo extends StatelessWidget {
             ),
           ),
         ],
-        if (data.overview.isNotEmpty) ...<Widget>[
-          SizedBox(height: compact ? 8 : 10),
+        if (overviewLines > 0) ...<Widget>[
+          SizedBox(height: overviewGap),
           Text(
             data.overview,
-            maxLines: featured && !compact ? 3 : 2,
+            maxLines: overviewLines,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: palette.secondaryText,
-              fontSize: compact ? 13 : 15,
+              fontSize: overviewSize,
               height: 1.3,
             ),
           ),

@@ -545,24 +545,28 @@ class _TvBrowseViewState extends State<TvBrowseView> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              ValueListenableBuilder<TvSpotlightData>(
-                valueListenable: _spotlight,
-                builder: (_, data, __) => AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  switchInCurve: Curves.easeOut,
-                  switchOutCurve: Curves.easeIn,
-                  layoutBuilder: (current, previous) => Stack(
-                    alignment: Alignment.bottomLeft,
-                    children: <Widget>[
-                      ...previous,
-                      if (current != null) current
-                    ],
-                  ),
-                  child: TvSpotlightInfo(
-                    key: ValueKey<String>('${data.id}|$browsing'),
-                    data: data,
-                    featured: !browsing,
-                    compact: compact,
+              // Whatever the button leaves, even mid-fold, so the spotlight
+              // can fit itself to it.
+              Flexible(
+                child: ValueListenableBuilder<TvSpotlightData>(
+                  valueListenable: _spotlight,
+                  builder: (_, data, __) => AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    layoutBuilder: (current, previous) => Stack(
+                      alignment: Alignment.bottomLeft,
+                      children: <Widget>[
+                        ...previous,
+                        if (current != null) current
+                      ],
+                    ),
+                    child: TvSpotlightInfo(
+                      key: ValueKey<String>('${data.id}|$browsing'),
+                      data: data,
+                      featured: !browsing,
+                      compact: compact,
+                    ),
                   ),
                 ),
               ),
