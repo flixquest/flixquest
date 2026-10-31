@@ -247,6 +247,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   String? _deliveryHost;
   bool _deliveryFailed = false;
   bool _deliveryReported = false;
+  bool _adBlockGateOn = false;
   bool _openingPage = false;
   bool _launchingBrowser = false;
   bool _popupAutoClose = false;
@@ -261,6 +262,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     super.didChangeDependencies();
     final config = context.watch<AppDependencyProvider?>();
     _popupAutoClose = config?.playbackPopupAutoClose ?? false;
+    _adBlockGateOn = config?.adBlockGateEnabled ?? false;
     _externalBrowserOnTap = config?.playbackPopupExternalBrowserOnTap ?? true;
     // A popup may have stayed open beyond its deadline while automatic close
     // was disabled. Enabling it remotely must still honor that deadline.
@@ -373,6 +375,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     _deliveryReported = true;
     _log('delivery host $host ${delivery.name}');
     widget.onDelivery?.call(host, delivery);
+    if (delivery == AdDelivery.blocked) _finish('ad_blocked');
   }
 
   @override
@@ -1155,8 +1158,11 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     _finished = true;
     _cancelTimers();
     widget.preload?._fail();
+    // Fallback networks are for no-fill. With the ad blocker check on, a
+    // blocked network ends the popup so the check can stop playback.
     final noFill = !_adShown &&
-        AdsterraPlaybackAdScreen.noFillReasons.contains(reason);
+        (AdsterraPlaybackAdScreen.noFillReasons.contains(reason) ||
+            (reason == 'ad_blocked' && !_adBlockGateOn));
     _log(
         '${noFill ? 'no ad' : 'closing'} reason=$reason phase=${_phase.name} pageReady=$_pageReady closeAllowed=$_closeAllowed');
     // Deactivate before navigation; late messages cannot open an advertiser

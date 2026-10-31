@@ -61,28 +61,20 @@ void main() {
     }
   });
 
-  test('resolved chains drop any ad whose source stays unknown', () async {
+  test('sources resolve to hosts; unknown ones are left out', () async {
     final resolver = AdRedirectResolver(
       clientFactory: () => MockClient((request) async => request.url == popup
           ? http.Response('', 302,
               headers: {'location': 'https://s.rotating.example/l'})
           : http.Response('page', 200)),
     );
-    final page = Uri.parse('https://flix.quest/a/3ad05c8e4d');
-    final ads = await resolver.resolve((
-      required: {Uri.parse('https://ads.example/s.js'), page, null},
-      alternatives: [
-        {popup, Uri.parse('https://smart.example/l')},
-        {popup, null},
-        {page, Uri.parse('https://other.example/l')},
-      ],
-    ));
-    expect(ads.required, {'ads.example'});
-    expect(ads.alternatives, [
-      {'s.rotating.example', 'smart.example'}
-    ]);
-    expect(ads.blockedBy({'s.rotating.example'}), isFalse);
-    expect(ads.blockedBy({'s.rotating.example', 'smart.example'}), isTrue);
-    expect(ads.blockedBy({'ads.example'}), isTrue);
+    expect(
+        await resolver.resolve({
+          Uri.parse('https://ads.example/s.js'),
+          popup,
+          Uri.parse('https://flix.quest/a/3ad05c8e4d'),
+          null,
+        }),
+        {'ads.example', 's.rotating.example'});
   });
 }

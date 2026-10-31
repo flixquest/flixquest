@@ -85,6 +85,7 @@ void main() {
       true,
       true,
     ),
+    // The primary decides; Adsterra serves only on ExoClick's no-fill.
     'ExoClick popup, Adsterra endpoint as fallback': (
       popupOnly(AdNetwork.exoclick)
         ..setPlaybackPopunderFallbackNetworks([AdNetwork.adsterra])
@@ -92,8 +93,8 @@ void main() {
             exoclickPopup('https://flix.quest/api/exoclick-popup'))
         ..setAdsterraPlaybackAdsConfig(
             adsterraPopup('https://flix.quest/api/adsterra-popup')),
-      false,
-      false,
+      true,
+      true,
     ),
     'ExoClick popup, directyp.org Adsterra as fallback': (
       popupOnly(AdNetwork.exoclick)
@@ -131,13 +132,9 @@ void main() {
   final redirects = AdRedirectResolver();
   Future<(Set<String>, bool)> scan(AppDependencyProvider provider,
       {required bool television, required HostLookup lookup}) async {
-    final ads = await redirects
+    final hosts = await redirects
         .resolve(AdBlockDetector.adSources(provider, television: television));
-    return (
-      ads.all,
-      await AdBlockDetector(lookup: lookup)
-          .isBlocking(ads.required, alternatives: ads.alternatives),
-    );
+    return (hosts, await AdBlockDetector(lookup: lookup).isBlocking(hosts));
   }
 
   for (final MapEntry(key: name, value: (provider, phone, tv))

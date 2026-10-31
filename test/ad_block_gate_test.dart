@@ -204,32 +204,7 @@ void main() {
           isTrue);
     });
 
-    test('a fallback chain is blocked only when every network in it is',
-        () async {
-      final check = detector({
-        'exo.example': [
-          [InternetAddress('0.0.0.0')]
-        ],
-        'adsterra.example': [
-          [real]
-        ],
-        'other.example': [
-          [InternetAddress('0.0.0.0')]
-        ],
-      });
-      expect(
-          await check.isBlocking({}, alternatives: [
-            {'exo.example', 'adsterra.example'}
-          ]),
-          isFalse);
-      expect(
-          await check.isBlocking({}, alternatives: [
-            {'exo.example', 'other.example'}
-          ]),
-          isTrue);
-    });
-
-    test('popup and VAST fallbacks form chains; banners stand alone', () {
+    test('only the primary popup network and first VAST tag are judged', () {
       final provider = AppDependencyProvider()
         ..setBannerAdsConfig(testAdsterraConfig())
         ..setPlaybackPopunderNetwork(AdNetwork.exoclick)
@@ -244,24 +219,22 @@ void main() {
           "popunder":{"enabled":true,"mode":"smartlink","url":"https://smart.example/l"},
           "tv_popunder":{"enabled":true,"mode":"smartlink","url":"https://smart.example/tv"}
         }''', enabled: true));
-      final phone = AdBlockDetector.adSources(provider);
-      expect(phone.required, {
+      final exoclick = Uri.parse('https://flix.quest/api/exoclick-popup');
+      expect(AdBlockDetector.adSources(provider), {
         for (final unit in testAdsterraConfig().units.values) unit.scriptUrl,
         Uri.parse('https://social.example/s'),
+        exoclick,
       });
-      expect(phone.alternatives, [
-        {
-          Uri.parse('https://flix.quest/api/exoclick-popup'),
-          Uri.parse('https://smart.example/l'),
-        }
-      ]);
-      final tv = AdBlockDetector.adSources(provider, television: true);
-      expect(tv.alternatives, [
-        {
-          Uri.parse('https://flix.quest/api/exoclick-popup'),
-          Uri.parse('https://smart.example/tv'),
-        }
-      ]);
+      expect(AdBlockDetector.adSources(provider, television: true), {
+        ...testAdsterraConfig().units.values.map((unit) => unit.scriptUrl),
+        exoclick
+      });
+
+      // With no ExoClick popup for the viewer, Adsterra is requested first.
+      provider.setPopunderAdsConfig(
+          PopunderAdsConfig(AdNetwork.exoclick, enabled: false));
+      expect(AdBlockDetector.adSources(provider, television: true),
+          contains(Uri.parse('https://smart.example/tv')));
     });
 
     test('no ad hosts means nothing to check', () async {
@@ -311,8 +284,9 @@ void main() {
           {'tv.exoclick.example'});
 
       provider.setPlaybackPopunderFallbackNetworks([AdNetwork.clickadu]);
+      // A fallback serves only on no-fill; its own popup judges it.
       expect(AdBlockDetector.adHosts(provider, television: true),
-          {'tv.exoclick.example', 'tv.clickadu.example'});
+          {'tv.exoclick.example'});
 
       provider
         ..setPlaybackPopunderNetwork(null)
@@ -418,8 +392,8 @@ void main() {
       final check = AdBlockGate(
         detector: AdBlockDetector(lookup: (_) async => [real]),
         additionalChecks: [
-          (_, ads) async {
-            expect(ads.all, {'ads.example'});
+          (_, hosts) async {
+            expect(hosts, {'ads.example'});
             return true;
           }
         ],
@@ -548,7 +522,7 @@ void main() {
       expect(find.byType(Dialog), findsNothing);
     });
 
-    testWidgets('a blocked ExoClick popup is fine while Adsterra falls back',
+    testWidgets('a blocked primary stops playback whatever its fallback',
         (tester) async {
       provider
         ..setBannerAdNetwork('none')
@@ -560,29 +534,62 @@ void main() {
         ..setAdsterraPlaybackAdsConfig(AdsterraPlaybackAdsConfig.parse('''{
           "popunder":{"enabled":true,"mode":"smartlink","url":"https://smart.example/l"}
         }''', enabled: true));
-      var adsterraBlocked = false;
-      AdBlockGate probe() => AdBlockGate(
+      AdBlockGate probe(String blockedHost) => AdBlockGate(
             cache: AdBlockCheckCache(
                 foregroundWait: const Duration(milliseconds: 700)),
-            additionalChecks: const [],
             detector: AdBlockDetector(lookup: (host) async {
               if (AdBlockDetector.dnsControlHosts.contains(host)) return [real];
-              final blocked = host == 'exo.example' ||
-                  (adsterraBlocked && host == 'smart.example');
-              return [blocked ? InternetAddress('0.0.0.0') : real];
+              return [host == blockedHost ? InternetAddress('0.0.0.0') : real];
             }),
           );
       await pumpHost(tester);
-      expect(await probe().allowPlayback(host), isTrue);
+      // Only the fallback blocked: the primary serves, so play on.
+      expect(await probe('smart.example').allowPlayback(host), isTrue);
       expect(find.byType(Dialog), findsNothing);
 
-      adsterraBlocked = true;
-      final result = probe().allowPlayback(host);
+      final result = probe('exo.example').allowPlayback(host);
       await tester.pumpAndSettle();
       expect(find.text('Turn off your ad blocker'), findsOneWidget);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(await result, isFalse);
+    });
+
+    testWidgets('a blocked popup waits for confirmation, then asks',
+        (tester) async {
+      await pumpHost(tester);
+      bool? publicKnowsHost = true;
+      final shared = AdBlockGate(
+        detector: AdBlockDetector(
+          lookup: (host) async => [real],
+          publicLookup: (_) async => publicKnowsHost,
+        ),
+      );
+      // Retired or unreachable in public DNS: never blamed on the viewer.
+      publicKnowsHost = null;
+      expect(await shared.popupBlocked(host, 'exo.example'), isTrue);
+      expect(find.byType(Dialog), findsNothing);
+
+      publicKnowsHost = true;
+      var verdict = shared.popupBlocked(host, 'exo.example');
+      await tester.pumpAndSettle();
+      expect(find.text('Turn off your ad blocker'), findsOneWidget);
+      expect(shared.blocksPlayback(provider), isFalse,
+          reason: 'only the scan result marks playback blocked');
+      await tester.tap(find.text('I turned it off'));
+      await tester.pumpAndSettle();
+      // Null: show the popup again; the real ad is the test.
+      expect(await verdict, isNull);
+
+      verdict = shared.popupBlocked(host, 'exo.example', again: true);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('still on'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(await verdict, isFalse);
+
+      provider.adBlockGateEnabled = false;
+      expect(await shared.popupBlocked(host, 'exo.example'), isTrue);
     });
 
     testWidgets('ExoClick\'s rotating delivery domain is what gets checked',

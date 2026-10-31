@@ -18,14 +18,16 @@ import '../tv/widgets/tv_dialog.dart';
 import 'plus/plus_visuals.dart';
 
 /// Another check over the live ad hosts, alongside DNS.
-typedef AdBlockProbe = Future<bool> Function(BuildContext context, AdHosts ads);
+typedef AdBlockProbe = Future<bool> Function(
+    BuildContext context, Set<String> hosts);
 
 /// Browsing stays open to everyone; Play and Download ask viewers whose ad
 /// blocker hides FlixQuest's ads to turn it off first. Every loader calls
 /// [allowPlayback] before it looks for sources, so all entry points share it.
 /// Only the ads this device shows count, so a phone-only placement never
-/// stops a TV, and nothing is checked while no ad is live. A popup counts as
-/// blocked only when every network in its fallback chain is.
+/// stops a TV, and nothing is checked while no ad is live. A popup's primary
+/// network decides: fallbacks serve only when it answers with no ad, and a
+/// blocked primary stops playback ([popupBlocked]).
 ///
 /// No check requests anything from an ad network: the device's DNS answers
 /// for the live hosts, and what happened to the popups the viewer was shown
@@ -89,47 +91,35 @@ class AdBlockGate {
       provider.adBlockGateEnabled &&
       _cache.isBlocked(_key(provider, _sources(provider)));
 
-  AdSources _sources(AppDependencyProvider provider,
+  Set<Uri?> _sources(AppDependencyProvider provider,
           {bool television = false}) =>
       AdBlockDetector.adSources(provider,
           television:
               television || DevicePresentationService.instance.isTelevision);
 
-  Object _key(AppDependencyProvider provider, AdSources sources) {
-    String sorted(Iterable<Uri?> urls) =>
-        (urls.map((url) => '$url').toList()..sort()).join(',');
-    return (
-      provider,
-      provider.adBlockGateEnabled,
-      sorted(sources.required),
-      (sources.alternatives.map(sorted).toList()..sort()).join(';'),
-    );
-  }
+  Object _key(AppDependencyProvider provider, Set<Uri?> sources) => (
+        provider,
+        provider.adBlockGateEnabled,
+        (sources.map((url) => '$url').toList()..sort()).join(','),
+      );
 
-  Future<bool> _scan(BuildContext context, AdSources sources) async {
-    final resolved = await _redirects.resolve(sources);
-    // A popup that reached its network settles that ad, and its chain.
-    bool reached(String host) => _observedAt(host) == AdDelivery.reached;
-    final ads = AdHosts(
-      required: {
-        for (final host in resolved.required)
-          if (!reached(host)) host,
-      },
-      alternatives: [
-        for (final chain in resolved.alternatives)
-          if (!chain.any(reached)) chain,
-      ],
-    );
-    if (ads.all.isEmpty || !context.mounted) return false;
-    return _detector.isBlocking(ads.required,
-        alternatives: ads.alternatives,
-        observedBlocked: {
-          for (final host in ads.all)
-            if (_observedAt(host) == AdDelivery.blocked) host,
-        },
-        additionalChecks: [
-          for (final check in _additionalChecks) () => check(context, ads),
-        ]);
+  Future<bool> _scan(BuildContext context, Set<Uri?> sources) async {
+    // A popup that reached its network settles that host.
+    final hosts = {
+      for (final host in await _redirects.resolve(sources))
+        if (_observedAt(host) != AdDelivery.reached) host,
+    };
+    // A blocked popup counts even when its host is not (or no longer) live.
+    final observedBlocked = {
+      for (final host in _observed.keys)
+        if (_observedAt(host) == AdDelivery.blocked) host,
+    };
+    final all = {...hosts, ...observedBlocked};
+    if (all.isEmpty || !context.mounted) return false;
+    return _detector
+        .isBlocking(all, observedBlocked: observedBlocked, additionalChecks: [
+      for (final check in _additionalChecks) () => check(context, all),
+    ]);
   }
 
   Future<void> warmUp(BuildContext context) async {
@@ -198,6 +188,57 @@ class AdBlockGate {
           outcome: 'cleared', download: download, television: tv);
     }
     return context.mounted;
+  }
+
+  /// A popup's own network failed the way blockers make requests fail, on
+  /// [host]. Playback waits for the check to confirm it (public DNS knows the
+  /// host and local DNS is healthy), then asks as [allowPlayback] does.
+  /// True plays on (unconfirmed, gate off, or Plus started), false stops, and
+  /// null shows the popup again: after **I turned it off**, the viewer's real
+  /// ad is the test, and no extra request reaches the network.
+  Future<bool?> popupBlocked(BuildContext context, String host,
+      {bool download = false,
+      bool television = false,
+      bool again = false}) async {
+    observeDelivery(host, AdDelivery.blocked);
+    final provider = context.read<AppDependencyProvider?>();
+    if (provider == null ||
+        !provider.adBlockGateEnabled ||
+        AdsPolicy.adFreeAt(context)) {
+      return context.mounted;
+    }
+    final confirmed =
+        await _detector.isBlocking({host}, observedBlocked: {host});
+    if (!context.mounted) return false;
+    debugPrint('[AdBlockGate] popup blocked on $host; '
+        '${confirmed ? 'confirmed' : 'unconfirmed, playing on'}');
+    if (!confirmed || AdsPolicy.adFree) return true;
+    final tv = television || DevicePresentationService.instance.isTelevision;
+    final analytics = context.read<SettingsProvider?>()?.analytics;
+    analytics?.trackAdBlockerGate(
+        outcome: 'detected', download: download, television: tv);
+    while (true) {
+      final plus = AdsPolicy.offersPlus(context);
+      final choice =
+          await _ask(context, television: tv, again: again, plus: plus);
+      if (!context.mounted) return false;
+      if (choice == _Choice.plus) {
+        analytics?.trackAdBlockerGate(
+            outcome: 'plus', download: download, television: tv);
+        await AdsPolicy.openPlus(context);
+        if (!context.mounted) return false;
+        if (AdsPolicy.adFree) return true;
+        continue;
+      }
+      if (choice != _Choice.retry) {
+        analytics?.trackAdBlockerGate(
+            outcome: 'cancelled', download: download, television: tv);
+        return false;
+      }
+      _observed.remove(host);
+      _cache.invalidate();
+      return null;
+    }
   }
 
   /// [_Choice.retry] checks again, after the viewer turned the blocker

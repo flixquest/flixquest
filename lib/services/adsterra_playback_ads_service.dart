@@ -11,6 +11,7 @@ import '../models/adsterra_playback_ads_config.dart';
 import '../provider/app_dependency_provider.dart';
 import '../widgets/ad_block_gate.dart';
 import '../widgets/adsterra_playback_ad_screen.dart';
+import 'ad_delivery.dart';
 import 'device_presentation_service.dart';
 import 'playback_ad_input_service.dart';
 import 'playback_ad_browser_service.dart';
@@ -29,11 +30,19 @@ class AdsterraPlaybackAdsService {
     this.browserLauncher,
     this.continueTap,
     DateTime Function()? now,
+    AdBlockGate? adBlockGate,
   })  : _preferences = preferences ?? SharedPreferences.getInstance,
-        _now = now ?? DateTime.now {
+        _now = now ?? DateTime.now,
+        _adBlockGate = adBlockGate {
     AdsPolicy.addListener(_onPlusChanged);
   }
   static final instance = AdsterraPlaybackAdsService();
+
+  final AdBlockGate? _adBlockGate;
+  AdBlockGate get _gate => _adBlockGate ?? AdBlockGate.instance;
+
+  /// The delivery host a blocker stopped during the popup being shown.
+  String? _blockedHost;
 
   /// A popup owed from before Plus started is settled, never replayed
   /// later when Plus ends.
@@ -105,7 +114,7 @@ class AdsterraPlaybackAdsService {
       return context.mounted;
     }
     if (!context.mounted) return false;
-    if (!await AdBlockGate.instance.allowPlayback(context,
+    if (!await _gate.allowPlayback(context,
             download: download, television: television) ||
         !context.mounted) {
       return false;
@@ -366,7 +375,36 @@ class AdsterraPlaybackAdsService {
     return preload;
   }
 
+  /// Shows the popup for [requested]. When a blocker stopped its network
+  /// before playback starts (the Social Bar, stream found or a switch),
+  /// playback waits for [AdBlockGate.popupBlocked]; **I turned it off** shows
+  /// the popup again instead of trusting the tap.
   Future<bool> show(BuildContext context, PlaybackAdStage requested,
+      {bool download = false,
+      bool television = false,
+      PlaybackAdPreload? preload}) async {
+    for (var attempt = 0;; attempt++) {
+      if (attempt > 0 && !context.mounted) return false;
+      _blockedHost = null;
+      final proceed = await _present(context, requested,
+          download: download,
+          television: television,
+          preload: attempt == 0 ? preload : null);
+      final host = _blockedHost;
+      if (host == null ||
+          !proceed ||
+          !(requested == PlaybackAdStage.beforeLoader ||
+              requested.startsPlayback)) {
+        return proceed;
+      }
+      if (!context.mounted) return false;
+      final verdict = await _gate.popupBlocked(context, host,
+          download: download, television: television, again: attempt > 0);
+      if (verdict != null) return verdict;
+    }
+  }
+
+  Future<bool> _present(BuildContext context, PlaybackAdStage requested,
       {bool download = false,
       bool television = false,
       PlaybackAdPreload? preload}) async {
@@ -504,7 +542,10 @@ class AdsterraPlaybackAdsService {
           television: tv,
           preload: prepared,
           continueTap: continueTap,
-          onDelivery: AdBlockGate.instance.observeDelivery,
+          onDelivery: (host, delivery) {
+            if (delivery == AdDelivery.blocked) _blockedHost = host;
+            _gate.observeDelivery(host, delivery);
+          },
           onAdShown: stage == PlaybackAdStage.beforeLoader
               ? null
               : () {

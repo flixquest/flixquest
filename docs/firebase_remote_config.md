@@ -796,10 +796,10 @@ phones, and the selected mobile or TV popup network with its fallbacks
 (`tv_popunder` only on TV). Blocking an ad domain FlixQuest does not use, such
 as Google's, never stops playback, and with no ad live nothing is checked.
 
-Banners and the Social Bar each count on their own. A popup counts as blocked
-only when every network in its fallback chain (`playback_popunder_network`,
-then `playback_popunder_fallback`) is, because the next network serves when
-one cannot; VAST tags form the same kind of chain.
+A popup's primary network decides: `playback_popunder_fallback` networks serve
+only when the primary answers with no ad, never when a blocker stopped it. So
+a blocked primary counts even when a fallback could load, and a fallback is
+judged only by its own popup when it runs. VAST is judged by its first tag.
 
 Two kinds of evidence, combined under a six-second background deadline:
 
@@ -819,8 +819,14 @@ Two kinds of evidence, combined under a six-second background deadline:
   error from a block page) counts once public DNS shows the host exists and
   local DNS is healthy. Timeouts, offline errors and untrusted certificate
   authorities (old devices) count as neither. An outcome stands for 30
-  minutes, until the network changes, or until the viewer taps **I turned it
-  off**.
+  minutes, or until the network changes.
+
+  With the check on, a blocked network ends its popup at once (no fallback),
+  and the stream does not start: once the block is confirmed, the viewer is
+  asked to turn the blocker off. **I turned it off** loads the popup again, so
+  the viewer's real ad is the test, not the tap; **Cancel** closes the loader.
+  An unconfirmed block plays on. With the check off, a blocked network still
+  hands over to the fallback, as a no-fill does.
 
 Popups served through FlixQuest's redirectors (`flix.quest/api/exoclick-popup`,
 whose ExoClick delivery domain rotates, and `flix.quest/api/adsterra-popup`)

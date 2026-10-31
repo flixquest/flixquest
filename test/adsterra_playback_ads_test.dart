@@ -5,9 +5,11 @@ import 'dart:io';
 import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/models/adsterra_playback_ads_config.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
+import 'package:flixquest/services/ad_block_detector.dart';
 import 'package:flixquest/services/adsterra_playback_ads_service.dart';
 import 'package:flixquest/services/app_remote_config.dart';
 import 'package:flixquest/services/device_presentation_service.dart';
+import 'package:flixquest/widgets/ad_block_gate.dart';
 import 'package:flixquest/widgets/adsterra_playback_ad_screen.dart';
 import 'package:flixquest/widgets/adsterra_playback_gate.dart';
 import 'package:flutter/foundation.dart';
@@ -21,6 +23,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'support/fake_adsterra_webview.dart';
 import 'support/fake_remote_config.dart';
+import 'support/tv_localization.dart';
 
 const catalog = '''{
   "interstitial":{"enabled":true,"script_url":"https://ads.example/social","load_timeout_ms":1000,"max_duration_seconds":5,"cooldown_seconds":60},
@@ -4128,6 +4131,7 @@ void main() {
   });
 
   group('popup fallback networks', () {
+    initializeTvTranslations();
     const exoclickSmartlink = '''{
   "popunder":{"enabled":true,"mode":"smartlink","url":"https://exo.example/smartlink","load_timeout_ms":10000,"max_duration_seconds":30}
 }''';
@@ -4216,6 +4220,88 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1500));
       expect(find.byTooltip('Close ad'), findsOneWidget);
       await close(tester, result);
+    }, variant: android);
+
+    const blockedExoclick = WebResourceError(
+        errorCode: -2,
+        description: 'net::ERR_NAME_NOT_RESOLVED',
+        isForMainFrame: true,
+        url: 'https://exo.example/smartlink');
+
+    testWidgets('a blocked ExoClick hands over only while the check is off',
+        (tester) async {
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      platform.controllers.single.delegate!
+          .onWebResourceError!(blockedExoclick);
+      await pumpAd(tester);
+      expect(web(platform.controllers.last), [adsterra]);
+      await close(tester, result);
+    }, variant: android);
+
+    testWidgets(
+        'with the check on, a blocked ExoClick holds the stream until its '
+        'popup loads', (tester) async {
+      provider.adBlockGateEnabled = true;
+      service = AdsterraPlaybackAdsService(
+        storeLauncher: recordStoreLaunch,
+        adBlockGate: AdBlockGate(
+          detector: AdBlockDetector(
+            lookup: (_) async => [InternetAddress('1.1.1.1')],
+            publicLookup: (_) async => true,
+          ),
+        ),
+      );
+      await pumpHost(tester);
+      var proceeded = false;
+      final result =
+          service.streamFound(host).whenComplete(() => proceeded = true);
+      await pumpAd(tester);
+      platform.controllers.single.delegate!
+          .onWebResourceError!(blockedExoclick);
+      await tester.pumpAndSettle();
+      // No fallback, no stream: the viewer is asked first.
+      expect(platform.controllers, hasLength(1));
+      expect(find.text('Turn off your ad blocker'), findsOneWidget);
+      expect(proceeded, isFalse);
+
+      // "I turned it off" shows the real popup again as the test.
+      await tester.tap(find.text('I turned it off'));
+      await pumpAd(tester);
+      expect(platform.controllers, hasLength(2));
+      expect(web(platform.controllers.last), [exoclick]);
+      expect(proceeded, isFalse);
+
+      // ExoClick answers this time (no ad): the stream may start.
+      await platform.controllers.last.delegate!.onNavigationRequest!(
+          const NavigationRequest(
+              url: 'https://www.google.com/', isMainFrame: true));
+      await pumpAd(tester);
+      await close(tester, result);
+    }, variant: android);
+
+    testWidgets('cancelling after a blocked popup stops the stream',
+        (tester) async {
+      provider.adBlockGateEnabled = true;
+      service = AdsterraPlaybackAdsService(
+        storeLauncher: recordStoreLaunch,
+        adBlockGate: AdBlockGate(
+          detector: AdBlockDetector(
+            lookup: (_) async => [InternetAddress('1.1.1.1')],
+            publicLookup: (_) async => true,
+          ),
+        ),
+      );
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      platform.controllers.single.delegate!
+          .onWebResourceError!(blockedExoclick);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(await result, isFalse);
     }, variant: android);
 
     testWidgets('an ad the viewer saw is never followed by another network',

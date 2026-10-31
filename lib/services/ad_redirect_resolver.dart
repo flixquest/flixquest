@@ -29,34 +29,15 @@ class AdRedirectResolver {
   Future<Set<String>> hosts(Iterable<Uri> redirects) async =>
       (await Future.wait(redirects.map(host))).nonNulls.toSet();
 
-  /// [sources] as hosts. A redirect that cannot be read drops its ad, and
-  /// with it a whole chain: an unknown source might still serve the ad.
-  Future<AdHosts> resolve(AdSources sources) async {
-    final all = {
-      ...sources.required,
-      for (final chain in sources.alternatives) ...chain,
-    }.nonNulls;
-    final hosts = <Uri, String?>{
-      for (final (source, host) in await Future.wait(all.map((source) async => (
-            source,
+  /// [sources] as hosts. A redirect that cannot be read, or an unknown
+  /// (null) source, is left out: it cannot be judged.
+  Future<Set<String>> resolve(Set<Uri?> sources) async => {
+        for (final host in await Future.wait(sources.nonNulls.map((source) =>
             AdBlockDetector.isFirstPartyHost(source.host)
-                ? await host(source)
-                : source.host
-          ))))
-        source: host == null || host.isEmpty ? null : host,
-    };
-    return AdHosts(
-      required: {
-        for (final source in sources.required)
-          if (hosts[source] case final host?) host,
-      },
-      alternatives: [
-        for (final chain in sources.alternatives)
-          if (chain.every((source) => hosts[source] != null))
-            {for (final source in chain) hosts[source]!},
-      ],
-    );
-  }
+                ? host(source)
+                : Future.value(source.host))))
+          if (host != null && host.isNotEmpty) host,
+      };
 
   /// The ad host [redirect] points to; the last one seen when it cannot be
   /// read now, and null when it never could.
