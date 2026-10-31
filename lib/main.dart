@@ -287,7 +287,9 @@ void main() async {
       await bookmarkProvider.fetchBookmarks();
       await recentProvider.fetchMovies();
       await recentProvider.fetchEpisodes();
-      unawaited(injector.syncCoordinator.syncAll());
+      // A quick relaunch reuses the last session's sync rather than
+      // repeating it; the sync screen still forces one.
+      unawaited(injector.syncCoordinator.autoSyncAll());
     }
     // Read after the owner is known, so the first frame shows this account's.
     await playlistProvider.load();

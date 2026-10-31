@@ -47,6 +47,10 @@ class PlusController extends ChangeNotifier {
 
   /// How long a verified entitlement stays usable without the network.
   static const offlineGrace = Duration(hours: 24);
+
+  /// Coming back to the app within this long of a check does not ask
+  /// Laravel again; the timer armed by the last answer keeps the pace.
+  static const resumeRecheckAfter = Duration(minutes: 2);
   static const _cacheKey = 'plus.account';
 
   String? _owner;
@@ -232,7 +236,16 @@ class PlusController extends ChangeNotifier {
       unawaited(refreshCatalog());
     }
     if (_owner == null) return;
-    unawaited(refresh());
+    // A quick trip out of the app does not ask again; open top-ups and
+    // Patreon links below are still checked straight away.
+    final verified = _verifiedAt;
+    if (!_fromCache &&
+        verified != null &&
+        serverNow.difference(verified) < resumeRecheckAfter) {
+      _scheduleRefresh();
+    } else {
+      unawaited(refresh());
+    }
     // Back from the payment page: look at the open top-up straight away.
     final topup = _topup;
     if (topup != null && topup.isOpen) _watchTopup(topup, restart: true);

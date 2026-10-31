@@ -25,7 +25,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     super.initState();
     // Another device may have changed them since this one last looked.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PlaylistProvider>().sync();
+      if (mounted) context.read<PlaylistProvider>().autoSync();
     });
   }
 
