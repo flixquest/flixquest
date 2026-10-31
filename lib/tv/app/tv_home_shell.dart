@@ -23,6 +23,7 @@ import '../controllers/tv_catalog_controller.dart';
 import '../controllers/tv_title_logos.dart';
 import '../screens/tv_catalog_screen.dart';
 import '../screens/tv_collection_screen.dart';
+import '../screens/tv_discover_screen.dart';
 import '../screens/tv_home_screen.dart';
 import '../screens/tv_library_screen.dart';
 import '../screens/tv_live_screen.dart';
@@ -74,6 +75,11 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
             label: tr('series'),
             icon: PhosphorIcons.television(),
             selectedIcon: PhosphorIcons.television(PhosphorIconsStyle.fill)),
+        TvNavigationDestination(
+            id: 'discover',
+            label: tr('discover'),
+            icon: PhosphorIcons.compass(),
+            selectedIcon: PhosphorIcons.compass(PhosphorIconsStyle.fill)),
         TvNavigationDestination(
             id: 'live',
             label: tr('live_tv'),
@@ -452,6 +458,11 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
           metrics: metrics,
           onOpenMedia: _openMedia,
           onOpenCollection: _openCollection,
+          focusController: focusController,
+        ),
+      'discover' => TvDiscoverScreen(
+          metrics: metrics,
+          onOpenMedia: _openMedia,
           focusController: focusController,
         ),
       _liveDestinationId => TvLiveScreen(

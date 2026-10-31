@@ -742,6 +742,16 @@ abstract class  LocaleKeys {
   static const year = 'year';
   static const minimum_ratings = 'minimum_ratings';
   static const ratings_at_least = 'ratings_at_least';
+  static const country = 'country';
+  static const more_countries = 'more_countries';
+  static const search_countries = 'search_countries';
+  static const popular_countries = 'popular_countries';
+  static const all_countries = 'all_countries';
+  static const no_countries_match = 'no_countries_match';
+  static const n_selected = 'n_selected';
+  static const tv_discover_country_hint = 'tv_discover_country_hint';
+  static const tv_discover_titles = 'tv_discover_titles';
+  static const tv_discover_no_matches = 'tv_discover_no_matches';
   static const coming_soon = 'coming_soon';
   static const everyone_watching = 'everyone_watching';
   static const top_10_movies = 'top_10_movies';

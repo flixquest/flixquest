@@ -19,9 +19,6 @@ import '../widgets/page_kit.dart';
 import '../widgets/pill_button.dart';
 import 'collection_screen.dart';
 
-/// Counts what a discover request would find; null when it can't tell.
-typedef DiscoverCounter = Future<int?> Function(String url);
-
 /// Browse with filters: FlixQuest's Discover for movies or series, laid out
 /// as choices to tap rather than form controls, with a button that says how
 /// many titles the choices find.
@@ -29,7 +26,12 @@ typedef DiscoverCounter = Future<int?> Function(String url);
 /// Each kind keeps its own choices, so switching between them and back
 /// loses nothing; so does coming back from the results.
 class DiscoverScreen extends StatefulWidget {
-  const DiscoverScreen({this.openResults, this.countResults, super.key});
+  const DiscoverScreen({
+    this.openResults,
+    this.countResults,
+    this.loadCountries,
+    super.key,
+  });
 
   /// Shows the results; the paged grid by default.
   final void Function(BuildContext context, MediaCollection results)?
@@ -37,6 +39,9 @@ class DiscoverScreen extends StatefulWidget {
 
   /// How many titles a request finds; TMDB's count by default.
   final DiscoverCounter? countResults;
+
+  /// The countries to search; TMDB's list by default.
+  final DiscoverCountryLoader? loadCountries;
 
   @override
   State<DiscoverScreen> createState() => _DiscoverScreenState();
@@ -55,6 +60,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Timer? _countTimer;
   bool _started = false;
 
+  /// Every country, once TMDB names them; the popular ones until then.
+  late Future<List<DiscoverCountry>> _allCountries;
+  List<DiscoverCountry> _countries = DiscoverQuery.featuredCountries;
+
   DiscoverQuery get _query => _queries[_kind]!;
 
   String get _url {
@@ -68,7 +77,54 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     if (!_started) {
       _started = true;
       _count();
+      _loadCountries();
     }
+  }
+
+  void _loadCountries() {
+    final language = context.read<SettingsProvider>().appLanguage;
+    final load = widget.loadCountries ??
+        (language) => fetchDiscoverCountries(
+              language,
+              proxyUrl: context.read<AppDependencyProvider>().tmdbProxy,
+            );
+    _allCountries = load(language);
+    _allCountries.then((countries) {
+      if (mounted) setState(() => _countries = countries);
+    });
+  }
+
+  /// [code]'s country, named in the app's language when TMDB has said.
+  DiscoverCountry _country(String code) =>
+      _countries.where((country) => country.code == code).firstOrNull ??
+      DiscoverQuery.featuredCountries
+          .where((country) => country.code == code)
+          .firstOrNull ??
+      (code: code, name: code, englishName: code);
+
+  /// Those chosen from the search first, so they stay in view, then the
+  /// popular ones.
+  List<DiscoverCountry> _countryChoices(DiscoverQuery query) {
+    final featured = <String>{
+      for (final country in DiscoverQuery.featuredCountries) country.code,
+    };
+    return <DiscoverCountry>[
+      for (final code in query.countries)
+        if (!featured.contains(code)) _country(code),
+      for (final code in featured) _country(code),
+    ];
+  }
+
+  Future<void> _searchCountries() {
+    final query = _query;
+    return showAppSheet<void>(
+      context,
+      builder: (_) => _CountrySheet(
+        countries: _allCountries,
+        selected: query.countries,
+        onToggle: (code) => _toggle(query.countries, code),
+      ),
+    );
   }
 
   @override
@@ -161,6 +217,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     return <(String, VoidCallback)>[
       for (final id in query.genres)
         (genreName(id), () => _toggle(query.genres, id)),
+      for (final code in query.countries)
+        (
+          _countryLabel(_country(code)),
+          () => _toggle(query.countries, code),
+        ),
       for (final id in query.providers)
         (serviceName(id), () => _toggle(query.providers, id)),
       if (query.year.isNotEmpty)
@@ -277,6 +338,25 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   ),
                 ),
                 _Section(
+                  title: tr('country'),
+                  child: Wrap(
+                    spacing: AppSpace.sm,
+                    runSpacing: 0,
+                    children: <Widget>[
+                      for (final country in _countryChoices(query))
+                        TogglePill(
+                          label: _countryLabel(country),
+                          selected: query.countries.contains(country.code),
+                          onTap: () => _toggle(query.countries, country.code),
+                        ),
+                      _MorePill(
+                        label: tr('more_countries'),
+                        onTap: _searchCountries,
+                      ),
+                    ],
+                  ),
+                ),
+                _Section(
                   title: tr('streaming_on'),
                   child: _ServiceGrid(
                     selected: query.providers,
@@ -345,6 +425,280 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     return ColoredBox(
       color: palette.page,
       child: ReadableWidth(maxWidth: 840, child: page),
+    );
+  }
+}
+
+/// A country's flag, where it has one, before its name.
+String _countryLabel(DiscoverCountry country) {
+  final flag = DiscoverQuery.flag(country.code);
+  return flag == null ? country.name : '$flag  ${country.name}';
+}
+
+/// Opens the search over every country: a soft pill with a magnifier,
+/// after the popular ones.
+class _MorePill extends StatelessWidget {
+  const _MorePill({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Semantics(
+      button: true,
+      label: label,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Center(
+            widthFactor: 1,
+            child: Material(
+              color: Colors.transparent,
+              shape: StadiumBorder(side: BorderSide(color: palette.hairline)),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(12, 9, 15, 9),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(
+                        PhosphorIcons.magnifyingGlass(),
+                        size: 15,
+                        color: palette.foreground,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        label,
+                        style: AppType.cardTitle.copyWith(
+                          fontSize: 14,
+                          color: palette.foreground,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Every country, to search by name: the popular ones first, then the rest
+/// A to Z. Each tap takes effect at once, so the count behind keeps up.
+class _CountrySheet extends StatefulWidget {
+  const _CountrySheet({
+    required this.countries,
+    required this.selected,
+    required this.onToggle,
+  });
+
+  final Future<List<DiscoverCountry>> countries;
+
+  /// The codes chosen; [onToggle] changes them.
+  final Set<String> selected;
+  final ValueChanged<String> onToggle;
+
+  @override
+  State<_CountrySheet> createState() => _CountrySheetState();
+}
+
+class _CountrySheetState extends State<_CountrySheet> {
+  final TextEditingController _search = TextEditingController();
+  String _needle = '';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _toggle(String code) {
+    widget.onToggle(code);
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
+    return FractionallySizedBox(
+      heightFactor: .9,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpace.md),
+              child: SearchPill(
+                controller: _search,
+                hint: tr('search_countries'),
+                onChanged: (text) => setState(() => _needle = text),
+              ),
+            ),
+            Expanded(
+              child: FutureBuilder<List<DiscoverCountry>>(
+                future: widget.countries,
+                initialData: DiscoverQuery.featuredCountries,
+                builder: (context, snapshot) {
+                  final all = snapshot.data ?? DiscoverQuery.featuredCountries;
+                  final searching = _needle.trim().isNotEmpty;
+                  final matches = DiscoverQuery.matchCountries(all, _needle);
+                  final featured = <DiscoverCountry>[
+                    for (final popular in DiscoverQuery.featuredCountries)
+                      all
+                              .where((country) => country.code == popular.code)
+                              .firstOrNull ??
+                          popular,
+                  ];
+                  // Until the whole list arrives, the popular ones are all
+                  // there is: no need to list them twice.
+                  final everyCountry =
+                      all.length > featured.length ? all : <DiscoverCountry>[];
+                  final rows = <Object>[
+                    if (searching)
+                      ...matches
+                    else ...<Object>[
+                      tr('popular_countries'),
+                      ...featured,
+                      if (everyCountry.isNotEmpty) ...<Object>[
+                        tr('all_countries'),
+                        ...everyCountry,
+                      ],
+                    ],
+                  ];
+                  if (rows.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.all(AppSpace.xxl),
+                      child: Text(
+                        tr('no_countries_match'),
+                        textAlign: TextAlign.center,
+                        style: AppType.body.copyWith(color: palette.mutedText),
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.only(
+                      bottom:
+                          MediaQuery.paddingOf(context).bottom + AppSpace.lg,
+                    ),
+                    itemCount: rows.length,
+                    itemBuilder: (context, index) {
+                      final row = rows[index];
+                      if (row is String) {
+                        return KickerHeading(
+                          row,
+                          padding: EdgeInsetsDirectional.fromSTEB(
+                            gutter,
+                            AppSpace.lg,
+                            gutter,
+                            AppSpace.xs,
+                          ),
+                        );
+                      }
+                      final country = row as DiscoverCountry;
+                      final selected = widget.selected.contains(country.code);
+                      return _CountryRow(
+                        country: country,
+                        selected: selected,
+                        onTap: () => _toggle(country.code),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CountryRow extends StatelessWidget {
+  const _CountryRow({
+    required this.country,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final DiscoverCountry country;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final flag = DiscoverQuery.flag(country.code);
+    // The English name too, when the app's language names it otherwise.
+    final english =
+        country.englishName != country.name ? country.englishName : null;
+    return Semantics(
+      selected: selected,
+      child: ListRow(
+        label: country.name,
+        subtitle: english,
+        leading: SizedBox(
+          width: 28,
+          child: flag == null
+              ? Icon(
+                  PhosphorIcons.globeHemisphereWest(),
+                  size: 22,
+                  color: palette.mutedText,
+                )
+              : Text(
+                  flag,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 22, height: 1.1),
+                ),
+        ),
+        trailing: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 140),
+          child: selected
+              ? Container(
+                  key: const ValueKey<bool>(true),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: palette.focusFill,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    PhosphorIcons.check(PhosphorIconsStyle.bold),
+                    size: 14,
+                    color: palette.onFocus,
+                  ),
+                )
+              : Container(
+                  key: const ValueKey<bool>(false),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: palette.hairline, width: 1.5),
+                  ),
+                ),
+        ),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+      ),
     );
   }
 }

@@ -32,6 +32,7 @@ class AppSessionStateStore {
     'search',
     'movies',
     'series',
+    'discover',
     'live',
     'library',
     'wellness',
