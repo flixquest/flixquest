@@ -778,6 +778,9 @@ abstract class  LocaleKeys {
   static const networks = 'networks';
   static const schedule = 'schedule';
   static const live_tv_unavailable = 'live_tv_unavailable';
+  static const live_tv_source = 'live_tv_source';
+  static const live_source_daddylive_hint = 'live_source_daddylive_hint';
+  static const live_source_ntv_hint = 'live_source_ntv_hint';
   static const no_channels_match = 'no_channels_match';
   static const try_another_channel_filter = 'try_another_channel_filter';
   static const clear_search = 'clear_search';

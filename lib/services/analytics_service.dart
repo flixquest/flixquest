@@ -231,11 +231,15 @@ class AnalyticsService {
     });
   }
 
-  /// DaddyLive events deliberately exclude stream URLs, embed URLs and request
-  /// headers because they can contain short-lived access tokens.
-  void trackLiveTVScreenOpened({required String surface}) {
+  /// Live TV events deliberately exclude stream URLs, embed URLs and request
+  /// headers because they can contain short-lived access tokens. [provider]
+  /// names the catalog: DaddyLive, or NTV beside it.
+  void trackLiveTVScreenOpened({
+    required String surface,
+    String provider = 'DaddyLive',
+  }) {
     _track('Live TV Screen Opened', {
-      'Provider': 'DaddyLive',
+      'Provider': provider,
       'Surface': surface,
     });
   }
@@ -250,9 +254,10 @@ class AnalyticsService {
     required int epgDayCount,
     String? error,
     bool fallbackToCache = false,
+    String provider = 'DaddyLive',
   }) {
     _track('Live TV Catalog Load', {
-      'Provider': 'DaddyLive',
+      'Provider': provider,
       'Surface': surface,
       'Refresh': refresh,
       'Cache Hit': cacheHit,
@@ -270,9 +275,10 @@ class AnalyticsService {
     required String action,
     String? value,
     int? resultCount,
+    String provider = 'DaddyLive',
   }) {
     _track('Live TV Interaction', {
-      'Provider': 'DaddyLive',
+      'Provider': provider,
       'Surface': surface,
       'Action': action,
       if (value != null) 'Value': value,
@@ -285,9 +291,10 @@ class AnalyticsService {
     required String channelId,
     required String channelName,
     required bool added,
+    String provider = 'DaddyLive',
   }) {
     _track('Live TV Favorite Toggled', {
-      'Provider': 'DaddyLive',
+      'Provider': provider,
       'Surface': surface,
       'Channel ID': channelId,
       'Channel Name': channelName,
@@ -303,9 +310,10 @@ class AnalyticsService {
     required int durationMs,
     String? source,
     String? error,
+    String provider = 'DaddyLive',
   }) {
     _track('Live TV Stream Resolution', {
-      'Provider': 'DaddyLive',
+      'Provider': provider,
       'Surface': surface,
       'Channel ID': channelId,
       'Channel Name': channelName,
@@ -327,9 +335,10 @@ class AnalyticsService {
     int? bufferingMs,
     int? bufferCount,
     String? error,
+    String provider = 'DaddyLive',
   }) {
     _track('Live TV Player Event', {
-      'Provider': 'DaddyLive',
+      'Provider': provider,
       'Surface': surface,
       'Session ID': sessionId,
       'Channel ID': channelId,
@@ -353,9 +362,10 @@ class AnalyticsService {
     required int bufferingMs,
     required int bufferCount,
     required int channelSwitchCount,
+    String provider = 'DaddyLive',
   }) {
     _track('Live TV Session Ended', {
-      'Provider': 'DaddyLive',
+      'Provider': provider,
       'Surface': surface,
       'Session ID': sessionId,
       'Channel ID': channelId,

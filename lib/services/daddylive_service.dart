@@ -62,7 +62,9 @@ String friendlyLiveTvError(Object error) {
     return 'Live TV returned an invalid response. Please try again later.';
   }
   if (RegExp(
-    r'https?://|uri[=:]|platformexception|methodchannel|stack trace|flixquest',
+    // Upstream names stay out of sight, as the source switch masks them.
+    r'https?://|uri[=:]|platformexception|methodchannel|stack trace|flixquest'
+    r'|dlhd|daddy|ntv',
     caseSensitive: false,
   ).hasMatch(raw)) {
     return unavailable;
@@ -87,57 +89,12 @@ class DaddyLiveCatalog {
     required this.categories,
   });
 
-  final List<Channel> channels;
-  final DaddyLiveEpg epg;
-  final List<String> categories;
-}
-
-abstract interface class LiveTvService {
-  Future<DaddyLiveCatalog> getCatalog({bool refresh = false});
-
-  Future<DaddyLiveStream> getStream(String channelId);
-
-  void close();
-}
-
-class DaddyLiveService implements LiveTvService {
-  DaddyLiveService({required String baseUrl, http.Client? client})
-      : _baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), ''),
-        _client = client ?? http.Client();
-
-  static const String _browserUserAgent =
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
-      '(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
-  static const String _siteReferer = 'https://dlhd.st/';
-  static const Duration _pageTimeout = Duration(seconds: 15);
-  static const int _maxEmbedDepth = 3;
-
-  final String _baseUrl;
-  final http.Client _client;
-  final Map<String, String> _watchUrlsByChannel = <String, String>{};
-  final _discoveries = <LiveStreamDiscovery>{};
-  final _loaderUrlsByEmbed = <String, Future<String>>{};
-  final _loaderProxies = <DlhdPlaybackProxy>[];
-  bool _closed = false;
-
-  Uri _uri(String path, [Map<String, String>? query]) =>
-      Uri.parse('$_baseUrl$path').replace(queryParameters: query);
-
-  @override
-  Future<DaddyLiveCatalog> getCatalog({bool refresh = false}) async {
-    // The channel directory and guide are independent upstream pages. A DLHD
-    // schedule outage must not take the 24/7 channel browser down with it.
-    final channelsFuture = getChannels(refresh: refresh);
-    final epgFuture = () async {
-      try {
-        return await getEpg(refresh: refresh);
-      } catch (error) {
-        _log('EPG failed, continuing without a guide: $error');
-        return const DaddyLiveEpg(timezone: '', days: <DaddyLiveEpgDay>[]);
-      }
-    }();
-    final channels = await channelsFuture;
-    final epg = await epgFuture;
+  /// [channels] with what [epg] says of each: the categories and events it
+  /// airs, and what is on now and next.
+  factory DaddyLiveCatalog.fromGuide(
+    List<Channel> channels,
+    DaddyLiveEpg epg,
+  ) {
     final categoriesByChannel = <String, Set<String>>{};
     final eventsByChannel = <String, Set<String>>{};
     final nowPlayingByChannel = <String, String>{};
@@ -194,6 +151,60 @@ class DaddyLiveService implements LiveTvService {
       epg: epg,
       categories: sortedCategories,
     );
+  }
+
+  final List<Channel> channels;
+  final DaddyLiveEpg epg;
+  final List<String> categories;
+}
+
+abstract interface class LiveTvService {
+  Future<DaddyLiveCatalog> getCatalog({bool refresh = false});
+
+  Future<DaddyLiveStream> getStream(String channelId);
+
+  void close();
+}
+
+class DaddyLiveService implements LiveTvService {
+  DaddyLiveService({required String baseUrl, http.Client? client})
+      : _baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), ''),
+        _client = client ?? http.Client();
+
+  static const String _browserUserAgent =
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
+  static const String _siteReferer = 'https://dlhd.st/';
+  static const Duration _pageTimeout = Duration(seconds: 15);
+  static const int _maxEmbedDepth = 3;
+
+  final String _baseUrl;
+  final http.Client _client;
+  final Map<String, String> _watchUrlsByChannel = <String, String>{};
+  final _discoveries = <LiveStreamDiscovery>{};
+  final _loaderUrlsByEmbed = <String, Future<String>>{};
+  final _loaderProxies = <DlhdPlaybackProxy>[];
+  bool _closed = false;
+
+  Uri _uri(String path, [Map<String, String>? query]) =>
+      Uri.parse('$_baseUrl$path').replace(queryParameters: query);
+
+  @override
+  Future<DaddyLiveCatalog> getCatalog({bool refresh = false}) async {
+    // The channel directory and guide are independent upstream pages. A DLHD
+    // schedule outage must not take the 24/7 channel browser down with it.
+    final channelsFuture = getChannels(refresh: refresh);
+    final epgFuture = () async {
+      try {
+        return await getEpg(refresh: refresh);
+      } catch (error) {
+        _log('EPG failed, continuing without a guide: $error');
+        return const DaddyLiveEpg(timezone: '', days: <DaddyLiveEpgDay>[]);
+      }
+    }();
+    final channels = await channelsFuture;
+    final epg = await epgFuture;
+    return DaddyLiveCatalog.fromGuide(channels, epg);
   }
 
   Future<List<Channel>> getChannels({bool refresh = false}) async {

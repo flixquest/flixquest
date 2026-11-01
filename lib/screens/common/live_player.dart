@@ -25,6 +25,7 @@ import '../../services/adsterra_playback_ads_service.dart';
 import '../../widgets/ad_block_playback_guard.dart';
 import '../../services/analytics_service.dart';
 import '../../services/daddylive_service.dart';
+import '../../services/live_tv_source.dart';
 import '../../services/playback_wake_lock.dart';
 import '../../services/stream_intro_service.dart';
 import 'player/player_preroll_ad.dart';
@@ -62,6 +63,7 @@ class LivePlayer extends StatefulWidget {
     // Keep this opt-in until the native button is made safe for that context.
     this.enableCast = false,
     this.useTvControls = false,
+    this.source = LiveTvSource.daddyLive,
     super.key,
   });
 
@@ -87,6 +89,9 @@ class LivePlayer extends StatefulWidget {
   final void Function(Channel channel)? onChannelSwitch;
   final bool enableCast;
   final bool useTvControls;
+
+  /// The catalog [channels] come from, named in analytics and stream reports.
+  final LiveTvSource source;
 
   @override
   State<LivePlayer> createState() => _LivePlayerState();
@@ -1081,6 +1086,7 @@ class _LivePlayerState extends State<LivePlayer> {
   }) {
     widget.analytics.trackLiveTVPlayerEvent(
       surface: widget.analyticsSurface,
+      provider: widget.source.analyticsName,
       sessionId: _sessionId,
       channelId: _currentChannelId ?? 'unknown',
       channelName: _currentChannelName,
@@ -1127,6 +1133,7 @@ class _LivePlayerState extends State<LivePlayer> {
   Future<void> _showChannelSwitcher() async {
     widget.analytics.trackLiveTVInteraction(
       surface: widget.analyticsSurface,
+      provider: widget.source.analyticsName,
       action: 'channel_switcher_opened',
       resultCount: widget.channels.length,
     );
@@ -1144,6 +1151,7 @@ class _LivePlayerState extends State<LivePlayer> {
     if (selected == null) {
       widget.analytics.trackLiveTVInteraction(
         surface: widget.analyticsSurface,
+        provider: widget.source.analyticsName,
         action: 'channel_switcher_dismissed',
       );
       return;
@@ -1174,6 +1182,7 @@ class _LivePlayerState extends State<LivePlayer> {
         kind == _LiveTvMenuKind.categories) {
       widget.analytics.trackLiveTVInteraction(
         surface: widget.analyticsSurface,
+        provider: widget.source.analyticsName,
         action: 'channel_switcher_dismissed',
       );
     }
@@ -1418,6 +1427,7 @@ class _LivePlayerState extends State<LivePlayer> {
     final stopwatch = Stopwatch()..start();
     widget.analytics.trackLiveTVInteraction(
       surface: widget.analyticsSurface,
+      provider: widget.source.analyticsName,
       action: 'channel_switch_requested',
       value: 'player',
     );
@@ -1456,6 +1466,7 @@ class _LivePlayerState extends State<LivePlayer> {
       );
       widget.analytics.trackLiveTVStreamResolution(
         surface: widget.analyticsSurface,
+        provider: widget.source.analyticsName,
         channelId: channel.id,
         channelName: channel.name,
         outcome: 'success',
@@ -1468,6 +1479,7 @@ class _LivePlayerState extends State<LivePlayer> {
       if (!_isActiveSourceOperation(operation)) return;
       widget.analytics.trackLiveTVStreamResolution(
         surface: widget.analyticsSurface,
+        provider: widget.source.analyticsName,
         channelId: channel.id,
         channelName: channel.name,
         outcome: 'error',
@@ -1527,6 +1539,7 @@ class _LivePlayerState extends State<LivePlayer> {
     }
     widget.analytics.trackLiveTVSessionEnded(
       surface: widget.analyticsSurface,
+      provider: widget.source.analyticsName,
       sessionId: _sessionId,
       channelId: _currentChannelId ?? 'unknown',
       channelName: _currentChannelName,
@@ -1802,8 +1815,8 @@ class _LivePlayerState extends State<LivePlayer> {
       surface: widget.useTvControls ? 'tv' : 'mobile',
       channelId: _currentChannelId,
       initialChannelId: _initialFeedbackChannel,
-      provider: 'dlhd',
-      initialProvider: 'dlhd',
+      provider: widget.source.reportId,
+      initialProvider: widget.source.reportId,
       sourceSwitches: _feedbackChannelSwitches,
       videoHeight: value?.size?.height.round(),
       connectionType: _feedbackConnection.type,
