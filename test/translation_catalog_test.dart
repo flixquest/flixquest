@@ -75,6 +75,21 @@ void main() {
     }
   });
 
+  test('the delete-account notice asks for the word the form accepts', () {
+    for (final file
+        in Directory('assets/translations').listSync().whereType<File>()) {
+      if (!file.path.endsWith('.json')) continue;
+      final catalog =
+          jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+      expect(catalog['delete_notice'], contains('DELETE'), reason: file.path);
+      expect(catalog['delete_notice'], isNot(contains('CONFIRM')),
+          reason: file.path);
+      for (final key in <String>['type_delete', 'must_type_delete']) {
+        expect(catalog[key], contains('DELETE'), reason: '${file.path}: $key');
+      }
+    }
+  });
+
   test(
       'TV translation templates preserve their named arguments in every locale',
       () {

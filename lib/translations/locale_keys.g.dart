@@ -319,6 +319,8 @@ abstract class  LocaleKeys {
   static const requires_recent_login = 'requires_recent_login';
   static const delete_account = 'delete_account';
   static const delete_notice = 'delete_notice';
+  static const type_delete = 'type_delete';
+  static const must_type_delete = 'must_type_delete';
   static const del_input_err = 'del_input_err';
   static const type_confirm = 'type_confirm';
   static const username_exists = 'username_exists';
