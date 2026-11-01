@@ -125,7 +125,7 @@ class _SettingsState extends State<Settings> {
 
     for (final language in langs) {
       if (language.languageCode.contains(settingsValues.appLanguage)) {
-        languageFlag = language.languageFlag;
+        languageFlag = language.flag;
         languageName = language.languageName;
         break;
       }

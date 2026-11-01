@@ -306,15 +306,23 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet> {
   }
 }
 
-/// A language's flag, at the size of a row icon.
+/// A language's flag emoji, at the size of a row icon.
 class LanguageFlag extends StatelessWidget {
-  const LanguageFlag(this.asset, {super.key});
+  const LanguageFlag(this.emoji, {super.key});
 
-  final String asset;
+  final String emoji;
 
   @override
-  Widget build(BuildContext context) => ClipOval(
-        child: Image.asset(asset, width: 24, height: 24, fit: BoxFit.cover),
+  Widget build(BuildContext context) => SizedBox(
+        width: 24,
+        height: 24,
+        child: Center(
+          child: Text(
+            emoji,
+            style: const TextStyle(fontSize: 20, height: 1),
+            textScaler: TextScaler.noScaling,
+          ),
+        ),
       );
 }
 
