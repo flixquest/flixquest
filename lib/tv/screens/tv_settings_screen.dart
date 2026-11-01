@@ -19,6 +19,7 @@ import '../widgets/tv_dialog.dart';
 import '../widgets/tv_list_row.dart';
 import '../widgets/tv_page_header.dart';
 import '../widgets/tv_provider_order_dialog.dart';
+import 'tv_server_status_screen.dart';
 
 class TvSettingsScreen extends StatelessWidget {
   const TvSettingsScreen({
@@ -265,6 +266,17 @@ class TvSettingsScreen extends StatelessWidget {
               MaterialPageRoute<void>(
                 builder: (_) =>
                     const UpdateScreen(isForced: false, television: true),
+              ),
+            ),
+          ),
+          _TvSettingTile(
+            key: const ValueKey<String>('server-status'),
+            label: tr('tv_server_status'),
+            value: tr('tv_server_status_detail'),
+            icon: PhosphorIcons.pulse(),
+            onActivate: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const TvServerStatusScreen(),
               ),
             ),
           ),

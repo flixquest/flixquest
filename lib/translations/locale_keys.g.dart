@@ -1993,5 +1993,36 @@ abstract class  LocaleKeys {
   static const tv_biography_semantics = 'tv_biography_semantics';
   static const tv_person_see_all_description = 'tv_person_see_all_description';
   static const tv_new_and_hot_empty_message = 'tv_new_and_hot_empty_message';
+  static const tv_manage_account = 'tv_manage_account';
+  static const tv_edit_profile_subtitle = 'tv_edit_profile_subtitle';
+  static const tv_change_email_subtitle = 'tv_change_email_subtitle';
+  static const tv_change_password_subtitle = 'tv_change_password_subtitle';
+  static const tv_delete_account_subtitle = 'tv_delete_account_subtitle';
+  static const tv_change_password_detail = 'tv_change_password_detail';
+  static const tv_delete_account_detail = 'tv_delete_account_detail';
+  static const tv_current_password = 'tv_current_password';
+  static const tv_enter_current_password = 'tv_enter_current_password';
+  static const tv_google_password_hint = 'tv_google_password_hint';
+  static const tv_new_password = 'tv_new_password';
+  static const tv_repeat_new_password = 'tv_repeat_new_password';
+  static const tv_passwords_dont_match = 'tv_passwords_dont_match';
+  static const tv_password_too_common = 'tv_password_too_common';
+  static const tv_new_email = 'tv_new_email';
+  static const tv_repeat_new_email = 'tv_repeat_new_email';
+  static const tv_emails_dont_match = 'tv_emails_dont_match';
+  static const tv_type_delete = 'tv_type_delete';
+  static const tv_type_delete_hint = 'tv_type_delete_hint';
+  static const tv_must_type_delete = 'tv_must_type_delete';
+  static const tv_profile_updated = 'tv_profile_updated';
+  static const tv_email_changed = 'tv_email_changed';
+  static const tv_password_changed_sign_in = 'tv_password_changed_sign_in';
+  static const tv_account_deleted = 'tv_account_deleted';
+  static const tv_server_status = 'tv_server_status';
+  static const tv_server_status_kicker = 'tv_server_status_kicker';
+  static const tv_server_status_detail = 'tv_server_status_detail';
+  static const tv_server_status_stale = 'tv_server_status_stale';
+  static const tv_check_again = 'tv_check_again';
+  static const tv_checking = 'tv_checking';
+  static const tv_sources_online = 'tv_sources_online';
 
 }
