@@ -253,8 +253,26 @@ class DaddyLiveService implements LiveTvService {
     _log('channel $channelId: watch page failed, trying scraper fallback');
 
     // If DLHD moved mirrors or refused its heavy watch page, ask the configured
-    // scraper only for its final embed location. M3U8 extraction still happens
-    // locally, so the signed token belongs to the playback device's IP.
+    // scraper only where the players' streams live. M3U8 extraction still
+    // happens locally, so the signed token belongs to the playback device's IP.
+    final embeds = await _scraperEmbeds(channelId);
+    if (embeds != null) {
+      _log('channel $channelId: scraper returned ${embeds.length} embed(s)');
+      final stream = await _resolvePlayers(embeds, referer: watchUrl);
+      if (stream != null) {
+        _log(
+          'channel $channelId: OK via scraper embeds in '
+          '${stopwatch.elapsedMilliseconds}ms',
+        );
+        return stream;
+      }
+      _log('channel $channelId: no scraper embed played, trying /stream');
+    }
+
+    // Scrapers from before /embeds sign one stream and return its embed. A
+    // newer one is asked too when none of its embeds played: /stream checks
+    // each playlist and keeps searching sibling frames, where /embeds stops
+    // at the first page with a playlist link.
     try {
       final json = await _getJson(
         _uri('/api/v2/dlhd/channels/${Uri.encodeComponent(channelId)}/stream'),
@@ -307,6 +325,69 @@ class DaddyLiveService implements LiveTvService {
     return result;
   }
 
+  /// Each player's stream page, as the scraper finds them, or null when the
+  /// scraper can't say (one from before `/embeds`, a failed request, or an
+  /// answer without embeds).
+  Future<List<_DlhdPlayer>?> _scraperEmbeds(String channelId) async {
+    try {
+      final json = await _getJson(
+        _uri('/api/v2/dlhd/channels/${Uri.encodeComponent(channelId)}/embeds'),
+      );
+      final listed = json['embeds'];
+      final embeds = (listed is List<dynamic> ? listed : const <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .where((embed) =>
+              embed['embedUrl']?.toString().trim().isNotEmpty == true)
+          .toList(growable: false);
+      if (embeds.isEmpty) {
+        _log('channel $channelId: scraper listed no embeds');
+        return null;
+      }
+      return <_DlhdPlayer>[
+        for (final (index, embed) in embeds.indexed)
+          _DlhdPlayer(
+            label: 'Stream ${index + 1}',
+            url: embed['embedUrl'].toString().trim(),
+            referer: embed['referer']?.toString().trim(),
+          ),
+      ];
+    } catch (error) {
+      _log('channel $channelId: scraper embeds unavailable: $error');
+      return null;
+    }
+  }
+
+  /// The first of [players] that plays, with the rest resolving on demand as
+  /// its backups.
+  Future<DaddyLiveStream?> _resolvePlayers(
+    List<_DlhdPlayer> players, {
+    required String referer,
+  }) async {
+    for (var index = 0; index < players.length && !_closed; index++) {
+      final resolved = await _resolvePlayer(players[index], referer: referer);
+      if (resolved == null) continue;
+      LiveStreamDiscovery? discovery;
+      if (index + 1 < players.length) {
+        discovery = LiveStreamDiscovery(
+          initial: resolved.variant,
+          backups: [
+            for (final player in players.skip(index + 1))
+              () async => (await _resolvePlayer(
+                    player,
+                    referer: referer,
+                    cancelled: () => _closed || discovery!.isDisposed,
+                  ))
+                      ?.variant,
+          ],
+        );
+        _discoveries.removeWhere((item) => item.isDisposed);
+        _discoveries.add(discovery);
+      }
+      return _streamFromResolvedPlayers([resolved], discovery: discovery);
+    }
+    return null;
+  }
+
   Future<DaddyLiveStream?> _resolveFromWatchPage(String watchUrl) async {
     try {
       final response = await _getHtml(watchUrl, referer: _siteReferer);
@@ -329,31 +410,8 @@ class DaddyLiveService implements LiveTvService {
         return null;
       }
 
-      for (var index = 0; index < players.length && !_closed; index++) {
-        final resolved = await _resolvePlayer(
-          players[index],
-          referer: finalWatchUrl,
-        );
-        if (resolved == null) continue;
-        LiveStreamDiscovery? discovery;
-        if (index + 1 < players.length) {
-          discovery = LiveStreamDiscovery(
-            initial: resolved.variant,
-            backups: [
-              for (final player in players.skip(index + 1))
-                () async => (await _resolvePlayer(
-                      player,
-                      referer: finalWatchUrl,
-                      cancelled: () => _closed || discovery!.isDisposed,
-                    ))
-                        ?.variant,
-            ],
-          );
-          _discoveries.removeWhere((item) => item.isDisposed);
-          _discoveries.add(discovery);
-        }
-        return _streamFromResolvedPlayers([resolved], discovery: discovery);
-      }
+      final stream = await _resolvePlayers(players, referer: finalWatchUrl);
+      if (stream != null) return stream;
       _log('every player on the watch page failed');
     } catch (error) {
       // A mirror refusal is handled by the metadata fallback in getStream().
@@ -369,7 +427,7 @@ class DaddyLiveService implements LiveTvService {
     bool Function()? cancelled,
   }) async {
     final queue = <({String url, String referer, int depth})>[
-      (url: player.url, referer: referer, depth: 0),
+      (url: player.url, referer: player.referer ?? referer, depth: 0),
     ];
     final visited = <String>{};
     while (queue.isNotEmpty && visited.length < 16) {
@@ -792,10 +850,13 @@ class DaddyLiveService implements LiveTvService {
 }
 
 class _DlhdPlayer {
-  const _DlhdPlayer({required this.label, required this.url});
+  const _DlhdPlayer({required this.label, required this.url, this.referer});
 
   final String label;
   final String url;
+
+  /// The page that framed [url], when it isn't the watch page.
+  final String? referer;
 }
 
 class _ResolvedDlhdPlayer {
