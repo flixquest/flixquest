@@ -9,11 +9,13 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../catalog/episode_choice.dart';
+import '../../catalog/title_people.dart';
 import '../../constants/api_constants.dart';
 import '../../constants/app_constants.dart';
 import '../../data/ads/content_ads.dart';
 import '../../design/outline_mark.dart';
 import '../../functions/function.dart';
+import '../../models/credits.dart';
 import '../../widgets/playback_action.dart';
 import '../../models/movie_stream_metadata.dart';
 import '../../models/tv.dart';
@@ -38,17 +40,20 @@ import '../widgets/tv_content_row.dart';
 import '../widgets/tv_dialog.dart';
 import '../widgets/tv_playlist_picker.dart';
 import '../widgets/tv_media_card.dart';
+import '../widgets/tv_person_card.dart';
 import '../widgets/tv_spotlight.dart';
+import 'tv_person_screen.dart';
 
 /// A title's page, laid out like the browse pages: its backdrop fills the
-/// screen, the logo, facts and actions sit bottom left, and the episodes and
-/// a "More like this" grid wait below.
+/// screen, the logo, facts and actions sit bottom left, and the episodes, the
+/// cast and crew, the videos and a "More like this" grid wait below.
 ///
 /// The page opens straight away from what the card already knows; details,
 /// seasons, videos and recommendations fill in as they load, each on its own.
 ///
 /// Down and Up step between the actions, the seasons, the episodes, the
-/// videos and the recommendations, each returning to where it was left.
+/// cast and crew, the videos and the recommendations, each returning to
+/// where it was left. A face opens that person's page.
 /// Back from below the actions returns to them; Back from the actions leaves
 /// the page.
 ///
@@ -68,7 +73,7 @@ class TvMediaDetailsScreen extends StatefulWidget {
 }
 
 /// The rows of controls Down and Up move between.
-enum _Stop { actions, seasons, episodes, videos, similar }
+enum _Stop { actions, seasons, episodes, cast, videos, similar }
 
 class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
   TvMediaDetailsController get _controller => widget.controller;
@@ -112,12 +117,19 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
   final FocusNode _videosRetry =
       FocusNode(debugLabel: 'TV details videos retry');
 
+  /// The title's cast and crew, loaded apart like the videos. Null until
+  /// they come; a failure leaves the row out, as having nobody listed does.
+  Credits? _credits;
+  int _creditsRequest = 0;
+  final TvContentRowController _castRow = TvContentRowController();
+
   /// Where each row was left, for this page only.
   final TvFocusMemory _memory = TvFocusMemory();
 
   _Stop _stop = _Stop.actions;
   final GlobalKey _columnKey = GlobalKey();
   final GlobalKey _episodesKey = GlobalKey();
+  final GlobalKey _castKey = GlobalKey();
   final GlobalKey _videosKey = GlobalKey();
   final GlobalKey _similarKey = GlobalKey();
 
@@ -143,6 +155,8 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
       _videos = null;
       _videosFailed = false;
       _loadVideos();
+      _credits = null;
+      _loadCredits();
       _bookmarked = _controller.isBookmarked(_item);
     }
   }
@@ -186,6 +200,26 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
       if (!mounted || request != _videosRequest) return;
       setState(() => _videosFailed = true);
       _settleAfterVideos();
+    });
+  }
+
+  void _loadCredits() {
+    final request = ++_creditsRequest;
+    _controller
+        .loadCredits(
+      item: _item,
+      settings: context.read<SettingsProvider>(),
+      dependencies: context.read<AppDependencyProvider>(),
+    )
+        .then((credits) {
+      if (!mounted || request != _creditsRequest) return;
+      setState(() => _credits = credits);
+      // The row moves those below it; follow the focused one.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _stop != _Stop.actions) _scheduleShift();
+      });
+    }, onError: (Object error) {
+      debugPrint('[TvMediaDetails] credits unavailable: $error');
     });
   }
 
@@ -294,6 +328,10 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
         final itemId = _memory.recall(_episodesScope(season)) ??
             (resume?.seasonNum == season ? '${resume?.episodeNum}' : null);
         return _episodeRows[season]?.requestFocus(itemId) ?? false;
+      case _Stop.cast:
+        // Nobody listed, or not loaded yet: no stop.
+        if (_castKey.currentContext == null) return false;
+        return _castRow.requestFocus();
       case _Stop.videos:
         // No stop at all while they load, or when there are none.
         if (_videosKey.currentContext == null) return false;
@@ -322,6 +360,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
       final section = switch (stop) {
         _Stop.actions => null,
         _Stop.seasons || _Stop.episodes => _episodesKey,
+        _Stop.cast => _castKey,
         _Stop.videos => _videosKey,
         _Stop.similar => _similarKey,
       };
@@ -456,6 +495,28 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
         builder: (_) {
           final page =
               TvMediaDetailsScreen(item: item, controller: _controller);
+          return logos == null
+              ? page
+              : TvTitleLogoScope(logos: logos, child: page);
+        },
+      ),
+    );
+    _restoreFocus(previousFocus);
+  }
+
+  Future<void> _openPerson(TitlePerson person) async {
+    final previousFocus = FocusManager.instance.primaryFocus;
+    final logos = TvTitleLogoScope.maybeOf(context);
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) {
+          final page = TvPersonScreen(
+            personId: person.id,
+            name: person.name,
+            profilePath: person.profilePath,
+            isAdult: person.adult,
+            controller: _controller,
+          );
           return logos == null
               ? page
               : TvTitleLogoScope(logos: logos, child: page);
@@ -786,6 +847,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
     if (data == null) return true;
     return data.recommendations.isNotEmpty ||
         data.seasons.isNotEmpty ||
+        _people.isNotEmpty ||
         (_videos?.isNotEmpty ?? false) ||
         _videosFailed;
   }
@@ -1065,6 +1127,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
           );
         },
       ),
+      _buildCast(metrics, inset: inset, gap: gap),
       _buildVideos(metrics, inset: inset, gap: gap),
       FutureBuilder<TvMediaDetailsData>(
         future: _details,
@@ -1083,6 +1146,58 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
         },
       ),
     ];
+  }
+
+  /// The cast in billing order, then who made the title.
+  List<TitlePerson> get _people => titlePeople(
+        _credits,
+        creators: _loaded?.seriesDetails?.createdBy ?? const <CreatedBy>[],
+        creatorRole: tr('tv_creator'),
+      );
+
+  /// Faces in billing order, each opening the person's page. Nothing at
+  /// all while they load or when nobody is listed, so Down never stops on
+  /// an empty row.
+  Widget _buildCast(
+    TvShellMetrics metrics, {
+    required double inset,
+    required Widget gap,
+  }) {
+    final people = _people;
+    if (people.isEmpty) return const SizedBox.shrink();
+    final width = metrics.mediaCardWidth * 0.9;
+    return Column(
+      key: _castKey,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        _stopRegion(
+          _Stop.cast,
+          TvContentRow<TitlePerson>(
+            controller: _castRow,
+            title: tr('cast_and_crew'),
+            scopeId: 'details-cast:${_item.stableId}',
+            items: people,
+            itemId: (person) => person.key,
+            semanticLabel: (person) => <String>[
+              person.name,
+              if (person.role case final role?) role,
+            ].join(', '),
+            itemBuilder: (_, person) => TvPersonCard(
+              name: person.name,
+              role: person.role,
+              profilePath: person.profilePath,
+              width: width,
+            ),
+            itemSpacing: 18,
+            itemFocusScale: 1.06,
+            trailingInset: inset,
+            pinFocusedItem: true,
+            onItemActivated: _openPerson,
+          ),
+        ),
+        gap,
+      ],
+    );
   }
 
   String get _videosScope => 'details-videos:${_item.stableId}';

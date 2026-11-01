@@ -58,9 +58,14 @@ class TvMediaRow extends TvBrowseRow {
     this.itemMenuHint,
     this.showBadges = true,
     this.seeAll,
+    this.spotlightFor,
   });
 
   final List<TvMediaItem> items;
+
+  /// What the spotlight says about this row's focused card, in place of its
+  /// usual facts and synopsis, such as when a coming title arrives.
+  final TvSpotlightData Function(TvMediaItem item)? spotlightFor;
 
   /// For a row cut short of its list.
   final TvRowSeeAll? seeAll;
@@ -115,6 +120,22 @@ class TvShortcutRow extends TvBrowseRow {
   bool get isEmpty => shortcuts.isEmpty;
 }
 
+/// The billboard's button, when it does something other than open the
+/// featured title.
+class TvBillboardAction {
+  const TvBillboardAction({
+    required this.label,
+    required this.icon,
+    required this.onActivate,
+    this.semanticLabel,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onActivate;
+  final String? semanticLabel;
+}
+
 /// A Netflix-style browse page: the focused title fills the backdrop and the
 /// spotlight above the rows, and the focused row holds one position on screen
 /// while the rows move under it.
@@ -134,6 +155,9 @@ class TvBrowseView extends StatefulWidget {
     this.focusController,
     this.badgeFor,
     this.showBillboard = true,
+    this.featuredSpotlight,
+    this.billboard,
+    this.billboardAction,
     super.key,
   });
 
@@ -155,6 +179,18 @@ class TvBrowseView extends StatefulWidget {
   /// spotlight until a card has focus, entering lands in the rows, and Up off
   /// the first row and Back are left to the screen around the view.
   final bool showBillboard;
+
+  /// What the billboard says about [featured], in place of its usual
+  /// facts, such as the day a coming title arrives.
+  final TvSpotlightData? featuredSpotlight;
+
+  /// Fills the billboard in place of [featured]'s spotlight, for a page that
+  /// leads with something other than a title, such as a person. Browsing
+  /// the rows still shows the focused card's.
+  final WidgetBuilder? billboard;
+
+  /// The billboard's button; More info on [featured] when null.
+  final TvBillboardAction? billboardAction;
 
   @override
   State<TvBrowseView> createState() => _TvBrowseViewState();
@@ -202,13 +238,15 @@ class _TvBrowseViewState extends State<TvBrowseView> {
   late final ValueNotifier<TvMediaItem> _backdrop =
       ValueNotifier<TvMediaItem>(widget.featured);
 
-  TvSpotlightData get _featuredSpotlight => TvSpotlightData.forItem(
+  TvSpotlightData get _featuredSpotlight =>
+      widget.featuredSpotlight ??
+      TvSpotlightData.forItem(
         widget.featured,
         featured: widget.showBillboard,
       );
 
-  void _showItem(TvMediaItem item) {
-    _spotlight.value = TvSpotlightData.forItem(item);
+  void _showItem(TvMediaItem item, {TvSpotlightData? spotlight}) {
+    _spotlight.value = spotlight ?? TvSpotlightData.forItem(item);
     _backdrop.value = item;
   }
 
@@ -550,7 +588,7 @@ class _TvBrowseViewState extends State<TvBrowseView> {
               Flexible(
                 child: ValueListenableBuilder<TvSpotlightData>(
                   valueListenable: _spotlight,
-                  builder: (_, data, __) => AnimatedSwitcher(
+                  builder: (context, data, __) => AnimatedSwitcher(
                     duration: const Duration(milliseconds: 180),
                     switchInCurve: Curves.easeOut,
                     switchOutCurve: Curves.easeIn,
@@ -561,12 +599,18 @@ class _TvBrowseViewState extends State<TvBrowseView> {
                         if (current != null) current
                       ],
                     ),
-                    child: TvSpotlightInfo(
-                      key: ValueKey<String>('${data.id}|$browsing'),
-                      data: data,
-                      featured: !browsing,
-                      compact: compact,
-                    ),
+                    child: switch (widget.billboard) {
+                      final billboard? when !browsing => KeyedSubtree(
+                          key: const ValueKey<String>('billboard'),
+                          child: billboard(context),
+                        ),
+                      _ => TvSpotlightInfo(
+                          key: ValueKey<String>('${data.id}|$browsing'),
+                          data: data,
+                          featured: !browsing,
+                          compact: compact,
+                        ),
+                    },
                   ),
                 ),
               ),
@@ -586,11 +630,20 @@ class _TvBrowseViewState extends State<TvBrowseView> {
                       heightFactor: browsing ? 0 : 1,
                       child: Padding(
                         padding: EdgeInsets.only(top: compact ? 12 : 16),
-                        child: _MoreInfoButton(
+                        child: _BillboardButton(
                           focusNode: _featuredFocus,
-                          title: widget.featured.title,
+                          action: widget.billboardAction ??
+                              TvBillboardAction(
+                                label: tr('tv_more_info'),
+                                icon: PhosphorIcons.info(),
+                                semanticLabel: tr('tv_more_info_semantics',
+                                    namedArgs: {
+                                      'title': widget.featured.title
+                                    }),
+                                onActivate: () =>
+                                    widget.onOpenMedia(widget.featured),
+                              ),
                           onFocused: _handleFeaturedFocused,
-                          onActivate: () => widget.onOpenMedia(widget.featured),
                         ),
                       ),
                     ),
@@ -694,7 +747,7 @@ class _TvBrowseViewState extends State<TvBrowseView> {
       trailingInset: TvShellInsets.of(context).right,
       onItemActivated: row.onItemActivated ?? widget.onOpenMedia,
       onItemFocused: (item) {
-        _showItem(item);
+        _showItem(item, spotlight: row.spotlightFor?.call(item));
         _prefetchLogos(row.items, item);
       },
       onItemMenu: row.onItemMenu,
@@ -838,18 +891,16 @@ class _SeeAllTile extends StatelessWidget {
   }
 }
 
-class _MoreInfoButton extends StatelessWidget {
-  const _MoreInfoButton({
+class _BillboardButton extends StatelessWidget {
+  const _BillboardButton({
     required this.focusNode,
-    required this.title,
+    required this.action,
     required this.onFocused,
-    required this.onActivate,
   });
 
   final FocusNode focusNode;
-  final String title;
+  final TvBillboardAction action;
   final VoidCallback onFocused;
-  final VoidCallback onActivate;
 
   @override
   Widget build(BuildContext context) {
@@ -857,11 +908,11 @@ class _MoreInfoButton extends StatelessWidget {
     final palette = TvPalette.of(context);
     return TvFocusable(
       focusNode: focusNode,
-      semanticLabel: tr('tv_more_info_semantics', namedArgs: {'title': title}),
+      semanticLabel: action.semanticLabel ?? action.label,
       onFocusChanged: (hasFocus) {
         if (hasFocus) onFocused();
       },
-      onActivate: onActivate,
+      onActivate: action.onActivate,
       focusScale: 1.035,
       borderRadius: BorderRadius.circular(5),
       scrollAlignment: null,
@@ -874,10 +925,10 @@ class _MoreInfoButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(PhosphorIcons.info(), color: palette.onFocus, size: 19),
+            Icon(action.icon, color: palette.onFocus, size: 19),
             const SizedBox(width: 8),
             Text(
-              tr('tv_more_info'),
+              action.label,
               style: TextStyle(
                 color: palette.onFocus,
                 fontFamily: 'FigtreeSB',

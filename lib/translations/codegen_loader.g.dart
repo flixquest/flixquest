@@ -2099,7 +2099,15 @@ class CodegenLoader extends AssetLoader{
   "tv_phone_sign_in_use_remote": "Use the remote instead",
   "tv_phone_sign_in_signing_in": "Signing in…",
   "tv_phone_sign_in_denied": "The sign-in was cancelled on the phone. Here is a new code.",
-  "tv_phone_sign_in_failed": "Couldn't get a code. Check your connection and try again."
+  "tv_phone_sign_in_failed": "Couldn't get a code. Check your connection and try again.",
+  "tv_reader_scroll_hint": "Up and Down scroll",
+  "tv_as_role": "As {role}",
+  "tv_person_no_titles": "No movies or series are listed for {name} yet.",
+  "tv_creator": "Creator",
+  "tv_hold_ok_for_my_list": "Hold OK to add to My List or remove it",
+  "tv_biography_semantics": "Biography of {name}",
+  "tv_person_see_all_description": "{name}'s full list, past the first few.",
+  "tv_new_and_hot_empty_message": "New releases and premieres show up here as they're announced."
 };
 static const Map<String,dynamic> _hi = {
   "popularity_descending": "लोकप्रियता घटती",
@@ -4186,7 +4194,15 @@ static const Map<String,dynamic> _hi = {
   "tv_phone_sign_in_use_remote": "इसके बजाय रिमोट का उपयोग करें",
   "tv_phone_sign_in_signing_in": "साइन इन हो रहा है…",
   "tv_phone_sign_in_denied": "फ़ोन पर साइन इन रद्द कर दिया गया। यह रहा नया कोड।",
-  "tv_phone_sign_in_failed": "कोड नहीं मिल सका। अपना कनेक्शन जाँचें और फिर से कोशिश करें।"
+  "tv_phone_sign_in_failed": "कोड नहीं मिल सका। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
+  "tv_reader_scroll_hint": "स्क्रॉल करने के लिए ऊपर और नीचे दबाएँ",
+  "tv_as_role": "{role} के रूप में",
+  "tv_person_no_titles": "{name} की कोई फ़िल्म या सीरीज़ अभी सूचीबद्ध नहीं है।",
+  "tv_creator": "निर्माता",
+  "tv_hold_ok_for_my_list": "मेरी सूची में जोड़ने या हटाने के लिए OK दबाकर रखें",
+  "tv_biography_semantics": "{name} की जीवनी",
+  "tv_person_see_all_description": "{name} की पूरी सूची, शुरुआती कुछ के बाद भी।",
+  "tv_new_and_hot_empty_message": "नई रिलीज़ और प्रीमियर घोषित होते ही यहाँ दिखते हैं।"
 };
 static const Map<String,dynamic> _es = {
   "popularity_descending": "Popularidad descendiente",
@@ -6273,7 +6289,15 @@ static const Map<String,dynamic> _es = {
   "tv_phone_sign_in_use_remote": "Usar el control remoto",
   "tv_phone_sign_in_signing_in": "Iniciando sesión…",
   "tv_phone_sign_in_denied": "Se canceló el inicio de sesión en el teléfono. Aquí tienes un código nuevo.",
-  "tv_phone_sign_in_failed": "No se pudo obtener un código. Revisa tu conexión e inténtalo de nuevo."
+  "tv_phone_sign_in_failed": "No se pudo obtener un código. Revisa tu conexión e inténtalo de nuevo.",
+  "tv_reader_scroll_hint": "Usa Arriba y Abajo para desplazarte",
+  "tv_as_role": "Como {role}",
+  "tv_person_no_titles": "Aún no hay películas ni series de {name}.",
+  "tv_creator": "Creador",
+  "tv_hold_ok_for_my_list": "Mantén pulsado OK para añadir a Mi lista o quitarlo",
+  "tv_biography_semantics": "Biografía de {name}",
+  "tv_person_see_all_description": "La lista completa de {name}, más allá de los primeros.",
+  "tv_new_and_hot_empty_message": "Los estrenos y las novedades aparecen aquí en cuanto se anuncian."
 };
 static const Map<String,dynamic> _ar = {
   "popularity_descending": "ترتيب تنازلي حسب الشعبية",
@@ -8431,7 +8455,15 @@ static const Map<String,dynamic> _ar = {
   "tv_phone_sign_in_use_remote": "استخدم جهاز التحكم بدلًا من ذلك",
   "tv_phone_sign_in_signing_in": "جارٍ تسجيل الدخول…",
   "tv_phone_sign_in_denied": "أُلغي تسجيل الدخول من الهاتف. إليك رمزًا جديدًا.",
-  "tv_phone_sign_in_failed": "تعذّر الحصول على رمز. تحقق من اتصالك وحاول مرة أخرى."
+  "tv_phone_sign_in_failed": "تعذّر الحصول على رمز. تحقق من اتصالك وحاول مرة أخرى.",
+  "tv_reader_scroll_hint": "استخدم الأعلى والأسفل للتمرير",
+  "tv_as_role": "بدور {role}",
+  "tv_person_no_titles": "لا توجد أفلام أو مسلسلات مدرجة لـ {name} بعد.",
+  "tv_creator": "المبتكر",
+  "tv_hold_ok_for_my_list": "اضغط مطولاً على OK للإضافة إلى قائمتي أو الإزالة منها",
+  "tv_biography_semantics": "السيرة الذاتية لـ {name}",
+  "tv_person_see_all_description": "القائمة الكاملة لـ {name}، بعد العناوين الأولى.",
+  "tv_new_and_hot_empty_message": "تظهر الإصدارات الجديدة والعروض الأولى هنا فور الإعلان عنها."
 };
 static const Map<String, Map<String,dynamic>> mapLocales = {"en": _en, "hi": _hi, "es": _es, "ar": _ar};
 }

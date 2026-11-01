@@ -1,5 +1,8 @@
+import 'package:flixquest/catalog/person_credits.dart';
 import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/data/ads/content_ads.dart';
+import 'package:flixquest/models/credits.dart';
+import 'package:flixquest/models/person.dart' show PersonDetails;
 import 'package:flixquest/models/recently_watched.dart';
 import 'package:flixquest/models/tv.dart';
 import 'package:flixquest/models/videos.dart';
@@ -12,6 +15,7 @@ import 'package:flixquest/services/video_launcher.dart';
 import 'package:flixquest/tv/controllers/tv_media_details_controller.dart';
 import 'package:flixquest/tv/models/tv_media_item.dart';
 import 'package:flixquest/tv/screens/tv_media_details_screen.dart';
+import 'package:flixquest/tv/screens/tv_person_screen.dart';
 import 'package:flixquest/widgets/network_banner_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -77,9 +81,32 @@ RecentMovie _watchedMovie(int id, {int elapsed = 600, int remaining = 3000}) =>
       title: 'Title $id',
     );
 
+/// Someone's page without the network: one movie each.
+class _FakePeople implements PersonSource {
+  final List<int> opened = <int>[];
+
+  @override
+  Future<PersonDetails> details(int personId) async {
+    opened.add(personId);
+    return PersonDetails(id: personId, name: 'Person $personId');
+  }
+
+  @override
+  Future<List<PersonCredit>> credits(int personId, TvMediaKind kind) async =>
+      kind == TvMediaKind.movie
+          ? <PersonCredit>[
+              PersonCredit(item: _item(900 + personId, kind: kind)),
+            ]
+          : const <PersonCredit>[];
+}
+
 /// Serves a series with Specials and two seasons, without the network.
 class _FakeController extends TvMediaDetailsController {
-  _FakeController({this.videos = const <Results>[], this.videosFail = false});
+  _FakeController({
+    this.videos = const <Results>[],
+    this.videosFail = false,
+    Credits? credits,
+  }) : credits = credits ?? Credits();
 
   final List<int> seasonsLoaded = <int>[];
   List<Results> videos;
@@ -87,6 +114,23 @@ class _FakeController extends TvMediaDetailsController {
   /// Fails the videos request until a test clears it.
   bool videosFail;
   int videoLoads = 0;
+  Credits credits;
+  final _FakePeople people = _FakePeople();
+
+  @override
+  Future<Credits> loadCredits({
+    required TvMediaItem item,
+    required SettingsProvider settings,
+    required AppDependencyProvider dependencies,
+  }) async =>
+      credits;
+
+  @override
+  PersonSource personSource({
+    required SettingsProvider settings,
+    required AppDependencyProvider dependencies,
+  }) =>
+      people;
 
   @override
   Future<List<Results>> loadVideos({
@@ -594,6 +638,101 @@ void main() {
         expect(controller.videoLoads, 2);
         expect(find.text('Videos could not be loaded.'), findsNothing);
         expect(_focused, 'details-videos:series:42:aaa');
+      });
+    });
+
+    group('cast and crew', () {
+      Credits credits() => Credits(
+            cast: <Cast>[
+              // Out of billing order, as TMDB can send them.
+              Cast(id: 2, name: 'Second Lead', character: 'Sidekick', order: 1),
+              Cast(id: 1, name: 'Lead', character: 'Hero', order: 0),
+            ],
+            crew: <Crew>[
+              Crew(id: 3, name: 'Maker', job: 'Director'),
+              Crew(id: 4, name: 'Grip', job: 'Key Grip'),
+            ],
+          );
+
+      testWidgets('sit between the episodes and the videos', (tester) async {
+        await _pumpDetails(
+          tester,
+          controller: _FakeController(
+            credits: credits(),
+            videos: <Results>[_video('aaa')],
+          ),
+        );
+        expect(find.text('Cast And Crew'), findsOneWidget);
+        expect(find.text('Hero'), findsOneWidget);
+        expect(find.text('Director'), findsOneWidget);
+        expect(find.text('Grip'), findsNothing,
+            reason: 'only who made the title, not the whole crew');
+
+        await _press(tester, LogicalKeyboardKey.arrowDown);
+        await _press(tester, LogicalKeyboardKey.arrowDown);
+        expect(_focused, 'details-episodes:42:1:1');
+
+        await _press(tester, LogicalKeyboardKey.arrowDown);
+        expect(_focused, 'details-cast:series:42:cast:1',
+            reason: 'billing order, not the order TMDB listed them');
+        await _press(tester, LogicalKeyboardKey.arrowRight);
+        await _press(tester, LogicalKeyboardKey.arrowRight);
+        expect(_focused, 'details-cast:series:42:crew:3');
+
+        await _press(tester, LogicalKeyboardKey.arrowDown);
+        expect(_focused, 'details-videos:series:42:aaa');
+        await _press(tester, LogicalKeyboardKey.arrowUp);
+        expect(_focused, 'details-cast:series:42:crew:3');
+
+        await _press(tester, LogicalKeyboardKey.escape);
+        expect(_focused, 'TV details play');
+      });
+
+      testWidgets('a movie reaches them straight from its actions',
+          (tester) async {
+        await _pumpDetails(
+          tester,
+          item: _item(7, kind: TvMediaKind.movie),
+          controller: _FakeController(credits: credits()),
+        );
+        await _press(tester, LogicalKeyboardKey.arrowDown);
+        expect(_focused, 'details-cast:movie:7:cast:1');
+      });
+
+      testWidgets('nobody listed leaves no row to stop on', (tester) async {
+        await _pumpDetails(tester);
+        expect(find.text('Cast And Crew'), findsNothing);
+        await _press(tester, LogicalKeyboardKey.arrowDown);
+        await _press(tester, LogicalKeyboardKey.arrowDown);
+        await _press(tester, LogicalKeyboardKey.arrowDown);
+        expect(_focused, 'details-similar:series:42:series:500');
+      });
+
+      testWidgets('a face opens their page, and Back returns to it',
+          (tester) async {
+        final controller = _FakeController(credits: credits());
+        await _pumpDetails(
+          tester,
+          item: _item(7, kind: TvMediaKind.movie),
+          controller: controller,
+        );
+        await _press(tester, LogicalKeyboardKey.arrowDown);
+        await _press(tester, LogicalKeyboardKey.arrowRight);
+        expect(_focused, 'details-cast:movie:7:cast:2');
+
+        await _press(tester, LogicalKeyboardKey.select);
+        expect(find.byType(TvPersonScreen), findsOneWidget);
+        expect(controller.people.opened, <int>[2]);
+        // The name TMDB gives on their page, over the credit's.
+        expect(find.text('Person 2'), findsWidgets);
+
+        final navigator = tester.state<NavigatorState>(
+          find.byType(Navigator).first,
+        );
+        navigator.pop();
+        await tester.pumpAndSettle();
+        expect(find.byType(TvPersonScreen), findsNothing);
+        expect(_focused, 'details-cast:movie:7:cast:2');
       });
     });
 

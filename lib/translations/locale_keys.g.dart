@@ -1983,5 +1983,13 @@ abstract class  LocaleKeys {
   static const tv_phone_sign_in_signing_in = 'tv_phone_sign_in_signing_in';
   static const tv_phone_sign_in_denied = 'tv_phone_sign_in_denied';
   static const tv_phone_sign_in_failed = 'tv_phone_sign_in_failed';
+  static const tv_reader_scroll_hint = 'tv_reader_scroll_hint';
+  static const tv_as_role = 'tv_as_role';
+  static const tv_person_no_titles = 'tv_person_no_titles';
+  static const tv_creator = 'tv_creator';
+  static const tv_hold_ok_for_my_list = 'tv_hold_ok_for_my_list';
+  static const tv_biography_semantics = 'tv_biography_semantics';
+  static const tv_person_see_all_description = 'tv_person_see_all_description';
+  static const tv_new_and_hot_empty_message = 'tv_new_and_hot_empty_message';
 
 }

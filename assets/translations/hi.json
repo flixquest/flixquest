@@ -2083,5 +2083,13 @@
   "tv_phone_sign_in_use_remote": "इसके बजाय रिमोट का उपयोग करें",
   "tv_phone_sign_in_signing_in": "साइन इन हो रहा है…",
   "tv_phone_sign_in_denied": "फ़ोन पर साइन इन रद्द कर दिया गया। यह रहा नया कोड।",
-  "tv_phone_sign_in_failed": "कोड नहीं मिल सका। अपना कनेक्शन जाँचें और फिर से कोशिश करें।"
+  "tv_phone_sign_in_failed": "कोड नहीं मिल सका। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
+  "tv_reader_scroll_hint": "स्क्रॉल करने के लिए ऊपर और नीचे दबाएँ",
+  "tv_as_role": "{role} के रूप में",
+  "tv_person_no_titles": "{name} की कोई फ़िल्म या सीरीज़ अभी सूचीबद्ध नहीं है।",
+  "tv_creator": "निर्माता",
+  "tv_hold_ok_for_my_list": "मेरी सूची में जोड़ने या हटाने के लिए OK दबाकर रखें",
+  "tv_biography_semantics": "{name} की जीवनी",
+  "tv_person_see_all_description": "{name} की पूरी सूची, शुरुआती कुछ के बाद भी।",
+  "tv_new_and_hot_empty_message": "नई रिलीज़ और प्रीमियर घोषित होते ही यहाँ दिखते हैं।"
 }

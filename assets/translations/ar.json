@@ -2154,5 +2154,13 @@
   "tv_phone_sign_in_use_remote": "استخدم جهاز التحكم بدلًا من ذلك",
   "tv_phone_sign_in_signing_in": "جارٍ تسجيل الدخول…",
   "tv_phone_sign_in_denied": "أُلغي تسجيل الدخول من الهاتف. إليك رمزًا جديدًا.",
-  "tv_phone_sign_in_failed": "تعذّر الحصول على رمز. تحقق من اتصالك وحاول مرة أخرى."
+  "tv_phone_sign_in_failed": "تعذّر الحصول على رمز. تحقق من اتصالك وحاول مرة أخرى.",
+  "tv_reader_scroll_hint": "استخدم الأعلى والأسفل للتمرير",
+  "tv_as_role": "بدور {role}",
+  "tv_person_no_titles": "لا توجد أفلام أو مسلسلات مدرجة لـ {name} بعد.",
+  "tv_creator": "المبتكر",
+  "tv_hold_ok_for_my_list": "اضغط مطولاً على OK للإضافة إلى قائمتي أو الإزالة منها",
+  "tv_biography_semantics": "السيرة الذاتية لـ {name}",
+  "tv_person_see_all_description": "القائمة الكاملة لـ {name}، بعد العناوين الأولى.",
+  "tv_new_and_hot_empty_message": "تظهر الإصدارات الجديدة والعروض الأولى هنا فور الإعلان عنها."
 }

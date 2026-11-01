@@ -325,14 +325,19 @@ class TvSpotlightInfo extends StatelessWidget {
                 Icon(icon, color: colors.primary, size: 18),
                 const SizedBox(width: 8),
               ],
-              Text(
-                kicker,
-                style: TextStyle(
-                  color: colors.primary,
-                  fontFamily: 'FigtreeSB',
-                  fontSize: kickerSize,
-                  height: 1.2,
-                  letterSpacing: 1.5,
+              // A role or a date can run long; it stays on its line.
+              Flexible(
+                child: Text(
+                  kicker,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.primary,
+                    fontFamily: 'FigtreeSB',
+                    fontSize: kickerSize,
+                    height: 1.2,
+                    letterSpacing: 1.5,
+                  ),
                 ),
               ),
             ],

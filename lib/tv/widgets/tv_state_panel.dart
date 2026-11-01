@@ -12,6 +12,7 @@ class TvStatePanel extends StatelessWidget {
     required this.icon,
     this.actionLabel,
     this.onAction,
+    this.autofocusAction = false,
     super.key,
   });
 
@@ -21,9 +22,14 @@ class TvStatePanel extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
 
+  /// Focuses the action on mount, for a page of its own that has nothing
+  /// else to land on, rather than a shell destination the rail enters.
+  final bool autofocusAction;
+
   factory TvStatePanel.error({
     required VoidCallback onRetry,
     String? message,
+    bool autofocusAction = false,
   }) {
     return TvStatePanel(
       title: tr('something_went_wrong'),
@@ -31,6 +37,7 @@ class TvStatePanel extends StatelessWidget {
       icon: PhosphorIcons.warningCircle(),
       actionLabel: tr('retry'),
       onAction: onRetry,
+      autofocusAction: autofocusAction,
     );
   }
 
@@ -72,6 +79,7 @@ class TvStatePanel extends StatelessWidget {
                 label: actionLabel!,
                 icon: PhosphorIcons.arrowClockwise(),
                 prominent: true,
+                autofocus: autofocusAction,
                 onActivate: onAction!,
               ),
             ],

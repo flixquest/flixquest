@@ -2083,5 +2083,13 @@
   "tv_phone_sign_in_use_remote": "Usar el control remoto",
   "tv_phone_sign_in_signing_in": "Iniciando sesión…",
   "tv_phone_sign_in_denied": "Se canceló el inicio de sesión en el teléfono. Aquí tienes un código nuevo.",
-  "tv_phone_sign_in_failed": "No se pudo obtener un código. Revisa tu conexión e inténtalo de nuevo."
+  "tv_phone_sign_in_failed": "No se pudo obtener un código. Revisa tu conexión e inténtalo de nuevo.",
+  "tv_reader_scroll_hint": "Usa Arriba y Abajo para desplazarte",
+  "tv_as_role": "Como {role}",
+  "tv_person_no_titles": "Aún no hay películas ni series de {name}.",
+  "tv_creator": "Creador",
+  "tv_hold_ok_for_my_list": "Mantén pulsado OK para añadir a Mi lista o quitarlo",
+  "tv_biography_semantics": "Biografía de {name}",
+  "tv_person_see_all_description": "La lista completa de {name}, más allá de los primeros.",
+  "tv_new_and_hot_empty_message": "Los estrenos y las novedades aparecen aquí en cuanto se anuncian."
 }

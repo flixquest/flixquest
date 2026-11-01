@@ -22,6 +22,12 @@ Future<Map<String, dynamic>> _tmdbJson(
       err: (failure) => throw FailureException(failure));
 }
 
+/// TMDB's answer as it came, for a reader that needs fields the models drop,
+/// such as the role a person played in each of their credits.
+Future<Map<String, dynamic>> fetchTmdbJson(
+        String api, bool isProxyEnabled, String proxyUrl) =>
+    _tmdbJson(api, isProxyEnabled, proxyUrl);
+
 Future<List<Movie>> fetchMovies(
   String api,
   bool isProxyEnabled,

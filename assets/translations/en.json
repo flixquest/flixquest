@@ -2083,5 +2083,13 @@
   "tv_phone_sign_in_use_remote": "Use the remote instead",
   "tv_phone_sign_in_signing_in": "Signing in…",
   "tv_phone_sign_in_denied": "The sign-in was cancelled on the phone. Here is a new code.",
-  "tv_phone_sign_in_failed": "Couldn't get a code. Check your connection and try again."
+  "tv_phone_sign_in_failed": "Couldn't get a code. Check your connection and try again.",
+  "tv_reader_scroll_hint": "Up and Down scroll",
+  "tv_as_role": "As {role}",
+  "tv_person_no_titles": "No movies or series are listed for {name} yet.",
+  "tv_creator": "Creator",
+  "tv_hold_ok_for_my_list": "Hold OK to add to My List or remove it",
+  "tv_biography_semantics": "Biography of {name}",
+  "tv_person_see_all_description": "{name}'s full list, past the first few.",
+  "tv_new_and_hot_empty_message": "New releases and premieres show up here as they're announced."
 }
