@@ -68,6 +68,10 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   List<String> _recent = const <String>[];
   _TvLiveScope _scope = _TvLiveScope.all;
   _TvLiveMode _mode = _TvLiveMode.channels;
+
+  /// The view shown: the chosen one, or the channels for a source without a
+  /// schedule. The choice is kept for the sources that have one.
+  _TvLiveMode get _view => _source.hasSchedule ? _mode : _TvLiveMode.channels;
   LiveTvSource _source = LiveTvSource.daddyLive;
   String? _category;
   String? _letter;
@@ -116,7 +120,12 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   /// in. A link to a channel is not interrupted, and a failed load leaves the
   /// question for the next visit.
   Future<void> _askSports() async {
-    if (!mounted || _openedForChannel || _error != null) return;
+    if (!mounted ||
+        _openedForChannel ||
+        _error != null ||
+        !_source.hasSchedule) {
+      return;
+    }
     if (await _sportsDatabase.getPreferredSports() != null || !mounted) return;
     if (_openedForChannel) return;
     await _editSports(firstTime: true);
@@ -189,7 +198,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
     // The grid is not built until the catalog arrives; it takes the request
     // then, unless focus has moved on.
     if (_loading && _channels.isEmpty) return _channelGrid.requestFocus();
-    if (_mode == _TvLiveMode.channels &&
+    if (_view == _TvLiveMode.channels &&
         _visible.isNotEmpty &&
         _channelGrid.requestFocus()) {
       return true;
@@ -462,7 +471,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         channelName: channel.name,
         outcome: 'success',
         durationMs: stopwatch.elapsedMilliseconds,
-        source: _mode.name,
+        source: _view.name,
       );
       if (!mounted) return;
       // The channel works: the TV's stream-found popup, first.
@@ -514,7 +523,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         channelName: channel.name,
         outcome: 'error',
         durationMs: stopwatch.elapsedMilliseconds,
-        source: _mode.name,
+        source: _view.name,
         error: error.toString(),
       );
       if (mounted) {
@@ -538,8 +547,8 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
         surface: _analyticsSurface,
         provider: _source.analyticsName,
         action: 'search',
-        value: _mode.name,
-        resultCount: _mode == _TvLiveMode.channels
+        value: _view.name,
+        resultCount: _view == _TvLiveMode.channels
             ? _visible.length
             : _visibleEventCount,
       );
@@ -581,7 +590,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
   /// Right off the keyboard: the channels, or in the schedule whatever sits
   /// beside the key.
   bool _focusResultsFromKeyboard() {
-    if (_mode == _TvLiveMode.channels &&
+    if (_view == _TvLiveMode.channels &&
         _visible.isNotEmpty &&
         _channelGrid.requestFocus()) {
       return true;
@@ -738,7 +747,7 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
     if (_loading && !_loadedOnce) {
       return TvLiveSkeleton(metrics: widget.metrics);
     }
-    final isSchedule = _mode == _TvLiveMode.schedule;
+    final isSchedule = _view == _TvLiveMode.schedule;
     return FocusTraversalGroup(
       policy: ReadingOrderTraversalPolicy(),
       child: Padding(
@@ -1013,25 +1022,28 @@ class _TvLiveScreenState extends State<TvLiveScreen> {
                 ),
             ],
           ),
-          const SizedBox(width: 28),
-          _TvSegmentedTrack(
-            options: <_TvSegmentedOption>[
-              _TvSegmentedOption(
-                icon: PhosphorIcons.televisionSimple(),
-                label: tr('channels'),
-                semanticLabel: tr('tv_channels_view'),
-                selected: _mode == _TvLiveMode.channels,
-                onActivate: () => _selectMode(_TvLiveMode.channels),
-              ),
-              _TvSegmentedOption(
-                icon: PhosphorIcons.calendarDots(),
-                label: tr('schedule'),
-                semanticLabel: tr('tv_schedule_view'),
-                selected: _mode == _TvLiveMode.schedule,
-                onActivate: () => _selectMode(_TvLiveMode.schedule),
-              ),
-            ],
-          ),
+          // A source without a schedule has only its channels to show.
+          if (_source.hasSchedule) ...<Widget>[
+            const SizedBox(width: 28),
+            _TvSegmentedTrack(
+              options: <_TvSegmentedOption>[
+                _TvSegmentedOption(
+                  icon: PhosphorIcons.televisionSimple(),
+                  label: tr('channels'),
+                  semanticLabel: tr('tv_channels_view'),
+                  selected: _view == _TvLiveMode.channels,
+                  onActivate: () => _selectMode(_TvLiveMode.channels),
+                ),
+                _TvSegmentedOption(
+                  icon: PhosphorIcons.calendarDots(),
+                  label: tr('schedule'),
+                  semanticLabel: tr('tv_schedule_view'),
+                  selected: _view == _TvLiveMode.schedule,
+                  onActivate: () => _selectMode(_TvLiveMode.schedule),
+                ),
+              ],
+            ),
+          ],
           if (!isSchedule) ...<Widget>[
             const SizedBox(width: 28),
             _TvSegmentedTrack(

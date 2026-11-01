@@ -12,15 +12,27 @@ enum LiveTvSource {
     label: 'Awash',
     analyticsName: 'DaddyLive',
     reportId: 'dlhd',
+    hasSchedule: true,
   ),
-  ntv(id: 'ntv', label: 'Abay', analyticsName: 'NTV', reportId: 'ntv');
+  ntv(
+    id: 'ntv',
+    label: 'Abay',
+    analyticsName: 'NTV',
+    reportId: 'ntv',
+    hasSchedule: false,
+  );
 
   const LiveTvSource({
     required this.id,
     required this.label,
     required this.analyticsName,
     required this.reportId,
+    required this.hasSchedule,
   });
+
+  /// Whether the source offers a schedule beside its channels; without one,
+  /// only the channels are shown.
+  final bool hasSchedule;
 
   /// Names its local store; DaddyLive's predates the others and keeps its
   /// original name.

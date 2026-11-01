@@ -24,145 +24,27 @@ void main() {
     Map<String, dynamic> channel(String id, String name, String server) =>
         <String, dynamic>{'id': id, 'name': name, 'server': server};
 
-    Map<String, dynamic> event(
-      String title,
-      String server,
-      List<Map<String, dynamic>> channels, {
-      String startsAt = '2026-11-01T18:00:00.000Z',
-    }) =>
-        <String, dynamic>{
-          'title': title,
-          'time': startsAt.substring(11, 16),
-          'startsAt': startsAt,
-          'server': server,
-          'channels': channels,
-        };
-
     test('leaves out the DaddyLive channels NTV relays, and namespaces IDs',
         () async {
+      final requested = <String>[];
       final ntv = service((request) async {
-        if (request.url.path == '/api/v2/ntv/channels') {
-          return _json(<String, dynamic>{
-            'channels': <Map<String, dynamic>>[
-              channel('51', 'ABC USA', 'phoenix'),
-              channel('f-1', 'beIN SPORTS USA', 'falcon'),
-              channel('cdnlive-2', 'DR 1 HD DK', 'titan'),
-            ],
-          });
-        }
-        if (request.url.path == '/api/v2/ntv/epg') {
-          return _json(<String, dynamic>{
-            'days': <Map<String, dynamic>>[
-              <String, dynamic>{
-                'date': '2026-11-01',
-                'label': '2026-11-01',
-                'categories': <Map<String, dynamic>>[
-                  <String, dynamic>{
-                    'name': 'Football',
-                    'events': <Map<String, dynamic>>[
-                      event('Relayed match', 'phoenix', [
-                        channel('51', 'ABC USA', 'phoenix'),
-                      ]),
-                      event('Champions League', 'falcon', [
-                        channel('f-1', 'beIN SPORTS USA', 'falcon'),
-                      ]),
-                    ],
-                  },
-                ],
-              },
-            ],
-          });
-        }
-        fail('Unexpected request: ${request.url}');
+        requested.add(request.url.path);
+        return _json(<String, dynamic>{
+          'channels': <Map<String, dynamic>>[
+            channel('51', 'ABC USA', 'phoenix'),
+            channel('f-1', 'beIN SPORTS USA', 'falcon'),
+            channel('cdnlive-2', 'DR 1 HD DK', 'titan'),
+          ],
+        });
       });
 
       final catalog = await ntv.getCatalog();
 
       expect(catalog.channels.map((channel) => channel.id),
           <String>['ntv:f-1', 'ntv:cdnlive-2']);
-      final events = catalog.epg.days.single.categories.single.events;
-      expect(events.map((event) => event.title), <String>['Champions League']);
-      expect(events.single.channels.single.id, 'ntv:f-1');
-      expect(catalog.channels.first.categories, <String>['Football'],
-          reason: 'the schedule still fills in what a channel airs');
-    });
-
-    test('opens on today, with the undated 24/7 events last', () async {
-      Map<String, dynamic> day(String? date) => <String, dynamic>{
-            if (date != null) 'date': date,
-            'label': date ?? '24/7',
-            'categories': <Map<String, dynamic>>[
-              <String, dynamic>{
-                'name': 'Football',
-                'events': <Map<String, dynamic>>[
-                  event('Match', 'raptor', [
-                    channel('event-a', 'Match', 'raptor'),
-                  ]),
-                ],
-              },
-            ],
-          };
-      final ntv = service((request) async => request.url.path.endsWith('/epg')
-          ? _json(<String, dynamic>{
-              'days': <Map<String, dynamic>>[
-                day(null),
-                day('2026-11-02'),
-                day('2026-11-01'),
-              ],
-            })
-          : _json(<String, dynamic>{'channels': <dynamic>[]}));
-
-      final catalog = await ntv.getCatalog();
-
-      expect(catalog.epg.days.map((day) => day.label),
-          <String>['2026-11-01', '2026-11-02', '24/7']);
-    });
-
-    test('numbers an event\'s streams that share its title', () async {
-      final ntv = service((request) async => request.url.path.endsWith('/epg')
-          ? _json(<String, dynamic>{
-              'days': <Map<String, dynamic>>[
-                <String, dynamic>{
-                  'date': '2026-11-01',
-                  'label': '2026-11-01',
-                  'categories': <Map<String, dynamic>>[
-                    <String, dynamic>{
-                      'name': 'American Football',
-                      'events': <Map<String, dynamic>>[
-                        event('Ravens at Bills', 'raptor', [
-                          channel('event-a', 'Ravens at Bills', 'raptor'),
-                          channel('event-b', 'Ravens at Bills', 'raptor'),
-                          channel('event-c', 'ESPN', 'raptor'),
-                        ]),
-                      ],
-                    },
-                  ],
-                },
-              ],
-            })
-          : _json(<String, dynamic>{'channels': <dynamic>[]}));
-
-      final catalog = await ntv.getCatalog();
-
-      final channels =
-          catalog.epg.days.single.categories.single.events.single.channels;
-      expect(channels.map((channel) => channel.name),
-          <String>['Stream 1', 'Stream 2', 'ESPN']);
-    });
-
-    test('keeps the channels when the schedule is down', () async {
-      final ntv = service((request) async => request.url.path.endsWith('/epg')
-          ? http.Response('error code: 502', 502)
-          : _json(<String, dynamic>{
-              'channels': <Map<String, dynamic>>[
-                channel('f-1', 'beIN SPORTS USA', 'falcon'),
-              ],
-            }));
-
-      final catalog = await ntv.getCatalog();
-
-      expect(catalog.channels.single.id, 'ntv:f-1');
       expect(catalog.epg.days, isEmpty);
+      expect(requested, <String>['/api/v2/ntv/channels'],
+          reason: 'NTV offers channels only, so its schedule is never asked');
     });
 
     test('plays the scraper\'s stream for the unprefixed channel', () async {
@@ -230,6 +112,11 @@ void main() {
         friendlyLiveTvError(StateError('DLHD playback session closed')),
         liveTvUnavailableMessage,
       );
+    });
+
+    test('offers a schedule only where one plays', () {
+      expect(LiveTvSource.daddyLive.hasSchedule, isTrue);
+      expect(LiveTvSource.ntv.hasSchedule, isFalse);
     });
 
     test('keeps DaddyLive\'s existing store', () {

@@ -72,6 +72,10 @@ class _ChannelListState extends State<ChannelList> {
   Timer? _searchAnalyticsDebounce;
   _ChannelScope _scope = _ChannelScope.all;
   _LiveTvMode _mode = _LiveTvMode.channels;
+
+  /// The view shown: the chosen one, or the channels for a source without a
+  /// schedule. The choice is kept for the sources that have one.
+  _LiveTvMode get _view => _source.hasSchedule ? _mode : _LiveTvMode.channels;
   LiveTvSource _source = LiveTvSource.daddyLive;
   // The remembered source is read first; the picker waits for it.
   bool _sourceKnown = false;
@@ -109,7 +113,12 @@ class _ChannelListState extends State<ChannelList> {
   /// in. A link to a channel is not interrupted, and a failed load leaves the
   /// question for the next visit.
   Future<void> _askSports() async {
-    if (!mounted || widget.initialChannelId != null || _error != null) return;
+    if (!mounted ||
+        widget.initialChannelId != null ||
+        _error != null ||
+        !_source.hasSchedule) {
+      return;
+    }
     if (await _sportsDatabase.getPreferredSports() != null || !mounted) return;
     await _editSports(firstTime: true);
   }
@@ -462,7 +471,7 @@ class _ChannelListState extends State<ChannelList> {
         channelName: channel.name,
         outcome: 'success',
         durationMs: stopwatch.elapsedMilliseconds,
-        source: _mode.name,
+        source: _view.name,
       );
       if (!mounted) return;
       // The channel works: the same stream-found popup as movies, first.
@@ -511,7 +520,7 @@ class _ChannelListState extends State<ChannelList> {
         channelName: channel.name,
         outcome: 'error',
         durationMs: stopwatch.elapsedMilliseconds,
-        source: _mode.name,
+        source: _view.name,
         error: error.toString(),
       );
       if (mounted) {
@@ -535,8 +544,8 @@ class _ChannelListState extends State<ChannelList> {
         surface: _analyticsSurface,
         provider: _source.analyticsName,
         action: 'search',
-        value: _mode.name,
-        resultCount: _mode == _LiveTvMode.channels
+        value: _view.name,
+        resultCount: _view == _LiveTvMode.channels
             ? _visibleChannels.length
             : _visibleEventCount,
       );
@@ -673,32 +682,35 @@ class _ChannelListState extends State<ChannelList> {
             icon: Icon(PhosphorIcons.arrowsClockwise()),
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(SegmentSwitch.height + 12),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 12),
-            child: SegmentSwitch<_LiveTvMode>(
-              segments: <Segment<_LiveTvMode>>[
-                Segment(
-                  _LiveTvMode.channels,
-                  tr('channels'),
-                  icon: PhosphorIcons.televisionSimple(),
+        // A source without a schedule has only its channels to show.
+        bottom: !_source.hasSchedule
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(SegmentSwitch.height + 12),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 12),
+                  child: SegmentSwitch<_LiveTvMode>(
+                    segments: <Segment<_LiveTvMode>>[
+                      Segment(
+                        _LiveTvMode.channels,
+                        tr('channels'),
+                        icon: PhosphorIcons.televisionSimple(),
+                      ),
+                      Segment(
+                        _LiveTvMode.schedule,
+                        tr('schedule'),
+                        icon: PhosphorIcons.calendarDots(),
+                      ),
+                    ],
+                    selected: _view,
+                    onChanged: _selectMode,
+                  ),
                 ),
-                Segment(
-                  _LiveTvMode.schedule,
-                  tr('schedule'),
-                  icon: PhosphorIcons.calendarDots(),
-                ),
-              ],
-              selected: _mode,
-              onChanged: _selectMode,
-            ),
-          ),
-        ),
+              ),
       ),
       body: SkeletonSwitcher(
         loading: _loading && _channels.isEmpty,
-        skeleton: _LiveTvSkeleton(schedule: _mode == _LiveTvMode.schedule),
+        skeleton: _LiveTvSkeleton(schedule: _view == _LiveTvMode.schedule),
         child: _buildBody(),
       ),
     );
@@ -726,7 +738,7 @@ class _ChannelListState extends State<ChannelList> {
         slivers: <Widget>[
           SliverToBoxAdapter(child: _buildHeader()),
           _bannerSliver(_headerPlacement),
-          if (_mode == _LiveTvMode.channels)
+          if (_view == _LiveTvMode.channels)
             ..._buildChannelSlivers()
           else
             ..._buildScheduleSlivers(),
@@ -914,7 +926,7 @@ class _ChannelListState extends State<ChannelList> {
   Widget _buildHeader() {
     final palette = AppPalette.of(context);
     final gutter = AppSpace.gutter(context);
-    final isSchedule = _mode == _LiveTvMode.schedule;
+    final isSchedule = _view == _LiveTvMode.schedule;
     final selectedCategory = _selectedCategory;
     final epg = _epg;
     return Padding(
