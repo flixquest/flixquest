@@ -248,6 +248,13 @@ class TvSettingsScreen extends StatelessWidget {
             onActivate: () => _showSubtitleLanguagePicker(context),
           ),
           _TvSettingTile(
+            key: const ValueKey<String>('auto-translate-subtitles'),
+            label: tr('auto_translate_subtitles'),
+            value: settings.autoTranslateSubtitles ? tr('tv_on') : tr('player_off'),
+            icon: PhosphorIcons.translate(),
+            onActivate: () => settings.autoTranslateSubtitles = !settings.autoTranslateSubtitles,
+          ),
+          _TvSettingTile(
             key: const ValueKey<String>('subtitle-settings'),
             label: tr('tv_subtitle_settings'),
             value: _subtitleSummary(settings),

@@ -89,6 +89,9 @@ class SettingsProvider with ChangeNotifier {
   String _defaultSubtitleLanguage = 'en';
   String get defaultSubtitleLanguage => _defaultSubtitleLanguage;
 
+  bool _autoTranslateSubtitles = false;
+  bool get autoTranslateSubtitles => _autoTranslateSubtitles;
+
   bool _defaultViewMode = true;
   bool get defaultViewMode => _defaultViewMode;
 
@@ -331,6 +334,7 @@ class SettingsProvider with ChangeNotifier {
 
   Future<void> getSubtitleLanguage() async {
     defaultSubtitleLanguage = await _settingsPreferences.getSubLanguage();
+    _autoTranslateSubtitles = await _settingsPreferences.getAutoTranslateSubtitles();
   }
 
   set defaultSubtitleLanguage(String value) {
@@ -338,6 +342,17 @@ class SettingsProvider with ChangeNotifier {
     _settingsPreferences.setDefaultSubtitle(value);
     _trackSetting('Subtitle Language', value);
     notifyListeners();
+  }
+
+  set autoTranslateSubtitles(bool value) {
+    _autoTranslateSubtitles = value;
+    _settingsPreferences.setAutoTranslateSubtitles(value);
+    _trackSetting('Auto Translate Subtitles', value);
+    notifyListeners();
+  }
+
+  Future<void> getAutoTranslateSubtitles() async {
+    autoTranslateSubtitles = await _settingsPreferences.getAutoTranslateSubtitles();
   }
 
   Future<void> getForegroundSubtitleColor() async {

@@ -2084,5 +2084,10 @@
   "device_platform_tv": "تلفاز",
   "device_platform_ios": "iPhone أو iPad",
   "device_platform_android": "جهاز Android",
-  "device_last_used": "آخر استخدام {date}"
+  "device_last_used": "آخر استخدام {date}",
+  "auto_translate_subtitles": "ترجمة الترجمة تلقائيًا",
+  "auto_translate": "ترجمة تلقائية",
+  "auto_translated": "مترجم تلقائياً",
+  "translating_subtitles": "جارٍ ترجمة الترجمة...",
+  "auto_translate_description": "ترجمة الترجمة تلقائيًا إلى لغتك المفضلة عندما لا تكون متاحة."
 }

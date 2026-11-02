@@ -136,6 +136,15 @@ class SettingsPreferences {
     return sharedPrefsSingleton.getString(DEFAULT_SUBTITLE) ?? 'en';
   }
 
+  static const AUTO_TRANSLATE_SUBTITLES = 'auto_translate_subtitles';
+  setAutoTranslateSubtitles(bool mode) async {
+    sharedPrefsSingleton.setBool(AUTO_TRANSLATE_SUBTITLES, mode);
+  }
+
+  Future<bool> getAutoTranslateSubtitles() async {
+    return sharedPrefsSingleton.getBool(AUTO_TRANSLATE_SUBTITLES) ?? false;
+  }
+
   static const DEFAULT_FULL_SCREEN = 'default_full_screen';
   setDefaultFullScreen(bool mode) async {
     sharedPrefsSingleton.setBool(DEFAULT_FULL_SCREEN, mode);

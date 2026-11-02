@@ -2013,5 +2013,10 @@
   "device_platform_tv": "टीवी",
   "device_platform_ios": "iPhone या iPad",
   "device_platform_android": "Android डिवाइस",
-  "device_last_used": "आखिरी इस्तेमाल {date}"
+  "device_last_used": "आखिरी इस्तेमाल {date}",
+  "auto_translate_subtitles": "उपशीर्षक स्वतः अनुवाद करें",
+  "auto_translate": "स्वतः अनुवाद",
+  "auto_translated": "स्वतः अनुवादित",
+  "translating_subtitles": "उपशीर्षक अनुवाद हो रहे हैं...",
+  "auto_translate_description": "उपलब्ध न होने पर उपशीर्षक को अपनी पसंदीदा भाषा में स्वतः अनुवाद करें।"
 }

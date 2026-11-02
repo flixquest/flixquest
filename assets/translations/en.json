@@ -2013,5 +2013,10 @@
   "device_platform_tv": "TV",
   "device_platform_ios": "iPhone or iPad",
   "device_platform_android": "Android device",
-  "device_last_used": "Last used {date}"
+  "device_last_used": "Last used {date}",
+  "auto_translate_subtitles": "Auto translate subtitles",
+  "auto_translate": "Auto Translate",
+  "auto_translated": "Auto-translated",
+  "translating_subtitles": "Translating subtitles...",
+  "auto_translate_description": "Automatically translate subtitles to your preferred language when not available."
 }

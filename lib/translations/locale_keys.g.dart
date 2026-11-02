@@ -515,8 +515,8 @@ abstract class  LocaleKeys {
   static const check = 'check';
   static const server_working = 'server_working';
   static const checking_server = 'checking_server';
-  static const waiting_queue = 'waiting_queue';
   static const server_check_complete = 'server_check_complete';
+  static const waiting_queue = 'waiting_queue';
   static const server_down = 'server_down';
   static const provider_health_overview = 'provider_health_overview';
   static const provider_availability = 'provider_availability';
@@ -1913,5 +1913,10 @@ abstract class  LocaleKeys {
   static const device_platform_ios = 'device_platform_ios';
   static const device_platform_android = 'device_platform_android';
   static const device_last_used = 'device_last_used';
+  static const auto_translate_subtitles = 'auto_translate_subtitles';
+  static const auto_translate = 'auto_translate';
+  static const auto_translated = 'auto_translated';
+  static const translating_subtitles = 'translating_subtitles';
+  static const auto_translate_description = 'auto_translate_description';
 
 }

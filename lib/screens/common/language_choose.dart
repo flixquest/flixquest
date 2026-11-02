@@ -32,6 +32,11 @@ List<AppLanguages> appLanguageChoices() => <AppLanguages>[
         languageName: tr('hindi'),
         languageCode: 'hi',
       ),
+      AppLanguages(
+        languageFlag: 'assets/images/country_flags/indonesia.png',
+        languageName: tr('indonesian'),
+        languageCode: 'id',
+      ),
     ];
 
 class AppLanguageChoose extends StatelessWidget {

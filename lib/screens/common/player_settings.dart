@@ -253,6 +253,14 @@ class _PlayerSettingsState extends State<PlayerSettings>
                   ),
                   SwitchRow(
                     icon: PhosphorIcons.translate(),
+                    label: tr('auto_translate_subtitles'),
+                    value: settingValues.autoTranslateSubtitles,
+                    onChanged: (value) => setState(
+                      () => settingValues.autoTranslateSubtitles = value,
+                    ),
+                  ),
+                  SwitchRow(
+                    icon: PhosphorIcons.translate(),
                     label: tr('fetch_all_subs'),
                     value: settingValues.fetchSpecificLangSubs,
                     onChanged: (value) => setState(

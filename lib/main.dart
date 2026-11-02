@@ -164,6 +164,7 @@ Future<DevicePresentation> appInitialize({
   await settingsProvider.getMaxBufferDuration();
   await settingsProvider.getVideoResolution();
   await settingsProvider.getSubtitleLanguage();
+  await settingsProvider.getAutoTranslateSubtitles();
   await settingsProvider.getSubtitleMode();
   await settingsProvider.getViewMode();
   await settingsProvider.getSubtitleSize();
