@@ -4247,8 +4247,11 @@ void main() {
       service = AdsterraPlaybackAdsService(
         storeLauncher: recordStoreLaunch,
         adBlockGate: AdBlockGate(
+          // Blocker DNS: the unreachable ExoClick host is sinkholed here.
           detector: AdBlockDetector(
-            lookup: (_) async => [InternetAddress('1.1.1.1')],
+            lookup: (host) async => [
+              InternetAddress(host == 'exo.example' ? '0.0.0.0' : '1.1.1.1')
+            ],
             publicLookup: (_) async => true,
           ),
         ),
@@ -4287,8 +4290,11 @@ void main() {
       service = AdsterraPlaybackAdsService(
         storeLauncher: recordStoreLaunch,
         adBlockGate: AdBlockGate(
+          // Blocker DNS: the unreachable ExoClick host is sinkholed here.
           detector: AdBlockDetector(
-            lookup: (_) async => [InternetAddress('1.1.1.1')],
+            lookup: (host) async => [
+              InternetAddress(host == 'exo.example' ? '0.0.0.0' : '1.1.1.1')
+            ],
             publicLookup: (_) async => true,
           ),
         ),

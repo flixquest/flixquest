@@ -19,26 +19,23 @@ void main() {
     outcomes = [];
   });
 
-  test('only the errors blockers cause count as blocked', () {
-    for (final code in [
-      'ERR_NAME_NOT_RESOLVED',
-      'ERR_CONNECTION_REFUSED',
-      'ERR_CONNECTION_RESET',
-      'ERR_ADDRESS_INVALID',
-      'ERR_BLOCKED_BY_CLIENT',
-      'ERR_CERT_COMMON_NAME_INVALID',
-      'ERR_SSL_PROTOCOL_ERROR',
-    ]) {
-      expect(isBlockingLoadError('net::$code'), isTrue, reason: code);
-    }
-    for (final code in [
-      'ERR_TIMED_OUT',
-      'ERR_INTERNET_DISCONNECTED',
-      'ERR_CERT_AUTHORITY_INVALID',
-      'ERR_FAILED',
-      'ERR_HTTP_RESPONSE_CODE_FAILURE',
-    ]) {
-      expect(isBlockingLoadError('net::$code'), isFalse, reason: code);
+  test('filters, unreachable hosts and everything else are told apart', () {
+    final expected = {
+      'ERR_BLOCKED_BY_CLIENT': AdDelivery.blocked,
+      'ERR_CERT_COMMON_NAME_INVALID': AdDelivery.blocked,
+      'ERR_SSL_PROTOCOL_ERROR': AdDelivery.blocked,
+      'ERR_NAME_NOT_RESOLVED': AdDelivery.unreachable,
+      'ERR_CONNECTION_REFUSED': AdDelivery.unreachable,
+      'ERR_CONNECTION_RESET': AdDelivery.unreachable,
+      'ERR_ADDRESS_INVALID': AdDelivery.unreachable,
+      'ERR_TIMED_OUT': null,
+      'ERR_INTERNET_DISCONNECTED': null,
+      'ERR_CERT_AUTHORITY_INVALID': null,
+      'ERR_FAILED': null,
+      'ERR_HTTP_RESPONSE_CODE_FAILURE': null,
+    };
+    for (final MapEntry(key: code, value: delivery) in expected.entries) {
+      expect(deliveryForLoadError('net::$code'), delivery, reason: code);
     }
   });
 
@@ -72,7 +69,7 @@ void main() {
         const NavigationRequest(url: rotating, isMainFrame: true));
   }
 
-  testWidgets('a blocked delivery host is reported for that host',
+  testWidgets('an unreachable delivery host is reported for that host',
       (tester) async {
     final page = await openPopup(tester, exoclick);
     await redirectToNetwork(page);
@@ -82,7 +79,7 @@ void main() {
         isForMainFrame: true,
         url: rotating));
     await tester.pump();
-    expect(outcomes, [('s.rotating.example', AdDelivery.blocked)]);
+    expect(outcomes, [('s.rotating.example', AdDelivery.unreachable)]);
   }, variant: android);
 
   testWidgets('a network with no ad still answered', (tester) async {
@@ -96,18 +93,43 @@ void main() {
     expect(outcomes, [('s.rotating.example', AdDelivery.reached)]);
   }, variant: android);
 
-  testWidgets('a redirect on to the advertiser means the network answered',
+  testWidgets('a blocker stopping a later hop is named by that hop',
+      (tester) async {
+    // An Adsterra Smartlink: its first host answers, a later hop does not.
+    final page = await openPopup(
+        tester,
+        PlaybackAdPlacement(
+            smartlinkUrl: Uri.parse('https://flix.quest/api/adsterra-popup'),
+            loadTimeout: const Duration(seconds: 10)));
+    for (final hop in [
+      'https://smart.example/4/abc',
+      'https://track.example/r?c=1',
+    ]) {
+      await page
+          .onNavigationRequest!(NavigationRequest(url: hop, isMainFrame: true));
+    }
+    expect(outcomes, isEmpty, reason: 'moving on is not the ad showing');
+    page.onWebResourceError!(const WebResourceError(
+        errorCode: -6,
+        description: 'net::ERR_CONNECTION_REFUSED',
+        isForMainFrame: true,
+        url: 'https://track.example/r?c=1'));
+    await tester.pump();
+    expect(outcomes, [('track.example', AdDelivery.unreachable)]);
+  }, variant: android);
+
+  testWidgets('once the ad shows, later failures change nothing',
       (tester) async {
     final page = await openPopup(tester, exoclick);
     await redirectToNetwork(page);
-    await page.onNavigationRequest!(const NavigationRequest(
-        url: 'https://advertiser.example/offer', isMainFrame: true));
-    // An advertiser blocked later is not the network being blocked.
+    page.onPageStarted!('https://offer.example/ad');
+    page.onPageFinished!('https://offer.example/ad');
+    await tester.pump();
     page.onWebResourceError!(const WebResourceError(
         errorCode: -2,
         description: 'net::ERR_NAME_NOT_RESOLVED',
         isForMainFrame: true,
-        url: 'https://advertiser.example/offer'));
+        url: 'https://next.example/'));
     await tester.pump();
     expect(outcomes, [('s.rotating.example', AdDelivery.reached)]);
   }, variant: android);
@@ -125,7 +147,6 @@ void main() {
         description: 'net::ERR_TIMED_OUT',
         isForMainFrame: true,
         url: rotating));
-    page.onPageFinished!(rotating);
     await tester.pump();
     expect(outcomes, isEmpty);
   }, variant: android);
@@ -146,15 +167,27 @@ void main() {
     expect(outcomes, [('smart.example', AdDelivery.blocked)]);
   }, variant: android);
 
-  testWidgets('a tag script that loads means its network answered',
-      (tester) async {
-    await openPopup(
+  testWidgets('a tag page judges only its tag\'s host', (tester) async {
+    final tag = await openPopup(
         tester,
         PlaybackAdPlacement(
             scriptUrl: Uri.parse('https://tags.example/14/abc'),
             loadTimeout: const Duration(seconds: 10)));
+    // A loaded tag is not an ad yet, and its other requests may fail.
     platform.controllers.last.send('{"event":"script"}');
+    tag.onWebResourceError!(const WebResourceError(
+        errorCode: -11,
+        description: 'net::ERR_BLOCKED_BY_CLIENT',
+        isForMainFrame: false,
+        url: 'https://pixel.example/p.gif'));
     await tester.pump();
-    expect(outcomes, [('tags.example', AdDelivery.reached)]);
+    expect(outcomes, isEmpty);
+    tag.onWebResourceError!(const WebResourceError(
+        errorCode: -11,
+        description: 'net::ERR_BLOCKED_BY_CLIENT',
+        isForMainFrame: false,
+        url: 'https://tags.example/14/abc'));
+    await tester.pump();
+    expect(outcomes, [('tags.example', AdDelivery.blocked)]);
   }, variant: android);
 }

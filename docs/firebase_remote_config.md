@@ -813,16 +813,24 @@ Two kinds of evidence, combined under a six-second background deadline:
   parallel) confirms an A or AAAA record, so a retired domain is never
   blamed. No blocker's addresses are listed.
 - **The viewer's own popups:** when an Adsterra or ExoClick popup loads, the
-  ad screen watches its network's delivery host: the tag's script host, or a
-  direct link's first host after FlixQuest. Any answer from that host (an
-  ad, a redirect, an HTTP error, the network's no-ad page) means it was
-  reached, which settles that ad even if DNS looked odd. A failure blockers
-  cause (name not resolved, connection refused/reset/closed, invalid address,
-  `ERR_BLOCKED_BY_CLIENT`, a certificate for another host, an SSL protocol
-  error from a block page) counts once public DNS shows the host exists and
-  local DNS is healthy. Timeouts, offline errors and untrusted certificate
-  authorities (old devices) count as neither. An outcome stands for 30
-  minutes, or until the network changes.
+  ad screen follows its whole redirect chain until the ad shows. A direct
+  link's first host (`asiafilm.org` for Adsterra) is rarely what a blocker
+  stops; its later hops are (the network's redirect and tracking hosts, then
+  the advertiser), and they are only known once the chain runs. The popup
+  counts as reached when its ad shows or the network answers with no ad (its
+  no-ad page or an HTTP error); moving on to the next hop is not enough.
+  Before that, a failing hop is judged by its error:
+  - filtered (`ERR_BLOCKED_BY_CLIENT`, a certificate for another host, an SSL
+    protocol error from a block page) counts once public DNS shows the host
+    exists and local DNS is healthy;
+  - unreachable (name not resolved, connection refused/reset/closed, invalid
+    address) counts only when the device's own DNS sinkholes the host or
+    cannot resolve it while public DNS can, so an advertiser's outage never
+    stops a viewer.
+
+  Timeouts, offline errors and untrusted certificate authorities (old
+  devices) count as neither. An outcome stands for 30 minutes, or until the
+  network changes; a failed hop joins the DNS check for that time.
 
   With the check on, a blocked network ends its popup at once (no fallback),
   and the stream does not start: once the block is confirmed, the viewer is

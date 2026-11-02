@@ -41,8 +41,8 @@ class AdsterraPlaybackAdsService {
   final AdBlockGate? _adBlockGate;
   AdBlockGate get _gate => _adBlockGate ?? AdBlockGate.instance;
 
-  /// The delivery host a blocker stopped during the popup being shown.
-  String? _blockedHost;
+  /// Where a blocker stopped the popup being shown, and how.
+  ({String host, AdDelivery delivery})? _blocked;
 
   /// A popup owed from before Plus started is settled, never replayed
   /// later when Plus ends.
@@ -385,21 +385,24 @@ class AdsterraPlaybackAdsService {
       PlaybackAdPreload? preload}) async {
     for (var attempt = 0;; attempt++) {
       if (attempt > 0 && !context.mounted) return false;
-      _blockedHost = null;
+      _blocked = null;
       final proceed = await _present(context, requested,
           download: download,
           television: television,
           preload: attempt == 0 ? preload : null);
-      final host = _blockedHost;
-      if (host == null ||
+      final blocked = _blocked;
+      if (blocked == null ||
           !proceed ||
           !(requested == PlaybackAdStage.beforeLoader ||
               requested.startsPlayback)) {
         return proceed;
       }
       if (!context.mounted) return false;
-      final verdict = await _gate.popupBlocked(context, host,
-          download: download, television: television, again: attempt > 0);
+      final verdict = await _gate.popupBlocked(context, blocked.host,
+          delivery: blocked.delivery,
+          download: download,
+          television: television,
+          again: attempt > 0);
       if (verdict != null) return verdict;
     }
   }
@@ -543,7 +546,9 @@ class AdsterraPlaybackAdsService {
           preload: prepared,
           continueTap: continueTap,
           onDelivery: (host, delivery) {
-            if (delivery == AdDelivery.blocked) _blockedHost = host;
+            if (delivery != AdDelivery.reached) {
+              _blocked = (host: host, delivery: delivery);
+            }
             _gate.observeDelivery(host, delivery);
           },
           onAdShown: stage == PlaybackAdStage.beforeLoader

@@ -245,7 +245,6 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   DateTime? _lastPointer;
   bool _finished = false;
   String? _deliveryHost;
-  bool _deliveryFailed = false;
   bool _deliveryReported = false;
   bool _adBlockGateOn = false;
   bool _openingPage = false;
@@ -337,45 +336,38 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     }
   }
 
-  /// A main-frame address: the first host past FlixQuest is the network's;
-  /// moving on from it means it answered.
+  /// A main-frame address: the first host past FlixQuest is the network's.
   void _noteNavigation(Uri? target) {
-    if (!_webUrl(target) || AdBlockDetector.isFirstPartyHost(target!.host)) {
+    if (_webUrl(target) && !AdBlockDetector.isFirstPartyHost(target!.host)) {
+      _deliveryHost ??= target.host;
+    }
+  }
+
+  /// Until the ad shows, a blocker may stop any hop of a direct link's
+  /// redirect chain, and usually stops a later one: the network's own
+  /// redirect and tracking hosts, or the advertiser. [scriptOnly] limits a
+  /// tag page to its tag's host, as its other requests may fail harmlessly.
+  void _noteLoadError(WebResourceError error, {bool scriptOnly = false}) {
+    final host = Uri.tryParse(error.url ?? '')?.host;
+    if (host == null ||
+        host.isEmpty ||
+        AdBlockDetector.isFirstPartyHost(host) ||
+        (scriptOnly && host != _deliveryHost)) {
       return;
     }
-    if (_deliveryHost == null) {
-      _deliveryHost = target.host;
-    } else if (target.host != _deliveryHost) {
-      _reportDelivery(AdDelivery.reached);
-    }
+    final delivery = deliveryForLoadError(error.description);
+    if (delivery != null) _reportDelivery(delivery, host);
   }
 
-  void _noteLoadError(WebResourceError error) {
-    if (Uri.tryParse(error.url ?? '')?.host != _deliveryHost) return;
-    _deliveryFailed = true;
-    if (isBlockingLoadError(error.description)) {
-      _reportDelivery(AdDelivery.blocked);
-    }
-  }
-
-  /// Any HTTP answer, even an error page, came from the network itself.
-  void _noteResponse(Uri? from) {
-    if (from != null && from.host == _deliveryHost) {
-      _reportDelivery(AdDelivery.reached);
-    }
-  }
-
-  void _notePageFinished(String url) {
-    if (!_deliveryFailed) _noteResponse(Uri.tryParse(url));
-  }
-
-  void _reportDelivery(AdDelivery delivery) {
-    final host = _deliveryHost;
+  /// [AdDelivery.reached] (the ad showed, or the network had none) is about
+  /// the network's own host; a block names the hop that failed.
+  void _reportDelivery(AdDelivery delivery, [String? failedHost]) {
+    final host = failedHost ?? _deliveryHost;
     if (_deliveryReported || host == null) return;
     _deliveryReported = true;
-    _log('delivery host $host ${delivery.name}');
+    _log('delivery ${delivery.name} at $host');
     widget.onDelivery?.call(host, delivery);
-    if (delivery == AdDelivery.blocked) _finish('ad_blocked');
+    if (delivery != AdDelivery.reached) _finish('ad_blocked');
   }
 
   @override
@@ -480,7 +472,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           if (url != 'about:blank') unawaited(_activateMonetag(controller));
         },
         onWebResourceError: (error) {
-          _noteLoadError(error);
+          _noteLoadError(error, scriptOnly: true);
           _log(
               'script resource error code=${error.errorCode} ${error.description} origin=${_origin(error.url ?? '')} path=${Uri.tryParse(error.url ?? '')?.path ?? ''} mainFrame=${error.isForMainFrame}');
           if (error.isForMainFrame == true) _finish('script_main_frame_error');
@@ -596,14 +588,12 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           }
         case 'script':
           _tagScriptLoaded = true;
-          _reportDelivery(AdDelivery.reached);
           _log('tag script loaded; waiting for the tag to fetch its ad');
         case 'request':
           // The tag's own requests, to see where it stops before arming.
           _log('tag request ${payload['url']} ${payload['detail']}');
         case 'loaded':
           _tagScriptLoaded = true;
-          _reportDelivery(AdDelivery.reached);
           // A loaded script is not proof of an impression. Clickadu sends
           // loaded after its ad request; Monetag checks its options separately.
           if (_automaticContinue && !_automaticContinueAttempted) {
@@ -750,11 +740,12 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       void onHttpError(HttpResponseError error) {
         final failedUrl = error.request?.uri ?? error.response?.uri;
         final status = error.response?.statusCode ?? 0;
-        if (status > 0) _noteResponse(failedUrl);
         if (!_finished &&
             _samePageDocument(failedUrl, _pageDocument ?? mainUrl) &&
             status >= 400) {
           _log('page HTTP $status ${_origin(failedUrl.toString())}');
+          // A server answered: no ad for this viewer, not a blocker.
+          _reportDelivery(AdDelivery.reached);
           _finish('page_http_error');
         }
       }
@@ -793,10 +784,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           _noteNavigation(started);
           _onPageStarted(url);
         },
-        onPageFinished: (url) {
-          _notePageFinished(url);
-          _inspectPage(page, url);
-        },
+        onPageFinished: (url) => _inspectPage(page, url),
         onWebResourceError: (error) {
           if (error.isForMainFrame == true) _noteLoadError(error);
           if (!_finished && error.isForMainFrame == true) {
@@ -870,6 +858,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   /// page. There is no ad to see, so continue at once.
   void _onNoAd(Uri fallback) {
     _log('redirect chain ended on ${fallback.origin}, not an ad');
+    _reportDelivery(AdDelivery.reached);
     _finish('no_ad_fallback');
   }
 
@@ -992,6 +981,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     });
     if (!_adShown) {
       _adShown = true;
+      _reportDelivery(AdDelivery.reached);
       widget.onAdShown?.call();
     }
     // The ad is final only if no further redirect starts in the settle

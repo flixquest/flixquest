@@ -592,6 +592,38 @@ void main() {
       expect(await shared.popupBlocked(host, 'exo.example'), isTrue);
     });
 
+    testWidgets('an unreachable hop counts only when DNS shows the block',
+        (tester) async {
+      await pumpHost(tester);
+      var sinkholed = false;
+      final shared = AdBlockGate(
+        detector: AdBlockDetector(
+          lookup: (host) async => [
+            AdBlockDetector.dnsControlHosts.contains(host) || !sinkholed
+                ? real
+                : InternetAddress('0.0.0.0')
+          ],
+          publicLookup: (_) async => true,
+        ),
+      );
+      // The advertiser's server refused, but this device resolves it: an
+      // outage, not a blocker.
+      expect(
+          await shared.popupBlocked(host, 'offer.example',
+              delivery: AdDelivery.unreachable),
+          isTrue);
+      expect(find.byType(Dialog), findsNothing);
+
+      sinkholed = true;
+      final verdict = shared.popupBlocked(host, 'offer.example',
+          delivery: AdDelivery.unreachable);
+      await tester.pumpAndSettle();
+      expect(find.text('Turn off your ad blocker'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(await verdict, isFalse);
+    });
+
     testWidgets('ExoClick\'s rotating delivery domain is what gets checked',
         (tester) async {
       provider

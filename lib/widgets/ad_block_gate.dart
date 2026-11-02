@@ -109,12 +109,19 @@ class AdBlockGate {
       for (final host in await _redirects.resolve(sources))
         if (_observedAt(host) != AdDelivery.reached) host,
     };
-    // A blocked popup counts even when its host is not (or no longer) live.
-    final observedBlocked = {
-      for (final host in _observed.keys)
-        if (_observedAt(host) == AdDelivery.blocked) host,
+    // A failed popup counts even when its host is not (or no longer) live:
+    // a filtered hop once public DNS knows it, an unreachable one when the
+    // device's own DNS shows the block.
+    Set<String> observed(AdDelivery delivery) => {
+          for (final host in _observed.keys)
+            if (_observedAt(host) == delivery) host,
+        };
+    final observedBlocked = observed(AdDelivery.blocked);
+    final all = {
+      ...hosts,
+      ...observedBlocked,
+      ...observed(AdDelivery.unreachable),
     };
-    final all = {...hosts, ...observedBlocked};
     if (all.isEmpty || !context.mounted) return false;
     return _detector
         .isBlocking(all, observedBlocked: observedBlocked, additionalChecks: [
@@ -190,27 +197,31 @@ class AdBlockGate {
     return context.mounted;
   }
 
-  /// A popup's own network failed the way blockers make requests fail, on
-  /// [host]. Playback waits for the check to confirm it (public DNS knows the
-  /// host and local DNS is healthy), then asks as [allowPlayback] does.
+  /// A popup's redirect chain failed on [host] the way blockers make requests
+  /// fail ([delivery]). Playback waits for the check to confirm it, then asks
+  /// as [allowPlayback] does. A filtered hop is confirmed when public DNS
+  /// knows the host and local DNS is healthy; an unreachable one only when
+  /// the device's own DNS sinkholes the host or cannot resolve it while
+  /// public DNS can, so an advertiser's outage never stops a viewer.
   /// True plays on (unconfirmed, gate off, or Plus started), false stops, and
   /// null shows the popup again: after **I turned it off**, the viewer's real
   /// ad is the test, and no extra request reaches the network.
   Future<bool?> popupBlocked(BuildContext context, String host,
-      {bool download = false,
+      {AdDelivery delivery = AdDelivery.blocked,
+      bool download = false,
       bool television = false,
       bool again = false}) async {
-    observeDelivery(host, AdDelivery.blocked);
+    observeDelivery(host, delivery);
     final provider = context.read<AppDependencyProvider?>();
     if (provider == null ||
         !provider.adBlockGateEnabled ||
         AdsPolicy.adFreeAt(context)) {
       return context.mounted;
     }
-    final confirmed =
-        await _detector.isBlocking({host}, observedBlocked: {host});
+    final confirmed = await _detector.isBlocking({host},
+        observedBlocked: delivery == AdDelivery.blocked ? {host} : const {});
     if (!context.mounted) return false;
-    debugPrint('[AdBlockGate] popup blocked on $host; '
+    debugPrint('[AdBlockGate] popup ${delivery.name} at $host; '
         '${confirmed ? 'confirmed' : 'unconfirmed, playing on'}');
     if (!confirmed || AdsPolicy.adFree) return true;
     final tv = television || DevicePresentationService.instance.isTelevision;
