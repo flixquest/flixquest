@@ -72,7 +72,7 @@ void main() {
     });
   });
 
-  group('SubtitleTranslationService format handling', () {
+  group('SubtitleTranslationService format handling and world language support', () {
     test('preserves SRT cues, numbers, and timestamps', () async {
       const srt = '''1
 00:00:01,000 --> 00:00:03,000
@@ -83,15 +83,27 @@ Hello world.
 Goodbye.
 ''';
 
-      // Parsing check via translateSubtitleContent with mock client or logic
       final result = await SubtitleTranslationService.instance.translateSubtitleContent(
         srt,
-        targetLanguage: 'en', // identity target
+        targetLanguage: 'en',
       );
 
       expect(result, contains('00:00:01,000 --> 00:00:03,000'));
       expect(result, contains('00:00:04,500 --> 00:00:06,000'));
     });
+
+    test('supports translating to other world languages (e.g. Spanish, French)', () async {
+      final esResult = await SubtitleTranslationService.instance.translateText(
+        'Hello, welcome!',
+        targetLanguage: 'es',
+      );
+      expect(esResult.toLowerCase(), contains('hola'));
+
+      final frResult = await SubtitleTranslationService.instance.translateText(
+        'Thank you very much',
+        targetLanguage: 'fr',
+      );
+      expect(frResult.toLowerCase(), contains('merci'));
+    });
   });
 }
-

@@ -3781,7 +3781,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               betterPlayerController: _betterPlayerController,
             );
           }),
-          onAutoTranslate: () => then(_autoTranslateActiveOrFallbackSubtitle),
+          onAutoTranslate: () => then(_showAutoTranslateLanguagePicker),
         );
       },
     );
@@ -3797,11 +3797,48 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _autoTranslateActiveOrFallbackSubtitle() async {
-    final targetLang = widget.settings.defaultSubtitleLanguage.isNotEmpty
+  void _showAutoTranslateLanguagePicker() {
+    final defaultLang = widget.settings.defaultSubtitleLanguage.isNotEmpty
         ? widget.settings.defaultSubtitleLanguage
         : (widget.settings.appLanguage.isNotEmpty ? widget.settings.appLanguage : 'id');
 
+    showPlayerSheet<void>(
+      context: context,
+      builder: (sheetContext) {
+        final languages = appLanguages;
+        return PlayerSheetScaffold(
+          title: tr('auto_translate'),
+          subtitle: tr('choose_subtitle_language'),
+          actions: [
+            PlayerSheetAction(
+              icon: PhosphorIcons.x(),
+              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+              onPressed: () => Navigator.pop(sheetContext),
+            ),
+          ],
+          child: ListView.builder(
+            itemCount: languages.length,
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+            itemBuilder: (context, index) {
+              final lang = languages[index];
+              final isDefault = lang.code == defaultLang;
+              return PlayerChoiceCard(
+                title: tr(lang.translationKey),
+                subtitle: lang.code.toUpperCase(),
+                selected: isDefault,
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _translateActiveOrFallbackSubtitle(targetLang: lang.code);
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _translateActiveOrFallbackSubtitle({required String targetLang}) async {
     final currentSource = _betterPlayerController.betterPlayerSubtitlesSource;
     final allSources = _betterPlayerController.betterPlayerSubtitlesSourceList
         .where((s) => s.type != BetterPlayerSubtitlesSourceType.none)
