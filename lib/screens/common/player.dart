@@ -3880,8 +3880,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       final firstUrl = sourceToTranslate.urls != null && sourceToTranslate.urls!.isNotEmpty
           ? sourceToTranslate.urls!.first
           : null;
-      if (sourceToTranslate.type == BetterPlayerSubtitlesSourceType.memory) {
-        rawContent = sourceToTranslate.content;
+      if (sourceToTranslate.type == BetterPlayerSubtitlesSourceType.memory &&
+          sourceToTranslate.content?.isNotEmpty == true) {
+        rawContent = await SubtitleTranslationService.instance.translateSubtitleContent(
+          sourceToTranslate.content!,
+          targetLanguage: targetLang,
+        );
       } else if (firstUrl != null && firstUrl.isNotEmpty) {
         rawContent = await SubtitleTranslationService.instance.translateUrlOrFile(
           pathOrUrl: firstUrl,
@@ -3907,8 +3911,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         );
 
         _activeSubtitles.insert(0, translatedSource);
-        _betterPlayerController.betterPlayerSubtitlesSourceList.add(translatedSource);
+        _betterPlayerController.betterPlayerSubtitlesSourceList.insert(0, translatedSource);
         await _betterPlayerController.setupSubtitleSource(translatedSource);
+        if (mounted) setState(() {});
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

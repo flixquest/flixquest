@@ -116,14 +116,40 @@ class SubtitleTranslationService {
     if (trimmed.isEmpty) return text;
 
     final target = targetLanguage.toLowerCase().split(RegExp('[-_]')).first;
-    final uri = Uri.parse(
-      'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$target&dt=t&q=${Uri.encodeComponent(trimmed)}',
-    );
-
     final httpClient = client ?? http.Client();
     final retryOptions = const RetryOptions(maxAttempts: 3);
 
     try {
+      // Primary: Google Translate dict-chrome-ex POST (resilient, no length limit, no 429)
+      try {
+        final response = await retryOptions.retry(
+          () => httpClient.post(
+            Uri.parse('https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=$target'),
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+            },
+            body: {'q': trimmed},
+          ).timeout(const Duration(seconds: 15)),
+          retryIf: (e) => e is SocketException || e is http.ClientException,
+        );
+
+        if (response.statusCode == 200) {
+          final data = json.decode(utf8.decode(response.bodyBytes, allowMalformed: true)) as List<dynamic>;
+          if (data.isNotEmpty && data[0] is List && (data[0] as List).isNotEmpty) {
+            var translated = data[0][0].toString();
+            if (target == 'id') {
+              translated = applyIndonesianPronounRules(translated);
+            }
+            return translated;
+          }
+        }
+      } catch (_) {}
+
+      // Fallback: gtx endpoint
+      final uri = Uri.parse(
+        'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=$target&dt=t&q=${Uri.encodeComponent(trimmed)}',
+      );
       final response = await retryOptions.retry(
         () => httpClient.get(
           uri,
@@ -136,7 +162,7 @@ class SubtitleTranslationService {
         throw HttpException('HTTP ${response.statusCode}');
       }
 
-      final data = json.decode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+      final data = json.decode(utf8.decode(response.bodyBytes, allowMalformed: true)) as List<dynamic>;
       final sentences = data[0] as List<dynamic>;
       final buffer = StringBuffer();
       for (final part in sentences) {
@@ -176,37 +202,64 @@ class SubtitleTranslationService {
       );
     }
 
-    const batchSize = 25;
-    const delimiter = '\n<<<CUE>>>\n';
+    final target = targetLanguage.toLowerCase().split(RegExp('[-_]')).first;
+    if (target == 'en') {
+      return rawContent;
+    }
 
+    const batchSize = 35;
+    const delimiter = '\n___999___\n';
+    final splitRegex = RegExp(r'\s*___999___\s*');
+
+    final batches = <List<_SubtitleCue>>[];
     for (var i = 0; i < cues.length; i += batchSize) {
       final end = (i + batchSize < cues.length) ? i + batchSize : cues.length;
-      final batch = cues.sublist(i, end);
+      batches.add(cues.sublist(i, end));
+    }
 
-      final joinedText = batch.map((cue) => cue.text).join(delimiter);
-      try {
-        final translatedJoined = await translateText(
-          joinedText,
-          targetLanguage: targetLanguage,
-          client: client,
+    final httpClient = client ?? http.Client();
+    try {
+      // Process batches in parallel groups of 6 to complete full translation in 2-3s
+      const concurrency = 6;
+      for (var i = 0; i < batches.length; i += concurrency) {
+        final group = batches.sublist(
+          i,
+          (i + concurrency < batches.length) ? i + concurrency : batches.length,
         );
 
-        final parts = translatedJoined.split('<<<CUE>>>');
-        if (parts.length == batch.length) {
-          for (var j = 0; j < batch.length; j++) {
-            batch[j].text = parts[j].trim();
-          }
-        } else {
-          for (final cue in batch) {
-            cue.text = await translateText(
-              cue.text,
-              targetLanguage: targetLanguage,
-              client: client,
-            );
-          }
-        }
-      } catch (_) {
-        // Keep original text on translation failure for this batch
+        await Future.wait(
+          group.map((batch) async {
+            final joinedText = batch.map((cue) => cue.text).join(delimiter);
+            try {
+              final translatedJoined = await translateText(
+                joinedText,
+                targetLanguage: targetLanguage,
+                client: httpClient,
+              );
+
+              final parts = translatedJoined.split(splitRegex);
+              if (parts.length == batch.length) {
+                for (var j = 0; j < batch.length; j++) {
+                  batch[j].text = parts[j].trim();
+                }
+              } else {
+                for (final cue in batch) {
+                  cue.text = await translateText(
+                    cue.text,
+                    targetLanguage: targetLanguage,
+                    client: httpClient,
+                  );
+                }
+              }
+            } catch (_) {
+              // Keep original text on translation failure for this batch
+            }
+          }),
+        );
+      }
+    } finally {
+      if (client == null) {
+        httpClient.close();
       }
     }
 
@@ -228,9 +281,14 @@ class SubtitleTranslationService {
     String rawContent = '';
     if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
       try {
+        final effectiveHeaders = <String, String>{
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+          'Accept': '*/*',
+          if (headers != null) ...headers,
+        };
         final response = await http
-            .get(Uri.parse(pathOrUrl), headers: headers)
-            .timeout(const Duration(seconds: 20));
+            .get(Uri.parse(pathOrUrl), headers: effectiveHeaders)
+            .timeout(const Duration(seconds: 15));
         if (response.statusCode == 200) {
           rawContent = utf8.decode(response.bodyBytes, allowMalformed: true);
         }

@@ -206,7 +206,12 @@ class VideoUtils {
   /// segments, redirects, and encryption keys can all enforce the same origin.
   static Map<String, String>? inferVideoHeaders(String? url) {
     final host = Uri.tryParse(url ?? '')?.host.toLowerCase();
-    if (host == null || !host.endsWith('vixsrc.to')) return null;
+    if (host == null) return null;
+    final isVixHost = host.endsWith('vixsrc.to') ||
+        host.contains('secretanchor') ||
+        host.contains('boats') ||
+        host.contains('vixcloud');
+    if (!isVixHost) return null;
 
     return const {
       'accept': '*/*',

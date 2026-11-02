@@ -683,17 +683,32 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
 
   Future<void> _addSubtitles(List<RegularSubtitleLinks>? subtitleLinks) async {
     if (subtitleLinks == null || subtitleLinks.isEmpty) return;
-    final preferredLang = settings.defaultSubtitleLanguage.toLowerCase();
+    final preferredLang = (settings.defaultSubtitleLanguage.isNotEmpty &&
+            settings.defaultSubtitleLanguage != 'en'
+        ? settings.defaultSubtitleLanguage
+        : (settings.appLanguage.isNotEmpty
+            ? settings.appLanguage
+            : settings.defaultSubtitleLanguage)).toLowerCase();
+
+    bool matchesLanguage(String normalized, String target) {
+      if (target.isEmpty) return false;
+      if (normalized == target) return true;
+      if (normalized.startsWith(target)) return true;
+      if (target == 'en' && normalized.startsWith('english')) return true;
+      if (target == 'id' &&
+          (normalized.startsWith('ind') ||
+              normalized == 'in' ||
+              normalized == 'id')) {
+        return true;
+      }
+      return false;
+    }
 
     var hasPreferred = false;
     for (final subLink in subtitleLinks) {
       final subLanguage = subLink.language ?? 'Unknown';
       final normalizedLanguage = subLanguage.toLowerCase();
-      final isPreferred = preferredLang.isNotEmpty &&
-          (normalizedLanguage.startsWith(preferredLang) ||
-              normalizedLanguage == preferredLang ||
-              (preferredLang == 'en' &&
-                  normalizedLanguage.startsWith('english')));
+      final isPreferred = matchesLanguage(normalizedLanguage, preferredLang);
       if (isPreferred) hasPreferred = true;
       subs.add(
         BetterPlayerSubtitlesSource(
@@ -706,7 +721,10 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
       );
     }
 
-    if (!hasPreferred && settings.autoTranslateSubtitles && preferredLang.isNotEmpty) {
+    if (!hasPreferred &&
+        settings.autoTranslateSubtitles &&
+        preferredLang.isNotEmpty &&
+        preferredLang != 'en') {
       final fallback = subtitleLinks.firstWhere(
         (s) => (s.language ?? '').toLowerCase().startsWith('en') && s.url?.isNotEmpty == true,
         orElse: () => subtitleLinks.firstWhere(
@@ -717,11 +735,13 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
 
       if (fallback.url?.isNotEmpty == true) {
         try {
-          final translated = await SubtitleTranslationService.instance.translateUrlOrFile(
-            pathOrUrl: fallback.url!,
-            targetLanguageCode: preferredLang,
-            headers: fallback.headers,
-          );
+          final translated = await SubtitleTranslationService.instance
+              .translateUrlOrFile(
+                pathOrUrl: fallback.url!,
+                targetLanguageCode: preferredLang,
+                headers: fallback.headers,
+              )
+              .timeout(const Duration(seconds: 5));
           if (translated != null && translated.isNotEmpty) {
             final targetName = subtitleLanguageName(preferredLang);
             subs.insert(
@@ -734,7 +754,9 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
               ),
             );
           }
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('[AutoTranslateSubtitles] Non-blocking fallback: $e');
+        }
       }
     }
   }

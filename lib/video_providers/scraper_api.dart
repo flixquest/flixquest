@@ -27,7 +27,7 @@ class ScraperApi {
     try {
       final uri = _endpoint('/providers');
       _logRequest(uri);
-      final response = await _get(uri);
+      final response = await _get(uri, timeout: const Duration(seconds: 3));
       _logResponse(uri, response);
       final body = _decodeObject(response.data ?? '');
       if ((response.statusCode ?? 0) < 200 ||
@@ -65,7 +65,7 @@ class ScraperApi {
     try {
       final uri = _endpoint('/providers/status');
       _logRequest(uri);
-      final response = await _get(uri);
+      final response = await _get(uri, timeout: const Duration(seconds: 3));
       _logResponse(uri, response);
       final body = _decodeObject(response.data ?? '');
       if ((response.statusCode ?? 0) < 200 ||
