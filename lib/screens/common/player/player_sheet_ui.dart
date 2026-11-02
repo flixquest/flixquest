@@ -106,6 +106,68 @@ Future<T?> showPlayerSheet<T>({
   );
 }
 
+/// A side sheet that opens from the right edge over the player (similar to YouTube).
+/// The video on the left remains streaming and visible so playback is uninterrupted.
+Future<T?> showPlayerSideSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool useRootNavigator = true,
+  bool isDismissible = true,
+}) {
+  final theme = playerSheetTheme(context);
+  final colors = theme.extension<BetterPlayerPanelColors>() ??
+      BetterPlayerPanelColors.dark;
+
+  return showGeneralDialog<T>(
+    context: context,
+    useRootNavigator: useRootNavigator,
+    barrierDismissible: isDismissible,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.black26,
+    transitionDuration: const Duration(milliseconds: 280),
+    pageBuilder: (dialogContext, animation, secondaryAnimation) {
+      final media = MediaQuery.of(dialogContext);
+      final screenWidth = media.size.width;
+      final panelWidth = media.orientation == Orientation.landscape
+          ? (screenWidth * 0.42).clamp(320.0, 420.0)
+          : (screenWidth * 0.88).clamp(300.0, 380.0);
+
+      return Align(
+        alignment: Alignment.centerRight,
+        child: SizedBox(
+          width: panelWidth,
+          height: double.infinity,
+          child: Material(
+            color: colors.panel,
+            elevation: 16,
+            borderRadius:
+                const BorderRadius.horizontal(left: Radius.circular(16)),
+            clipBehavior: Clip.antiAlias,
+            child: Theme(
+              data: theme,
+              child: Builder(builder: builder),
+            ),
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+      final curvedValue = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(1.0, 0.0),
+          end: Offset.zero,
+        ).animate(curvedValue),
+        child: child,
+      );
+    },
+  );
+}
+
 /// A player sheet's frame: a handle, the title with a muted line under it,
 /// the sheet's own actions at the end, then its content and an optional
 /// footer.

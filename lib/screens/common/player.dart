@@ -53,7 +53,7 @@ import 'sublanguage_choose.dart' show subtitleLanguageName;
 import 'player/player_preroll_ad.dart';
 import 'player/player_completion_detector.dart';
 import 'player/tv_subtitle_timing_panel.dart';
-import 'player/player_subtitle_timing_sheet.dart';
+import 'player/player_subtitle_side_panel.dart';
 import 'player/player_external_subtitles.dart';
 import 'player/player_local_subtitles.dart';
 import 'player/player_episode_selection.dart';
@@ -3753,20 +3753,16 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
 
     final options = buildSubtitleOptions(subtitles);
 
-    showPlayerSheet<void>(
+    showPlayerSideSheet<void>(
       context: context,
       builder: (sheetContext) {
-        void then(VoidCallback action) {
-          Navigator.pop(sheetContext);
-          action();
-        }
-
-        return _SubtitleSwitcherSheet(
+        return PlayerSubtitleSidePanel(
           controller: _betterPlayerController,
           options: options,
+          settings: widget.settings,
           onClose: () => Navigator.pop(sheetContext),
-          onTiming: () => then(_showSubtitleTimingAdjuster),
-          onSearchOnline: () => then(() {
+          onSearchOnline: () {
+            Navigator.pop(sheetContext);
             _externalSubtitles.showExternalSubtitlesMenu(
               context: context,
               colors: widget.colors,
@@ -3776,70 +3772,23 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               tvMetadata: widget.tvMetadata,
               betterPlayerController: _betterPlayerController,
             );
-          }),
-          onUpload: () => then(() {
+          },
+          onUpload: () {
+            Navigator.pop(sheetContext);
             _localSubtitles.showLocalSubtitlesUpload(
               context: context,
               colors: widget.colors,
               betterPlayerController: _betterPlayerController,
             );
-          }),
-          onAutoTranslate: () => then(_showAutoTranslateLanguagePicker),
+          },
+          onAutoTranslate: (targetLang) {
+            _translateActiveOrFallbackSubtitle(targetLang: targetLang);
+          },
         );
       },
     );
   }
 
-  void _showSubtitleTimingAdjuster() {
-    showPlayerSheet<void>(
-      context: context,
-      builder: (sheetContext) => PlayerSubtitleTimingSheet(
-        controller: _betterPlayerController,
-        onClose: () => Navigator.pop(sheetContext),
-      ),
-    );
-  }
-
-  void _showAutoTranslateLanguagePicker() {
-    final defaultLang = widget.settings.defaultSubtitleLanguage.isNotEmpty
-        ? widget.settings.defaultSubtitleLanguage
-        : (widget.settings.appLanguage.isNotEmpty ? widget.settings.appLanguage : 'id');
-
-    showPlayerSheet<void>(
-      context: context,
-      builder: (sheetContext) {
-        final languages = appLanguages;
-        return PlayerSheetScaffold(
-          title: tr('auto_translate'),
-          subtitle: tr('choose_subtitle_language'),
-          actions: [
-            PlayerSheetAction(
-              icon: PhosphorIcons.x(),
-              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-              onPressed: () => Navigator.pop(sheetContext),
-            ),
-          ],
-          child: ListView.builder(
-            itemCount: languages.length,
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-            itemBuilder: (context, index) {
-              final lang = languages[index];
-              final isDefault = lang.code == defaultLang;
-              return PlayerChoiceCard(
-                title: tr(lang.translationKey),
-                subtitle: lang.code.toUpperCase(),
-                selected: isDefault,
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _translateActiveOrFallbackSubtitle(targetLang: lang.code);
-                },
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
 
   Future<void> _translateActiveOrFallbackSubtitle({required String targetLang}) async {
     final currentSource = _betterPlayerController.betterPlayerSubtitlesSource;
