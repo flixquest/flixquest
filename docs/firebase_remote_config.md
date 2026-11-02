@@ -138,15 +138,15 @@ the format off. Selectors are case-insensitive and apply while the app runs.
 
 | Format | Selector (default) | Adsterra | Clickadu |
 | --- | --- | --- | --- |
-| Banners | `banner_ad_network` (`adsterra`) | `adsterra_banner_enabled`, `adsterra_tv_enabled`, `adsterra_banners` | `clickadu_banner_enabled`, `clickadu_tv_enabled`, `clickadu_banners` |
+| Banners | `banner_ad_network_v2` (`adsterra`) | `adsterra_banner_enabled`, `adsterra_tv_enabled`, `adsterra_banners` | `clickadu_banner_enabled`, `clickadu_tv_enabled`, `clickadu_banners` |
 | Stream-found popup (Popunder / Smartlink / Direct Link) | `playback_popunder_network` (`adsterra`) | `adsterra_playback_enabled`, `adsterra_playback_ads` | `clickadu_playback_enabled`, `clickadu_playback_ads` |
 | Video pre-roll (VAST) | `vast_preroll_network` (`clickadu`) | `vast_preroll_enabled`, `vast_preroll.adsterra` | `vast_preroll_enabled`, `vast_preroll.clickadu` |
 
 Monetag serves only the stream-found popup: `playback_popunder_network=monetag` with `monetag_playback_enabled` and `monetag_playback_ads`. See [Monetag popup](#monetag-popup).
 
-ExoClick banners use `banner_ad_network=exoclick`, `exoclick_banner_enabled`,
-`exoclick_tv_enabled` and `exoclick_banners`. See [ExoClick banners](#exoclick-banners).
-`banner_ad_network_overrides` can migrate individual slots between networks.
+ExoClick banners use `banner_ad_network_v2=exoclick`, `exoclick_banner_enabled_v2`,
+`exoclick_tv_enabled_v2` and `exoclick_banners_v2`. See [ExoClick banners](#exoclick-banners).
+`banner_ad_network_overrides_v2` can migrate individual slots between networks.
 ExoClick also serves the stream-found popup through `exoclick_playback_enabled` and
 `exoclick_playback_ads`, selected by `playback_popunder_network=exoclick`. See
 [ExoClick popup](#exoclick-popup). Its video pre-roll uses
@@ -171,25 +171,26 @@ named after the enum value.
 
 | Parameter | Firebase type | Default | Purpose |
 | --- | --- | --- | --- |
-| `banner_ad_network` | String | `adsterra` | Which network's WebView banners fill the slots: `adsterra`, `clickadu` or `exoclick`. `none` hides all banners including hosted announcements and overrides. Published legacy values `native`, `unity`, and `startio` select Adsterra, but cannot enable requests without its switch and valid codes. Unknown values show no network banner but keep hosted announcements. |
+| `banner_ad_network_v2` | String | `adsterra` | Which network's WebView banners fill the slots: `adsterra`, `clickadu` or `exoclick`. `none` hides all banners including hosted announcements and overrides. Published legacy values `native`, `unity`, and `startio` select Adsterra, but cannot enable requests without its switch and valid codes. Unknown values show no network banner but keep hosted announcements. |
 | `banner_ad_network_test` | String | empty | Dev-flavor-only selector for real banner testing: `adsterra`, `clickadu`, `exoclick`, or `none`. Applies to dev debug/profile/release builds. Prod and unflavored builds ignore it. A valid value locally replaces the normal selector and slot overrides, locally enables the selected network (including TV), and hides hosted announcements. Empty/unknown values restore normal behavior. Uses the existing real network catalog. |
-| `banner_ad_network_overrides` | String (JSON) | `{}` | Optional slot-to-network mapping, e.g. `{"downloads":"exoclick","movie_detail":"adsterra","bookmarks":"none"}`. Unlisted slots use the global selector. An override of `none` or an unknown value hides only that slot's network ad. TV uses explicit `_tv` slot names. Each selected network still requires its own enabled switch. |
+| `banner_ad_network_overrides_v2` | String (JSON) | `{}` | Optional slot-to-network mapping, e.g. `{"downloads":"exoclick","movie_detail":"adsterra","bookmarks":"none"}`. Unlisted slots use the global selector. An override of `none` or an unknown value hides only that slot's network ad. TV uses explicit `_tv` slot names. Each selected network still requires its own enabled switch. |
 | `adsterra_banner_enabled` | Boolean | `false` | Adsterra banner switch. Must be explicitly enabled remotely; no demo ads or hardcoded publisher codes ship in the app. |
 | `adsterra_tv_enabled` | Boolean | `false` | Additional gate for Android TV; the global switch must also be on. TV placements use `_tv` names and TV-specific defaults. |
 | `adsterra_banners` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | Central catalog of banner codes, sizes, default variants and placement overrides. See below. |
 | `clickadu_banner_enabled` | Boolean | `false` | Clickadu banner switch. Must be published remotely. |
 | `clickadu_tv_enabled` | Boolean | `false` | Android TV gate for Clickadu banners, like `adsterra_tv_enabled`. |
 | `clickadu_banners` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | Clickadu's catalog: the same `units` / `defaults` / `placements` schema as Adsterra's, with Clickadu unit fields. See [Clickadu banners](#clickadu-banners). |
-| `exoclick_banner_enabled` | Boolean | `false` | ExoClick banner switch; must be explicitly published remotely. |
-| `exoclick_tv_enabled` | Boolean | `false` | Additional Android TV gate for ExoClick banners. |
-| `exoclick_banners` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | ExoClick Mobile Banner and web Banner zones in the shared catalog schema. See [ExoClick banners](#exoclick-banners). |
+| `exoclick_banner_enabled_v2` | Boolean | `false` | ExoClick banner switch; must be explicitly published remotely. |
+| `exoclick_tv_enabled_v2` | Boolean | `false` | Additional Android TV gate for ExoClick banners. |
+| `exoclick_banners_v2` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | ExoClick Mobile Banner and web Banner zones in the shared catalog schema. See [ExoClick banners](#exoclick-banners). |
+| `banner_ad_network`, `banner_ad_network_overrides`, `exoclick_banner_enabled`, `exoclick_tv_enabled`, `exoclick_banners` | — | — | Legacy keys read only by builds before the `_v2` keys. Those builds ignore `block_ad_types`: keep their selector and overrides off `exoclick` (e.g. `banner_ad_network=adsterra`, overrides `{}`) and both ExoClick switches `false`. |
 | `hosted_banner_mode` | String | `stack` | How `/ads` announcements share a slot with the network banner. `stack`: hosted above the network banner. `priority`: an eligible hosted banner takes the slot and the network banner loads only where no hosted ad exists. `off`: show only the network banner. Unknown values use `stack`. |
 | `banners` | String (JSON) | `{"banners":[]}` | Existing per-announcement overrides for `/ads`, keyed by `key` (`enabled`, `placements`, `shape`, `width`, `height`, `aspectRatio`). Separate from the network catalogs. |
 
 ### Test real banners in development
 
 Publish `banner_ad_network_test=exoclick` and the real
-[exoclick_banners.json](exoclick_banners.json) catalog as `exoclick_banners`.
+[exoclick_banners.json](exoclick_banners.json) catalog as `exoclick_banners_v2`.
 Run the **dev flavor** (`flutter run --flavor dev`); the next Remote Config
 activation selects ExoClick locally, including TV placements. The same behavior
 applies to `flutter run --flavor dev --profile` and
@@ -208,8 +209,8 @@ behavior. You can switch between `adsterra`, `clickadu` and `exoclick`.
 debug builds, even when the test value is published. Unflavored and unknown
 flavors also use production settings. `prod` is the default in `pubspec.yaml`,
 so plain `flutter run` and `flutter build apk --release` use production settings.
-Leave `banner_ad_network`,
-`banner_ad_network_overrides` and production enable switches unchanged when
+Leave `banner_ad_network_v2`,
+`banner_ad_network_overrides_v2` and production enable switches unchanged when
 testing. The test selector uses the same real catalogs: edits to a catalog
 still apply wherever that catalog is selected. This is a development network
 override, not a source of sandbox creatives. Playback popups and VAST selectors
@@ -236,7 +237,7 @@ flutter test --flavor dev test/banner_ads_config_test.dart
 1. Generate banner codes in the Adsterra publisher dashboard, using the sizes you want. Each size needs its matching code; changing dimensions does not turn one ad unit into a different size.
 2. Copy [adsterra_banners.example.json](adsterra_banners.example.json). For each unit you intend to use, fill `key` from the generated `atOptions.key`, and `script_url` with the exact HTTPS script URL from the generated code (the URL does not have to end in `invoke.js`). Empty units remain inactive. Protocol-relative URLs (`//...`) must be written as `https://...`.
 3. Publish the completed JSON as the **String** parameter `adsterra_banners` in Firebase Remote Config.
-4. Set `banner_ad_network=adsterra` and `adsterra_banner_enabled=true`. To activate television slots too, publish `adsterra_tv_enabled=true` and fill the TV units.
+4. Set `banner_ad_network_v2=adsterra` and `adsterra_banner_enabled=true`. To activate television slots too, publish `adsterra_tv_enabled=true` and fill the TV units.
 5. Select `hosted_banner_mode=off`, `stack`, or `priority` depending on whether your own announcements should appear.
 
 Remote Config's existing realtime listener applies switches and new codes while the app is running. A changed unit replaces its WebView; turning a switch off removes the view and stops its document. Unrelated rebuilds keep the same WebView. No automatic ad refresh is scheduled.
@@ -291,8 +292,8 @@ TV slots: `title_detail_tv` (top-right details slot, maximum width 360) and `liv
 
 **Ready-to-publish catalog:** [clickadu_banners.json](clickadu_banners.json)
 holds spot `2150724`. Publish it as `clickadu_banners`, publish
-`clickadu_banner_enabled=true`, then set `banner_ad_network=clickadu`.
-Switching back is `banner_ad_network=adsterra`.
+`clickadu_banner_enabled=true`, then set `banner_ad_network_v2=clickadu`.
+Switching back is `banner_ad_network_v2=adsterra`.
 
 Clickadu's code is a Main Tag (`bn.js`) plus one Ad Spot per banner
 (`<div data-cl-spot="…">`). Every banner is its own WebView document, so the
@@ -363,6 +364,8 @@ the mobile sizes `300x50`, `300x100`, `300x250` and web sizes `160x600`,
 | `zone_id` | Unit | Positive digits, string or integer, from `data-zoneid`. |
 | `size` | Unit | Exact `WxH` used when creating that zone. |
 | `enabled` | Unit, optional | `false` removes that unit from selection. |
+| `block_ad_types` | Catalog or unit, optional | The number in the generated tag's `data-block-ad-types`, string or integer. Untick ad types in ExoClick's code generator, then copy the value it prints. `0` (the default) blocks nothing and omits the attribute. A unit value overrides the catalog. An invalid value drops the unit rather than serving types you meant to block. |
+| `sub` | Catalog, unit or placement, optional | ExoClick sub ID written as `data-sub`, a positive integer or digits string, so stats can be split by slot or device. A placement's `sub` (e.g. `"downloads": {"units": [...], "sub": 12}`) wins over the unit's, which wins over the catalog's. `0` or an invalid value is ignored and falls back to the next level; with none, the attribute is omitted. |
 | `min_width` | Unit, optional | Minimum available slot width in logical pixels (integer 0–10000; default 0). The supplied web 300x250 unit uses 600, allowing the mobile 300x250 unit to serve narrower slots. This changes eligibility, not the creative dimensions. |
 
 `defaults` and `placements` use the same ordered size selection as the other
@@ -371,10 +374,10 @@ wins; this is a size preference, not an ad auction or a no-fill waterfall.
 An empty zone collapses after 20 seconds without requesting another network.
 The provider script loading alone does not mark a zone filled.
 
-Publish the completed catalog as `exoclick_banners`, then publish
-`exoclick_banner_enabled=true`. For a full replacement use
-`banner_ad_network=exoclick`. To migrate one slot at a time, keep
-`banner_ad_network=adsterra` and publish, for example:
+Publish the completed catalog as `exoclick_banners_v2`, then publish
+`exoclick_banner_enabled_v2=true`. For a full replacement use
+`banner_ad_network_v2=exoclick`. To migrate one slot at a time, keep
+`banner_ad_network_v2=adsterra` and publish, for example:
 
 ```json
 {
@@ -384,11 +387,11 @@ Publish the completed catalog as `exoclick_banners`, then publish
 }
 ```
 
-Use that JSON as `banner_ad_network_overrides`. Removing an entry restores
-the global network for that slot. Switching to `banner_ad_network=none`
+Use that JSON as `banner_ad_network_overrides_v2`. Removing an entry restores
+the global network for that slot. Switching to `banner_ad_network_v2=none`
 removes all banners even when overrides exist. Keep the Adsterra and Clickadu
 catalogs published to make switching back immediate. To use TV slots, also
-publish `exoclick_tv_enabled=true`; a phone override never applies to TV.
+publish `exoclick_tv_enabled_v2=true`; a phone override never applies to TV.
 
 For revenue experiments, compare 300x50 versus 300x100 in standard slots,
 300x250 versus 300x500 in suitable scrolling slots, and 728x90 or 900x250 on

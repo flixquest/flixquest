@@ -243,6 +243,8 @@ class ExoclickBannerUnit extends BannerAdUnit {
     required this.className,
     required this.size,
     this.minWidth = 0,
+    this.blockAdTypes = 0,
+    this.sub = 0,
   });
 
   static const sizes = {
@@ -265,13 +267,24 @@ class ExoclickBannerUnit extends BannerAdUnit {
   @override
   final int minWidth;
 
+  /// The zone tag's `data-block-ad-types` bitmask: the ad types unticked in
+  /// the dashboard's code generator. 0 blocks none and omits the attribute.
+  final int blockAdTypes;
+
+  /// The zone tag's `data-sub`: a number ExoClick reports stats under, so
+  /// slots sharing a zone can be told apart. 0 omits the attribute.
+  final int sub;
+
   @override
   AdNetwork get network => AdNetwork.exoclick;
   @override
   String get code => zoneId;
 
   static ExoclickBannerUnit? parse(Object? raw,
-      {Object? scriptUrl, Object? className}) {
+      {Object? scriptUrl,
+      Object? className,
+      Object? blockAdTypes,
+      Object? sub}) {
     if (raw is! Map || raw['enabled'] == false) return null;
     final zone = raw['zone_id'];
     final zoneId = zone is int ? '$zone' : zone;
@@ -279,6 +292,7 @@ class ExoclickBannerUnit extends BannerAdUnit {
     final cssClass = raw['class_name'] ?? className;
     final size = BannerSize.parse(raw['size']);
     final minWidth = raw['min_width'] ?? 0;
+    final blocked = _bitmask(raw['block_ad_types'] ?? blockAdTypes ?? 0);
     if (zoneId is! String ||
         !RegExp(r'^[0-9]{1,12}$').hasMatch(zoneId) ||
         int.parse(zoneId) <= 0 ||
@@ -288,7 +302,8 @@ class ExoclickBannerUnit extends BannerAdUnit {
         !sizes.contains(size?.value) ||
         minWidth is! int ||
         minWidth < 0 ||
-        minWidth > 10000) {
+        minWidth > 10000 ||
+        blocked == null) {
       return null;
     }
     return ExoclickBannerUnit(
@@ -296,7 +311,37 @@ class ExoclickBannerUnit extends BannerAdUnit {
         scriptUrl: script,
         className: cssClass,
         size: size!,
-        minWidth: minWidth);
+        minWidth: minWidth,
+        blockAdTypes: blocked,
+        sub: parseSub(raw['sub']) ?? parseSub(sub) ?? 0);
+  }
+
+  /// A positive sub ID, integer or digits. Anything else is ignored, since
+  /// a wrong sub only mislabels stats.
+  static int? parseSub(Object? raw) {
+    final value = _bitmask(raw);
+    return value != null && value > 0 ? value : null;
+  }
+
+  ExoclickBannerUnit withSub(int sub) => sub == this.sub
+      ? this
+      : ExoclickBannerUnit(
+          zoneId: zoneId,
+          scriptUrl: scriptUrl,
+          className: className,
+          size: size,
+          minWidth: minWidth,
+          blockAdTypes: blockAdTypes,
+          sub: sub);
+
+  /// A non-negative integer, or digits as a string, as the dashboard prints it.
+  static int? _bitmask(Object? raw) {
+    final value = raw is int
+        ? raw
+        : raw is String && RegExp(r'^[0-9]{1,9}$').hasMatch(raw.trim())
+            ? int.parse(raw.trim())
+            : null;
+    return value != null && value >= 0 && value <= 0x7fffffff ? value : null;
   }
 
   @override
@@ -304,9 +349,12 @@ class ExoclickBannerUnit extends BannerAdUnit {
     final script = const HtmlEscape(HtmlEscapeMode.attribute)
         .convert(scriptUrl.toString());
     final status = BannerAdUnit.statusChannel;
+    final blocked = (sub == 0 ? '' : ' data-sub="$sub"') +
+        (blockAdTypes == 0 ? '' : ' data-block-ad-types="$blockAdTypes"');
     // A loaded provider script alone is not a filled zone. The shared view
     // collapses the slot if no creative appears within twenty seconds.
-    return document('''<ins class="$className" data-zoneid="$zoneId"></ins>
+    return document(
+        '''<ins class="$className" data-zoneid="$zoneId"$blocked></ins>
 <script>
 (function(){
   var spot=document.querySelector('ins[data-zoneid]');
@@ -332,10 +380,13 @@ onerror="$status.postMessage('failed')"></script>''');
       scriptUrl == other.scriptUrl &&
       className == other.className &&
       minWidth == other.minWidth &&
+      blockAdTypes == other.blockAdTypes &&
+      sub == other.sub &&
       size == other.size;
 
   @override
-  int get hashCode => Object.hash(zoneId, scriptUrl, className, size, minWidth);
+  int get hashCode => Object.hash(
+      zoneId, scriptUrl, className, size, minWidth, blockAdTypes, sub);
 }
 
 Uri? _scriptUrl(Object? raw) {
@@ -353,18 +404,22 @@ Uri? _scriptUrl(Object? raw) {
 
 @immutable
 class BannerPlacement {
-  const BannerPlacement({this.enabled = true, this.units = const []});
+  const BannerPlacement({this.enabled = true, this.units = const [], this.sub});
   final bool enabled;
   final List<String> units;
+
+  /// ExoClick's `data-sub` for this slot, over the unit's own.
+  final int? sub;
 
   @override
   bool operator ==(Object other) =>
       other is BannerPlacement &&
       enabled == other.enabled &&
+      sub == other.sub &&
       listEquals(units, other.units);
 
   @override
-  int get hashCode => Object.hash(enabled, Object.hashAll(units));
+  int get hashCode => Object.hash(enabled, sub, Object.hashAll(units));
 }
 
 /// One network's remotely published catalog: all codes, sizes and placement
@@ -406,7 +461,10 @@ class BannerAdsConfig {
             AdNetwork.clickadu => ClickaduBannerUnit.parse(entry.value,
                 scriptUrl: json['script_url']),
             AdNetwork.exoclick => ExoclickBannerUnit.parse(entry.value,
-                scriptUrl: json['script_url'], className: json['class_name']),
+                scriptUrl: json['script_url'],
+                className: json['class_name'],
+                blockAdTypes: json['block_ad_types'],
+                sub: json['sub']),
             AdNetwork.monetag => null,
           };
           if (entry.key is String && unit != null) units[entry.key] = unit;
@@ -428,6 +486,7 @@ class BannerAdsConfig {
             enabled:
                 value != false && (value is! Map || value['enabled'] != false),
             units: List.unmodifiable(ids),
+            sub: value is Map ? ExoclickBannerUnit.parseSub(value['sub']) : null,
           );
         }
         return Map.unmodifiable(result);
@@ -464,7 +523,10 @@ class BannerAdsConfig {
           unit.minWidth <= maxWidth &&
           unit.size.width <= maxWidth &&
           unit.size.height <= maxHeight) {
-        return unit;
+        final sub = rule.sub;
+        return unit is ExoclickBannerUnit && sub != null
+            ? unit.withSub(sub)
+            : unit;
       }
     }
     return null;
