@@ -126,6 +126,15 @@ class SettingsProvider with ChangeNotifier {
   int _subtitleFontSize = 17;
   int get subtitleFontSize => _subtitleFontSize;
 
+  bool _subtitleOutlineEnabled = false;
+  bool get subtitleOutlineEnabled => _subtitleOutlineEnabled;
+
+  String _subtitleOutlineColor = serializeSubtitleColor(Colors.black);
+  String get subtitleOutlineColor => _subtitleOutlineColor;
+
+  int _subtitleOutlineSize = defaultSubtitleOutlineSize;
+  int get subtitleOutlineSize => _subtitleOutlineSize;
+
   String _appLanguage = 'en';
   String get appLanguage => _appLanguage;
 
@@ -389,6 +398,37 @@ class SettingsProvider with ChangeNotifier {
     _subtitleFontSize = normalizeSubtitleFontSize(value);
     _settingsPreferences.setSubtitleFont(_subtitleFontSize);
     _trackSetting('Subtitle Font Size', _subtitleFontSize);
+    notifyListeners();
+  }
+
+  Future<void> getSubtitleOutlineSettings() async {
+    _subtitleOutlineEnabled =
+        await _settingsPreferences.getSubtitleOutlineEnabled();
+    _subtitleOutlineColor = await _settingsPreferences.subtitleOutlineColor();
+    _subtitleOutlineSize = await _settingsPreferences.getSubtitleOutlineSize();
+  }
+
+  set subtitleOutlineEnabled(bool value) {
+    if (_subtitleOutlineEnabled == value) return;
+    _subtitleOutlineEnabled = value;
+    _settingsPreferences.setSubtitleOutlineEnabled(value);
+    _trackSetting('Subtitle Outline Enabled', value);
+    notifyListeners();
+  }
+
+  set subtitleOutlineColor(String value) {
+    _subtitleOutlineColor = serializeSubtitleColor(
+      parseStoredSubtitleColor(value, fallback: Colors.black),
+    );
+    _settingsPreferences.setSubtitleOutlineColor(_subtitleOutlineColor);
+    _trackSetting('Subtitle Outline Color', _subtitleOutlineColor);
+    notifyListeners();
+  }
+
+  set subtitleOutlineSize(int value) {
+    _subtitleOutlineSize = normalizeSubtitleOutlineSize(value);
+    _settingsPreferences.setSubtitleOutlineSize(_subtitleOutlineSize);
+    _trackSetting('Subtitle Outline Size', _subtitleOutlineSize);
     notifyListeners();
   }
 

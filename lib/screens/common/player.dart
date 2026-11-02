@@ -512,6 +512,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               fontSize: widget.settings.subtitleFontSize,
               textStyle:
                   widget.subtitleStyle ?? widget.settings.subtitleTextStyle,
+              outlineEnabled: widget.settings.subtitleOutlineEnabled,
+              outlineColor: widget.settings.subtitleOutlineColor,
+              outlineSize: widget.settings.subtitleOutlineSize.toDouble(),
             ));
 
     final dataSource = _buildDataSource(

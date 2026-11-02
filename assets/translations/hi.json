@@ -2018,5 +2018,11 @@
   "auto_translate": "स्वतः अनुवाद",
   "auto_translated": "स्वतः अनुवादित",
   "translating_subtitles": "उपशीर्षक अनुवाद हो रहे हैं...",
-  "auto_translate_description": "उपलब्ध न होने पर उपशीर्षक को अपनी पसंदीदा भाषा में स्वतः अनुवाद करें।"
+  "auto_translate_description": "उपलब्ध न होने पर उपशीर्षक को अपनी पसंदीदा भाषा में स्वतः अनुवाद करें।",
+  "subtitle_outline": "सबटाइटल रूपरेखा",
+  "outline_color": "रूपरेखा का रंग",
+  "outline_width": "रूपरेखा की चौड़ाई",
+  "tv_subtitle_outline": "सबटाइटल रूपरेखा",
+  "tv_subtitle_outline_color": "सबटाइटल रूपरेखा का रंग",
+  "tv_subtitle_outline_width": "सबटाइटल रूपरेखा की चौड़ाई"
 }

@@ -2018,5 +2018,11 @@
   "auto_translate": "Terjemahkan Otomatis",
   "auto_translated": "Diterjemahkan otomatis",
   "translating_subtitles": "Menerjemahkan subtitle...",
-  "auto_translate_description": "Terjemahkan subtitle secara otomatis ke bahasa pilihan saat tidak tersedia."
+  "auto_translate_description": "Terjemahkan subtitle secara otomatis ke bahasa pilihan saat tidak tersedia.",
+  "subtitle_outline": "Garis tepi subtitle",
+  "outline_color": "Warna garis tepi",
+  "outline_width": "Lebar garis tepi",
+  "tv_subtitle_outline": "Garis tepi subtitle",
+  "tv_subtitle_outline_color": "Warna garis tepi subtitle",
+  "tv_subtitle_outline_width": "Lebar garis tepi subtitle"
 }

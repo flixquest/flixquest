@@ -4,6 +4,10 @@ const int minimumSubtitleFontSize = 5;
 const int maximumSubtitleFontSize = 30;
 const int defaultSubtitleFontSize = 17;
 
+const int minimumSubtitleOutlineSize = 1;
+const int maximumSubtitleOutlineSize = 6;
+const int defaultSubtitleOutlineSize = 2;
+
 /// Converts all subtitle color formats written by supported Flutter versions.
 ///
 /// Flutter used to return `Color(0xff112233)` from [Color.toString], while
@@ -58,6 +62,11 @@ String serializeSubtitleColor(Color color) =>
 int normalizeSubtitleFontSize(int value) => value.clamp(
       minimumSubtitleFontSize,
       maximumSubtitleFontSize,
+    );
+
+int normalizeSubtitleOutlineSize(int value) => value.clamp(
+      minimumSubtitleOutlineSize,
+      maximumSubtitleOutlineSize,
     );
 
 String normalizeSubtitleTextStyle(String value) =>

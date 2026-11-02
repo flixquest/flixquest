@@ -2105,7 +2105,13 @@ class CodegenLoader extends AssetLoader{
   "auto_translate": "ترجمة تلقائية",
   "auto_translated": "مترجم تلقائياً",
   "translating_subtitles": "جارٍ ترجمة الترجمة...",
-  "auto_translate_description": "ترجمة الترجمة تلقائيًا إلى لغتك المفضلة عندما لا تكون متاحة."
+  "auto_translate_description": "ترجمة الترجمة تلقائيًا إلى لغتك المفضلة عندما لا تكون متاحة.",
+  "subtitle_outline": "مخطط الترجمة",
+  "outline_color": "لون المخطط",
+  "outline_width": "عرض المخطط",
+  "tv_subtitle_outline": "مخطط الترجمة",
+  "tv_subtitle_outline_color": "لون مخطط الترجمة",
+  "tv_subtitle_outline_width": "عرض مخطط الترجمة"
 };
 static const Map<String,dynamic> _en = {
   "popularity_descending": "Popularity descending",
@@ -4127,7 +4133,13 @@ static const Map<String,dynamic> _en = {
   "auto_translate": "Auto Translate",
   "auto_translated": "Auto-translated",
   "translating_subtitles": "Translating subtitles...",
-  "auto_translate_description": "Automatically translate subtitles to your preferred language when not available."
+  "auto_translate_description": "Automatically translate subtitles to your preferred language when not available.",
+  "subtitle_outline": "Subtitle outline",
+  "outline_color": "Outline color",
+  "outline_width": "Outline width",
+  "tv_subtitle_outline": "Subtitle outline",
+  "tv_subtitle_outline_color": "Subtitle outline color",
+  "tv_subtitle_outline_width": "Subtitle outline width"
 };
 static const Map<String,dynamic> _es = {
   "popularity_descending": "Popularidad descendiente",
@@ -6149,7 +6161,13 @@ static const Map<String,dynamic> _es = {
   "auto_translate": "Traducción automática",
   "auto_translated": "Traducido automáticamente",
   "translating_subtitles": "Traduciendo subtítulos...",
-  "auto_translate_description": "Traduce subtítulos automáticamente a tu idioma preferido cuando no estén disponibles."
+  "auto_translate_description": "Traduce subtítulos automáticamente a tu idioma preferido cuando no estén disponibles.",
+  "subtitle_outline": "Borde de subtítulos",
+  "outline_color": "Color del borde",
+  "outline_width": "Grosor del borde",
+  "tv_subtitle_outline": "Borde de subtítulos",
+  "tv_subtitle_outline_color": "Color del borde del subtítulo",
+  "tv_subtitle_outline_width": "Grosor del borde del subtítulo"
 };
 static const Map<String,dynamic> _hi = {
   "popularity_descending": "लोकप्रियता घटती",
@@ -8171,7 +8189,13 @@ static const Map<String,dynamic> _hi = {
   "auto_translate": "स्वतः अनुवाद",
   "auto_translated": "स्वतः अनुवादित",
   "translating_subtitles": "उपशीर्षक अनुवाद हो रहे हैं...",
-  "auto_translate_description": "उपलब्ध न होने पर उपशीर्षक को अपनी पसंदीदा भाषा में स्वतः अनुवाद करें।"
+  "auto_translate_description": "उपलब्ध न होने पर उपशीर्षक को अपनी पसंदीदा भाषा में स्वतः अनुवाद करें।",
+  "subtitle_outline": "सबटाइटल रूपरेखा",
+  "outline_color": "रूपरेखा का रंग",
+  "outline_width": "रूपरेखा की चौड़ाई",
+  "tv_subtitle_outline": "सबटाइटल रूपरेखा",
+  "tv_subtitle_outline_color": "सबटाइटल रूपरेखा का रंग",
+  "tv_subtitle_outline_width": "सबटाइटल रूपरेखा की चौड़ाई"
 };
 static const Map<String,dynamic> _id = {
   "popularity_descending": "Popularitas menurun",
@@ -10193,7 +10217,13 @@ static const Map<String,dynamic> _id = {
   "auto_translate": "Terjemahkan Otomatis",
   "auto_translated": "Diterjemahkan otomatis",
   "translating_subtitles": "Menerjemahkan subtitle...",
-  "auto_translate_description": "Terjemahkan subtitle secara otomatis ke bahasa pilihan saat tidak tersedia."
+  "auto_translate_description": "Terjemahkan subtitle secara otomatis ke bahasa pilihan saat tidak tersedia.",
+  "subtitle_outline": "Garis tepi subtitle",
+  "outline_color": "Warna garis tepi",
+  "outline_width": "Lebar garis tepi",
+  "tv_subtitle_outline": "Garis tepi subtitle",
+  "tv_subtitle_outline_color": "Warna garis tepi subtitle",
+  "tv_subtitle_outline_width": "Lebar garis tepi subtitle"
 };
 static const Map<String, Map<String,dynamic>> mapLocales = {"ar": _ar, "en": _en, "es": _es, "hi": _hi, "id": _id};
 }

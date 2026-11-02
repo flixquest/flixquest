@@ -170,6 +170,7 @@ Future<DevicePresentation> appInitialize({
   await settingsProvider.getSubtitleSize();
   await settingsProvider.getForegroundSubtitleColor();
   await settingsProvider.getBackgroundSubtitleColor();
+  await settingsProvider.getSubtitleOutlineSettings();
   await settingsProvider.getAppLanguage();
   await settingsProvider.getAppColorIndex();
   await settingsProvider.getCustomAppColor();

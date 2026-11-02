@@ -2018,5 +2018,11 @@
   "auto_translate": "Traducción automática",
   "auto_translated": "Traducido automáticamente",
   "translating_subtitles": "Traduciendo subtítulos...",
-  "auto_translate_description": "Traduce subtítulos automáticamente a tu idioma preferido cuando no estén disponibles."
+  "auto_translate_description": "Traduce subtítulos automáticamente a tu idioma preferido cuando no estén disponibles.",
+  "subtitle_outline": "Borde de subtítulos",
+  "outline_color": "Color del borde",
+  "outline_width": "Grosor del borde",
+  "tv_subtitle_outline": "Borde de subtítulos",
+  "tv_subtitle_outline_color": "Color del borde del subtítulo",
+  "tv_subtitle_outline_width": "Grosor del borde del subtítulo"
 }

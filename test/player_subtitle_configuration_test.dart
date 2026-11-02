@@ -76,4 +76,20 @@ void main() {
 
     expect(configuration.fontFamily, 'FigtreeLight');
   });
+
+  test('builds subtitle appearance with custom outline configuration', () {
+    final configuration = buildPlayerSubtitleConfiguration(
+      backgroundColor: 'Color(0x80112233)',
+      foregroundColor: 'Color(0xffabcdef)',
+      fontSize: 20,
+      textStyle: 'bold',
+      outlineEnabled: true,
+      outlineColor: '0xffffff00',
+      outlineSize: 3.5,
+    );
+
+    expect(configuration.outlineEnabled, isTrue);
+    expect(configuration.outlineColor, const Color(0xffffff00));
+    expect(configuration.outlineSize, 3.5);
+  });
 }

@@ -1918,5 +1918,11 @@ abstract class  LocaleKeys {
   static const auto_translated = 'auto_translated';
   static const translating_subtitles = 'translating_subtitles';
   static const auto_translate_description = 'auto_translate_description';
+  static const subtitle_outline = 'subtitle_outline';
+  static const outline_color = 'outline_color';
+  static const outline_width = 'outline_width';
+  static const tv_subtitle_outline = 'tv_subtitle_outline';
+  static const tv_subtitle_outline_color = 'tv_subtitle_outline_color';
+  static const tv_subtitle_outline_width = 'tv_subtitle_outline_width';
 
 }
