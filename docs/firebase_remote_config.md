@@ -813,13 +813,16 @@ Two kinds of evidence, combined under a six-second background deadline:
   parallel) confirms an A or AAAA record, so a retired domain is never
   blamed. No blocker's addresses are listed.
 - **The viewer's own popups:** when an Adsterra or ExoClick popup loads, the
-  ad screen follows its whole redirect chain until the ad shows. A direct
-  link's first host (`asiafilm.org` for Adsterra) is rarely what a blocker
-  stops; its later hops are (the network's redirect and tracking hosts, then
-  the advertiser), and they are only known once the chain runs. The popup
-  counts as reached when its ad shows or the network answers with no ad (its
-  no-ad page or an HTTP error); moving on to the next hop is not enough.
-  Before that, a failing hop is judged by its error:
+  ad screen follows its whole redirect chain for as long as the popup is
+  open. A direct link's first host (`asiafilm.org` for Adsterra) is rarely
+  what a blocker stops; its later hops are (the network's redirect and
+  tracking hosts, a bot check such as `start.portablica.com`, then the
+  advertiser), and they are only known once the chain runs. The popup counts
+  as reached when it closes on a page with content, or when the network
+  answers with no ad (its no-ad page or an HTTP error). A page that shows
+  content and then moves on (a bot check or interstitial, whatever its
+  address) is not the ad. Until the popup closes, a failing hop is judged by
+  its error:
   - filtered (`ERR_BLOCKED_BY_CLIENT`, a certificate for another host, an SSL
     protocol error from a block page) counts once public DNS shows the host
     exists and local DNS is healthy;
@@ -834,8 +837,15 @@ Two kinds of evidence, combined under a six-second background deadline:
 
   With the check on, a blocked network ends its popup at once (no fallback),
   and the stream does not start: once the block is confirmed, the viewer is
-  asked to turn the blocker off. **I turned it off** loads the popup again, so
-  the viewer's real ad is the test, not the tap; **Cancel** closes the loader.
+  asked to turn the blocker off. **I turned it off** first looks an
+  unreachable hop up again: while the device's DNS still blocks it, the
+  dialog stays ("still on"). Adsterra rotates offers, so a replayed popup can
+  land on one the blocker allows (such as a `start.portablica.com` captcha
+  page) and prove nothing. Once the hop resolves, or for a filtered hop, the
+  popup loads again and the viewer's real ad is the test, not the tap. A
+  blocked hop also stays in the DNS check on the next Play for 30 minutes,
+  even after a later popup reached its network. **Cancel** closes the
+  loader.
   An unconfirmed block plays on. With the check off, a blocked network still
   hands over to the fallback, as a no-fill does.
 

@@ -343,13 +343,16 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     }
   }
 
-  /// Until the ad shows, a blocker may stop any hop of a direct link's
+  /// While the popup is open, a blocker may stop any hop of a direct link's
   /// redirect chain, and usually stops a later one: the network's own
-  /// redirect and tracking hosts, or the advertiser. [scriptOnly] limits a
-  /// tag page to its tag's host, as its other requests may fail harmlessly.
+  /// redirect and tracking hosts, or the advertiser. A page with content is
+  /// not the ad yet; a bot check or interstitial shows one and moves on.
+  /// [scriptOnly] limits a tag page to its tag's host, as its other requests
+  /// may fail harmlessly.
   void _noteLoadError(WebResourceError error, {bool scriptOnly = false}) {
     final host = Uri.tryParse(error.url ?? '')?.host;
-    if (host == null ||
+    if (_finished ||
+        host == null ||
         host.isEmpty ||
         AdBlockDetector.isFirstPartyHost(host) ||
         (scriptOnly && host != _deliveryHost)) {
@@ -359,8 +362,9 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     if (delivery != null) _reportDelivery(delivery, host);
   }
 
-  /// [AdDelivery.reached] (the ad showed, or the network had none) is about
-  /// the network's own host; a block names the hop that failed.
+  /// [AdDelivery.reached] (the popup ended on a page with content, or the
+  /// network had no ad) is about the network's own host; a block names the
+  /// hop that failed.
   void _reportDelivery(AdDelivery delivery, [String? failedHost]) {
     final host = failedHost ?? _deliveryHost;
     if (_deliveryReported || host == null) return;
@@ -981,7 +985,6 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     });
     if (!_adShown) {
       _adShown = true;
-      _reportDelivery(AdDelivery.reached);
       widget.onAdShown?.call();
     }
     // The ad is final only if no further redirect starts in the settle
@@ -1146,6 +1149,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   void _finish([String reason = 'completed']) {
     if (!mounted || _finished) return;
     _finished = true;
+    _settleDelivery();
     _cancelTimers();
     widget.preload?._fail();
     // Fallback networks are for no-fill. With the ad blocker check on, a
@@ -1166,6 +1170,13 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     } else if (route?.isActive == true) {
       Navigator.of(context).removeRoute(route!);
     }
+  }
+
+  /// The chain is judged by where it ended, whatever pages it showed on the
+  /// way: a popup closing on content reached its network. A blocked hop
+  /// reported earlier stands.
+  void _settleDelivery() {
+    if (_adShown) _reportDelivery(AdDelivery.reached);
   }
 
   void _cancelTimers() {
@@ -1190,6 +1201,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     if (!_finished) {
       _log(
           'disposed before completion (remote config or route removal) phase=${_phase.name}');
+      _settleDelivery();
     }
     WidgetsBinding.instance.removeObserver(this);
     _finished = true;

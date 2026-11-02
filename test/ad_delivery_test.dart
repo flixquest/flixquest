@@ -118,19 +118,34 @@ void main() {
     expect(outcomes, [('track.example', AdDelivery.unreachable)]);
   }, variant: android);
 
-  testWidgets('once the ad shows, later failures change nothing',
+  testWidgets('a page that moves on, such as a bot check, is not the ad',
       (tester) async {
     final page = await openPopup(tester, exoclick);
     await redirectToNetwork(page);
-    page.onPageStarted!('https://offer.example/ad');
-    page.onPageFinished!('https://offer.example/ad');
+    page.onPageStarted!('https://start.check.example/');
+    page.onPageFinished!('https://start.check.example/');
     await tester.pump();
+    expect(outcomes, isEmpty, reason: 'the chain has not ended');
+    await page.onNavigationRequest!(const NavigationRequest(
+        url: 'https://next.example/', isMainFrame: true));
     page.onWebResourceError!(const WebResourceError(
         errorCode: -2,
         description: 'net::ERR_NAME_NOT_RESOLVED',
         isForMainFrame: true,
         url: 'https://next.example/'));
     await tester.pump();
+    expect(outcomes, [('next.example', AdDelivery.unreachable)]);
+  }, variant: android);
+
+  testWidgets('a popup that ends on its ad reached the network',
+      (tester) async {
+    final page = await openPopup(tester, exoclick);
+    await redirectToNetwork(page);
+    page.onPageStarted!('https://offer.example/ad');
+    page.onPageFinished!('https://offer.example/ad');
+    await tester.pump();
+    expect(outcomes, isEmpty);
+    await tester.pumpWidget(const SizedBox());
     expect(outcomes, [('s.rotating.example', AdDelivery.reached)]);
   }, variant: android);
 

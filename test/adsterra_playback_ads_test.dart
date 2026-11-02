@@ -4244,13 +4244,16 @@ void main() {
         'with the check on, a blocked ExoClick holds the stream until its '
         'popup loads', (tester) async {
       provider.adBlockGateEnabled = true;
+      var blockerOn = true;
       service = AdsterraPlaybackAdsService(
         storeLauncher: recordStoreLaunch,
         adBlockGate: AdBlockGate(
           // Blocker DNS: the unreachable ExoClick host is sinkholed here.
           detector: AdBlockDetector(
             lookup: (host) async => [
-              InternetAddress(host == 'exo.example' ? '0.0.0.0' : '1.1.1.1')
+              InternetAddress(host == 'exo.example' && blockerOn
+                  ? '0.0.0.0'
+                  : '1.1.1.1')
             ],
             publicLookup: (_) async => true,
           ),
@@ -4269,7 +4272,14 @@ void main() {
       expect(find.text('Turn off your ad blocker'), findsOneWidget);
       expect(proceeded, isFalse);
 
-      // "I turned it off" shows the real popup again as the test.
+      // Still sinkholed: the dialog stays rather than replaying the popup.
+      await tester.tap(find.text('I turned it off'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('still on'), findsOneWidget);
+      expect(platform.controllers, hasLength(1));
+
+      // Gone from DNS: the real popup is shown again as the test.
+      blockerOn = false;
       await tester.tap(find.text('I turned it off'));
       await pumpAd(tester);
       expect(platform.controllers, hasLength(2));

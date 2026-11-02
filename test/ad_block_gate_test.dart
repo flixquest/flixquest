@@ -624,6 +624,67 @@ void main() {
       expect(await verdict, isFalse);
     });
 
+    testWidgets('"I turned it off" looks the blocked hop up again first',
+        (tester) async {
+      await pumpHost(tester);
+      var sinkholed = true;
+      final shared = AdBlockGate(
+        detector: AdBlockDetector(
+          lookup: (host) async => [
+            AdBlockDetector.dnsControlHosts.contains(host) || !sinkholed
+                ? real
+                : InternetAddress('0.0.0.0')
+          ],
+          publicLookup: (_) async => true,
+        ),
+      );
+      final verdict = shared.popupBlocked(host, 'offer.example',
+          delivery: AdDelivery.unreachable);
+      await tester.pumpAndSettle();
+      // Still sinkholed: no replay, which might land on an allowed offer.
+      await tester.tap(find.text('I turned it off'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('still on'), findsOneWidget);
+
+      sinkholed = false;
+      await tester.tap(find.text('I turned it off'));
+      await tester.pumpAndSettle();
+      expect(await verdict, isNull);
+    });
+
+    testWidgets('a blocked hop is looked up again on the next Play',
+        (tester) async {
+      provider
+        ..setBannerAdNetwork('none')
+        ..setPlaybackPopunderNetwork(null)
+        ..setTvPlaybackPopunderNetwork(null);
+      await pumpHost(tester);
+      var sinkholed = true;
+      final shared = AdBlockGate(
+        cache: AdBlockCheckCache(
+            foregroundWait: const Duration(milliseconds: 700)),
+        detector: AdBlockDetector(
+          lookup: (host) async => [
+            AdBlockDetector.dnsControlHosts.contains(host) || !sinkholed
+                ? real
+                : InternetAddress('0.0.0.0')
+          ],
+          publicLookup: (_) async => true,
+        ),
+      )..observeDelivery('offer.example', AdDelivery.unreachable);
+      final result = shared.allowPlayback(host);
+      await tester.pumpAndSettle();
+      expect(find.text('Turn off your ad blocker'), findsOneWidget);
+      await tester.tap(find.text('I turned it off'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('still on'), findsOneWidget);
+
+      sinkholed = false;
+      await tester.tap(find.text('I turned it off'));
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    });
+
     testWidgets('ExoClick\'s rotating delivery domain is what gets checked',
         (tester) async {
       provider

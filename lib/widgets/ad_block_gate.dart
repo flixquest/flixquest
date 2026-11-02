@@ -77,12 +77,18 @@ class AdBlockGate {
         : null;
   }
 
-  /// [forgetPopups] also drops popup outcomes: after the viewer turned a
-  /// blocker off, or on another network.
+  /// [forgetPopups] also drops popup outcomes, as on another network.
   void invalidate({bool forgetPopups = false}) {
     if (forgetPopups) _observed.clear();
     _cache.invalidate();
   }
+
+  /// After **I turned it off**: a filtered hop can only be retested by a
+  /// popup, but an unreachable one stays and is looked up again, so the
+  /// device's DNS says whether the blocker really went. A replayed popup
+  /// that happens to pick an offer the blocker allows proves nothing.
+  void _forgetFiltered() => _observed
+      .removeWhere((_, seen) => seen.delivery == AdDelivery.blocked);
 
   void addListener(VoidCallback listener) => _cache.addListener(listener);
   void removeListener(VoidCallback listener) => _cache.removeListener(listener);
@@ -188,7 +194,8 @@ class AdBlockGate {
         return false;
       }
       asked = true;
-      invalidate(forgetPopups: true);
+      _forgetFiltered();
+      _cache.invalidate();
     }
     if (asked) {
       analytics?.trackAdBlockerGate(
@@ -204,8 +211,10 @@ class AdBlockGate {
   /// the device's own DNS sinkholes the host or cannot resolve it while
   /// public DNS can, so an advertiser's outage never stops a viewer.
   /// True plays on (unconfirmed, gate off, or Plus started), false stops, and
-  /// null shows the popup again: after **I turned it off**, the viewer's real
-  /// ad is the test, and no extra request reaches the network.
+  /// null shows the popup again. After **I turned it off**, an unreachable
+  /// hop is looked up again first and the dialog stays while the device's
+  /// DNS still blocks it; otherwise the viewer's real ad is the test. No
+  /// extra request reaches the network.
   Future<bool?> popupBlocked(BuildContext context, String host,
       {AdDelivery delivery = AdDelivery.blocked,
       bool download = false,
@@ -246,9 +255,19 @@ class AdBlockGate {
             outcome: 'cancelled', download: download, television: tv);
         return false;
       }
-      _observed.remove(host);
-      _cache.invalidate();
-      return null;
+      // The device's DNS still sinkholing the hop says the blocker is on,
+      // with no request to the network; a replay could land on an allowed
+      // offer instead.
+      if (delivery == AdDelivery.unreachable &&
+          await _detector.isBlocking({host})) {
+        debugPrint('[AdBlockGate] $host is still blocked');
+        again = true;
+      } else {
+        _observed.remove(host);
+        _cache.invalidate();
+        return null;
+      }
+      if (!context.mounted) return false;
     }
   }
 
