@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:better_player_plus/better_player_plus.dart';
@@ -18,7 +19,7 @@ import 'player_sheet_ui.dart';
 class PlayerSubtitleSidePanel extends StatefulWidget {
   const PlayerSubtitleSidePanel({
     required this.controller,
-    required this.options,
+    this.options,
     required this.settings,
     required this.onClose,
     required this.onSearchOnline,
@@ -29,7 +30,7 @@ class PlayerSubtitleSidePanel extends StatefulWidget {
   });
 
   final BetterPlayerController controller;
-  final List<SubtitleOption> options;
+  final List<SubtitleOption>? options;
   final SettingsProvider settings;
   final VoidCallback onClose;
   final VoidCallback onSearchOnline;
@@ -44,6 +45,7 @@ class PlayerSubtitleSidePanel extends StatefulWidget {
 class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
   late final PageController _pageController;
   int _currentPage = 0;
+  StreamSubscription? _controllerSubscription;
 
   // Timing state
   static const _step = Duration(milliseconds: 500);
@@ -60,13 +62,38 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
     _pageController = PageController(initialPage: widget.initialPageIndex);
     _offset = widget.controller.subtitleOffset;
     widget.controller.subtitleOffsetListenable.addListener(_onOffsetChanged);
+    _controllerSubscription = widget.controller.controllerEventStream.listen((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _controllerSubscription?.cancel();
     widget.controller.subtitleOffsetListenable.removeListener(_onOffsetChanged);
     _pageController.dispose();
     super.dispose();
+  }
+
+  List<SubtitleOption> get _currentOptions {
+    if (widget.options != null && widget.options!.isNotEmpty) {
+      return widget.options!;
+    }
+    final subtitles = List<BetterPlayerSubtitlesSource>.of(
+      widget.controller.betterPlayerSubtitlesSourceList,
+    );
+    final offIndex = subtitles.indexWhere(
+      (source) => source.type == BetterPlayerSubtitlesSourceType.none,
+    );
+    if (offIndex < 0) {
+      subtitles.insert(
+        0,
+        BetterPlayerSubtitlesSource(type: BetterPlayerSubtitlesSourceType.none),
+      );
+    } else if (offIndex > 0) {
+      subtitles.insert(0, subtitles.removeAt(offIndex));
+    }
+    return buildSubtitleOptions(subtitles);
   }
 
   void _onOffsetChanged() {
@@ -123,17 +150,27 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
           _goToPage(0);
         }
       },
-      child: SafeArea(
-        left: false,
-        child: PageView(
-          controller: _pageController,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            _buildMainPage(context, colors),
-            _buildTimingPage(context, colors),
-            _buildOutlinePage(context, colors),
-            _buildAutoTranslatePage(context, colors),
-          ],
+      child: Material(
+        color: colors.panel,
+        child: Container(
+          decoration: const BoxDecoration(
+            border: Border(
+              left: BorderSide(color: Colors.white12, width: 1),
+            ),
+          ),
+          child: SafeArea(
+            left: false,
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildMainPage(context, colors),
+                _buildTimingPage(context, colors),
+                _buildOutlinePage(context, colors),
+                _buildAutoTranslatePage(context, colors),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -148,6 +185,7 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
     final outlineStatus = widget.settings.subtitleOutlineEnabled
         ? '${widget.settings.subtitleOutlineSize}px'
         : tr('off');
+    final options = _currentOptions;
 
     return Column(
       children: [
@@ -209,10 +247,10 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
         const Divider(height: 1, thickness: 1),
         Expanded(
           child: ListView.builder(
-            itemCount: widget.options.length,
+            itemCount: options.length,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             itemBuilder: (context, index) {
-              final option = widget.options[index];
+              final option = options[index];
               final isSelected = currentSource?.type == BetterPlayerSubtitlesSourceType.none
                   ? option.isOff
                   : (!option.isOff &&

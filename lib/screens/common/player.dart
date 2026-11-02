@@ -2919,7 +2919,13 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       return PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) _exitPlayer();
+          if (!didPop) {
+            if (_betterPlayerController.isSidePanelOpen) {
+              _betterPlayerController.closeSidePanel();
+              return;
+            }
+            _exitPlayer();
+          }
         },
         // The page around the video follows the app's mode; the video
         // itself stays black.
@@ -2937,6 +2943,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) {
+          if (_betterPlayerController.isSidePanelOpen) {
+            _betterPlayerController.closeSidePanel();
+            return;
+          }
           if (widget.useTvControls && _handleTvOverlayBack()) return;
           if (widget.useTvControls && _tvControlsController.handleBack()) {
             return;
@@ -3734,6 +3744,11 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   void _showSubtitleSwitcher() {
+    if (_betterPlayerController.isSidePanelOpen) {
+      _betterPlayerController.closeSidePanel();
+      return;
+    }
+
     final subtitles = List<BetterPlayerSubtitlesSource>.of(
       _betterPlayerController.betterPlayerSubtitlesSourceList,
     );
@@ -3753,16 +3768,16 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
 
     final options = buildSubtitleOptions(subtitles);
 
-    showPlayerSideSheet<void>(
-      context: context,
-      builder: (sheetContext) {
-        return PlayerSubtitleSidePanel(
+    _betterPlayerController.openSidePanel(
+      PlayerTheme(
+        onVideo: true,
+        child: PlayerSubtitleSidePanel(
           controller: _betterPlayerController,
           options: options,
           settings: widget.settings,
-          onClose: () => Navigator.pop(sheetContext),
+          onClose: () => _betterPlayerController.closeSidePanel(),
           onSearchOnline: () {
-            Navigator.pop(sheetContext);
+            _betterPlayerController.closeSidePanel();
             _externalSubtitles.showExternalSubtitlesMenu(
               context: context,
               colors: widget.colors,
@@ -3774,7 +3789,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
             );
           },
           onUpload: () {
-            Navigator.pop(sheetContext);
+            _betterPlayerController.closeSidePanel();
             _localSubtitles.showLocalSubtitlesUpload(
               context: context,
               colors: widget.colors,
@@ -3784,8 +3799,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
           onAutoTranslate: (targetLang) {
             _translateActiveOrFallbackSubtitle(targetLang: targetLang);
           },
-        );
-      },
+        ),
+      ),
     );
   }
 
