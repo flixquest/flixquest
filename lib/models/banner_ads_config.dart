@@ -243,7 +243,7 @@ class ExoclickBannerUnit extends BannerAdUnit {
     required this.className,
     required this.size,
     this.minWidth = 0,
-    this.blockAdTypes = 0,
+    this.blockAdTypes = '',
     this.sub = 0,
   });
 
@@ -267,9 +267,9 @@ class ExoclickBannerUnit extends BannerAdUnit {
   @override
   final int minWidth;
 
-  /// The zone tag's `data-block-ad-types` bitmask: the ad types unticked in
-  /// the dashboard's code generator. 0 blocks none and omits the attribute.
-  final int blockAdTypes;
+  /// The zone tag's `data-block-ad-types`: comma-separated ExoClick ad type
+  /// IDs to exclude, e.g. `101` for NSFW. Empty omits the attribute.
+  final String blockAdTypes;
 
   /// The zone tag's `data-sub`: a number ExoClick reports stats under, so
   /// slots sharing a zone can be told apart. 0 omits the attribute.
@@ -292,7 +292,7 @@ class ExoclickBannerUnit extends BannerAdUnit {
     final cssClass = raw['class_name'] ?? className;
     final size = BannerSize.parse(raw['size']);
     final minWidth = raw['min_width'] ?? 0;
-    final blocked = _bitmask(raw['block_ad_types'] ?? blockAdTypes ?? 0);
+    final blocked = parseAdTypes(raw['block_ad_types'] ?? blockAdTypes);
     if (zoneId is! String ||
         !RegExp(r'^[0-9]{1,12}$').hasMatch(zoneId) ||
         int.parse(zoneId) <= 0 ||
@@ -319,8 +319,12 @@ class ExoclickBannerUnit extends BannerAdUnit {
   /// A positive sub ID, integer or digits. Anything else is ignored, since
   /// a wrong sub only mislabels stats.
   static int? parseSub(Object? raw) {
-    final value = _bitmask(raw);
-    return value != null && value > 0 ? value : null;
+    final value = raw is int
+        ? raw
+        : raw is String && RegExp(r'^[1-9][0-9]{0,9}$').hasMatch(raw.trim())
+            ? int.parse(raw.trim())
+            : null;
+    return value != null && value > 0 && value <= 0x7fffffff ? value : null;
   }
 
   ExoclickBannerUnit withSub(int sub) => sub == this.sub
@@ -334,14 +338,32 @@ class ExoclickBannerUnit extends BannerAdUnit {
           blockAdTypes: blockAdTypes,
           sub: sub);
 
-  /// A non-negative integer, or digits as a string, as the dashboard prints it.
-  static int? _bitmask(Object? raw) {
-    final value = raw is int
+  /// Ad type IDs as a number, a comma-separated string (`"101,102"`) or a
+  /// list. Absent, empty or `0` blocks none and gives `''`. Anything else
+  /// gives null, so the unit is dropped rather than serving what it blocks.
+  static String? parseAdTypes(Object? raw) {
+    if (raw == null) return '';
+    final List<Object?> items = raw is List
         ? raw
-        : raw is String && RegExp(r'^[0-9]{1,9}$').hasMatch(raw.trim())
-            ? int.parse(raw.trim())
-            : null;
-    return value != null && value >= 0 && value <= 0x7fffffff ? value : null;
+        : raw is String
+            ? raw.split(',')
+            : [raw];
+    final ids = <String>[];
+    for (final item in items) {
+      final id = item is int && item >= 0
+          ? '$item'
+          : item is String
+              ? item.trim()
+              : null;
+      if (id == null || !RegExp(r'^[a-zA-Z0-9_-]{1,32}$').hasMatch(id)) {
+        if (raw is String && raw.trim().isEmpty) return '';
+        return null;
+      }
+      ids.add(id);
+    }
+    if (ids.length > 50) return null;
+    final value = ids.join(',');
+    return value == '0' ? '' : value;
   }
 
   @override
@@ -350,7 +372,7 @@ class ExoclickBannerUnit extends BannerAdUnit {
         .convert(scriptUrl.toString());
     final status = BannerAdUnit.statusChannel;
     final blocked = (sub == 0 ? '' : ' data-sub="$sub"') +
-        (blockAdTypes == 0 ? '' : ' data-block-ad-types="$blockAdTypes"');
+        (blockAdTypes.isEmpty ? '' : ' data-block-ad-types="$blockAdTypes"');
     // A loaded provider script alone is not a filled zone. The shared view
     // collapses the slot if no creative appears within twenty seconds.
     return document(

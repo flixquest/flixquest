@@ -336,14 +336,20 @@ void main() {
 
     expect(tag({}), isNot(contains('data-block-ad-types')));
     expect(tag({'block_ad_types': 0}), isNot(contains('data-block-ad-types')));
-    expect(tag({'block_ad_types': 6}),
-        contains('data-zoneid="3001" data-block-ad-types="6"></ins>'));
-    expect(tag({'block_ad_types': '6'}), contains('data-block-ad-types="6"'));
-    expect(tag({'block_ad_types': 6}, {'block_ad_types': 2}),
-        contains('data-block-ad-types="2"'));
-    expect(tag({'block_ad_types': 6}, {'block_ad_types': 0}),
+    expect(tag({'block_ad_types': ''}), isNot(contains('data-block-ad-types')));
+    expect(tag({'block_ad_types': 101}),
+        contains('data-zoneid="3001" data-block-ad-types="101"></ins>'));
+    expect(tag({'block_ad_types': '101, 102'}),
+        contains('data-block-ad-types="101,102"'));
+    expect(tag({'block_ad_types': [101, '105']}),
+        contains('data-block-ad-types="101,105"'));
+    expect(tag({'block_ad_types': 'banners-video'}),
+        contains('data-block-ad-types="banners-video"'));
+    expect(tag({'block_ad_types': 101}, {'block_ad_types': '102'}),
+        contains('data-block-ad-types="102"'));
+    expect(tag({'block_ad_types': 101}, {'block_ad_types': 0}),
         isNot(contains('data-block-ad-types')));
-    for (final bad in <Object>[-1, 1.5, '2"', 'video', true]) {
+    for (final bad in <Object>[-1, 1.5, '2"', '101,,102', '101 102', true]) {
       expect(tag({}, {'block_ad_types': bad}), 'rejected', reason: '$bad');
     }
   });
