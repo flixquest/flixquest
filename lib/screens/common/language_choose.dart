@@ -13,24 +13,34 @@ import '/provider/settings_provider.dart';
 /// language.
 List<AppLanguages> appLanguageChoices() => <AppLanguages>[
       AppLanguages(
-        languageFlag: 'assets/images/country_flags/united-kingdom.png',
+        flag: '🇬🇧',
         languageName: tr('english'),
         languageCode: 'en',
       ),
       AppLanguages(
-        languageFlag: 'assets/images/country_flags/united-arab-emirates.png',
+        flag: '🇦🇪',
         languageName: tr('arabic'),
         languageCode: 'ar',
       ),
       AppLanguages(
-        languageFlag: 'assets/images/country_flags/spain.png',
+        flag: '🇪🇸',
         languageName: tr('spanish'),
         languageCode: 'es',
       ),
       AppLanguages(
-        languageFlag: 'assets/images/country_flags/india.png',
+        flag: '🇮🇳',
         languageName: tr('hindi'),
         languageCode: 'hi',
+      ),
+      AppLanguages(
+        flag: '🇮🇹',
+        languageName: tr('italian'),
+        languageCode: 'it',
+      ),
+      AppLanguages(
+        flag: '🇫🇷',
+        languageName: tr('french'),
+        languageCode: 'fr',
       ),
     ];
 
@@ -62,7 +72,7 @@ class AppLanguageChoose extends StatelessWidget {
                   for (final language in appLanguageChoices())
                     SelectableRow(
                       label: language.languageName,
-                      leading: LanguageFlag(language.languageFlag),
+                      leading: LanguageFlag(language.flag),
                       selected: settings.appLanguage == language.languageCode,
                       onTap: () {
                         settings.appLanguage = language.languageCode;

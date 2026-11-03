@@ -42,6 +42,11 @@ class _FlixAiScreenState extends State<FlixAiScreen>
   String? _lastOwner;
   bool _typed = false;
 
+  /// Whether the reader is at the newest message, so a shrinking chat (the
+  /// keyboard opening, or the composer growing) keeps it in view.
+  bool _atLatest = true;
+  double? _viewportHeight;
+
   @override
   void initState() {
     super.initState();
@@ -85,6 +90,23 @@ class _FlixAiScreenState extends State<FlixAiScreen>
             curve: Curves.easeOutCubic));
       }
     });
+  }
+
+  /// Keeps the newest message above the composer when the chat shrinks
+  /// beneath a reader who was already reading it.
+  bool _scrolled(Notification notification) {
+    switch (notification) {
+      case ScrollEndNotification(:final metrics, depth: 0):
+        _atLatest = metrics.extentAfter <= AppSpace.xl;
+      case ScrollMetricsNotification(:final metrics, depth: 0):
+        final height = metrics.viewportDimension;
+        final shrank = _viewportHeight != null && height < _viewportHeight!;
+        _viewportHeight = height;
+        if (shrank && _atLatest && _scroll.hasClients) {
+          _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        }
+    }
+    return false;
   }
 
   void _send([String? suggestion]) {
@@ -200,7 +222,12 @@ class _FlixAiScreenState extends State<FlixAiScreen>
           : SafeArea(
               top: false,
               child: Column(children: [
-                Expanded(child: _conversation(palette)),
+                Expanded(
+                  child: NotificationListener<Notification>(
+                    onNotification: _scrolled,
+                    child: _conversation(palette),
+                  ),
+                ),
                 ReadableWidth(
                   maxWidth: _columnWidth,
                   child: _Composer(

@@ -237,7 +237,20 @@ class PlayerLocalSubtitles {
     );
   }
 
-  Future<void> _pickFiles(
+  /// On TV: the device's picker, then the files straight onto the stream,
+  /// to be chosen from the remote's Subtitles menu. The phone's sheet has
+  /// nothing the remote can reach.
+  Future<void> pickAndApply({
+    required BuildContext context,
+    required BetterPlayerController betterPlayerController,
+  }) async {
+    final picked = await _pickFiles((update) => update(), context);
+    if (picked == 0 || !context.mounted) return;
+    _applySelectedSubtitles(context, betterPlayerController);
+  }
+
+  /// How many subtitle files the picker returned.
+  Future<int> _pickFiles(
       StateSetter setBottomSheetState, BuildContext context) async {
     try {
       final result = await _pickSubtitleFiles();
@@ -269,6 +282,7 @@ class PlayerLocalSubtitles {
             }
           }
         });
+        return subtitles.length;
       }
     } catch (e) {
       if (context.mounted) {
@@ -280,6 +294,7 @@ class PlayerLocalSubtitles {
         );
       }
     }
+    return 0;
   }
 
   static const _subtitleExtensions = ['srt', 'vtt'];

@@ -26,11 +26,16 @@ class AppRemoteConfig {
   static const enableWatchNowKey = 'enable_stream';
   static const enableDownloadKey = 'enable_download';
   static const enableLiveTvKey = 'enable_live_tv';
-  static const adBlockGateEnabledKey = 'ad_block_gate_enabled';
+  /// The ad-blocker check that judges only live Adsterra/ExoClick hosts and
+  /// popups. Builds before it read `ad_block_gate_enabled`, whose generic
+  /// probes stopped viewers who still saw ads; that key stays off for them.
+  static const adBlockGateEnabledKey = 'ad_block_gate_v2_enabled';
   static const bannersKey = 'banners';
-  static const bannerAdNetworkKey = 'banner_ad_network';
+  // v2 alongside the ExoClick v2 keys: builds before it read the unsuffixed
+  // selector, so they can stay on another network while new builds use ExoClick.
+  static const bannerAdNetworkKey = 'banner_ad_network_v2';
   static const bannerAdNetworkTestKey = 'banner_ad_network_test';
-  static const bannerAdNetworkOverridesKey = 'banner_ad_network_overrides';
+  static const bannerAdNetworkOverridesKey = 'banner_ad_network_overrides_v2';
   static const hostedBannerModeKey = 'hosted_banner_mode';
   static const adsterraBannerEnabledKey = 'adsterra_banner_enabled';
   static const adsterraTvEnabledKey = 'adsterra_tv_enabled';
@@ -38,12 +43,15 @@ class AppRemoteConfig {
   static const clickaduBannerEnabledKey = 'clickadu_banner_enabled';
   static const clickaduTvEnabledKey = 'clickadu_tv_enabled';
   static const clickaduBannersKey = 'clickadu_banners';
-  static const exoclickBannerEnabledKey = 'exoclick_banner_enabled';
-  static const exoclickTvEnabledKey = 'exoclick_tv_enabled';
-  static const exoclickBannersKey = 'exoclick_banners';
+  // The v2 keys come with `block_ad_types` support. Builds before it read the
+  // unsuffixed keys and drop the attribute, so they would serve blocked types.
+  static const exoclickBannerEnabledKey = 'exoclick_banner_enabled_v2';
+  static const exoclickTvEnabledKey = 'exoclick_tv_enabled_v2';
+  static const exoclickBannersKey = 'exoclick_banners_v2';
   static const adsterraPlaybackEnabledKey = 'adsterra_playback_enabled';
   static const adsterraPlaybackAdsKey = 'adsterra_playback_ads';
   static const playbackPopunderNetworkKey = 'playback_popunder_network';
+  static const playbackPopunderFallbackKey = 'playback_popunder_fallback';
   static const playbackPopupFrequencyMinutesKey =
       'playback_popup_frequency_minutes';
   static const playbackPopupAutoCloseEnabledKey =
@@ -141,6 +149,8 @@ class AppRemoteConfig {
         adsterraPlaybackEnabledKey: false,
         adsterraPlaybackAdsKey: '{}',
         playbackPopunderNetworkKey: 'adsterra',
+        // Empty: a network with no popup for the viewer leaves none.
+        playbackPopunderFallbackKey: '',
         playbackPopupFrequencyMinutesKey: 0,
         playbackPopupAutoCloseEnabledKey: false,
         playbackPopupExternalBrowserOnTapKey: true,
@@ -342,6 +352,10 @@ class AppRemoteConfig {
     }
     provider.setPlaybackPopunderNetwork(
         AdNetwork.parse(remoteConfig.getString(playbackPopunderNetworkKey)));
+    // A separate key, so builds without fallbacks keep reading one network
+    // from `playback_popunder_network`.
+    provider.setPlaybackPopunderFallbackNetworks(AdNetwork.parseList(
+        remoteConfig.getString(playbackPopunderFallbackKey)));
     provider.setPlaybackPopupFrequencyMinutes(
         remoteConfig.getValue(playbackPopupFrequencyMinutesKey).asInt());
     provider.setPlaybackPopupBrowserBehavior(

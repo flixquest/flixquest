@@ -316,6 +316,10 @@ class _TransactionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final (icon, label) = switch (item.type) {
+      'topup' when item.source == 'patreon' => (
+          PhosphorIcons.heart(),
+          tr('plus_tx_patreon')
+        ),
       'topup' => (PhosphorIcons.arrowDownLeft(), tr('plus_tx_topup')),
       'plus_period' => (PhosphorIcons.calendarCheck(), tr('plus_tx_period')),
       'reversal' => (PhosphorIcons.arrowUUpLeft(), tr('plus_tx_reversal')),

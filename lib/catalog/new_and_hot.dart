@@ -141,6 +141,47 @@ class NewAndHotFeed {
   bool get isEmpty => groups.isEmpty && items.isEmpty;
 }
 
+/// All of New & Hot at once, as the TV lays it out.
+class NewAndHotPage {
+  const NewAndHotPage({
+    this.comingSoon = const <PremiereGroup>[],
+    this.everyoneWatching = const <MediaItem>[],
+    this.topMovies = const <MediaItem>[],
+    this.topSeries = const <MediaItem>[],
+    this.movieGenres = const <Genres>[],
+    this.seriesGenres = const <Genres>[],
+  });
+
+  final List<PremiereGroup> comingSoon;
+  final List<MediaItem> everyoneWatching;
+  final List<MediaItem> topMovies;
+  final List<MediaItem> topSeries;
+  final List<Genres> movieGenres;
+  final List<Genres> seriesGenres;
+
+  bool get isEmpty =>
+      comingSoon.isEmpty &&
+      everyoneWatching.isEmpty &&
+      topMovies.isEmpty &&
+      topSeries.isEmpty;
+
+  /// The coming titles soonest first, each with the day it arrives.
+  List<(DateTime, MediaItem)> get premieres => <(DateTime, MediaItem)>[
+        for (final group in comingSoon)
+          for (final item in group.items) (group.date, item),
+      ];
+
+  /// The genre names of [item], in TMDB's order.
+  List<String> genreNames(MediaItem item) {
+    final genres = item.kind == MediaKind.movie ? movieGenres : seriesGenres;
+    return <String>[
+      for (final id in item.genreIds)
+        for (final genre in genres)
+          if (genre.genreID == id && genre.genreName != null) genre.genreName!,
+    ];
+  }
+}
+
 /// Independent segment loads let the screen cache each one for this visit.
 class NewAndHotCatalog {
   const NewAndHotCatalog(this.source, {this.now = DateTime.now});
@@ -178,6 +219,49 @@ class NewAndHotCatalog {
         return NewAndHotFeed(
             items: topTen(await source.trending(MediaKind.series)));
     }
+  }
+
+  /// Every segment at once, for the TV, which shows them as rows of one
+  /// page. Each list is asked for once: Everyone's Watching and the two
+  /// Top 10s share the day's trending lists.
+  ///
+  /// A list that fails leaves its rows empty and the rest showing; the page
+  /// fails only when none of them loads. Genres are only labels, so they
+  /// never fail it.
+  Future<NewAndHotPage> loadPage() async {
+    final today = now();
+    Object? error;
+    Future<List<T>?> settle<T>(Future<List<T>> load) async {
+      try {
+        return await load;
+      } catch (caught) {
+        error = caught;
+        return null;
+      }
+    }
+
+    final upcoming = settle(source.upcomingMovies());
+    final premieres = settle(source.seriesPremieres(today));
+    final movies = settle(source.trending(MediaKind.movie));
+    final series = settle(source.trending(MediaKind.series));
+    final movieGenres = settle(source.genres(MediaKind.movie));
+    final seriesGenres = settle(source.genres(MediaKind.series));
+    final rows = <List<MediaItem>?>[
+      await upcoming,
+      await premieres,
+      await movies,
+      await series,
+    ];
+    if (rows.every((row) => row == null)) throw error!;
+    List<MediaItem> row(int index) => rows[index] ?? const <MediaItem>[];
+    return NewAndHotPage(
+      comingSoon: groupPremieres(row(0), row(1), today),
+      everyoneWatching: everyoneWatching(row(2), row(3)),
+      topMovies: topTen(row(2)),
+      topSeries: topTen(row(3)),
+      movieGenres: await movieGenres ?? const <Genres>[],
+      seriesGenres: await seriesGenres ?? const <Genres>[],
+    );
   }
 
   /// Both kinds' lists; one failing leaves the other showing, and the

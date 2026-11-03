@@ -15,6 +15,7 @@ import '../../widgets/plus/plus_format.dart';
 import '../../widgets/plus/plus_visuals.dart';
 import '../screens/plus_payment_screen.dart';
 import 'page_kit.dart';
+import 'patreon_sheet.dart';
 import 'pill_button.dart';
 import 'settings_kit.dart';
 
@@ -239,15 +240,30 @@ class _AddFundsSheetState extends State<_AddFundsSheet> {
               SwitchRow(
                 icon: PhosphorIcons.calendarCheck(),
                 label: tr('plus_start_when_confirmed'),
-                subtitle: tr('plus_start_when_confirmed_consent', args: [
-                      formatUsd(plus.chargeFor(price)),
-                      '$interval'
-                    ]) +
+                subtitle: tr('plus_start_when_confirmed_consent',
+                        args: [formatUsd(plus.chargeFor(price)), '$interval']) +
                     discountConsentNote(discount, price),
                 value: _activate,
                 onChanged: (value) => setState(() => _activate = value),
               ),
             ],
+            if (plus.patreonOffer.enabled && plus.patreon?.linked != true)
+              Padding(
+                padding: EdgeInsets.fromLTRB(gutter, AppSpace.sm, gutter, 0),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      if (widget.host.mounted) {
+                        unawaited(showPatreonSheet(widget.host));
+                      }
+                    },
+                    icon: Icon(PhosphorIcons.heart(), size: 18),
+                    label: Text(tr('plus_patreon_row_offer')),
+                  ),
+                ),
+              ),
             Padding(
               padding:
                   EdgeInsets.fromLTRB(gutter, AppSpace.md, gutter, AppSpace.lg),
@@ -341,8 +357,8 @@ class _DiscountLine extends StatelessWidget {
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.only(top: 2),
-          child: Icon(PhosphorIcons.ticket(),
-              size: 18, color: palette.foreground),
+          child:
+              Icon(PhosphorIcons.ticket(), size: 18, color: palette.foreground),
         ),
         const SizedBox(width: AppSpace.sm),
         Expanded(

@@ -25,6 +25,7 @@ import '../../services/adsterra_playback_ads_service.dart';
 import '../../widgets/ad_block_playback_guard.dart';
 import '../../services/analytics_service.dart';
 import '../../services/daddylive_service.dart';
+import '../../services/live_tv_source.dart';
 import '../../services/playback_wake_lock.dart';
 import '../../services/stream_intro_service.dart';
 import 'player/player_preroll_ad.dart';
@@ -62,6 +63,7 @@ class LivePlayer extends StatefulWidget {
     // Keep this opt-in until the native button is made safe for that context.
     this.enableCast = false,
     this.useTvControls = false,
+    this.source = LiveTvSource.daddyLive,
     super.key,
   });
 
@@ -87,6 +89,9 @@ class LivePlayer extends StatefulWidget {
   final void Function(Channel channel)? onChannelSwitch;
   final bool enableCast;
   final bool useTvControls;
+
+  /// The catalog [channels] come from, named in analytics and stream reports.
+  final LiveTvSource source;
 
   @override
   State<LivePlayer> createState() => _LivePlayerState();
@@ -176,6 +181,11 @@ class _LivePlayerState extends State<LivePlayer> {
   Orientation? _lastScreenOrientation;
   bool _landscapeFullscreenRequestPending = false;
 
+  /// The remote's menu over the picture: channels and backup streams are
+  /// chosen here on TV, where the phone's sheets can't be reached.
+  _LiveTvMenu? _tvMenu;
+  String? _tvChannelCategory;
+
   @override
   void initState() {
     super.initState();
@@ -245,6 +255,7 @@ class _LivePlayerState extends State<LivePlayer> {
           return _LivePlayerErrorOverlay(
             message: failure.message,
             retrying: failure.retrying,
+            television: widget.useTvControls,
             onRetry: _retryStream,
             onChannels: canSwitchChannels
                 ? () => unawaited(_showChannelSwitcher())
@@ -524,6 +535,7 @@ class _LivePlayerState extends State<LivePlayer> {
     }
     setState(() => _streamVariants = discovery.variants);
     _variantFailover.add(_streamVariants);
+    if (_tvMenu?.kind == _LiveTvMenuKind.streams) _showTvStreamMenu();
     betterPlayerControlsConfiguration =
         _buildControlsConfiguration(_currentChannelName);
     _betterPlayerController.setBetterPlayerControlsConfiguration(
@@ -1074,6 +1086,7 @@ class _LivePlayerState extends State<LivePlayer> {
   }) {
     widget.analytics.trackLiveTVPlayerEvent(
       surface: widget.analyticsSurface,
+      provider: widget.source.analyticsName,
       sessionId: _sessionId,
       channelId: _currentChannelId ?? 'unknown',
       channelName: _currentChannelName,
@@ -1120,9 +1133,14 @@ class _LivePlayerState extends State<LivePlayer> {
   Future<void> _showChannelSwitcher() async {
     widget.analytics.trackLiveTVInteraction(
       surface: widget.analyticsSurface,
+      provider: widget.source.analyticsName,
       action: 'channel_switcher_opened',
       resultCount: widget.channels.length,
     );
+    if (widget.useTvControls) {
+      _showTvChannelMenu(category: _tvChannelCategory);
+      return;
+    }
     final selected = await showPlayerSheet<Channel>(
       context: context,
       builder: (context) => _ChannelSwitcherSheet(
@@ -1133,6 +1151,7 @@ class _LivePlayerState extends State<LivePlayer> {
     if (selected == null) {
       widget.analytics.trackLiveTVInteraction(
         surface: widget.analyticsSurface,
+        provider: widget.source.analyticsName,
         action: 'channel_switcher_dismissed',
       );
       return;
@@ -1140,7 +1159,156 @@ class _LivePlayerState extends State<LivePlayer> {
     await _switchChannel(selected);
   }
 
+  void _openTvMenu(
+    _LiveTvMenuKind kind,
+    String title,
+    List<BetterPlayerTvMenuItem> items,
+  ) {
+    if (!mounted || !widget.useTvControls || items.isEmpty) return;
+    setState(() => _tvMenu = _LiveTvMenu(kind, title, items));
+    _tvControlsController.hide(preserveFocus: true);
+  }
+
+  void _closeTvMenu() {
+    if (!mounted || _tvMenu == null) return;
+    setState(() => _tvMenu = null);
+    _tvControlsController.show(restorePreviousFocus: true);
+  }
+
+  /// Closed with Back or the close button, without choosing anything.
+  void _dismissTvMenu() {
+    final kind = _tvMenu?.kind;
+    if (kind == _LiveTvMenuKind.channels ||
+        kind == _LiveTvMenuKind.categories) {
+      widget.analytics.trackLiveTVInteraction(
+        surface: widget.analyticsSurface,
+        provider: widget.source.analyticsName,
+        action: 'channel_switcher_dismissed',
+      );
+    }
+    _closeTvMenu();
+  }
+
+  bool _handleTvOverlayBack() {
+    if (_tvMenu == null) return false;
+    _dismissTvMenu();
+    return true;
+  }
+
+  /// The channels, the one being watched first, as the phone's list has
+  /// them. A long list starts with a way into its categories, as the
+  /// episode menu starts with the seasons.
+  void _showTvChannelMenu({String? category}) {
+    _tvChannelCategory = category;
+    var channels = _filterChannels(widget.channels, '', category: category);
+    if (category == null) {
+      final index =
+          channels.indexWhere((channel) => channel.id == _currentChannelId);
+      if (index > 0) {
+        channels = <Channel>[
+          channels[index],
+          ...channels.take(index),
+          ...channels.skip(index + 1),
+        ];
+      }
+    }
+    _openTvMenu(
+      _LiveTvMenuKind.channels,
+      category ?? tr('channels'),
+      <BetterPlayerTvMenuItem>[
+        if (_topCategories(widget.channels).length > 1)
+          BetterPlayerTvMenuItem(
+            label: tr('categories'),
+            subtitle: category ?? tr('all'),
+            icon: PhosphorIcons.squaresFour(),
+            showsNext: true,
+            onSelected: _showTvCategoryMenu,
+          ),
+        for (final channel in channels)
+          BetterPlayerTvMenuItem(
+            label: channel.name,
+            subtitle: channel.nowPlaying?.trim().isNotEmpty == true
+                ? channel.nowPlaying
+                : channel.categories.isEmpty
+                    ? null
+                    : channel.categories.join(' · '),
+            icon: channel.id == _currentChannelId
+                ? PhosphorIcons.playCircle(PhosphorIconsStyle.fill)
+                : PhosphorIcons.televisionSimple(),
+            selected: channel.id == _currentChannelId,
+            onSelected: channel.id == _currentChannelId
+                ? _closeTvMenu
+                : () {
+                    _closeTvMenu();
+                    unawaited(_switchChannel(channel));
+                  },
+          ),
+      ],
+    );
+  }
+
+  void _showTvCategoryMenu() {
+    int count(String? category) => category == null
+        ? widget.channels.length
+        : widget.channels
+            .where((channel) => channel.categories.contains(category))
+            .length;
+    _openTvMenu(
+      _LiveTvMenuKind.categories,
+      tr('categories'),
+      <BetterPlayerTvMenuItem>[
+        for (final (label, value) in <(String, String?)>[
+          (tr('all'), null),
+          for (final category in _topCategories(widget.channels))
+            (category, category),
+        ])
+          BetterPlayerTvMenuItem(
+            label: label,
+            subtitle: tr(
+              'player_channel_count',
+              namedArgs: {'count': '${count(value)}'},
+            ),
+            icon: PhosphorIcons.squaresFour(),
+            selected: _tvChannelCategory == value,
+            showsNext: true,
+            onSelected: () => _showTvChannelMenu(category: value),
+          ),
+      ],
+    );
+  }
+
+  void _showTvStreamMenu() {
+    _openTvMenu(
+      _LiveTvMenuKind.streams,
+      tr('player_backup_streams'),
+      <BetterPlayerTvMenuItem>[
+        for (final (index, variant) in _streamVariants.indexed)
+          BetterPlayerTvMenuItem(
+            label: variant.title ?? '${tr('player_stream')} ${index + 1}',
+            subtitle: <String>[
+              if (variant.url == _currentVideoUrl) tr('player_now_playing'),
+              variant.mediaType.toUpperCase(),
+            ].join('  •  '),
+            icon: variant.url == _currentVideoUrl
+                ? PhosphorIcons.playCircle(PhosphorIconsStyle.fill)
+                : PhosphorIcons.hardDrives(),
+            selected: variant.url == _currentVideoUrl,
+            onSelected: variant.url == _currentVideoUrl
+                ? _closeTvMenu
+                : () {
+                    _closeTvMenu();
+                    unawaited(_switchVariant(variant));
+                  },
+          ),
+      ],
+    );
+  }
+
   Future<void> _showStreamVariantSwitcher() async {
+    if (widget.useTvControls) {
+      _showTvStreamMenu();
+      return;
+    }
     final selected = await showPlayerSheet<LiveStreamVariant>(
       context: context,
       builder: (sheetContext) => StreamBuilder<List<LiveStreamVariant>>(
@@ -1259,6 +1427,7 @@ class _LivePlayerState extends State<LivePlayer> {
     final stopwatch = Stopwatch()..start();
     widget.analytics.trackLiveTVInteraction(
       surface: widget.analyticsSurface,
+      provider: widget.source.analyticsName,
       action: 'channel_switch_requested',
       value: 'player',
     );
@@ -1297,6 +1466,7 @@ class _LivePlayerState extends State<LivePlayer> {
       );
       widget.analytics.trackLiveTVStreamResolution(
         surface: widget.analyticsSurface,
+        provider: widget.source.analyticsName,
         channelId: channel.id,
         channelName: channel.name,
         outcome: 'success',
@@ -1309,6 +1479,7 @@ class _LivePlayerState extends State<LivePlayer> {
       if (!_isActiveSourceOperation(operation)) return;
       widget.analytics.trackLiveTVStreamResolution(
         surface: widget.analyticsSurface,
+        provider: widget.source.analyticsName,
         channelId: channel.id,
         channelName: channel.name,
         outcome: 'error',
@@ -1368,6 +1539,7 @@ class _LivePlayerState extends State<LivePlayer> {
     }
     widget.analytics.trackLiveTVSessionEnded(
       surface: widget.analyticsSurface,
+      provider: widget.source.analyticsName,
       sessionId: _sessionId,
       channelId: _currentChannelId ?? 'unknown',
       channelName: _currentChannelName,
@@ -1435,6 +1607,7 @@ class _LivePlayerState extends State<LivePlayer> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
+        if (widget.useTvControls && _handleTvOverlayBack()) return;
         if (widget.useTvControls && _tvControlsController.handleBack()) return;
         _exitPlayer();
       },
@@ -1521,6 +1694,16 @@ class _LivePlayerState extends State<LivePlayer> {
                     ),
                   ),
                 ),
+                if (_tvMenu case final menu?)
+                  Positioned.fill(
+                    child: BetterPlayerTvMenu(
+                      title: menu.title,
+                      strings: playerControlsStrings(),
+                      items: menu.items,
+                      onClose: _dismissTvMenu,
+                      accentColor: widget.colors.first,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1632,8 +1815,8 @@ class _LivePlayerState extends State<LivePlayer> {
       surface: widget.useTvControls ? 'tv' : 'mobile',
       channelId: _currentChannelId,
       initialChannelId: _initialFeedbackChannel,
-      provider: 'dlhd',
-      initialProvider: 'dlhd',
+      provider: widget.source.reportId,
+      initialProvider: widget.source.reportId,
       sourceSwitches: _feedbackChannelSwitches,
       videoHeight: value?.size?.height.round(),
       connectionType: _feedbackConnection.type,
@@ -2097,6 +2280,16 @@ class _ChannelLogo extends StatelessWidget {
   }
 }
 
+enum _LiveTvMenuKind { channels, categories, streams }
+
+class _LiveTvMenu {
+  const _LiveTvMenu(this.kind, this.title, this.items);
+
+  final _LiveTvMenuKind kind;
+  final String title;
+  final List<BetterPlayerTvMenuItem> items;
+}
+
 class _LivePlaybackFailure {
   const _LivePlaybackFailure({required this.message, this.retrying = false});
 
@@ -2109,11 +2302,16 @@ class _LivePlayerErrorOverlay extends StatelessWidget {
     required this.message,
     required this.retrying,
     required this.onRetry,
+    this.television = false,
     this.onChannels,
   });
 
   final String message;
   final bool retrying;
+
+  /// Focuses Retry, so the remote lands on the actions rather than on
+  /// controls hidden behind the error.
+  final bool television;
   final VoidCallback onRetry;
   final VoidCallback? onChannels;
 
@@ -2143,6 +2341,7 @@ class _LivePlayerErrorOverlay extends StatelessWidget {
           label: tr('retry'),
           icon: PhosphorIcons.arrowClockwise(),
           primary: true,
+          autofocus: television,
           onPressed: onRetry,
         ),
         if (onChannels != null)

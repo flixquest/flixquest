@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/live_tv.dart';
 import 'dlhd_playback_proxy.dart';
+import 'live_hls_probe.dart';
 
 /// Traces DLHD stream extraction to the console so a failing channel shows
 /// which step broke. Disabled in release builds: the logged URLs carry
@@ -61,7 +62,9 @@ String friendlyLiveTvError(Object error) {
     return 'Live TV returned an invalid response. Please try again later.';
   }
   if (RegExp(
-    r'https?://|uri[=:]|platformexception|methodchannel|stack trace|flixquest',
+    // Upstream names stay out of sight, as the source switch masks them.
+    r'https?://|uri[=:]|platformexception|methodchannel|stack trace|flixquest'
+    r'|dlhd|daddy|ntv',
     caseSensitive: false,
   ).hasMatch(raw)) {
     return unavailable;
@@ -86,57 +89,12 @@ class DaddyLiveCatalog {
     required this.categories,
   });
 
-  final List<Channel> channels;
-  final DaddyLiveEpg epg;
-  final List<String> categories;
-}
-
-abstract interface class LiveTvService {
-  Future<DaddyLiveCatalog> getCatalog({bool refresh = false});
-
-  Future<DaddyLiveStream> getStream(String channelId);
-
-  void close();
-}
-
-class DaddyLiveService implements LiveTvService {
-  DaddyLiveService({required String baseUrl, http.Client? client})
-      : _baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), ''),
-        _client = client ?? http.Client();
-
-  static const String _browserUserAgent =
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
-      '(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
-  static const String _siteReferer = 'https://dlhd.st/';
-  static const Duration _pageTimeout = Duration(seconds: 15);
-  static const int _maxEmbedDepth = 2;
-
-  final String _baseUrl;
-  final http.Client _client;
-  final Map<String, String> _watchUrlsByChannel = <String, String>{};
-  final _discoveries = <LiveStreamDiscovery>{};
-  final _loaderUrlsByEmbed = <String, Future<String>>{};
-  final _loaderProxies = <DlhdPlaybackProxy>[];
-  bool _closed = false;
-
-  Uri _uri(String path, [Map<String, String>? query]) =>
-      Uri.parse('$_baseUrl$path').replace(queryParameters: query);
-
-  @override
-  Future<DaddyLiveCatalog> getCatalog({bool refresh = false}) async {
-    // The channel directory and guide are independent upstream pages. A DLHD
-    // schedule outage must not take the 24/7 channel browser down with it.
-    final channelsFuture = getChannels(refresh: refresh);
-    final epgFuture = () async {
-      try {
-        return await getEpg(refresh: refresh);
-      } catch (error) {
-        _log('EPG failed, continuing without a guide: $error');
-        return const DaddyLiveEpg(timezone: '', days: <DaddyLiveEpgDay>[]);
-      }
-    }();
-    final channels = await channelsFuture;
-    final epg = await epgFuture;
+  /// [channels] with what [epg] says of each: the categories and events it
+  /// airs, and what is on now and next.
+  factory DaddyLiveCatalog.fromGuide(
+    List<Channel> channels,
+    DaddyLiveEpg epg,
+  ) {
     final categoriesByChannel = <String, Set<String>>{};
     final eventsByChannel = <String, Set<String>>{};
     final nowPlayingByChannel = <String, String>{};
@@ -195,6 +153,60 @@ class DaddyLiveService implements LiveTvService {
     );
   }
 
+  final List<Channel> channels;
+  final DaddyLiveEpg epg;
+  final List<String> categories;
+}
+
+abstract interface class LiveTvService {
+  Future<DaddyLiveCatalog> getCatalog({bool refresh = false});
+
+  Future<DaddyLiveStream> getStream(String channelId);
+
+  void close();
+}
+
+class DaddyLiveService implements LiveTvService {
+  DaddyLiveService({required String baseUrl, http.Client? client})
+      : _baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), ''),
+        _client = client ?? http.Client();
+
+  static const String _browserUserAgent =
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
+  static const String _siteReferer = 'https://dlhd.st/';
+  static const Duration _pageTimeout = Duration(seconds: 15);
+  static const int _maxEmbedDepth = 3;
+
+  final String _baseUrl;
+  final http.Client _client;
+  final Map<String, String> _watchUrlsByChannel = <String, String>{};
+  final _discoveries = <LiveStreamDiscovery>{};
+  final _loaderUrlsByEmbed = <String, Future<String>>{};
+  final _loaderProxies = <DlhdPlaybackProxy>[];
+  bool _closed = false;
+
+  Uri _uri(String path, [Map<String, String>? query]) =>
+      Uri.parse('$_baseUrl$path').replace(queryParameters: query);
+
+  @override
+  Future<DaddyLiveCatalog> getCatalog({bool refresh = false}) async {
+    // The channel directory and guide are independent upstream pages. A DLHD
+    // schedule outage must not take the 24/7 channel browser down with it.
+    final channelsFuture = getChannels(refresh: refresh);
+    final epgFuture = () async {
+      try {
+        return await getEpg(refresh: refresh);
+      } catch (error) {
+        _log('EPG failed, continuing without a guide: $error');
+        return const DaddyLiveEpg(timezone: '', days: <DaddyLiveEpgDay>[]);
+      }
+    }();
+    final channels = await channelsFuture;
+    final epg = await epgFuture;
+    return DaddyLiveCatalog.fromGuide(channels, epg);
+  }
+
   Future<List<Channel>> getChannels({bool refresh = false}) async {
     final json = await _getJson(
       _uri('/api/v2/dlhd/channels', <String, String>{
@@ -222,7 +234,7 @@ class DaddyLiveService implements LiveTvService {
 
   /// Resolves the first locally playable DLHD player for [channelId].
   ///
-  /// DLHD currently exposes Player 1 through Player 6 on each watch page. Its
+  /// DLHD exposes several player buttons on each watch page. Its
   /// signed playlists are bound to the IP that opened the final embed, so URLs
   /// extracted by the metadata API are intentionally not trusted here. The
   /// device fetches the watch page, follows every player/iframe chain, and
@@ -252,8 +264,26 @@ class DaddyLiveService implements LiveTvService {
     _log('channel $channelId: watch page failed, trying scraper fallback');
 
     // If DLHD moved mirrors or refused its heavy watch page, ask the configured
-    // scraper only for its final embed location. M3U8 extraction still happens
-    // locally, so the signed token belongs to the playback device's IP.
+    // scraper only where the players' streams live. M3U8 extraction still
+    // happens locally, so the signed token belongs to the playback device's IP.
+    final embeds = await _scraperEmbeds(channelId);
+    if (embeds != null) {
+      _log('channel $channelId: scraper returned ${embeds.length} embed(s)');
+      final stream = await _resolvePlayers(embeds, referer: watchUrl);
+      if (stream != null) {
+        _log(
+          'channel $channelId: OK via scraper embeds in '
+          '${stopwatch.elapsedMilliseconds}ms',
+        );
+        return stream;
+      }
+      _log('channel $channelId: no scraper embed played, trying /stream');
+    }
+
+    // Scrapers from before /embeds sign one stream and return its embed. A
+    // newer one is asked too when none of its embeds played: /stream checks
+    // each playlist and keeps searching sibling frames, where /embeds stops
+    // at the first page with a playlist link.
     try {
       final json = await _getJson(
         _uri('/api/v2/dlhd/channels/${Uri.encodeComponent(channelId)}/stream'),
@@ -262,8 +292,7 @@ class DaddyLiveService implements LiveTvService {
       final embedUrl = metadata.embedUrl.trim();
       _log(
         'channel $channelId: scraper returned '
-        'embedUrl=${embedUrl.isEmpty ? '<empty>' : embedUrl} '
-        'url=${metadata.url.isEmpty ? '<empty>' : metadata.url}',
+        'embedUrl=${embedUrl.isEmpty ? '<empty>' : embedUrl}',
       );
       if (embedUrl.isNotEmpty) {
         final resolved = await _resolvePlayer(
@@ -279,35 +308,6 @@ class DaddyLiveService implements LiveTvService {
           return _streamFromResolvedPlayers(<_ResolvedDlhdPlayer>[resolved]);
         }
         _log('channel $channelId: scraper embed yielded no playable m3u8');
-      }
-      // A same-egress development setup can occasionally use the server URL,
-      // but only after the device itself proves that the manifest is valid.
-      final headers = _playbackHeaders(metadata.headers);
-      if (metadata.url.isNotEmpty && await _isPlayable(metadata.url, headers)) {
-        final variant = LiveStreamVariant(
-          url: metadata.url,
-          headers: headers,
-          mediaType: metadata.mediaType,
-          clearKey: metadata.clearKey,
-          title: 'Stream 1',
-        );
-        _log(
-          'channel $channelId: OK via scraper URL in '
-          '${stopwatch.elapsedMilliseconds}ms',
-        );
-        return DaddyLiveStream(
-          url: variant.url,
-          headers: variant.headers,
-          embedUrl: embedUrl,
-          expiresAt: _streamExpiry(variant.url),
-          mediaType: variant.mediaType,
-          clearKey: variant.clearKey,
-          title: variant.title,
-          variants: <LiveStreamVariant>[variant],
-        );
-      }
-      if (metadata.url.isNotEmpty) {
-        _log('channel $channelId: scraper URL is not playable from here');
       }
     } catch (error) {
       // The local page walk already failed. Surface one stable message below.
@@ -336,10 +336,76 @@ class DaddyLiveService implements LiveTvService {
     return result;
   }
 
+  /// Each player's stream page, as the scraper finds them, or null when the
+  /// scraper can't say (one from before `/embeds`, a failed request, or an
+  /// answer without embeds).
+  Future<List<_DlhdPlayer>?> _scraperEmbeds(String channelId) async {
+    try {
+      final json = await _getJson(
+        _uri('/api/v2/dlhd/channels/${Uri.encodeComponent(channelId)}/embeds'),
+      );
+      final listed = json['embeds'];
+      final embeds = (listed is List<dynamic> ? listed : const <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .where((embed) =>
+              embed['embedUrl']?.toString().trim().isNotEmpty == true)
+          .toList(growable: false);
+      if (embeds.isEmpty) {
+        _log('channel $channelId: scraper listed no embeds');
+        return null;
+      }
+      return <_DlhdPlayer>[
+        for (final (index, embed) in embeds.indexed)
+          _DlhdPlayer(
+            label: 'Stream ${index + 1}',
+            url: embed['embedUrl'].toString().trim(),
+            referer: embed['referer']?.toString().trim(),
+          ),
+      ];
+    } catch (error) {
+      _log('channel $channelId: scraper embeds unavailable: $error');
+      return null;
+    }
+  }
+
+  /// The first of [players] that plays, with the rest resolving on demand as
+  /// its backups.
+  Future<DaddyLiveStream?> _resolvePlayers(
+    List<_DlhdPlayer> players, {
+    required String referer,
+  }) async {
+    for (var index = 0; index < players.length && !_closed; index++) {
+      final resolved = await _resolvePlayer(players[index], referer: referer);
+      if (resolved == null) continue;
+      LiveStreamDiscovery? discovery;
+      if (index + 1 < players.length) {
+        discovery = LiveStreamDiscovery(
+          initial: resolved.variant,
+          backups: [
+            for (final player in players.skip(index + 1))
+              () async => (await _resolvePlayer(
+                    player,
+                    referer: referer,
+                    cancelled: () => _closed || discovery!.isDisposed,
+                  ))
+                      ?.variant,
+          ],
+        );
+        _discoveries.removeWhere((item) => item.isDisposed);
+        _discoveries.add(discovery);
+      }
+      return _streamFromResolvedPlayers([resolved], discovery: discovery);
+    }
+    return null;
+  }
+
   Future<DaddyLiveStream?> _resolveFromWatchPage(String watchUrl) async {
     try {
       final response = await _getHtml(watchUrl, referer: _siteReferer);
-      final finalWatchUrl = response.request?.url.toString() ?? watchUrl;
+      final finalWatchUrl = _canonicalWatchUrl(
+        response.body,
+        response.request?.url.toString() ?? watchUrl,
+      );
       final players = _extractPlayers(response.body, finalWatchUrl);
       _log(
         'watch page ${response.statusCode}'
@@ -355,31 +421,8 @@ class DaddyLiveService implements LiveTvService {
         return null;
       }
 
-      for (var index = 0; index < players.length && !_closed; index++) {
-        final resolved = await _resolvePlayer(
-          players[index],
-          referer: finalWatchUrl,
-        );
-        if (resolved == null) continue;
-        LiveStreamDiscovery? discovery;
-        if (index + 1 < players.length) {
-          discovery = LiveStreamDiscovery(
-            initial: resolved.variant,
-            backups: [
-              for (final player in players.skip(index + 1))
-                () async => (await _resolvePlayer(
-                      player,
-                      referer: finalWatchUrl,
-                      cancelled: () => _closed || discovery!.isDisposed,
-                    ))
-                        ?.variant,
-            ],
-          );
-          _discoveries.removeWhere((item) => item.isDisposed);
-          _discoveries.add(discovery);
-        }
-        return _streamFromResolvedPlayers([resolved], discovery: discovery);
-      }
+      final stream = await _resolvePlayers(players, referer: finalWatchUrl);
+      if (stream != null) return stream;
       _log('every player on the watch page failed');
     } catch (error) {
       // A mirror refusal is handled by the metadata fallback in getStream().
@@ -395,10 +438,10 @@ class DaddyLiveService implements LiveTvService {
     bool Function()? cancelled,
   }) async {
     final queue = <({String url, String referer, int depth})>[
-      (url: player.url, referer: referer, depth: 0),
+      (url: player.url, referer: player.referer ?? referer, depth: 0),
     ];
     final visited = <String>{};
-    while (queue.isNotEmpty) {
+    while (queue.isNotEmpty && visited.length < 16) {
       if (_closed || cancelled?.call() == true) return null;
       final page = queue.removeAt(0);
       if (!visited.add(page.url)) continue;
@@ -453,13 +496,14 @@ class DaddyLiveService implements LiveTvService {
         );
         for (final candidate in candidates) {
           if (_closed || cancelled?.call() == true) return null;
-          if (await _isPlayable(candidate, headers)) {
+          final playableUrl = await _playableUrl(candidate, headers);
+          if (playableUrl != null) {
             if (_closed || cancelled?.call() == true) return null;
             _log('${player.label}: playable $candidate');
             return _ResolvedDlhdPlayer(
               embedUrl: finalUrl,
               variant: LiveStreamVariant(
-                url: candidate,
+                url: playableUrl,
                 headers: headers,
                 mediaType: 'hls',
                 title: player.label,
@@ -536,6 +580,20 @@ class DaddyLiveService implements LiveTvService {
       throw DaddyLiveException('DLHD page returned ${response.statusCode}.');
     }
     return response;
+  }
+
+  String _canonicalWatchUrl(String html, String responseUrl) {
+    for (final match
+        in RegExp(r'<link\b[^>]*>', caseSensitive: false).allMatches(html)) {
+      final tag = match.group(0)!;
+      if (_htmlAttribute(tag, 'rel')?.toLowerCase() != 'canonical') continue;
+      final href = _htmlAttribute(tag, 'href');
+      final canonical = href == null
+          ? null
+          : _absoluteHttpUrl(_decodeHtml(href), responseUrl);
+      if (canonical != null) return canonical;
+    }
+    return responseUrl;
   }
 
   List<_DlhdPlayer> _extractPlayers(String html, String pageUrl) {
@@ -632,29 +690,20 @@ class DaddyLiveService implements LiveTvService {
     };
   }
 
-  Future<bool> _isPlayable(
+  Future<String?> _playableUrl(
     String url,
     Map<String, String> headers,
   ) async {
     try {
-      final response = await _client
-          .get(Uri.parse(url), headers: headers)
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        _log('m3u8 rejected, HTTP ${response.statusCode}: $url');
-        return false;
-      }
-      final body = utf8.decode(response.bodyBytes);
-      final trimmed = body.trimLeft();
-      final playable = trimmed.startsWith('#EXTM3U') &&
-          (body.contains('#EXT-X-STREAM-INF') || body.contains('#EXTINF'));
-      if (!playable) {
-        _log('m3u8 rejected, not a playlist: $url -> ${_snippet(body)}');
-      }
-      return playable;
+      final playable = await probeLiveHls(
+        Uri.parse(url),
+        client: _client,
+        headers: headers,
+      );
+      return playable.toString();
     } catch (error) {
       _log('m3u8 rejected, $error: $url');
-      return false;
+      return null;
     }
   }
 
@@ -812,10 +861,13 @@ class DaddyLiveService implements LiveTvService {
 }
 
 class _DlhdPlayer {
-  const _DlhdPlayer({required this.label, required this.url});
+  const _DlhdPlayer({required this.label, required this.url, this.referer});
 
   final String label;
   final String url;
+
+  /// The page that framed [url], when it isn't the watch page.
+  final String? referer;
 }
 
 class _ResolvedDlhdPlayer {

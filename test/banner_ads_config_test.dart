@@ -266,6 +266,94 @@ void main() {
     expect(unit.html, contains('%22&amp;y=1'));
   });
 
+  test('ExoClick sub IDs come from the placement, then unit, then catalog', () {
+    final config = BannerAdsConfig.parse(
+        jsonEncode({
+          'script_url': 'https://exo.example/ad-provider.js',
+          'class_name': 'eas6a97888e10',
+          'sub': 100,
+          'units': {
+            'a': {'zone_id': '3001', 'size': '300x250'},
+            'b': {'zone_id': '3002', 'size': '300x250', 'sub': '200'},
+            'c': {'zone_id': '3003', 'size': '300x250', 'sub': 'bad'},
+          },
+          'placements': {
+            'catalog': ['a'],
+            'unit': ['b'],
+            'slot': {
+              'units': ['b'],
+              'sub': 300
+            },
+            'bad_slot': {
+              'units': ['a'],
+              'sub': -1
+            },
+            'invalid_unit': ['c'],
+          },
+        }),
+        network: AdNetwork.exoclick,
+        enabled: true);
+    String? tag(String placement) => config.resolve(placement)?.html;
+
+    expect(tag('catalog'), contains('data-zoneid="3001" data-sub="100"></ins>'));
+    expect(tag('unit'), contains('data-sub="200"'));
+    expect(tag('slot'), contains('data-zoneid="3002" data-sub="300"'));
+    expect(tag('bad_slot'), contains('data-sub="100"'));
+    expect(tag('invalid_unit'), contains('data-sub="100"'));
+    expect(config.units['b'], isNot(config.resolve('slot')));
+
+    final plain = BannerAdsConfig.parse(
+        jsonEncode({
+          'script_url': 'https://exo.example/ad-provider.js',
+          'class_name': 'eas6a97888e10',
+          'units': {
+            'a': {'zone_id': '3001', 'size': '300x250', 'sub': 0},
+          },
+          'defaults': {
+            'tall': ['a']
+          },
+        }),
+        network: AdNetwork.exoclick,
+        enabled: true);
+    expect(plain.resolve('any', tall: true)?.html, isNot(contains('data-sub')));
+  });
+
+  test('ExoClick passes the blocked ad types from the catalog or the unit', () {
+    String tag(Map<String, Object?> catalog, [Map<String, Object?>? unit]) {
+      final config = BannerAdsConfig.parse(
+          jsonEncode({
+            'script_url': 'https://exo.example/ad-provider.js',
+            'class_name': 'eas6a97888e10',
+            ...catalog,
+            'units': {
+              'a': {'zone_id': '3001', 'size': '300x250', ...?unit},
+            },
+          }),
+          network: AdNetwork.exoclick,
+          enabled: true);
+      return config.units['a']?.html ?? 'rejected';
+    }
+
+    expect(tag({}), isNot(contains('data-block-ad-types')));
+    expect(tag({'block_ad_types': 0}), isNot(contains('data-block-ad-types')));
+    expect(tag({'block_ad_types': ''}), isNot(contains('data-block-ad-types')));
+    expect(tag({'block_ad_types': 101}),
+        contains('data-zoneid="3001" data-block-ad-types="101"></ins>'));
+    expect(tag({'block_ad_types': '101, 102'}),
+        contains('data-block-ad-types="101,102"'));
+    expect(tag({'block_ad_types': [101, '105']}),
+        contains('data-block-ad-types="101,105"'));
+    expect(tag({'block_ad_types': 'banners-video'}),
+        contains('data-block-ad-types="banners-video"'));
+    expect(tag({'block_ad_types': 101}, {'block_ad_types': '102'}),
+        contains('data-block-ad-types="102"'));
+    expect(tag({'block_ad_types': 101}, {'block_ad_types': 0}),
+        isNot(contains('data-block-ad-types')));
+    for (final bad in <Object>[-1, 1.5, '2"', '101,,102', '101 102', true]) {
+      expect(tag({}, {'block_ad_types': bad}), 'rejected', reason: '$bad');
+    }
+  });
+
   test('ExoClick remote gates and slot overrides update independently',
       () async {
     final remote = FakeFirebaseRemoteConfig();

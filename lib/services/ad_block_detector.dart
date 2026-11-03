@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/adsterra_playback_ads_config.dart';
 import '../provider/app_dependency_provider.dart';
+import 'ad_delivery.dart';
 
 /// Resolves a host with the device's own DNS, the path every ad request takes.
 typedef HostLookup = Future<List<InternetAddress>> Function(String host);
@@ -20,6 +21,8 @@ typedef AdBlockCheck = Future<bool> Function();
 /// network filters such as Pi-hole. Apps have no browser extensions, so this
 /// is how Android users block FlixQuest's ads.
 ///
+/// Only the hosts FlixQuest's live ads load from are probed ([adHosts]), so a
+/// blocker that leaves Adsterra and ExoClick alone never stops playback.
 /// A blocker is reported on positive evidence; inconclusive checks let
 /// playback continue:
 /// - an ad host answers with a sinkhole address (`0.0.0.0`, `::`, loopback);
@@ -49,54 +52,98 @@ class AdBlockDetector {
     'https://dns.google/resolve',
   ];
 
-  /// A stable ad-domain probe catches DNS filtering even when a network's
-  /// rotating script/smartlink domains have not reached blocklists yet.
-  /// This is only a DNS lookup; no ad is requested from this host.
-  static const dnsProbeHosts = {
-    'doubleclick.net',
-    'pagead2.googlesyndication.com',
-    'ads.pubmatic.com',
-  };
   static const dnsControlHosts = {'example.com', 'www.wikipedia.org'};
 
-  /// The live banner catalog, Adsterra placements, selected popup networks
-  /// and enabled VAST tags. FlixQuest-hosted pages are not ad hosts.
-  static Set<String> adHosts(AppDependencyProvider provider) {
-    final playback = provider.adsterraPlaybackAds;
-    final popups = [
-      for (final network in {
-        provider.playbackPopunderNetwork,
-        provider.tvPlaybackPopunderNetwork,
-      })
-        if (network != null && network != AdNetwork.adsterra)
-          provider.popunderAdsFor(network),
-    ];
-    final placements = <PlaybackAdPlacement?>[
-      if (playback.enabled) ...[
-        playback.interstitial,
-        playback.popunder,
-        playback.tvPopunder,
-        ...playback.triggerPlacements.values,
-        ...?playback.streamFoundExperiment?.variants
-            .map((variant) => variant.placement),
-      ],
-      for (final popup in popups)
-        if (popup.enabled) ...[
-          popup.popunder,
-          popup.tvPopunder,
-          ...popup.triggerPlacements.values,
-        ],
-    ];
+  /// FlixQuest's own pages and redirectors; never an ad host.
+  static bool isFirstPartyHost(String host) =>
+      host == 'flix.quest' || host.endsWith('.flix.quest');
+
+  /// Where the ads this device requests first load from: banners and VAST
+  /// tags switched on for it, Adsterra's Social Bar on phones, and each popup
+  /// stage's primary network. Fallback networks serve only when the primary
+  /// answers with no ad, so they are judged by their own popup when it runs
+  /// ([AdDelivery]). A null source (a hosted tag page) cannot be judged.
+  /// Only these are probed: a blocker that stops ad domains FlixQuest does
+  /// not use leaves its ads showing.
+  static Set<Uri?> adSources(AppDependencyProvider provider,
+      {bool television = false}) {
+    final adsterra = provider.adsterraPlaybackAds;
+    final socialBar = adsterra.interstitial;
     return {
       for (final catalog in provider.activeBannerCatalogs)
-        for (final unit in catalog.units.values) unit.scriptUrl.host,
-      for (final placement in placements) ...[
-        if (placement?.scriptUrl != null) placement!.scriptUrl!.host,
-        if (placement?.smartlinkUrl != null) placement!.smartlinkUrl!.host,
-      ],
-      if (provider.vastPreroll.enabled)
-        for (final source in provider.vastPreroll.sources) source.tagUrl.host,
-    }..removeWhere((host) => host.isEmpty);
+        if (!television || catalog.tvEnabled)
+          for (final unit in catalog.units.values) unit.scriptUrl,
+      if (adsterra.enabled && !television && socialBar != null)
+        _source(socialBar),
+      ...provider.vastPreroll
+          .sourcesFor(television: television)
+          .take(1)
+          .map((source) => source.tagUrl),
+      for (final stage in television
+          ? const [PlaybackAdStage.streamFound]
+          : [PlaybackAdStage.streamFound, ...PlaybackAdStage.triggers])
+        for (final placement in _primaryPopups(provider, stage, television))
+          _source(placement),
+    };
+  }
+
+  /// Every third-party host in [adSources].
+  static Set<String> adHosts(AppDependencyProvider provider,
+          {bool television = false}) =>
+      {
+        for (final source in adSources(provider, television: television))
+          if (source != null && !isFirstPartyHost(source.host)) source.host,
+      }..remove('');
+
+  /// Direct links served through FlixQuest, such as ExoClick's
+  /// `flix.quest/api/exoclick-popup`, whose ad host rotates on the server.
+  static Set<Uri> adRedirects(AppDependencyProvider provider,
+          {bool television = false}) =>
+      {
+        for (final source in adSources(provider, television: television))
+          if (source != null && isFirstPartyHost(source.host)) source,
+      };
+
+  /// A FlixQuest-hosted tag page loads its network's scripts out of sight,
+  /// so it is an unknown (null) source.
+  static Uri? _source(PlaybackAdPlacement placement) =>
+      placement.smartlinkUrl ?? placement.scriptUrl;
+
+  /// Mirrors the playback ad service: the first network, the selected one
+  /// or else a fallback, that has a placement for [stage], with every
+  /// experiment variant viewers rotate through. TV only has `tv_popunder`.
+  static List<PlaybackAdPlacement> _primaryPopups(
+      AppDependencyProvider provider, PlaybackAdStage stage, bool television) {
+    final selected = television
+        ? provider.tvPlaybackPopunderNetwork
+        : provider.playbackPopunderNetwork;
+    if (selected == null ||
+        (stage.triggerKey != null &&
+            provider.popupTrigger(stage)?.enabled != true)) {
+      return const [];
+    }
+    final adsterra = provider.adsterraPlaybackAds;
+    for (final network in {
+      selected,
+      ...provider.playbackPopunderFallbackNetworks,
+    }) {
+      if (network == AdNetwork.adsterra) {
+        final placement = adsterra.forStage(stage, television: television);
+        if (placement == null) continue;
+        return [
+          placement,
+          if (stage == PlaybackAdStage.streamFound && !television)
+            ...[...?adsterra.streamFoundExperiment?.variants]
+                .map((variant) => variant.placement),
+        ];
+      }
+      final popup = provider.popunderAdsFor(network);
+      final placement = stage == PlaybackAdStage.streamFound
+          ? popup.activeFor(television: television)
+          : popup.activeForTrigger(stage);
+      if (placement != null) return [placement];
+    }
+    return const [];
   }
 
   /// What blockers answer instead of a real address.
@@ -113,8 +160,12 @@ class AdBlockDetector {
     return address.isLoopback || bytes.every((byte) => byte == 0);
   }
 
+  /// Any blocked host in [hosts] counts. [observedBlocked] hosts failed for a real popup ([AdDelivery.blocked]);
+  /// they count once public DNS shows the host exists and local DNS is
+  /// healthy, so a retired domain or an offline device is never blamed.
   Future<bool> isBlocking(Set<String> hosts,
-      {Iterable<AdBlockCheck> additionalChecks = const []}) async {
+      {Set<String> observedBlocked = const {},
+      Iterable<AdBlockCheck> additionalChecks = const []}) async {
     if (hosts.isEmpty && additionalChecks.isEmpty) return false;
     Future<bool>? controls;
     Future<bool> healthyDns() => controls ??= Stream<_LocalAnswer>.fromFutures(
@@ -123,7 +174,9 @@ class AdBlockDetector {
     try {
       return await Stream<bool>.fromFutures([
         for (final host in hosts)
-          _guard(() => _isHostBlocked(host, healthyDns)),
+          _guard(() => observedBlocked.contains(host)
+              ? _isObservedBlockConfirmed(host, healthyDns)
+              : _isHostBlocked(host, healthyDns)),
         for (final check in additionalChecks) _guard(check),
       ]).any((blocked) => blocked).timeout(timeout);
     } on TimeoutException {
@@ -161,6 +214,13 @@ class AdBlockDetector {
       }
     }
     return false;
+  }
+
+  Future<bool> _isObservedBlockConfirmed(
+      String host, Future<bool> Function() healthyDns) async {
+    if (await _publicLookup(host) != true || !await healthyDns()) return false;
+    debugPrint('[AdBlockDetector] a popup could not reach $host');
+    return true;
   }
 
   Future<_LocalAnswer> _resolveLocally(String host) async {

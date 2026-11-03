@@ -30,10 +30,11 @@ class LaravelSyncCoordinator {
       : wellness = wellness ?? WellnessDatabaseController.instance,
         _openLibrary = openLibrary ?? LocalLibrary.open,
         _openPlaylists = openPlaylists ?? PlaylistStore.forOwner {
+    // Every bookmark answer is the account's whole library.
     bookmarks = SyncRunner(
         canSync: () => canSync,
-        autoInterval: const Duration(minutes: 10),
-        debounce: const Duration(seconds: 3),
+        autoInterval: const Duration(minutes: 30),
+        debounce: const Duration(seconds: 10),
         run: (owner, current) async {
           final db = await _openLibrary(owner);
           await BookmarkSyncEngine(bookmarkRepository)
@@ -43,10 +44,12 @@ class LaravelSyncCoordinator {
                 'sync.$owner.bookmarks.last_synced', clock.nowUtcMs());
           }
         });
+    // The player saves on every play and pause, and each upload locks the
+    // account on Laravel; leaving the app flushes what is waiting.
     recents = SyncRunner(
         canSync: () => canSync,
-        autoInterval: const Duration(minutes: 2),
-        debounce: const Duration(seconds: 5),
+        autoInterval: const Duration(minutes: 5),
+        debounce: const Duration(seconds: 30),
         run: (owner, current) async {
           final db = await _openLibrary(owner);
           await RecentSyncEngine(recentRepository, clock).sync(
@@ -55,7 +58,7 @@ class LaravelSyncCoordinator {
         });
     playlists = SyncRunner(
         canSync: () => canSync && playlistRepository != null,
-        autoInterval: const Duration(minutes: 10),
+        autoInterval: const Duration(minutes: 15),
         debounce: const Duration(seconds: 2),
         run: (owner, current) async {
           final more = await PlaylistSyncEngine(playlistRepository!)
@@ -68,7 +71,7 @@ class LaravelSyncCoordinator {
         });
     wellnessSync = SyncRunner(
         canSync: () => canSync,
-        autoInterval: const Duration(minutes: 2),
+        autoInterval: const Duration(minutes: 15),
         debounce: const Duration(seconds: 5),
         run: (owner, current) =>
             WellnessSyncEngine(wellnessRepository, this.wellness, clock)
@@ -117,6 +120,19 @@ class LaravelSyncCoordinator {
       wellnessSync.lastSynced.value =
           SyncCursor.load(store, owner, 'wellness').lastSyncAt;
     }
+  }
+
+  /// What launch asks for: each kind syncs unless it did within its interval.
+  /// A guest library still waiting to be cleared takes the full [syncAll].
+  Future<void> autoSyncAll() async {
+    if (store.getString('sync.guest.claimed_by') != null) {
+      await syncAll();
+      return;
+    }
+    await bookmarks.autoSync();
+    await recents.autoSync();
+    await wellnessSync.autoSync();
+    await playlists.autoSync();
   }
 
   Future<bool> syncAll() async {

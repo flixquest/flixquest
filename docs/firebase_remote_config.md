@@ -138,15 +138,15 @@ the format off. Selectors are case-insensitive and apply while the app runs.
 
 | Format | Selector (default) | Adsterra | Clickadu |
 | --- | --- | --- | --- |
-| Banners | `banner_ad_network` (`adsterra`) | `adsterra_banner_enabled`, `adsterra_tv_enabled`, `adsterra_banners` | `clickadu_banner_enabled`, `clickadu_tv_enabled`, `clickadu_banners` |
+| Banners | `banner_ad_network_v2` (`adsterra`) | `adsterra_banner_enabled`, `adsterra_tv_enabled`, `adsterra_banners` | `clickadu_banner_enabled`, `clickadu_tv_enabled`, `clickadu_banners` |
 | Stream-found popup (Popunder / Smartlink / Direct Link) | `playback_popunder_network` (`adsterra`) | `adsterra_playback_enabled`, `adsterra_playback_ads` | `clickadu_playback_enabled`, `clickadu_playback_ads` |
 | Video pre-roll (VAST) | `vast_preroll_network` (`clickadu`) | `vast_preroll_enabled`, `vast_preroll.adsterra` | `vast_preroll_enabled`, `vast_preroll.clickadu` |
 
 Monetag serves only the stream-found popup: `playback_popunder_network=monetag` with `monetag_playback_enabled` and `monetag_playback_ads`. See [Monetag popup](#monetag-popup).
 
-ExoClick banners use `banner_ad_network=exoclick`, `exoclick_banner_enabled`,
-`exoclick_tv_enabled` and `exoclick_banners`. See [ExoClick banners](#exoclick-banners).
-`banner_ad_network_overrides` can migrate individual slots between networks.
+ExoClick banners use `banner_ad_network_v2=exoclick`, `exoclick_banner_enabled_v2`,
+`exoclick_tv_enabled_v2` and `exoclick_banners_v2`. See [ExoClick banners](#exoclick-banners).
+`banner_ad_network_overrides_v2` can migrate individual slots between networks.
 ExoClick also serves the stream-found popup through `exoclick_playback_enabled` and
 `exoclick_playback_ads`, selected by `playback_popunder_network=exoclick`. See
 [ExoClick popup](#exoclick-popup). Its video pre-roll uses
@@ -171,25 +171,26 @@ named after the enum value.
 
 | Parameter | Firebase type | Default | Purpose |
 | --- | --- | --- | --- |
-| `banner_ad_network` | String | `adsterra` | Which network's WebView banners fill the slots: `adsterra`, `clickadu` or `exoclick`. `none` hides all banners including hosted announcements and overrides. Published legacy values `native`, `unity`, and `startio` select Adsterra, but cannot enable requests without its switch and valid codes. Unknown values show no network banner but keep hosted announcements. |
+| `banner_ad_network_v2` | String | `adsterra` | Which network's WebView banners fill the slots: `adsterra`, `clickadu` or `exoclick`. `none` hides all banners including hosted announcements and overrides. Published legacy values `native`, `unity`, and `startio` select Adsterra, but cannot enable requests without its switch and valid codes. Unknown values show no network banner but keep hosted announcements. |
 | `banner_ad_network_test` | String | empty | Dev-flavor-only selector for real banner testing: `adsterra`, `clickadu`, `exoclick`, or `none`. Applies to dev debug/profile/release builds. Prod and unflavored builds ignore it. A valid value locally replaces the normal selector and slot overrides, locally enables the selected network (including TV), and hides hosted announcements. Empty/unknown values restore normal behavior. Uses the existing real network catalog. |
-| `banner_ad_network_overrides` | String (JSON) | `{}` | Optional slot-to-network mapping, e.g. `{"downloads":"exoclick","movie_detail":"adsterra","bookmarks":"none"}`. Unlisted slots use the global selector. An override of `none` or an unknown value hides only that slot's network ad. TV uses explicit `_tv` slot names. Each selected network still requires its own enabled switch. |
+| `banner_ad_network_overrides_v2` | String (JSON) | `{}` | Optional slot-to-network mapping, e.g. `{"downloads":"exoclick","movie_detail":"adsterra","bookmarks":"none"}`. Unlisted slots use the global selector. An override of `none` or an unknown value hides only that slot's network ad. TV uses explicit `_tv` slot names. Each selected network still requires its own enabled switch. |
 | `adsterra_banner_enabled` | Boolean | `false` | Adsterra banner switch. Must be explicitly enabled remotely; no demo ads or hardcoded publisher codes ship in the app. |
 | `adsterra_tv_enabled` | Boolean | `false` | Additional gate for Android TV; the global switch must also be on. TV placements use `_tv` names and TV-specific defaults. |
 | `adsterra_banners` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | Central catalog of banner codes, sizes, default variants and placement overrides. See below. |
 | `clickadu_banner_enabled` | Boolean | `false` | Clickadu banner switch. Must be published remotely. |
 | `clickadu_tv_enabled` | Boolean | `false` | Android TV gate for Clickadu banners, like `adsterra_tv_enabled`. |
 | `clickadu_banners` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | Clickadu's catalog: the same `units` / `defaults` / `placements` schema as Adsterra's, with Clickadu unit fields. See [Clickadu banners](#clickadu-banners). |
-| `exoclick_banner_enabled` | Boolean | `false` | ExoClick banner switch; must be explicitly published remotely. |
-| `exoclick_tv_enabled` | Boolean | `false` | Additional Android TV gate for ExoClick banners. |
-| `exoclick_banners` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | ExoClick Mobile Banner and web Banner zones in the shared catalog schema. See [ExoClick banners](#exoclick-banners). |
+| `exoclick_banner_enabled_v2` | Boolean | `false` | ExoClick banner switch; must be explicitly published remotely. |
+| `exoclick_tv_enabled_v2` | Boolean | `false` | Additional Android TV gate for ExoClick banners. |
+| `exoclick_banners_v2` | String (JSON) | `{"units":{},"defaults":{},"placements":{}}` | ExoClick Mobile Banner and web Banner zones in the shared catalog schema. See [ExoClick banners](#exoclick-banners). |
+| `banner_ad_network`, `banner_ad_network_overrides`, `exoclick_banner_enabled`, `exoclick_tv_enabled`, `exoclick_banners` | — | — | Legacy keys read only by builds before the `_v2` keys. Those builds ignore `block_ad_types`: keep their selector and overrides off `exoclick` (e.g. `banner_ad_network=adsterra`, overrides `{}`) and both ExoClick switches `false`. |
 | `hosted_banner_mode` | String | `stack` | How `/ads` announcements share a slot with the network banner. `stack`: hosted above the network banner. `priority`: an eligible hosted banner takes the slot and the network banner loads only where no hosted ad exists. `off`: show only the network banner. Unknown values use `stack`. |
 | `banners` | String (JSON) | `{"banners":[]}` | Existing per-announcement overrides for `/ads`, keyed by `key` (`enabled`, `placements`, `shape`, `width`, `height`, `aspectRatio`). Separate from the network catalogs. |
 
 ### Test real banners in development
 
 Publish `banner_ad_network_test=exoclick` and the real
-[exoclick_banners.json](exoclick_banners.json) catalog as `exoclick_banners`.
+[exoclick_banners.json](exoclick_banners.json) catalog as `exoclick_banners_v2`.
 Run the **dev flavor** (`flutter run --flavor dev`); the next Remote Config
 activation selects ExoClick locally, including TV placements. The same behavior
 applies to `flutter run --flavor dev --profile` and
@@ -208,8 +209,8 @@ behavior. You can switch between `adsterra`, `clickadu` and `exoclick`.
 debug builds, even when the test value is published. Unflavored and unknown
 flavors also use production settings. `prod` is the default in `pubspec.yaml`,
 so plain `flutter run` and `flutter build apk --release` use production settings.
-Leave `banner_ad_network`,
-`banner_ad_network_overrides` and production enable switches unchanged when
+Leave `banner_ad_network_v2`,
+`banner_ad_network_overrides_v2` and production enable switches unchanged when
 testing. The test selector uses the same real catalogs: edits to a catalog
 still apply wherever that catalog is selected. This is a development network
 override, not a source of sandbox creatives. Playback popups and VAST selectors
@@ -236,7 +237,7 @@ flutter test --flavor dev test/banner_ads_config_test.dart
 1. Generate banner codes in the Adsterra publisher dashboard, using the sizes you want. Each size needs its matching code; changing dimensions does not turn one ad unit into a different size.
 2. Copy [adsterra_banners.example.json](adsterra_banners.example.json). For each unit you intend to use, fill `key` from the generated `atOptions.key`, and `script_url` with the exact HTTPS script URL from the generated code (the URL does not have to end in `invoke.js`). Empty units remain inactive. Protocol-relative URLs (`//...`) must be written as `https://...`.
 3. Publish the completed JSON as the **String** parameter `adsterra_banners` in Firebase Remote Config.
-4. Set `banner_ad_network=adsterra` and `adsterra_banner_enabled=true`. To activate television slots too, publish `adsterra_tv_enabled=true` and fill the TV units.
+4. Set `banner_ad_network_v2=adsterra` and `adsterra_banner_enabled=true`. To activate television slots too, publish `adsterra_tv_enabled=true` and fill the TV units.
 5. Select `hosted_banner_mode=off`, `stack`, or `priority` depending on whether your own announcements should appear.
 
 Remote Config's existing realtime listener applies switches and new codes while the app is running. A changed unit replaces its WebView; turning a switch off removes the view and stops its document. Unrelated rebuilds keep the same WebView. No automatic ad refresh is scheduled.
@@ -291,8 +292,8 @@ TV slots: `title_detail_tv` (top-right details slot, maximum width 360) and `liv
 
 **Ready-to-publish catalog:** [clickadu_banners.json](clickadu_banners.json)
 holds spot `2150724`. Publish it as `clickadu_banners`, publish
-`clickadu_banner_enabled=true`, then set `banner_ad_network=clickadu`.
-Switching back is `banner_ad_network=adsterra`.
+`clickadu_banner_enabled=true`, then set `banner_ad_network_v2=clickadu`.
+Switching back is `banner_ad_network_v2=adsterra`.
 
 Clickadu's code is a Main Tag (`bn.js`) plus one Ad Spot per banner
 (`<div data-cl-spot="…">`). Every banner is its own WebView document, so the
@@ -363,6 +364,8 @@ the mobile sizes `300x50`, `300x100`, `300x250` and web sizes `160x600`,
 | `zone_id` | Unit | Positive digits, string or integer, from `data-zoneid`. |
 | `size` | Unit | Exact `WxH` used when creating that zone. |
 | `enabled` | Unit, optional | `false` removes that unit from selection. |
+| `block_ad_types` | Catalog or unit, optional | ExoClick ad type IDs written as `data-block-ad-types`: a number, a comma-separated string (`"101,102"`) or a list. `101` blocks NSFW ads. Empty or `0` (the default) blocks nothing and omits the attribute. A unit value overrides the catalog. An invalid value drops the unit rather than serving types you meant to block. This blocks per request on top of the zone editor's **Filter Ads → Block Ad Types**, which ExoClick applies to every app version. |
+| `sub` | Catalog, unit or placement, optional | ExoClick sub ID written as `data-sub`, a positive integer or digits string, so stats can be split by slot or device. A placement's `sub` (e.g. `"downloads": {"units": [...], "sub": 12}`) wins over the unit's, which wins over the catalog's. `0` or an invalid value is ignored and falls back to the next level; with none, the attribute is omitted. |
 | `min_width` | Unit, optional | Minimum available slot width in logical pixels (integer 0–10000; default 0). The supplied web 300x250 unit uses 600, allowing the mobile 300x250 unit to serve narrower slots. This changes eligibility, not the creative dimensions. |
 
 `defaults` and `placements` use the same ordered size selection as the other
@@ -371,10 +374,10 @@ wins; this is a size preference, not an ad auction or a no-fill waterfall.
 An empty zone collapses after 20 seconds without requesting another network.
 The provider script loading alone does not mark a zone filled.
 
-Publish the completed catalog as `exoclick_banners`, then publish
-`exoclick_banner_enabled=true`. For a full replacement use
-`banner_ad_network=exoclick`. To migrate one slot at a time, keep
-`banner_ad_network=adsterra` and publish, for example:
+Publish the completed catalog as `exoclick_banners_v2`, then publish
+`exoclick_banner_enabled_v2=true`. For a full replacement use
+`banner_ad_network_v2=exoclick`. To migrate one slot at a time, keep
+`banner_ad_network_v2=adsterra` and publish, for example:
 
 ```json
 {
@@ -384,11 +387,11 @@ Publish the completed catalog as `exoclick_banners`, then publish
 }
 ```
 
-Use that JSON as `banner_ad_network_overrides`. Removing an entry restores
-the global network for that slot. Switching to `banner_ad_network=none`
+Use that JSON as `banner_ad_network_overrides_v2`. Removing an entry restores
+the global network for that slot. Switching to `banner_ad_network_v2=none`
 removes all banners even when overrides exist. Keep the Adsterra and Clickadu
 catalogs published to make switching back immediate. To use TV slots, also
-publish `exoclick_tv_enabled=true`; a phone override never applies to TV.
+publish `exoclick_tv_enabled_v2=true`; a phone override never applies to TV.
 
 For revenue experiments, compare 300x50 versus 300x100 in standard slots,
 300x250 versus 300x500 in suitable scrolling slots, and 728x90 or 900x250 on
@@ -777,34 +780,83 @@ overlaps, selection, priorities, and global effect controls.
 
 | Parameter | Firebase type | Default | Purpose |
 | --- | --- | --- | --- |
-| `ad_block_gate_enabled` | Boolean | `false` | Asks viewers to turn off their ad blocker when they press **Play** or **Download**. Browsing is never blocked. |
+| `ad_block_gate_v2_enabled` | Boolean | `false` | Asks viewers to turn off their ad blocker when they press **Play** or **Download**. Browsing is never blocked. |
+
+Builds from 4.3.1 read only `ad_block_gate_v2_enabled`. Older builds read
+`ad_block_gate_enabled`, whose generic Google/PubMatic, HTTPS and WebView
+probes stopped viewers (especially on Android TV) who still saw Adsterra and
+ExoClick ads. Keep `ad_block_gate_enabled` at `false`.
 
 Android apps have no browser extensions: ads are blocked through DNS, by
 Private DNS (AdGuard DNS, NextDNS), local VPN blockers (AdGuard, Blokada,
-RethinkDNS), hosts files (AdAway) or a network filter such as Pi-hole. When
-The app warms the checks while viewers browse, then Play or Download uses
-that result. Three layers run in parallel under a six-second background
-deadline:
+RethinkDNS), hosts files (AdAway) or a network filter such as Pi-hole.
 
-- **DNS:** `doubleclick.net`, `pagead2.googlesyndication.com`,
-  `ads.pubmatic.com`, plus the live banner catalogs (including slot overrides),
-  Adsterra placements, selected mobile/TV popup networks and enabled VAST tags.
-  Sinkholes (including IPv4-mapped IPv6) count only when a neutral DNS control
-  resolves normally. Failed ad lookups must fail again while an independent
-  public DNS resolver confirms an A or AAAA record. Cloudflare and Google are
-  queried in parallel; unreadable or negative replies do not override a
-  positive answer from another resolver.
-- **HTTPS:** HEAD requests to static `robots.txt` files on two independent
-  ad hosts. Both must repeatedly refuse, reset or close connections while two
-  independent non-ad controls respond normally. HTTP responses, including
-  404/405/5xx, prove connectivity; TLS errors, redirects and timeouts are
-  inconclusive. No publisher tag or smartlink is fetched.
-- **WebView:** an invisible, non-interactive system WebView loads local bait
-  elements and the same static HEAD probes. Healthy controls plus explicit
-  `ERR_BLOCKED_BY_CLIENT` errors, two selectively hidden bait elements, or
-  repeated failures on two ad hosts that native HTTPS can reach count as
-  filtering. Missing WebView support, malformed reports and a 4.5-second
-  timeout allow playback; the temporary view is removed after the check.
+The check never requests anything from an ad network, so it adds no traffic
+the networks could mistake for bots. Only the hosts the device's live ads
+load from are judged: banner catalogs (including slot overrides) and VAST tags
+switched on for that device (`tv_enabled` on TV), Adsterra's Social Bar on
+phones, and the selected mobile or TV popup network with its fallbacks
+(`tv_popunder` only on TV). Blocking an ad domain FlixQuest does not use, such
+as Google's, never stops playback, and with no ad live nothing is checked.
+
+A popup's primary network decides: `playback_popunder_fallback` networks serve
+only when the primary answers with no ad, never when a blocker stopped it. So
+a blocked primary counts even when a fallback could load, and a fallback is
+judged only by its own popup when it runs. VAST is judged by its first tag.
+
+Two kinds of evidence, combined under a six-second background deadline:
+
+- **DNS:** the device resolves each live ad host. A sinkhole answer
+  (`0.0.0.0`, `::`, loopback, including IPv4-mapped IPv6) counts only when a
+  neutral DNS control resolves normally. A failed lookup must fail again while
+  an independent public DNS-over-HTTPS resolver (Cloudflare and Google, in
+  parallel) confirms an A or AAAA record, so a retired domain is never
+  blamed. No blocker's addresses are listed.
+- **The viewer's own popups:** when an Adsterra or ExoClick popup loads, the
+  ad screen follows its whole redirect chain for as long as the popup is
+  open. A direct link's first host (`asiafilm.org` for Adsterra) is rarely
+  what a blocker stops; its later hops are (the network's redirect and
+  tracking hosts, a bot check such as `start.portablica.com`, then the
+  advertiser), and they are only known once the chain runs. The popup counts
+  as reached when it closes on a page with content, or when the network
+  answers with no ad (its no-ad page or an HTTP error). A page that shows
+  content and then moves on (a bot check or interstitial, whatever its
+  address) is not the ad. Until the popup closes, a failing hop is judged by
+  its error:
+  - filtered (`ERR_BLOCKED_BY_CLIENT`, a certificate for another host, an SSL
+    protocol error from a block page) counts once public DNS shows the host
+    exists and local DNS is healthy;
+  - unreachable (name not resolved, connection refused/reset/closed, invalid
+    address) counts only when the device's own DNS sinkholes the host or
+    cannot resolve it while public DNS can, so an advertiser's outage never
+    stops a viewer.
+
+  Timeouts, offline errors and untrusted certificate authorities (old
+  devices) count as neither. An outcome stands for 30 minutes, or until the
+  network changes; a failed hop joins the DNS check for that time.
+
+  With the check on, a blocked network ends its popup at once (no fallback),
+  and the stream does not start: once the block is confirmed, the viewer is
+  asked to turn the blocker off. **I turned it off** first looks an
+  unreachable hop up again: while the device's DNS still blocks it, the
+  dialog stays ("still on"). Adsterra rotates offers, so a replayed popup can
+  land on one the blocker allows (such as a `start.portablica.com` captcha
+  page) and prove nothing. Once the hop resolves, or for a filtered hop, the
+  popup loads again and the viewer's real ad is the test, not the tap. A
+  blocked hop also stays in the DNS check on the next Play for 30 minutes,
+  even after a later popup reached its network. **Cancel** closes the
+  loader.
+  An unconfirmed block plays on. With the check off, a blocked network still
+  hands over to the fallback, as a no-fill does.
+
+Popups served through FlixQuest's redirectors (`flix.quest/api/exoclick-popup`,
+whose ExoClick delivery domain rotates, and `flix.quest/api/adsterra-popup`)
+are resolved with a HEAD request to flix.quest that does not follow the
+redirect, so the current delivery host is checked without reaching the
+network. The host is reused for an hour.
+
+`FQ_ADGUARD_DNS=94.140.14.14 flutter test test/ad_block_adguard_dns_test.dart`
+runs the DNS check against the live hosts through AdGuard DNS.
 
 Warmup never displays a prompt while browsing. On Play or Download, an already
 confirmed positive triggers the prompt without waiting for stalled checks.
@@ -830,25 +882,27 @@ Active players refresh the checks every 30 seconds after a completed scan,
 and on resume. Timeouts and inconclusive results do not stop playback. No
 real-device average or native teardown latency has been measured yet.
 
-When troubleshooting, publish `ad_block_gate_enabled = true` and confirm the
+When troubleshooting, publish `ad_block_gate_v2_enabled = true` and confirm the
 phone has fetched and activated that value. `[AdBlockGate]` logs show whether
 the gate is disabled and the foreground wait in milliseconds; `[AdBlockDetector]`
-logs identify the blocked host or a timeout. Changing a Firebase value without
+logs identify the blocked host or a timeout, and `[AdsterraPage] ... delivery
+host <host> reached|blocked` shows a popup's outcome. Changing a Firebase value without
 the device receiving it does not enable the gate on that device.
 
 Detection is behavioral and best effort. It does not enumerate installed
 apps, label every VPN/Private DNS service a blocker, or guarantee detection
-of allowlisted probes, arbitrary custom block pages, modified clients, or
-filters that act only on a particular creative. Browser extensions that do
-not affect the app's WebView cannot affect or be identified by this check.
+of a block page before a popup has loaded, modified clients, or filters that
+act only on a particular creative. Browser extensions that do not affect the
+app's WebView cannot affect or be identified by this check.
 
-Tests include the actual embedded JavaScript, Flutter WebView lifecycle
-tests, and real HTTP against `postman/simulations/ad-block-probes.sim.yaml`.
+Tests cover the popup outcomes through the WebView fake
+(`test/ad_delivery_test.dart`) and real DNS JSON against
+`postman/simulations/ad-block-probes.sim.yaml`.
 Start it with `postman simulation run postman/simulations/ad-block-probes.sim.yaml
 --port 4936 --output ndjson`, then run
 `FQ_AD_BLOCK_SIMULATION_URL=http://127.0.0.1:4936/probes .fvm/flutter_sdk/bin/flutter
-test test/ad_block_network_simulation_test.dart`. The mock models HEAD status,
-redirect and timeout behavior and Google's DNS JSON response schema. No
+test test/ad_block_network_simulation_test.dart`. The mock models Google's DNS
+JSON response schema and stalled resolvers. No
 published owner mock was used because the Postman CLI was signed out. Actual
 AdGuard/NextDNS/local-VPN testing on a device is still required for release.
 

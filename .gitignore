@@ -66,3 +66,19 @@ android/app/google-services.json
 
 /branding/
 /tools/
+# Brand ident / motion graphics (local only for now)
+/artifacts/brand-ident/
+/artifacts/brand-ident-v2/
+/artifacts/brand-ident-v3/
+/artifacts/flixquest-f-motion/
+/artifacts/flixquest-brand-kit.zip
+/artifacts/flixquest-f-motion-kit.zip
+/artifacts/flixquest-f-motion-v3-kit.zip
+/assets/audio/flixquest_ident.wav
+/docs/design/brand-ident.md
+/lib/services/brand_sound.dart
+/lib/widgets/flixquest_intro.dart
+/test/flixquest_intro_test.dart
+/tool/brand_ident_export.dart
+/tool/render_brand_ident.py
+/android/app/src/main/kotlin/dev/beamlak/flixquest_v2/branding/

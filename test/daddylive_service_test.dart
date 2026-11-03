@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flixquest/services/daddylive_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -32,6 +33,9 @@ void main() {
                 },
               ],
             });
+          }
+          if (request.url.path.endsWith('/segment.ts')) {
+            return http.Response.bytes(_ts(), 200);
           }
           switch (request.url.toString()) {
             case 'https://dlhd.test/watch.php?id=24':
@@ -138,6 +142,9 @@ void main() {
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
         client: MockClient((request) async {
+          if (request.url.path.endsWith('/segment.ts')) {
+            return http.Response.bytes(_ts(), 200);
+          }
           switch (request.url.toString()) {
             case 'https://dlhd.st/watch.php?id=51':
               return http.Response('''
@@ -196,6 +203,9 @@ void main() {
             expect(requested, contains('https://p1.test/embed'));
             return http.Response('https://cdn.test/two.m3u8', 200);
           }
+          if (request.url.path.endsWith('/segment.ts')) {
+            return http.Response.bytes(_ts(), 200);
+          }
           if (request.url.host == 'cdn.test') {
             return http.Response('#EXTM3U\n#EXTINF:4,\nsegment.ts', 200);
           }
@@ -229,6 +239,9 @@ void main() {
           if (request.url.host == 'p1.test') {
             return http.Response('https://cdn.test/one.m3u8', 200);
           }
+          if (request.url.path.endsWith('/segment.ts')) {
+            return http.Response.bytes(_ts(), 200);
+          }
           if (request.url.host == 'cdn.test') {
             return http.Response('#EXTM3U\n#EXTINF:4,\nsegment.ts', 200);
           }
@@ -251,6 +264,221 @@ void main() {
 
       expect(requested.any((url) => url.contains('late.embed.test')), isFalse);
       expect(discovery.variants, hasLength(1));
+    });
+
+    test('an older scraper\'s stream fallback resolves its embed on the device',
+        () async {
+      final requested = <String>[];
+      final service = DaddyLiveService(
+        baseUrl: 'https://metadata.example',
+        client: MockClient((request) async {
+          requested.add(request.url.toString());
+          if (request.url.path == '/watch.php') {
+            return http.Response('blocked', 403);
+          }
+          if (request.url.path == '/api/v2/dlhd/channels/51/embeds') {
+            return http.Response('Cannot GET', 404);
+          }
+          if (request.url.path == '/api/v2/dlhd/channels/51/stream') {
+            return _jsonResponse(<String, dynamic>{
+              'stream': <String, dynamic>{
+                'embedUrl': 'https://embed.test/channel/51',
+                'url': 'https://server-signed.test/51.m3u8',
+              },
+            });
+          }
+          if (request.url.host == 'embed.test') {
+            return http.Response('https://cdn.test/51.m3u8', 200);
+          }
+          if (request.url.path.endsWith('/segment.ts')) {
+            return http.Response.bytes(_ts(), 200);
+          }
+          if (request.url.host == 'cdn.test') {
+            return http.Response('#EXTM3U\n#EXTINF:4,\nsegment.ts', 200);
+          }
+          fail('Unexpected request: ${request.url}');
+        }),
+      );
+      addTearDown(service.close);
+
+      final stream = await service.getStream('51');
+
+      expect(stream.url, 'https://cdn.test/51.m3u8');
+      expect(stream.embedUrl, 'https://embed.test/channel/51');
+      expect(requested.any((url) => url.contains('server-signed.test')),
+          isFalse);
+    });
+
+    test('never plays the scraper-signed URL when its embed fails', () async {
+      final requested = <String>[];
+      final service = DaddyLiveService(
+        baseUrl: 'https://metadata.example',
+        client: MockClient((request) async {
+          requested.add(request.url.toString());
+          if (request.url.path == '/watch.php') {
+            return http.Response('blocked', 403);
+          }
+          if (request.url.path == '/api/v2/dlhd/channels/51/embeds') {
+            return http.Response('Cannot GET', 404);
+          }
+          if (request.url.path == '/api/v2/dlhd/channels/51/stream') {
+            return _jsonResponse(<String, dynamic>{
+              'stream': <String, dynamic>{
+                'embedUrl': 'https://embed.test/channel/51',
+                'url': 'https://server-signed.test/51.m3u8',
+              },
+            });
+          }
+          if (request.url.host == 'embed.test') {
+            return http.Response('down', 503);
+          }
+          fail('Unexpected request: ${request.url}');
+        }),
+      );
+      addTearDown(service.close);
+
+      await expectLater(
+        service.getStream('51'),
+        throwsA(isA<DaddyLiveException>()),
+      );
+      expect(requested.any((url) => url.contains('server-signed.test')),
+          isFalse,
+          reason: 'the scraper URL is signed for the server IP, not ours');
+    });
+
+    test('scraper embeds play on the device, the rest as backups', () async {
+      final requested = <http.Request>[];
+      final service = DaddyLiveService(
+        baseUrl: 'https://metadata.example',
+        client: MockClient((request) async {
+          requested.add(request);
+          if (request.url.path == '/watch.php') {
+            return http.Response('blocked', 403);
+          }
+          if (request.url.path == '/api/v2/dlhd/channels/51/embeds') {
+            return _jsonResponse(<String, dynamic>{
+              'embeds': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'embedUrl': 'https://down.test/e/51',
+                  'referer': 'https://mirror.test/stream/stream-51.php',
+                },
+                <String, dynamic>{
+                  'embedUrl': 'https://embed.test/e/51',
+                  'referer': 'https://mirror.test/cast/stream-51.php',
+                },
+                <String, dynamic>{'embedUrl': 'https://late.test/e/51'},
+              ],
+            });
+          }
+          if (request.url.host == 'down.test') {
+            return http.Response('down', 503);
+          }
+          if (request.url.host == 'embed.test') {
+            return http.Response('https://cdn.test/51.m3u8', 200);
+          }
+          if (request.url.path.endsWith('/segment.ts')) {
+            return http.Response.bytes(_ts(), 200);
+          }
+          if (request.url.host == 'cdn.test') {
+            return http.Response('#EXTM3U\n#EXTINF:4,\nsegment.ts', 200);
+          }
+          fail('Unexpected request: ${request.url}');
+        }),
+      );
+      addTearDown(service.close);
+
+      final stream = await service.getStream('51');
+
+      expect(stream.url, 'https://cdn.test/51.m3u8');
+      expect(stream.title, 'Stream 2');
+      expect(stream.discovery?.hasNext, isTrue,
+          reason: 'the third embed waits as a backup');
+      final embedRequest =
+          requested.firstWhere((request) => request.url.host == 'embed.test');
+      expect(embedRequest.headers['Referer'],
+          'https://mirror.test/cast/stream-51.php');
+      expect(requested.any((request) => request.url.host == 'late.test'),
+          isFalse);
+      expect(
+        requested.any((request) => request.url.path.endsWith('/stream')),
+        isFalse,
+        reason: 'a scraper with /embeds is never asked to sign a stream',
+      );
+    });
+
+    test('falls back to /stream when no scraper embed plays', () async {
+      final requested = <String>[];
+      final service = DaddyLiveService(
+        baseUrl: 'https://metadata.example',
+        client: MockClient((request) async {
+          requested.add(request.url.path);
+          if (request.url.path == '/watch.php') {
+            return http.Response('blocked', 403);
+          }
+          if (request.url.path == '/api/v2/dlhd/channels/51/embeds') {
+            return _jsonResponse(<String, dynamic>{
+              'embeds': <Map<String, dynamic>>[
+                <String, dynamic>{'embedUrl': 'https://down.test/e/51'},
+              ],
+            });
+          }
+          if (request.url.host == 'down.test') {
+            return http.Response('down', 503);
+          }
+          if (request.url.path == '/api/v2/dlhd/channels/51/stream') {
+            return _jsonResponse(<String, dynamic>{
+              'stream': <String, dynamic>{
+                'embedUrl': 'https://embed.test/channel/51',
+                'url': 'https://server-signed.test/51.m3u8',
+              },
+            });
+          }
+          if (request.url.host == 'embed.test') {
+            return http.Response('https://cdn.test/51.m3u8', 200);
+          }
+          if (request.url.path.endsWith('/segment.ts')) {
+            return http.Response.bytes(_ts(), 200);
+          }
+          if (request.url.host == 'cdn.test') {
+            return http.Response('#EXTM3U\n#EXTINF:4,\nsegment.ts', 200);
+          }
+          fail('Unexpected request: ${request.url}');
+        }),
+      );
+      addTearDown(service.close);
+
+      final stream = await service.getStream('51');
+
+      expect(stream.url, 'https://cdn.test/51.m3u8');
+      expect(requested, contains('/api/v2/dlhd/channels/51/stream'));
+    });
+
+    test('treats an answer without embeds as a scraper that has none',
+        () async {
+      final requested = <String>[];
+      final service = DaddyLiveService(
+        baseUrl: 'https://metadata.example',
+        client: MockClient((request) async {
+          requested.add(request.url.path);
+          if (request.url.path == '/watch.php') {
+            return http.Response('blocked', 403);
+          }
+          if (request.url.path == '/api/v2/dlhd/channels/51/embeds') {
+            return _jsonResponse(<String, dynamic>{'success': true});
+          }
+          if (request.url.path == '/api/v2/dlhd/channels/51/stream') {
+            return http.Response('{"success":false}', 502);
+          }
+          fail('Unexpected request: ${request.url}');
+        }),
+      );
+      addTearDown(service.close);
+
+      await expectLater(
+        service.getStream('51'),
+        throwsA(isA<DaddyLiveException>()),
+      );
+      expect(requested, contains('/api/v2/dlhd/channels/51/stream'));
     });
 
     test('keeps the channel catalog available when the EPG is down', () async {
@@ -287,3 +515,6 @@ http.Response _jsonResponse(Map<String, dynamic> value) => http.Response(
       200,
       headers: const <String, String>{'content-type': 'application/json'},
     );
+
+Uint8List _ts() => Uint8List.fromList(
+    List.generate(188 * 3, (i) => i % 188 == 0 ? 0x47 : i % 251));

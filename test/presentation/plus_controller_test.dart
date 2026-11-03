@@ -350,6 +350,44 @@ void main() {
     expect(controller.shouldSuggest, isFalse);
   });
 
+  test('coming back soon after a check does not ask Laravel again', () async {
+    await controller.start();
+    billing.walletCalls.single.complete(_account());
+    await pumpEventQueue();
+
+    controller.onPause();
+    now = now.add(const Duration(minutes: 1));
+    controller.onResume();
+    await pumpEventQueue();
+    expect(billing.walletCalls, hasLength(1));
+
+    controller.onPause();
+    now = now.add(PlusController.resumeRecheckAfter);
+    controller.onResume();
+    await pumpEventQueue();
+    expect(billing.walletCalls, hasLength(2));
+  });
+
+  test('access only restored from the cache is checked again on resume',
+      () async {
+    await controller.start();
+    billing.walletCalls.single.complete(_account());
+    await pumpEventQueue();
+    controller.dispose();
+    billing = _FakeBilling();
+    controller = build();
+    await controller.start();
+    billing.walletCalls.single
+        .completeError(const BillingError(Failure.network()));
+    await pumpEventQueue();
+
+    controller.onPause();
+    controller.onResume();
+    await pumpEventQueue();
+
+    expect(billing.walletCalls, hasLength(2));
+  });
+
   test('server time, not the device clock, decides expiry', () async {
     // The device runs two hours behind Laravel.
     now = _start.subtract(const Duration(hours: 2));

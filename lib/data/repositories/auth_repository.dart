@@ -6,6 +6,7 @@ import 'package:flixquest/core/network/interceptors/error_interceptor.dart';
 import '../models/app_user.dart';
 import '../models/auth_requests.dart';
 import '../models/auth_session.dart';
+import '../models/tv_sign_in.dart';
 import '../sources/laravel_api.dart';
 
 class AuthRepository {
@@ -111,6 +112,37 @@ class AuthRepository {
             if (guestToken != null) 'guest_token': guestToken,
             if (replaceDeviceId != null) 'replace_device_id': replaceDeviceId
           })));
+  /// A code for this TV to show so a phone can sign it in.
+  Future<Result<TvSignInCode>> startTvSignIn() =>
+      _result(() async => TvSignInCode.fromJson(await api.request(
+          'auth/tv/codes',
+          method: 'POST',
+          authenticated: false,
+          data: await _device())));
+
+  /// Whether a phone has approved [deviceCode] yet, and once it has, this
+  /// TV's session. A device-limit refusal leaves the approval standing, so
+  /// the check can be repeated with [replaceDeviceId].
+  Future<Result<TvSignInCheck>> checkTvSignIn(String deviceCode,
+          {String? guestToken, int? replaceDeviceId}) =>
+      _result(() async {
+        final body = await api.request('auth/tv/token',
+            method: 'POST',
+            authenticated: false,
+            data: {
+              ...await _device(),
+              'device_code': deviceCode,
+              if (guestToken != null) 'guest_token': guestToken,
+              if (replaceDeviceId != null) 'replace_device_id': replaceDeviceId
+            });
+        return switch (body['status']) {
+          'approved' => TvSignInCheck(TvSignInStatus.approved, _session(body)),
+          'pending' => const TvSignInCheck(TvSignInStatus.pending),
+          'denied' => const TvSignInCheck(TvSignInStatus.denied),
+          'expired' => const TvSignInCheck(TvSignInStatus.expired),
+          _ => throw const FormatException('Invalid TV sign-in status'),
+        };
+      });
   Future<Result<AuthSession>> exchangeFirebaseSession(String idToken) =>
       _result(() async => _session(await api.request('auth/firebase/exchange',
           method: 'POST',

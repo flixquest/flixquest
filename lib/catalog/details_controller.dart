@@ -1,6 +1,7 @@
 import '../api/endpoints.dart';
 import '../controllers/bookmark_database_controller.dart';
 import '../functions/network.dart';
+import '../models/credits.dart';
 import '../models/movie.dart';
 import '../models/recently_watched.dart';
 import '../models/tv.dart';
@@ -9,6 +10,7 @@ import '../provider/app_dependency_provider.dart';
 import '../provider/settings_provider.dart';
 import 'details_play.dart';
 import 'media_item.dart';
+import 'person_credits.dart';
 
 class MediaDetailsData {
   const MediaDetailsData({
@@ -224,6 +226,30 @@ class MediaDetailsController {
       dependencies.tmdbProxy,
     );
     return youTubeVideos(videos);
+  }
+
+  /// [item]'s cast and crew; a series' are its current season's, as TMDB
+  /// lists them on the title.
+  Future<Credits> loadCredits({
+    required MediaItem item,
+    required SettingsProvider settings,
+    required AppDependencyProvider dependencies,
+  }) {
+    return fetchCredits(
+      item.kind == MediaKind.movie
+          ? Endpoints.getCreditsUrl(item.id, settings.appLanguage)
+          : Endpoints.getTVCreditsUrl(item.id, settings.appLanguage),
+      settings.enableProxy,
+      dependencies.tmdbProxy,
+    );
+  }
+
+  /// Where the page of someone in a title's credits loads from.
+  PersonSource personSource({
+    required SettingsProvider settings,
+    required AppDependencyProvider dependencies,
+  }) {
+    return TmdbPersonSource(settings: settings, dependencies: dependencies);
   }
 
   Future<List<EpisodeList>> loadSeason({

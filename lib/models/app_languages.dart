@@ -1,9 +1,11 @@
 class AppLanguages {
   AppLanguages(
-      {required this.languageFlag,
+      {required this.flag,
       required this.languageName,
       required this.languageCode});
   String languageName;
-  String languageFlag;
+
+  /// The flag emoji shown beside the language's name.
+  String flag;
   String languageCode;
 }

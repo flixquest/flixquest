@@ -162,6 +162,18 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Networks tried in turn, on phones and TV, when the selected network has
+  /// no popup for the viewer. Each still needs its own switch and catalog.
+  List<AdNetwork> _playbackPopunderFallbackNetworks = const [];
+  List<AdNetwork> get playbackPopunderFallbackNetworks =>
+      _playbackPopunderFallbackNetworks;
+
+  void setPlaybackPopunderFallbackNetworks(List<AdNetwork> networks) {
+    if (listEquals(_playbackPopunderFallbackNetworks, networks)) return;
+    _playbackPopunderFallbackNetworks = List.unmodifiable(networks);
+    notifyListeners();
+  }
+
   /// Which network serves the popup on Android TV; null serves none. Follows
   /// [playbackPopunderNetwork] until TV gets its own.
   AdNetwork? _tvPlaybackPopunderNetwork;
@@ -288,6 +300,7 @@ class AppDependencyProvider extends ChangeNotifier {
   /// Everything that decides a playback ad. A change closes an active one.
   ({
     AdNetwork? network,
+    List<AdNetwork> fallbackNetworks,
     AdsterraPlaybackAdsConfig adsterra,
     Map<AdNetwork, PopunderAdsConfig> popunders,
     int popupFrequencyMinutes,
@@ -295,6 +308,7 @@ class AppDependencyProvider extends ChangeNotifier {
     int tvPopupFrequencyMinutes,
   }) get playbackAdsSelection => (
         network: _playbackPopunderNetwork,
+        fallbackNetworks: _playbackPopunderFallbackNetworks,
         adsterra: _adsterraPlaybackAds,
         popunders: _popunderAds,
         popupFrequencyMinutes: _playbackPopupFrequencyMinutes,

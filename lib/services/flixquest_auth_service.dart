@@ -3,6 +3,7 @@ import '../core/error/result.dart';
 import '../data/models/app_user.dart';
 import '../data/models/auth_requests.dart';
 import '../data/models/auth_session.dart';
+import '../data/models/tv_sign_in.dart';
 import '../presentation/session/auth_runtime.dart';
 import '../presentation/session/session_view_model.dart';
 
@@ -18,6 +19,11 @@ class FlixQuestAuthService {
   Future<void> signInAnonymously() => session.enterGuest();
   Future<AuthSession?> signInWithGoogle({int? replaceDeviceId}) async =>
       _value(await session.signInWithGoogle(replaceDeviceId: replaceDeviceId));
+
+  Future<TvSignInCode> startTvSignIn() async =>
+      _value(await session.startTvSignIn());
+  Future<TvSignInCheck> checkTvSignIn(String deviceCode, {int? replaceDeviceId}) async =>
+      _value(await session.checkTvSignIn(deviceCode, replaceDeviceId: replaceDeviceId));
 
   /// Runs [signIn], and while the account is at its device limit asks [pick]
   /// which device to sign out and signs in again in its place. Null when the

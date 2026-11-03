@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,8 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../models/adsterra_playback_ads_config.dart';
 import '../provider/app_dependency_provider.dart';
+import '../services/ad_block_detector.dart';
+import '../services/ad_delivery.dart';
 import '../services/playback_ad_browser_service.dart';
 import '../services/playback_ad_input_service.dart';
 import 'network_banner_widget.dart';
@@ -127,6 +130,9 @@ class AdsterraPlaybackAdScreen extends StatefulWidget {
       this.preload,
       this.continueTap,
       this.onAdShown,
+      this.alreadyOpenFor = Duration.zero,
+      this.onNoFill,
+      this.onDelivery,
       super.key});
   final PlaybackAdPlacement placement;
   final PlaybackAdStage stage;
@@ -138,6 +144,42 @@ class AdsterraPlaybackAdScreen extends StatefulWidget {
   /// Called once when advertiser content first becomes visible. This is a
   /// local presentation signal, not a network-confirmed paid impression.
   final VoidCallback? onAdShown;
+
+  /// How long the popup was already open for networks that had no ad. The
+  /// placement's close fallback and maximum duration count from when the
+  /// popup opened, not from when this network started.
+  final Duration alreadyOpenFor;
+
+  /// Called instead of closing when the network had no ad ([noFillReasons])
+  /// and nothing was shown. Returns whether the caller took over, for example
+  /// by loading the next network; otherwise the screen closes as usual.
+  final bool Function()? onNoFill;
+
+  /// Called at most once with the network's own delivery host (the tag's
+  /// script host, or a direct link's first host past FlixQuest) and whether
+  /// it answered (an ad or no-fill alike) or failed the way ad blockers make
+  /// requests fail. This observes the viewer's own popup; nothing extra is
+  /// requested from the network.
+  final void Function(String host, AdDelivery delivery)? onDelivery;
+
+  /// Closing reasons that mean the network had no ad for this request, as
+  /// opposed to the viewer moving on, the app leaving the foreground or the
+  /// popup running out of time.
+  static const noFillReasons = {
+    'load_timeout',
+    'script_failed',
+    'script_main_frame_error',
+    'script_setup_error',
+    'automatic_popup_timeout',
+    'automatic_activation_error',
+    'monetag_no_content',
+    'page_load_timeout',
+    'page_http_error',
+    'page_main_frame_error',
+    'page_setup_error',
+    'page_not_html',
+    'no_ad_fallback',
+  };
 
   /// Whether the ad page hides its close control until the ad is served.
   /// False for a page the viewer opened themselves, such as a video ad's
@@ -202,6 +244,9 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   int _documentGeneration = 0;
   DateTime? _lastPointer;
   bool _finished = false;
+  String? _deliveryHost;
+  bool _deliveryReported = false;
+  bool _adBlockGateOn = false;
   bool _openingPage = false;
   bool _launchingBrowser = false;
   bool _popupAutoClose = false;
@@ -216,6 +261,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     super.didChangeDependencies();
     final config = context.watch<AppDependencyProvider?>();
     _popupAutoClose = config?.playbackPopupAutoClose ?? false;
+    _adBlockGateOn = config?.adBlockGateEnabled ?? false;
     _externalBrowserOnTap = config?.playbackPopupExternalBrowserOnTap ?? true;
     // A popup may have stayed open beyond its deadline while automatic close
     // was disabled. Enabling it remotely must still honor that deadline.
@@ -227,7 +273,11 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   }
 
   void _pageTimeout(String reason) {
-    if (_autoClose) {
+    // With another network to try, a page that never showed an ad gives way
+    // to it instead of offering the way on.
+    final tryNext =
+        reason == 'page_load_timeout' && !_adShown && widget.onNoFill != null;
+    if (_autoClose || tryNext) {
       _finish(reason);
     } else {
       _allowClose(reason);
@@ -262,7 +312,8 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _durationTimer = Timer(widget.placement.maxDuration, () {
+    _durationTimer =
+        Timer(_remaining(widget.placement.maxDuration), () {
       if (_phase == _Phase.page) {
         _pageTimeout('max_duration');
       } else {
@@ -270,6 +321,10 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       }
     });
     final smartlink = widget.placement.trackedSmartlinkUrl;
+    // A FlixQuest redirector's target is learned from its redirect; a hosted
+    // tag page loads its network out of sight, so it reports nothing.
+    _noteNavigation(
+        widget.placement.smartlinkUrl ?? widget.placement.scriptUrl);
     _log(
         'starting mode=${widget.placement.mode} loadTimeoutMs=${widget.placement.loadTimeout.inMilliseconds}');
     if (smartlink != null) {
@@ -279,6 +334,44 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       if (widget.stage != PlaybackAdStage.beforeLoader) _holdClose();
       unawaited(_loadScript());
     }
+  }
+
+  /// A main-frame address: the first host past FlixQuest is the network's.
+  void _noteNavigation(Uri? target) {
+    if (_webUrl(target) && !AdBlockDetector.isFirstPartyHost(target!.host)) {
+      _deliveryHost ??= target.host;
+    }
+  }
+
+  /// While the popup is open, a blocker may stop any hop of a direct link's
+  /// redirect chain, and usually stops a later one: the network's own
+  /// redirect and tracking hosts, or the advertiser. A page with content is
+  /// not the ad yet; a bot check or interstitial shows one and moves on.
+  /// [scriptOnly] limits a tag page to its tag's host, as its other requests
+  /// may fail harmlessly.
+  void _noteLoadError(WebResourceError error, {bool scriptOnly = false}) {
+    final host = Uri.tryParse(error.url ?? '')?.host;
+    if (_finished ||
+        host == null ||
+        host.isEmpty ||
+        AdBlockDetector.isFirstPartyHost(host) ||
+        (scriptOnly && host != _deliveryHost)) {
+      return;
+    }
+    final delivery = deliveryForLoadError(error.description);
+    if (delivery != null) _reportDelivery(delivery, host);
+  }
+
+  /// [AdDelivery.reached] (the popup ended on a page with content, or the
+  /// network had no ad) is about the network's own host; a block names the
+  /// hop that failed.
+  void _reportDelivery(AdDelivery delivery, [String? failedHost]) {
+    final host = failedHost ?? _deliveryHost;
+    if (_deliveryReported || host == null) return;
+    _deliveryReported = true;
+    _log('delivery ${delivery.name} at $host');
+    widget.onDelivery?.call(host, delivery);
+    if (delivery != AdDelivery.reached) _finish('ad_blocked');
   }
 
   @override
@@ -383,6 +476,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           if (url != 'about:blank') unawaited(_activateMonetag(controller));
         },
         onWebResourceError: (error) {
+          _noteLoadError(error, scriptOnly: true);
           _log(
               'script resource error code=${error.errorCode} ${error.description} origin=${_origin(error.url ?? '')} path=${Uri.tryParse(error.url ?? '')?.path ?? ''} mainFrame=${error.isForMainFrame}');
           if (error.isForMainFrame == true) _finish('script_main_frame_error');
@@ -654,6 +748,8 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
             _samePageDocument(failedUrl, _pageDocument ?? mainUrl) &&
             status >= 400) {
           _log('page HTTP $status ${_origin(failedUrl.toString())}');
+          // A server answered: no ad for this viewer, not a blocker.
+          _reportDelivery(AdDelivery.reached);
           _finish('page_http_error');
         }
       }
@@ -663,6 +759,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           if (request.url == 'about:blank') return NavigationDecision.navigate;
           if (_finished) return NavigationDecision.prevent;
           final target = Uri.tryParse(request.url);
+          if (request.isMainFrame) _noteNavigation(target);
           if (request.isMainFrame && isNoAdFallback(target)) {
             _onNoAd(target!);
             return NavigationDecision.prevent;
@@ -688,10 +785,12 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         onPageStarted: (url) {
           final started = Uri.tryParse(url);
           if (_webUrl(started)) mainUrl = started!;
+          _noteNavigation(started);
           _onPageStarted(url);
         },
         onPageFinished: (url) => _inspectPage(page, url),
         onWebResourceError: (error) {
+          if (error.isForMainFrame == true) _noteLoadError(error);
           if (!_finished && error.isForMainFrame == true) {
             final failed = Uri.tryParse(error.url ?? '');
             if (_webUrl(failed) &&
@@ -763,6 +862,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   /// page. There is no ad to see, so continue at once.
   void _onNoAd(Uri fallback) {
     _log('redirect chain ended on ${fallback.origin}, not an ad');
+    _reportDelivery(AdDelivery.reached);
     _finish('no_ad_fallback');
   }
 
@@ -922,7 +1022,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     _fallbackTimer?.cancel();
     _minimumViewTimer?.cancel();
     _countdownTimer?.cancel();
-    _fallbackTimer = Timer(widget.placement.closeFallback, () {
+    _fallbackTimer = Timer(_remaining(widget.placement.closeFallback), () {
       _fallbackReached = true;
       _allowClose('fallback_reached');
     });
@@ -1041,23 +1141,42 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   void _log(String message) => debugPrint(
       '[AdsterraPage] ${widget.placement.network.name}/${widget.stage.name}: $message');
 
+  Duration _remaining(Duration budget) {
+    final left = budget - widget.alreadyOpenFor;
+    return left.isNegative ? Duration.zero : left;
+  }
+
   void _finish([String reason = 'completed']) {
     if (!mounted || _finished) return;
     _finished = true;
+    _settleDelivery();
     _cancelTimers();
     widget.preload?._fail();
+    // Fallback networks are for no-fill. With the ad blocker check on, a
+    // blocked network ends the popup so the check can stop playback.
+    final noFill = !_adShown &&
+        (AdsterraPlaybackAdScreen.noFillReasons.contains(reason) ||
+            (reason == 'ad_blocked' && !_adBlockGateOn));
     _log(
-        'closing reason=$reason phase=${_phase.name} pageReady=$_pageReady closeAllowed=$_closeAllowed');
+        '${noFill ? 'no ad' : 'closing'} reason=$reason phase=${_phase.name} pageReady=$_pageReady closeAllowed=$_closeAllowed');
     // Deactivate before navigation; late messages cannot open an advertiser
     // over the loader/player after this screen is dismissed.
     unawaited(_stop(_script));
     unawaited(_stop(_page));
+    if (noFill && widget.onNoFill?.call() == true) return;
     final route = ModalRoute.of(context);
     if (route?.isCurrent == true) {
       Navigator.of(context).pop();
     } else if (route?.isActive == true) {
       Navigator.of(context).removeRoute(route!);
     }
+  }
+
+  /// The chain is judged by where it ended, whatever pages it showed on the
+  /// way: a popup closing on content reached its network. A blocked hop
+  /// reported earlier stands.
+  void _settleDelivery() {
+    if (_adShown) _reportDelivery(AdDelivery.reached);
   }
 
   void _cancelTimers() {
@@ -1082,6 +1201,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     if (!_finished) {
       _log(
           'disposed before completion (remote config or route removal) phase=${_phase.name}');
+      _settleDelivery();
     }
     WidgetsBinding.instance.removeObserver(this);
     _finished = true;
@@ -1447,6 +1567,89 @@ class _WaitPill extends StatelessWidget {
       ),
     );
   }
+}
+
+/// One popup from the first network in [placements] that has an ad for the
+/// viewer. When a network has none, the next one loads in the same route, so
+/// the viewer sees one ad screen instead of one closing and another opening.
+/// Later networks share the popup's close fallback and maximum duration, so
+/// the way on never waits longer than it would for the first network alone.
+class PlaybackAdChainScreen extends StatefulWidget {
+  const PlaybackAdChainScreen(
+      {required this.placements,
+      required this.stage,
+      this.storeLauncher,
+      this.browserLauncher,
+      this.television = false,
+      this.preload,
+      this.continueTap,
+      this.onAdShown,
+      this.onDelivery,
+      super.key})
+      : assert(placements.length > 0);
+
+  /// The selected network's placement, then each fallback network's.
+  final List<PlaybackAdPlacement> placements;
+  final PlaybackAdStage stage;
+  final StoreLauncher? storeLauncher;
+  final PlaybackBrowserLauncher? browserLauncher;
+  final bool television;
+
+  /// Prepared for the first placement only.
+  final PlaybackAdPreload? preload;
+  final PlaybackContinueTap? continueTap;
+  final VoidCallback? onAdShown;
+
+  /// Each network's [AdsterraPlaybackAdScreen.onDelivery].
+  final void Function(String host, AdDelivery delivery)? onDelivery;
+
+  @override
+  State<PlaybackAdChainScreen> createState() => _PlaybackAdChainScreenState();
+}
+
+class _PlaybackAdChainScreenState extends State<PlaybackAdChainScreen> {
+  late final DateTime _openedAt;
+  int _index = 0;
+  Duration _openFor = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _openedAt = clock.now();
+  }
+
+  bool _next() {
+    final openFor = clock.now().difference(_openedAt);
+    final from = widget.placements[_index].network.name;
+    if (!mounted || openFor >= widget.placements.first.maxDuration) {
+      return false;
+    }
+    debugPrint('[AdsterraPage] $from/${widget.stage.name}: trying '
+        '${widget.placements[_index + 1].network.name} after '
+        '${openFor.inMilliseconds}ms');
+    setState(() {
+      _index++;
+      _openFor = openFor;
+    });
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) => AdsterraPlaybackAdScreen(
+        key: ValueKey(_index),
+        placement: widget.placements[_index],
+        stage: widget.stage,
+        storeLauncher: widget.storeLauncher,
+        browserLauncher: widget.browserLauncher,
+        television: widget.television,
+        preload: _index == 0 ? widget.preload : null,
+        continueTap: widget.continueTap,
+        onAdShown: widget.onAdShown,
+        onDelivery: widget.onDelivery,
+        alreadyOpenFor: _openFor,
+        // The last network closes, or offers the way on, as it always has.
+        onNoFill: _index + 1 < widget.placements.length ? _next : null,
+      );
 }
 
 /// What the viewer sees while the ad's redirects run, instead of blank pages.

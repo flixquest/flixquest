@@ -114,7 +114,7 @@ void main() {
       'clickadu_banner_enabled': 'true',
       'clickadu_tv_enabled': 'true',
       'clickadu_banners': testClickaduCatalog,
-      'ad_block_gate_enabled': 'true',
+      'ad_block_gate_v2_enabled': 'true',
       'download_popup_enabled': 'true',
       'download_popup_frequency_minutes': '7',
       'player_exit_popup_relaunch_enabled': 'true',
@@ -163,7 +163,7 @@ void main() {
           'download_popup_enabled': true,
           'download_popup_frequency_minutes': 7,
         },
-        'features': {'ad_block_gate_enabled': true},
+        'features': {'ad_block_gate_v2_enabled': true},
         'network': {'telegram_channel_url': 'https://t.me/flixquest'},
         'updates': {
           'app_download_url_arm64_v8a': 'https://download.test/arm64.apk'

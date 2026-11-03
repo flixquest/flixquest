@@ -47,6 +47,10 @@ class PlusController extends ChangeNotifier {
 
   /// How long a verified entitlement stays usable without the network.
   static const offlineGrace = Duration(hours: 24);
+
+  /// Coming back to the app within this long of a check does not ask
+  /// Laravel again; the timer armed by the last answer keeps the pace.
+  static const resumeRecheckAfter = Duration(minutes: 2);
   static const _cacheKey = 'plus.account';
 
   String? _owner;
@@ -69,6 +73,12 @@ class PlusController extends ChangeNotifier {
   PlusEntitlement? get entitlement => _account?.entitlements;
   PlusRenewal? get renewal => _account?.renewal;
   WalletBalance? get wallet => _account?.wallet;
+
+  /// The account's Patreon link, once a Plus screen has read it.
+  PatreonMembership? get patreon => _account?.patreon;
+
+  /// Patreon as the catalog offers it.
+  PatreonOffer get patreonOffer => _catalog?.patreon ?? const PatreonOffer();
 
   /// Server time minus this device's clock, from the last verified answer.
   Duration _offset = Duration.zero;
@@ -211,6 +221,7 @@ class PlusController extends ChangeNotifier {
     _inFlight = null;
     _retryTopup = null;
     _stopTopupWatch();
+    _stopPatreonWatch();
     _refreshTimer?.cancel();
     _expiryTimer?.cancel();
     if (owner != null) _restoreCache(owner);
@@ -225,16 +236,28 @@ class PlusController extends ChangeNotifier {
       unawaited(refreshCatalog());
     }
     if (_owner == null) return;
-    unawaited(refresh());
+    // A quick trip out of the app does not ask again; open top-ups and
+    // Patreon links below are still checked straight away.
+    final verified = _verifiedAt;
+    if (!_fromCache &&
+        verified != null &&
+        serverNow.difference(verified) < resumeRecheckAfter) {
+      _scheduleRefresh();
+    } else {
+      unawaited(refresh());
+    }
     // Back from the payment page: look at the open top-up straight away.
     final topup = _topup;
     if (topup != null && topup.isOpen) _watchTopup(topup, restart: true);
+    // Back from Patreon in the browser: see whether the link went through.
+    if (_patreonLink?.isOpen ?? false) unawaited(checkPatreonLink());
   }
 
   void onPause() {
     _foreground = false;
     _refreshTimer?.cancel();
     _pollTimer?.cancel();
+    _patreonTimer?.cancel();
   }
 
   // ---- reads -------------------------------------------------------------
@@ -259,6 +282,8 @@ class PlusController extends ChangeNotifier {
       _account?.wallet?.id != null ||
       _account?.renewal?.mode != null ||
       (_account?.pendingTopups.isNotEmpty ?? false) ||
+      (_account?.patreon?.linked ?? false) ||
+      (_patreonLink?.isOpen ?? false) ||
       (_topup?.isOpen ?? false);
 
   /// One request per account at a time; later callers share it. [full] also
@@ -324,6 +349,7 @@ class PlusController extends ChangeNotifier {
     _account = fresh.copyWith(
       renewal: fresh.renewal ?? previous?.renewal,
       wallet: fresh.wallet ?? previous?.wallet,
+      patreon: fresh.patreon ?? previous?.patreon,
       pendingTopups: fresh.renewal == null && fresh.wallet == null
           ? previous?.pendingTopups ?? const []
           : fresh.pendingTopups,
@@ -656,6 +682,98 @@ class PlusController extends ChangeNotifier {
     if (!keep) _topup = null;
   }
 
+  // ---- Patreon ------------------------------------------------------------
+
+  PatreonLink? _patreonLink;
+  Timer? _patreonTimer;
+  bool _checkingPatreon = false;
+
+  /// The "connect Patreon" link opened in this session, as last reported.
+  PatreonLink? get patreonLink => _patreonLink;
+  bool get checkingPatreon => _checkingPatreon;
+
+  /// Asks for a link to open in a browser (or show as a QR code on a TV)
+  /// and follows it until the viewer finishes on Patreon. With
+  /// [activatePlus] they agree to start Plus from the balance once a
+  /// charge covers a period, under the current terms.
+  Future<PatreonLink> startPatreonLink({bool activatePlus = false}) async {
+    final terms = termsVersion;
+    if (activatePlus && terms == null) {
+      throw const BillingError(Failure.unknown(), code: 'billing_unavailable');
+    }
+    final link = await _owned(() => _repository.startPatreonLink(
+        activatePlus: activatePlus, termsVersion: terms));
+    _patreonLink = link;
+    _schedulePatreonCheck();
+    notifyListeners();
+    return link;
+  }
+
+  /// Checks the followed link now; a finished link reads the account again.
+  Future<void> checkPatreonLink() async {
+    final current = _patreonLink;
+    if (current == null || _checkingPatreon) return;
+    _patreonTimer?.cancel();
+    _checkingPatreon = true;
+    notifyListeners();
+    final revision = _revision;
+    try {
+      final (link, membership) = await _repository.patreonLink(current.id);
+      if (revision != _revision || _disposed) return;
+      // Keep the URL: the TV keeps showing it while the link is open.
+      _patreonLink = link.copyWith(url: link.url ?? current.url);
+      final account = _account;
+      if (account != null) _account = account.copyWith(patreon: membership);
+      if (link.linked) await refresh(full: true);
+    } on BillingError catch (_) {
+      // A missed check is retried while the link is open.
+    } finally {
+      if (revision == _revision && !_disposed) {
+        _checkingPatreon = false;
+        _schedulePatreonCheck();
+        notifyListeners();
+      }
+    }
+  }
+
+  void _schedulePatreonCheck() {
+    _patreonTimer?.cancel();
+    final link = _patreonLink;
+    final expires = link?.expiresAt;
+    if (link == null || !link.isOpen || !_foreground) return;
+    if (expires != null && !_now().toUtc().isBefore(expires)) {
+      _patreonLink = link.copyWith(status: 'expired');
+      return;
+    }
+    _patreonTimer = Timer(pollInterval, () => unawaited(checkPatreonLink()));
+  }
+
+  /// Forgets the followed link once its outcome has been shown.
+  void dismissPatreonLink() {
+    _stopPatreonWatch();
+    notifyListeners();
+  }
+
+  void _stopPatreonWatch() {
+    _patreonTimer?.cancel();
+    _patreonTimer = null;
+    _patreonLink = null;
+    _checkingPatreon = false;
+  }
+
+  /// Reads the membership from Patreon now, crediting a new charge.
+  Future<void> syncPatreon() async {
+    final account = await _owned(_repository.syncPatreon);
+    _acceptChange(account);
+  }
+
+  /// Stops the pledge funding this account; the credit it added stays.
+  Future<void> unlinkPatreon() async {
+    final account = await _owned(_repository.unlinkPatreon);
+    _stopPatreonWatch();
+    _acceptChange(account);
+  }
+
   @override
   void dispose() {
     _disposed = true;
@@ -663,6 +781,7 @@ class PlusController extends ChangeNotifier {
     _refreshTimer?.cancel();
     _expiryTimer?.cancel();
     _pollTimer?.cancel();
+    _patreonTimer?.cancel();
     super.dispose();
   }
 }

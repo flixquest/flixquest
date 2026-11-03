@@ -80,8 +80,10 @@ Future<TvScreenFocusController> _pumpBrowse(
   TvFocusMemory? memory,
   String? Function(TvMediaItem item)? badgeFor,
   TvTitleLogos? logos,
+  Size size = const Size(864, 508),
+  TvMediaItem? featured,
 }) async {
-  tester.view.physicalSize = const Size(864, 508);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final focusController = TvScreenFocusController();
@@ -98,7 +100,7 @@ Future<TvScreenFocusController> _pumpBrowse(
             child: _withLogos(
               logos,
               TvBrowseView(
-                featured: _item(1),
+                featured: featured ?? _item(1),
                 badgeFor: badgeFor,
                 metrics: _metrics,
                 onOpenMedia: (_) {},
@@ -141,6 +143,50 @@ void main() {
 
     await _press(tester, LogicalKeyboardKey.arrowDown);
     expect(_focused, 'first:movie:100');
+  });
+
+  testWidgets('a short screen fits the spotlight above the rows',
+      (tester) async {
+    // A synopsis long enough to want every line it is allowed.
+    final overview = List<String>.filled(40, 'A long synopsis').join(' ');
+    TvMediaItem long(int id) => TvMediaItem(
+          kind: TvMediaKind.movie,
+          id: id,
+          title: 'A title long enough to want two lines on the billboard $id',
+          overview: overview,
+          posterPath: null,
+          backdropPath: null,
+          rating: 7,
+          releaseDate: '2024-01-01',
+        );
+    final controller = await _pumpBrowse(
+      tester,
+      size: const Size(864, 400),
+      featured: long(1),
+      rows: <TvBrowseRow>[
+        for (final (index, scope) in <String>['first', 'second'].indexed)
+          TvMediaRow(
+            title: scope,
+            scopeId: scope,
+            items: <TvMediaItem>[
+              for (var i = 0; i < 6; i++) long(100 * (index + 1) + i),
+            ],
+          ),
+      ],
+    );
+    controller.requestFocus();
+    await tester.pumpAndSettle();
+    // Into the rows, where the spotlight has least room, mid-fade too.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 30));
+    }
+    await tester.pumpAndSettle();
+    await _press(tester, LogicalKeyboardKey.arrowRight);
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    expect(tester.takeException(), isNull);
+    // The title always stays.
+    expect(find.textContaining('A title long enough'), findsWidgets);
   });
 
   testWidgets('each row returns to the card it was left on', (tester) async {

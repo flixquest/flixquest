@@ -21,7 +21,8 @@ import 'tv_redeem_code_screen.dart';
 /// FlixQuest Plus on Android TV. Nobody types amounts or a wallet address
 /// with a remote: the TV shows a QR code that opens this account's top-up
 /// page on a phone, the viewer pays there, and the TV follows the payment
-/// until Laravel confirms it.
+/// until Laravel confirms it. Viewers without crypto can switch the code to
+/// a Patreon link instead: their pledge then adds to the balance.
 class TvPlusScreen extends StatefulWidget {
   const TvPlusScreen({super.key});
 
@@ -39,6 +40,11 @@ class _TvPlusScreenState extends State<TvPlusScreen> {
   bool _linkLoading = false;
   String? _linkOwner;
   Timer? _linkRenewal;
+
+  /// The QR code shows the Patreon link instead of the top-up page.
+  bool _patreonMode = false;
+  bool _patreonLoading = false;
+  BillingError? _patreonError;
 
   /// Checks for a top-up started on the phone while this screen is open.
   Timer? _watch;
@@ -115,6 +121,33 @@ class _TvPlusScreenState extends State<TvPlusScreen> {
       if (mounted) setState(() => _linkError = error);
     } finally {
       if (mounted) setState(() => _linkLoading = false);
+    }
+  }
+
+  /// A Patreon link for the phone; Plus starts from the balance once a
+  /// charge covers it unless it is already on (the TV states this consent).
+  Future<void> _newPatreonLink() async {
+    if (!mounted || _patreonLoading || !_plus.signedIn) return;
+    setState(() {
+      _patreonLoading = true;
+      _patreonError = null;
+    });
+    try {
+      await _plus.startPatreonLink(activatePlus: _patreonActivates(_plus));
+    } on BillingError catch (error) {
+      if (mounted) setState(() => _patreonError = error);
+    } finally {
+      if (mounted) setState(() => _patreonLoading = false);
+    }
+  }
+
+  bool _patreonActivates(PlusController plus) =>
+      !plus.adFree && !(plus.renewal?.autoRenew ?? false);
+
+  void _togglePatreon() {
+    setState(() => _patreonMode = !_patreonMode);
+    if (_patreonMode && !(_plus.patreonLink?.isOpen ?? false)) {
+      unawaited(_newPatreonLink());
     }
   }
 
@@ -326,7 +359,35 @@ class _TvPlusScreenState extends State<TvPlusScreen> {
     final open = plus.catalog?.purchasesEnabled ?? false;
     final renewing = plus.renewal?.autoRenew == true;
     final frozen = plus.wallet?.frozen == true;
-    final link = _link;
+    final patreonLink = plus.patreonLink;
+    final offersPatreon =
+        plus.patreonOffer.enabled && plus.patreon?.linked != true;
+    if (_patreonMode && patreonLink != null && !_patreonLoading) {
+      if (patreonLink.linked || !offersPatreon) {
+        // Connected from the phone: back to the balance, now with Patreon.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _patreonMode = false);
+        });
+      } else if (patreonLink.status == 'expired' && _patreonError == null) {
+        // The code ran out (or was cancelled): show a fresh one.
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => unawaited(_newPatreonLink()));
+      }
+    }
+    final link = _patreonMode
+        ? (patreonLink?.isOpen == true && patreonLink?.url != null
+            ? (
+                url: Uri.parse(patreonLink!.url!),
+                expiresAt: patreonLink.expiresAt ?? DateTime.now()
+              )
+            : null)
+        : _link;
+    final linkError = _patreonMode ? _patreonError : _linkError;
+    final qrProblem = linkError != null
+        ? billingMessage(linkError)
+        : _patreonMode && patreonLink?.status != 'expired'
+            ? patreonLinkProblem(patreonLink)
+            : null;
     final qrSize = compact ? 176.0 : 260.0;
     final buttons = <Widget>[
       if (!plus.adFree && fundable)
@@ -355,8 +416,16 @@ class _TvPlusScreenState extends State<TvPlusScreen> {
           label: tr('plus_tv_phone_refresh'),
           icon: PhosphorIcons.qrCode(),
           autofocus: !fundable && !plus.adFree && !renewing,
-          enabled: !_linkLoading,
-          onActivate: _newLink,
+          enabled: !(_patreonMode ? _patreonLoading : _linkLoading),
+          onActivate: _patreonMode ? _newPatreonLink : _newLink,
+        ),
+      if (open && !frozen && (offersPatreon || _patreonMode))
+        TvPillButton(
+          label: _patreonMode
+              ? tr('plus_tv_crypto_instead')
+              : tr('plus_patreon_use'),
+          icon: _patreonMode ? PhosphorIcons.qrCode() : PhosphorIcons.heart(),
+          onActivate: _togglePatreon,
         ),
       TvPillButton(
         label: tr('plus_redeem_code'),
@@ -407,11 +476,11 @@ class _TvPlusScreenState extends State<TvPlusScreen> {
                         padding: const EdgeInsets.all(16),
                       ),
                     )
-                  : _linkError != null
+                  : qrProblem != null
                       ? Padding(
                           padding: const EdgeInsets.all(16),
                           child: Text(
-                            billingMessage(_linkError!),
+                            qrProblem,
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.black87),
                           ),
@@ -427,13 +496,24 @@ class _TvPlusScreenState extends State<TvPlusScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(tr('plus_tv_phone_title'), style: title),
+                  Text(
+                      _patreonMode
+                          ? tr('plus_tv_patreon_title')
+                          : tr('plus_tv_phone_title'),
+                      style: title),
                   SizedBox(height: compact ? 12 : 18),
-                  for (final (index, key) in const <String>[
-                    'plus_tv_phone_step1',
-                    'plus_tv_phone_step2',
-                    'plus_tv_phone_step3',
-                  ].indexed)
+                  for (final (index, key) in (_patreonMode
+                          ? const <String>[
+                              'plus_tv_phone_step1',
+                              'plus_tv_patreon_step2',
+                              'plus_tv_patreon_step3',
+                            ]
+                          : const <String>[
+                              'plus_tv_phone_step1',
+                              'plus_tv_phone_step2',
+                              'plus_tv_phone_step3',
+                            ])
+                      .indexed)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: Row(
@@ -458,7 +538,13 @@ class _TvPlusScreenState extends State<TvPlusScreen> {
                         ],
                       ),
                     ),
-                  Text(tr('plus_tv_phone_expires'),
+                  Text(
+                      _patreonMode && _patreonActivates(plus)
+                          ? tr('plus_tv_patreon_consent', args: [
+                              formatUsd(charge),
+                              '${_interval(plus)}',
+                            ])
+                          : tr('plus_tv_phone_expires'),
                       style: body.copyWith(fontSize: compact ? 12 : 14)),
                 ],
               ),
@@ -570,6 +656,12 @@ class _StatusPanel extends StatelessWidget {
                     icon: PhosphorIcons.wallet(),
                     label: tr('plus_balance_chip',
                         args: [formatUsd(plus.wallet?.spendableCents ?? 0)]),
+                  ),
+                if (plus.patreon?.activePatron == true)
+                  PlusChip(
+                    icon: PhosphorIcons.heart(),
+                    label: tr('plus_patreon_chip',
+                        args: [formatUsd(plus.patreon!.monthlyCents)]),
                   ),
                 if (discount != null)
                   PlusChip(

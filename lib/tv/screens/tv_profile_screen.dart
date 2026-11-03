@@ -18,6 +18,7 @@ import '../focus/tv_screen_focus_controller.dart';
 import '../widgets/tv_dialog.dart';
 import '../widgets/tv_page_header.dart';
 import '../widgets/tv_pill_button.dart';
+import 'tv_account_screens.dart';
 
 class LaravelTvProfileScreen extends StatelessWidget {
   const LaravelTvProfileScreen({
@@ -139,6 +140,18 @@ class _ProfileLayout extends StatelessWidget {
     );
   }
 
+  Future<void> _openManageAccount(BuildContext context) async {
+    final previous = FocusManager.instance.primaryFocus;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const TvManageAccountScreen()),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (previous?.context != null && previous!.canRequestFocus) {
+        previous.requestFocus();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     Localizations.localeOf(context);
@@ -239,8 +252,16 @@ class _ProfileLayout extends StatelessWidget {
                           spacing: 12,
                           runSpacing: 12,
                           children: <Widget>[
+                            // The page opens on the first button.
+                            if (!isGuest)
+                              TvPillButton(
+                                focusNode: signOutFocusNode,
+                                label: tr('tv_manage_account'),
+                                icon: PhosphorIcons.userGear(),
+                                onActivate: () => _openManageAccount(context),
+                              ),
                             TvPillButton(
-                              focusNode: signOutFocusNode,
+                              focusNode: isGuest ? signOutFocusNode : null,
                               label: tr('sign_out'),
                               icon: PhosphorIcons.signOut(),
                               onActivate: onSignOut,
@@ -358,8 +379,9 @@ class _ProfileFocusEntry extends StatefulWidget {
 }
 
 class _ProfileFocusEntryState extends State<_ProfileFocusEntry> {
+  /// The first button: Manage account when signed in, else Sign out.
   final FocusNode _signOutFocusNode =
-      FocusNode(debugLabel: 'TV profile sign out');
+      FocusNode(debugLabel: 'TV profile first action');
 
   @override
   void initState() {

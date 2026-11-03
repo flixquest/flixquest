@@ -83,6 +83,37 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the latest reply stays in view when the keyboard opens',
+      (tester) async {
+    final repository = FakeFlixAiRepository();
+    for (var index = 1; index <= 4; index++) {
+      repository.answers.add(() async => FlixAiReply(
+          FlixAiTurn(
+              id: 'turn-$index',
+              conversationId: 'chat-1',
+              message: 'Ask $index',
+              reply: 'Reply $index. ${'A long, thoughtful answer. ' * 12}',
+              recommendations: const []),
+          FakeFlixAiRepository.usage(remaining: 9)));
+    }
+    await pumpChat(tester, repository: repository);
+    for (var index = 1; index <= 4; index++) {
+      await tester.enterText(find.byType(TextField), 'Ask $index');
+      await tester.pump();
+      await tester.tap(find.byTooltip('Send message'));
+      await tester.pumpAndSettle();
+    }
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 340);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+
+    final latest = tester.getRect(find.textContaining('Reply 4.'));
+    final composer = tester.getRect(find.byType(TextField));
+    expect(latest.bottom, lessThanOrEqualTo(composer.top));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the quota state and input fit a narrow phone and a wide screen',
       (tester) async {
     for (final size in [const Size(320, 720), const Size(1280, 720)]) {

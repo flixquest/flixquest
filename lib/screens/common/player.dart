@@ -26,7 +26,6 @@ import '../../functions/player_buffering_configuration.dart';
 import '../../functions/language_names.dart';
 import '../../functions/subtitle_options.dart';
 import '/constants/app_constants.dart';
-import '/widgets/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -463,24 +462,17 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                 BetterPlayerOverflowMenuItem(
                   PhosphorIcons.fileArrowUp(),
                   tr('upload_subtitles'),
-                  () {
-                    _localSubtitles.showLocalSubtitlesUpload(
+                  () => unawaited(
+                    _localSubtitles.pickAndApply(
                       context: context,
-                      colors: widget.colors,
                       betterPlayerController: _betterPlayerController,
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ]
             // Subtitle timing, searching online and uploading live in the
             // Subtitles panel.
-            : [
-                BetterPlayerOverflowMenuItem(
-                  PhosphorIcons.arrowSquareOut(),
-                  tr('open_external'),
-                  _showExternalPlayerSheet,
-                ),
-              ]);
+            : const []);
     BetterPlayerConfiguration betterPlayerConfiguration =
         BetterPlayerConfiguration(
             autoDetectFullscreenDeviceOrientation: !widget.useTvControls,
@@ -3062,11 +3054,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         label: tr('download_action'),
         onTap: () => unawaited(_downloadFromCurrentProvider()),
       ),
-      WatchAction(
-        icon: PhosphorIcons.arrowSquareOut(),
-        label: tr('open_external'),
-        onTap: _showExternalPlayerSheet,
-      ),
     ];
   }
 
@@ -3523,20 +3510,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               .playerExit(context, watched: watched),
     );
     Navigator.pop(context);
-  }
-
-  void _showExternalPlayerSheet() {
-    showPlayerSheet<void>(
-      context: context,
-      builder: (context) => AppResponsiveContent(
-        maxWidth: 680,
-        padding: EdgeInsets.zero,
-        child: ExternalPlay(
-          videoSources: _activeSources,
-          subtitleSources: _activeSubtitles,
-        ),
-      ),
-    );
   }
 
   Future<void> _downloadFromCurrentProvider() async {

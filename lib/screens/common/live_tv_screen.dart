@@ -19,9 +19,8 @@ import '../../models/live_tv.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../services/daddylive_service.dart';
+import '../../services/live_tv_source.dart';
 import '../../services/media_link.dart';
-// EthioTV source (commented out - disabled):
-// import '../../services/ethio_sports_service.dart';
 import '../../services/adsterra_playback_ads_service.dart';
 import '../../services/analytics_service.dart';
 import '../../mobile/widgets/filter_chips.dart';
@@ -33,9 +32,6 @@ import '../../widgets/hosted_ads_banner.dart';
 enum _ChannelScope { all, favorites, recent }
 
 enum _LiveTvMode { channels, schedule }
-
-// EthioTV source (commented out - disabled):
-// enum _LiveTvSource { daddyLive, ethioSports }
 
 const _allCategoriesKey = '__all_categories__';
 
@@ -52,18 +48,16 @@ class ChannelList extends StatefulWidget {
 
 class _ChannelListState extends State<ChannelList> {
   static const _analyticsSurface = 'standard';
-  final _daddyDatabase = LiveTVDatabaseController();
-  // EthioTV source (commented out - disabled):
-  // final _ethioDatabase = LiveTVDatabaseController(namespace: 'ethiosports');
+  // The sports followed are the viewer's, whichever source is showing.
+  final _sportsDatabase = LiveTvSource.daddyLive.database();
+  final _databases = <LiveTvSource, LiveTVDatabaseController>{};
+  final _services = <LiveTvSource, LiveTvService>{};
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
   // Marks the linked channel's card so it can be scrolled to once it is built.
   final _linkedChannelKey = GlobalKey(debugLabel: 'Linked live channel');
   Timer? _highlightTimer;
   String? _highlightedId;
-  DaddyLiveService? _service;
-  // EthioTV source (commented out - disabled):
-  // EthioSportsService? _ethioService;
   List<Channel> _channels = const <Channel>[];
   DaddyLiveEpg? _epg;
   Set<String> _favoriteIds = <String>{};
@@ -78,8 +72,13 @@ class _ChannelListState extends State<ChannelList> {
   Timer? _searchAnalyticsDebounce;
   _ChannelScope _scope = _ChannelScope.all;
   _LiveTvMode _mode = _LiveTvMode.channels;
-  // EthioTV source (commented out - disabled):
-  // _LiveTvSource _source = _LiveTvSource.daddyLive;
+
+  /// The view shown: the chosen one, or the channels for a source without a
+  /// schedule. The choice is kept for the sources that have one.
+  _LiveTvMode get _view => _source.hasSchedule ? _mode : _LiveTvMode.channels;
+  LiveTvSource _source = LiveTvSource.daddyLive;
+  // The remembered source is read first; the picker waits for it.
+  bool _sourceKnown = false;
   int _selectedDayIndex = 0;
   String? _sport;
   // Sports the viewer follows, by [LiveSport.id]; their sections lead the
@@ -91,8 +90,21 @@ class _ChannelListState extends State<ChannelList> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _analytics.trackLiveTVScreenOpened(surface: _analyticsSurface);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // A link opens the source its channel belongs to.
+      final linked = widget.initialChannelId;
+      final source = linked == null
+          ? await LiveTvSource.lastUsed()
+          : LiveTvSource.forChannel(linked);
+      if (!mounted) return;
+      setState(() {
+        _source = source;
+        _sourceKnown = true;
+      });
+      _analytics.trackLiveTVScreenOpened(
+        surface: _analyticsSurface,
+        provider: source.analyticsName,
+      );
       _load().then((_) => _showInitialChannel()).then((_) => _askSports());
     });
   }
@@ -101,8 +113,13 @@ class _ChannelListState extends State<ChannelList> {
   /// in. A link to a channel is not interrupted, and a failed load leaves the
   /// question for the next visit.
   Future<void> _askSports() async {
-    if (!mounted || widget.initialChannelId != null || _error != null) return;
-    if (await _daddyDatabase.getPreferredSports() != null || !mounted) return;
+    if (!mounted ||
+        widget.initialChannelId != null ||
+        _error != null ||
+        !_source.hasSchedule) {
+      return;
+    }
+    if (await _sportsDatabase.getPreferredSports() != null || !mounted) return;
     await _editSports(firstTime: true);
   }
 
@@ -118,11 +135,12 @@ class _ChannelListState extends State<ChannelList> {
     );
     if (!mounted || (picked == null && !firstTime)) return;
     final sports = picked ?? const <String>{};
-    await _daddyDatabase.setPreferredSports(sports);
+    await _sportsDatabase.setPreferredSports(sports);
     if (!mounted) return;
     setState(() => _preferredSports = sports);
     _analytics.trackLiveTVInteraction(
       surface: _analyticsSurface,
+      provider: _source.analyticsName,
       action: 'preferred_sports_changed',
       value: sports.isEmpty ? 'none' : (sports.toList()..sort()).join(','),
       resultCount: sports.length,
@@ -183,32 +201,27 @@ class _ChannelListState extends State<ChannelList> {
     _highlightTimer?.cancel();
     _scrollController.dispose();
     _searchAnalyticsDebounce?.cancel();
-    _service?.close();
-    // EthioTV source (commented out - disabled):
-    // _ethioService?.close();
+    for (final service in _services.values) {
+      service.close();
+    }
     _searchController.dispose();
     super.dispose();
   }
 
-  DaddyLiveService _api() => _service ??= DaddyLiveService(
-        baseUrl: context.read<AppDependencyProvider>().flixquestAPIURL,
+  LiveTvService _api() => _services[_source] ??= _source.createService(
+        context.read<AppDependencyProvider>().flixquestAPIURL,
       );
 
-  // EthioTV source (commented out - disabled):
-  // EthioSportsService _ethioApi() => _ethioService ??= EthioSportsService(
-  //       baseUrl: context.read<AppDependencyProvider>().flixquestAPIURLV2,
-  //     );
-  //
-  // LiveTvService get _activeService =>
-  //     _source == _LiveTvSource.ethioSports ? _ethioApi() : _api();
-  //
-  // LiveTVDatabaseController get _database =>
-  //     _source == _LiveTvSource.ethioSports ? _ethioDatabase : _daddyDatabase;
+  LiveTVDatabaseController get _database =>
+      _databases[_source] ??= _source.database();
 
   AnalyticsService get _analytics => context.read<SettingsProvider>().analytics;
 
   Future<void> _load({bool refresh = false}) async {
     final stopwatch = Stopwatch()..start();
+    // A load the viewer has since switched away from is dropped.
+    final source = _source;
+    final database = _database;
     var cacheHit = false;
     if (mounted) {
       setState(() {
@@ -216,25 +229,26 @@ class _ChannelListState extends State<ChannelList> {
         _error = null;
       });
     }
+    final favorites = await database.getFavoriteIds();
+    final recent = await database.getRecentIds();
+    final preferredSports = await _sportsDatabase.getPreferredSports();
     try {
-      final favorites = await _daddyDatabase.getFavoriteIds();
-      final recent = await _daddyDatabase.getRecentIds();
-      final preferredSports = await _daddyDatabase.getPreferredSports();
       List<Channel> channels;
       DaddyLiveEpg? epg;
-      if (!refresh && await _daddyDatabase.isCacheValid()) {
+      if (!refresh && await database.isCacheValid()) {
         cacheHit = true;
-        channels = await _daddyDatabase.getCachedChannels();
-        epg = await _daddyDatabase.getCachedEpg();
+        channels = await database.getCachedChannels();
+        epg = await database.getCachedEpg();
       } else {
+        if (!mounted) return;
         final catalog = await _api().getCatalog(refresh: refresh);
         channels = catalog.channels;
         epg = catalog.epg;
-        await _daddyDatabase.cacheChannels(channels);
-        await _daddyDatabase.cacheEpg(catalog.epg);
+        await database.cacheChannels(channels);
+        await database.cacheEpg(catalog.epg);
       }
       channels = channels.toList()..sort((a, b) => a.name.compareTo(b.name));
-      if (!mounted) return;
+      if (!mounted || source != _source) return;
       setState(() {
         _channels = channels;
         _epg = epg;
@@ -245,6 +259,7 @@ class _ChannelListState extends State<ChannelList> {
       });
       _analytics.trackLiveTVCatalogLoad(
         surface: _analyticsSurface,
+        provider: source.analyticsName,
         refresh: refresh,
         cacheHit: cacheHit,
         success: true,
@@ -253,19 +268,21 @@ class _ChannelListState extends State<ChannelList> {
         epgDayCount: epg?.days.length ?? 0,
       );
     } catch (error) {
-      final cached = await _daddyDatabase.getCachedChannels();
-      final cachedEpg = await _daddyDatabase.getCachedEpg();
-      final preferredSports = await _daddyDatabase.getPreferredSports();
-      if (!mounted) return;
+      final cached = await database.getCachedChannels();
+      final cachedEpg = await database.getCachedEpg();
+      if (!mounted || source != _source) return;
       setState(() {
         _channels = cached;
         _epg = cachedEpg;
+        _favoriteIds = favorites;
+        _recentIds = recent;
         _preferredSports = preferredSports ?? <String>{};
         _loading = false;
         _error = cached.isEmpty ? friendlyLiveTvError(error) : null;
       });
       _analytics.trackLiveTVCatalogLoad(
         surface: _analyticsSurface,
+        provider: source.analyticsName,
         refresh: refresh,
         cacheHit: cacheHit,
         success: false,
@@ -330,6 +347,7 @@ class _ChannelListState extends State<ChannelList> {
     setState(() => _letter = letter);
     _analytics.trackLiveTVInteraction(
       surface: _analyticsSurface,
+      provider: _source.analyticsName,
       action: 'letter_changed',
       value: letter ?? 'all',
       resultCount: _visibleChannels.length,
@@ -398,8 +416,9 @@ class _ChannelListState extends State<ChannelList> {
       _scheduleSections.fold(0, (sum, section) => sum + section.events.length);
 
   Future<void> _toggleFavorite(Channel channel) async {
-    final isFavorite = await _daddyDatabase.toggleFavorite(channel.id);
-    if (!mounted) return;
+    final source = _source;
+    final isFavorite = await _database.toggleFavorite(channel.id);
+    if (!mounted || source != _source) return;
     setState(() {
       if (isFavorite) {
         _favoriteIds.add(channel.id);
@@ -409,6 +428,7 @@ class _ChannelListState extends State<ChannelList> {
     });
     _analytics.trackLiveTVFavorite(
       surface: _analyticsSurface,
+      provider: _source.analyticsName,
       channelId: channel.id,
       channelName: channel.name,
       added: isFavorite,
@@ -429,12 +449,16 @@ class _ChannelListState extends State<ChannelList> {
   Future<void> _play(Channel channel) async {
     if (_resolvingId != null) return;
     setState(() => _resolvingId = channel.id);
+    // The source this channel came from, should the viewer switch meanwhile.
+    final source = _source;
+    final service = _api();
+    final database = _database;
     _adPreload =
         AdsterraPlaybackAdsService.instance.preloadStreamFound(context);
     final stopwatch = Stopwatch()..start();
     try {
-      final stream = await _api().getStream(channel.id);
-      await _daddyDatabase.addRecent(channel.id);
+      final stream = await service.getStream(channel.id);
+      await database.addRecent(channel.id);
       if (!mounted) return;
       _analytics.trackLiveTVChannelView(
         channelName: channel.name,
@@ -442,11 +466,12 @@ class _ChannelListState extends State<ChannelList> {
       );
       _analytics.trackLiveTVStreamResolution(
         surface: _analyticsSurface,
+        provider: source.analyticsName,
         channelId: channel.id,
         channelName: channel.name,
         outcome: 'success',
         durationMs: stopwatch.elapsedMilliseconds,
-        source: _mode.name,
+        source: _view.name,
       );
       if (!mounted) return;
       // The channel works: the same stream-found popup as movies, first.
@@ -474,27 +499,28 @@ class _ChannelListState extends State<ChannelList> {
             // Keep in-player switching independent from browse filters.
             channels: _channels,
             initialChannelId: channel.id,
-            service: _api(),
+            service: service,
+            source: source,
             analytics: _analytics,
             analyticsSurface: _analyticsSurface,
             scraperApiUrl:
                 context.read<AppDependencyProvider>().flixquestAPIURL,
-            onChannelSwitch: (switched) =>
-                _daddyDatabase.addRecent(switched.id),
+            onChannelSwitch: (switched) => database.addRecent(switched.id),
             enableCast: false,
           ),
         ),
       );
-      _recentIds = await _daddyDatabase.getRecentIds();
-      if (mounted) setState(() {});
+      final recent = await database.getRecentIds();
+      if (mounted && source == _source) setState(() => _recentIds = recent);
     } catch (error) {
       _analytics.trackLiveTVStreamResolution(
         surface: _analyticsSurface,
+        provider: source.analyticsName,
         channelId: channel.id,
         channelName: channel.name,
         outcome: 'error',
         durationMs: stopwatch.elapsedMilliseconds,
-        source: _mode.name,
+        source: _view.name,
         error: error.toString(),
       );
       if (mounted) {
@@ -516,9 +542,10 @@ class _ChannelListState extends State<ChannelList> {
       if (!mounted || value != _query) return;
       _analytics.trackLiveTVInteraction(
         surface: _analyticsSurface,
+        provider: _source.analyticsName,
         action: 'search',
-        value: _mode.name,
-        resultCount: _mode == _LiveTvMode.channels
+        value: _view.name,
+        resultCount: _view == _LiveTvMode.channels
             ? _visibleChannels.length
             : _visibleEventCount,
       );
@@ -530,30 +557,51 @@ class _ChannelListState extends State<ChannelList> {
     setState(() => _mode = mode);
     _analytics.trackLiveTVInteraction(
       surface: _analyticsSurface,
+      provider: _source.analyticsName,
       action: 'view_changed',
       value: mode.name,
     );
   }
 
-  // EthioTV source (commented out - disabled):
-  // void _selectSource(_LiveTvSource source) {
-  //   if (source == _source) return;
-  //   setState(() {
-  //     _source = source;
-  //     _mode = _LiveTvMode.channels;
-  //     _selectedCategory = null;
-  //     _selectedDayIndex = 0;
-  //     _channels = const <Channel>[];
-  //     _epg = null;
-  //   });
-  //   _load();
-  // }
+  /// Shows [source]'s channels and schedule in place of the current ones.
+  /// The view and search stay; filters belonging to the old catalog go.
+  void _selectSource(LiveTvSource source) {
+    if (source == _source) return;
+    setState(() {
+      _source = source;
+      _selectedCategory = null;
+      _letter = null;
+      _sport = null;
+      _selectedDayIndex = 0;
+      _expandedEvents.clear();
+      _channels = const <Channel>[];
+      _epg = null;
+    });
+    unawaited(source.remember());
+    _analytics.trackLiveTVInteraction(
+      surface: _analyticsSurface,
+      provider: source.analyticsName,
+      action: 'source_changed',
+      value: source.id,
+    );
+    _load();
+  }
+
+  Future<void> _pickSource() async {
+    final source = await showAppSheet<LiveTvSource>(
+      context,
+      builder: (_) => _SourcePickerSheet(selected: _source),
+    );
+    if (!mounted || source == null) return;
+    _selectSource(source);
+  }
 
   void _selectScope(_ChannelScope scope) {
     if (scope == _scope) return;
     setState(() => _scope = scope);
     _analytics.trackLiveTVInteraction(
       surface: _analyticsSurface,
+      provider: _source.analyticsName,
       action: 'collection_changed',
       value: scope.name,
       resultCount: _visibleChannels.length,
@@ -565,6 +613,7 @@ class _ChannelListState extends State<ChannelList> {
     setState(() => _selectedCategory = category);
     _analytics.trackLiveTVInteraction(
       surface: _analyticsSurface,
+      provider: _source.analyticsName,
       action: 'category_changed',
       value: category ?? 'all',
       resultCount: _visibleChannels.length,
@@ -585,6 +634,7 @@ class _ChannelListState extends State<ChannelList> {
     setState(() => _sport = sport);
     _analytics.trackLiveTVInteraction(
       surface: _analyticsSurface,
+      provider: _source.analyticsName,
       action: 'schedule_sport_changed',
       value: sport ?? 'all',
       resultCount: _visibleEventCount,
@@ -596,6 +646,7 @@ class _ChannelListState extends State<ChannelList> {
     setState(() => _selectedDayIndex = index);
     _analytics.trackLiveTVInteraction(
       surface: _analyticsSurface,
+      provider: _source.analyticsName,
       action: 'schedule_day_changed',
       value: _epg?.days[index].label,
       resultCount: _visibleEventCount,
@@ -612,38 +663,54 @@ class _ChannelListState extends State<ChannelList> {
         title: tr('live_tv'),
         contentWidth: 900,
         actions: <Widget>[
+          // In the bar, so it stays to hand while a source loads or fails.
+          if (_sourceKnown)
+            Semantics(
+            label: tr('live_tv_source'),
+              child: ChoicePill(
+                spec: FilterChipSpec(
+                  label: _source.label,
+                  icon: _sourceIcon(_source),
+                  dropdown: true,
+                  onTap: _pickSource,
+                ),
+              ),
+            ),
           IconButton(
             tooltip: tr('refresh'),
             onPressed: _loading ? null : () => _load(refresh: true),
             icon: Icon(PhosphorIcons.arrowsClockwise()),
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(SegmentSwitch.height + 12),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 12),
-            child: SegmentSwitch<_LiveTvMode>(
-              segments: <Segment<_LiveTvMode>>[
-                Segment(
-                  _LiveTvMode.channels,
-                  tr('channels'),
-                  icon: PhosphorIcons.televisionSimple(),
+        // A source without a schedule has only its channels to show.
+        bottom: !_source.hasSchedule
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(SegmentSwitch.height + 12),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 12),
+                  child: SegmentSwitch<_LiveTvMode>(
+                    segments: <Segment<_LiveTvMode>>[
+                      Segment(
+                        _LiveTvMode.channels,
+                        tr('channels'),
+                        icon: PhosphorIcons.televisionSimple(),
+                      ),
+                      Segment(
+                        _LiveTvMode.schedule,
+                        tr('schedule'),
+                        icon: PhosphorIcons.calendarDots(),
+                      ),
+                    ],
+                    selected: _view,
+                    onChanged: _selectMode,
+                  ),
                 ),
-                Segment(
-                  _LiveTvMode.schedule,
-                  tr('schedule'),
-                  icon: PhosphorIcons.calendarDots(),
-                ),
-              ],
-              selected: _mode,
-              onChanged: _selectMode,
-            ),
-          ),
-        ),
+              ),
       ),
       body: SkeletonSwitcher(
         loading: _loading && _channels.isEmpty,
-        skeleton: _LiveTvSkeleton(schedule: _mode == _LiveTvMode.schedule),
+        skeleton: _LiveTvSkeleton(schedule: _view == _LiveTvMode.schedule),
         child: _buildBody(),
       ),
     );
@@ -671,7 +738,7 @@ class _ChannelListState extends State<ChannelList> {
         slivers: <Widget>[
           SliverToBoxAdapter(child: _buildHeader()),
           _bannerSliver(_headerPlacement),
-          if (_mode == _LiveTvMode.channels)
+          if (_view == _LiveTvMode.channels)
             ..._buildChannelSlivers()
           else
             ..._buildScheduleSlivers(),
@@ -859,7 +926,7 @@ class _ChannelListState extends State<ChannelList> {
   Widget _buildHeader() {
     final palette = AppPalette.of(context);
     final gutter = AppSpace.gutter(context);
-    final isSchedule = _mode == _LiveTvMode.schedule;
+    final isSchedule = _view == _LiveTvMode.schedule;
     final selectedCategory = _selectedCategory;
     final epg = _epg;
     return Padding(
@@ -1015,6 +1082,64 @@ class _ChannelListState extends State<ChannelList> {
     );
     if (!mounted || selected == null) return;
     _selectCategory(selected == _allCategoriesKey ? null : selected);
+  }
+}
+
+IconData _sourceIcon(LiveTvSource source) => switch (source) {
+      LiveTvSource.daddyLive => PhosphorIcons.broadcast(),
+      LiveTvSource.ntv => PhosphorIcons.globeHemisphereWest(),
+    };
+
+String _sourceHint(LiveTvSource source) => switch (source) {
+      LiveTvSource.daddyLive => tr('live_source_daddylive_hint'),
+      LiveTvSource.ntv => tr('live_source_ntv_hint'),
+    };
+
+/// The live TV sources, each with what it is good for.
+class _SourcePickerSheet extends StatelessWidget {
+  const _SourcePickerSheet({required this.selected});
+
+  final LiveTvSource selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final gutter = AppSpace.gutter(context);
+    return SafeArea(
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Padding(
+            padding: EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpace.md),
+            child: Text(
+              tr('live_tv_source'),
+              style: AppType.sectionHeader.copyWith(
+                fontFamily: AppType.bold,
+                color: palette.foreground,
+              ),
+            ),
+          ),
+          for (final source in LiveTvSource.values)
+            ListRow(
+              icon: _sourceIcon(source),
+              label: source.label,
+              subtitle: _sourceHint(source),
+              trailing: source == selected
+                  ? Icon(
+                      PhosphorIcons.check(PhosphorIconsStyle.bold),
+                      size: 18,
+                      color: palette.foreground,
+                    )
+                  : null,
+              showsNext: false,
+              onTap: () => Navigator.pop(context, source),
+            ),
+          const SizedBox(height: AppSpace.lg),
+        ],
+      ),
+    );
   }
 }
 

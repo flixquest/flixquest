@@ -53,6 +53,21 @@ class TopupLimits with _$TopupLimits {
   }
 }
 
+/// Patreon as the catalog offers it: a pledge that adds to the balance, for
+/// viewers who can't pay in crypto.
+@freezed
+class PatreonOffer with _$PatreonOffer {
+  const factory PatreonOffer({
+    @Default(false) bool enabled,
+    @JsonKey(name: 'pledge_url') String? pledgeUrl,
+
+    /// The monthly pledge that pays for every Plus period on its own.
+    @JsonKey(name: 'recommended_cents') @Default(200) int recommendedCents,
+  }) = _PatreonOffer;
+  factory PatreonOffer.fromJson(Map<String, dynamic> json) =>
+      _$PatreonOfferFromJson(json);
+}
+
 /// The public catalog: what Plus costs and whether top-ups are open.
 @freezed
 class PlusCatalog with _$PlusCatalog {
@@ -61,6 +76,7 @@ class PlusCatalog with _$PlusCatalog {
     @JsonKey(name: 'purchases_enabled') @Default(false) bool purchasesEnabled,
     @Default(<PlusPlan>[]) List<PlusPlan> plans,
     @Default(TopupLimits()) TopupLimits wallet,
+    @Default(PatreonOffer()) PatreonOffer patreon,
   }) = _PlusCatalog;
   factory PlusCatalog.fromJson(Map<String, dynamic> json) =>
       _$PlusCatalogFromJson(json);
@@ -206,6 +222,9 @@ class WalletTopup with _$WalletTopup {
   const factory WalletTopup({
     required String id,
     required String status,
+
+    /// `nowpayments` (crypto) or `patreon` (a credited pledge charge).
+    @Default('nowpayments') String provider,
     @JsonKey(name: 'amount_cents') required int amountCents,
     @JsonKey(name: 'credited_cents') @Default(0) int creditedCents,
     @Default('USD') String currency,
@@ -257,6 +276,9 @@ class WalletTransaction with _$WalletTransaction {
     @JsonKey(name: 'amount_cents') required int amountCents,
     @JsonKey(name: 'balance_after_cents') int? balanceAfterCents,
     @JsonKey(fromJson: _id) String? reference,
+
+    /// Where a credit came from: `nowpayments` or `patreon`.
+    String? source,
     @JsonKey(name: 'period_starts_at') DateTime? periodStartsAt,
     @JsonKey(name: 'period_ends_at') DateTime? periodEndsAt,
     @JsonKey(name: 'created_at') DateTime? createdAt,
@@ -276,6 +298,74 @@ class WalletHistoryPage {
   final String? nextCursor;
 }
 
+/// One "connect Patreon" request. [url] (only in the answer that created
+/// it) is opened in a browser, or shown as a QR code on a TV.
+@freezed
+class PatreonLink with _$PatreonLink {
+  const PatreonLink._();
+  const factory PatreonLink({
+    required String id,
+
+    /// `pending`, `authorized`, `linked`, `failed`, `cancelled` or `expired`.
+    required String status,
+    @JsonKey(name: 'error_code') String? errorCode,
+    @JsonKey(name: 'expires_at') DateTime? expiresAt,
+    @JsonKey(name: 'completed_at') DateTime? completedAt,
+    String? url,
+  }) = _PatreonLink;
+  factory PatreonLink.fromJson(Map<String, dynamic> json) =>
+      _$PatreonLinkFromJson(json);
+
+  /// Still waiting for the viewer in the browser.
+  bool get isOpen => status == 'pending' || status == 'authorized';
+  bool get linked => status == 'linked';
+}
+
+/// The account's Patreon link and membership, as Patreon last reported it.
+/// A pledge is wallet credit, not Plus: Plus still comes from the balance.
+@freezed
+class PatreonMembership with _$PatreonMembership {
+  const PatreonMembership._();
+  const factory PatreonMembership({
+    @Default(false) bool enabled,
+    @JsonKey(name: 'pledge_url') String? pledgeUrl,
+    @Default(false) bool linked,
+    @JsonKey(name: 'full_name') String? fullName,
+    String? email,
+    @JsonKey(name: 'patron_status') String? patronStatus,
+    @JsonKey(name: 'active_patron') @Default(false) bool activePatron,
+    @JsonKey(name: 'pledge_cents') @Default(0) int pledgeCents,
+    @JsonKey(name: 'will_pay_cents') @Default(0) int willPayCents,
+    @JsonKey(name: 'pledge_cadence_months') int? cadenceMonths,
+
+    /// The pledge alone pays for every Plus period.
+    @JsonKey(name: 'covers_plus') @Default(false) bool coversPlus,
+    @JsonKey(name: 'last_charge_at') DateTime? lastChargeAt,
+    @JsonKey(name: 'last_charge_status') String? lastChargeStatus,
+    @JsonKey(name: 'next_charge_at') DateTime? nextChargeAt,
+    @JsonKey(name: 'free_trial') @Default(false) bool freeTrial,
+    @JsonKey(name: 'credited_cents') @Default(0) int creditedCents,
+
+    /// Plus starts from the balance once a charge covers a period.
+    @JsonKey(name: 'plus_pending') @Default(false) bool plusPending,
+    @JsonKey(name: 'needs_reauthorization')
+    @Default(false)
+    bool needsReauthorization,
+    @JsonKey(name: 'linked_at') DateTime? linkedAt,
+    @JsonKey(name: 'last_synced_at') DateTime? lastSyncedAt,
+    @JsonKey(name: 'last_error_code') String? lastErrorCode,
+    PatreonLink? link,
+  }) = _PatreonMembership;
+  factory PatreonMembership.fromJson(Map<String, dynamic> json) =>
+      _$PatreonMembershipFromJson(json);
+
+  /// Patreon could not charge the pledge last time.
+  bool get declined => patronStatus == 'declined_patron';
+
+  /// What the patron pays each charge: the coming amount, else the current.
+  int get monthlyCents => willPayCents > 0 ? willPayCents : pledgeCents;
+}
+
 /// Everything account-scoped the Plus screens render. [renewal] and
 /// [wallet] are absent from the entitlement-only endpoint.
 @freezed
@@ -291,6 +381,7 @@ class PlusAccount with _$PlusAccount {
     @JsonKey(name: 'pending_topups')
     @Default(<WalletTopup>[])
     List<WalletTopup> pendingTopups,
+    PatreonMembership? patreon,
   }) = _PlusAccount;
   factory PlusAccount.fromJson(Map<String, dynamic> json) =>
       _$PlusAccountFromJson(json);

@@ -9,6 +9,7 @@ import 'package:flixquest/core/storage/secure_token_store.dart';
 import '../../data/models/app_user.dart';
 import '../../data/models/auth_requests.dart';
 import '../../data/models/auth_session.dart';
+import '../../data/models/tv_sign_in.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/sources/google_identity_client.dart';
 import 'session_state.dart';
@@ -223,6 +224,25 @@ class SessionViewModel extends ChangeNotifier {
   Future<Result<AuthSession>> signInWithFirebaseSession(String idToken) =>
       _authenticate(() => repository.exchangeFirebaseSession(idToken),
           mergeGuest: true);
+  Future<Result<TvSignInCode>> startTvSignIn() => repository.startTvSignIn();
+
+  /// Checks once whether a phone approved [deviceCode]. An approval signs
+  /// this install in like any other sign-in; waiting changes nothing here.
+  Future<Result<TvSignInCheck>> checkTvSignIn(String deviceCode,
+      {int? replaceDeviceId}) async {
+    final result = await repository.checkTvSignIn(deviceCode,
+        guestToken: _guestToken, replaceDeviceId: replaceDeviceId);
+    final session = switch (result) {
+      Ok(:final value) => value.session,
+      Err() => null,
+    };
+    if (session == null) return result;
+    final signedIn = await _authenticate(() async => Result.ok(session),
+        mergeGuest: true);
+    return signedIn.map(
+        (session) => TvSignInCheck(TvSignInStatus.approved, session));
+  }
+
   /// The Google sign-in a device-limit refusal answered, reused when the
   /// person picks a device to sign out so Google does not ask again.
   String? _deviceLimitedGoogleToken;

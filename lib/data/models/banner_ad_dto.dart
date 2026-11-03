@@ -19,6 +19,7 @@ class BannerAdDto with _$BannerAdDto {
     double? width,
     double? height,
     @Default([]) List<String> placements,
+    @Default(false) bool isAnnouncement,
   }) = _BannerAdDto;
 
   factory BannerAdDto.fromJson(Map<String, dynamic> json) =>
@@ -44,6 +45,7 @@ class BannerAdDto with _$BannerAdDto {
       shape: shape,
       aspectRatio: aspectRatio,
       placements: placements,
+      isAnnouncement: isAnnouncement,
       width: width,
       height: height);
 }

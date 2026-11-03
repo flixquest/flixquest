@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixquest/data/repositories/ads_repository.dart';
+import 'package:flixquest/data/ads/ads_policy.dart';
 import '../support/fake_dio.dart';
 
 void main() {
@@ -31,6 +32,7 @@ void main() {
     expect(catalogs.first.single.appliesTo('movie_detail'), true);
     expect(catalogs.first.single.appliesTo('tv_list'), false);
     expect(catalogs.first.single.altText, 'NordVPN discount banner');
+    expect(catalogs.first.single.isAnnouncement, false);
     expect(catalogs.first.single.width, 320.5);
     expect(catalogs.first.single.height, 50);
     await repository.load();
@@ -39,6 +41,44 @@ void main() {
     await repository.load();
     expect(adapter.requests, hasLength(2));
     dio.close();
+  });
+
+  test('the public catalog preserves announcements for guests and Plus',
+      () async {
+    final adapter = FakeDioAdapter()
+      ..enqueueJson({
+        'success': true,
+        'ads': [
+          {
+            'id': '1',
+            'key': 'telegram',
+            'name': 'Join Telegram',
+            'imageUrl': 'https://backend.test/images/telegram.png',
+            'targetUrl': 'https://t.me/flixquestapp',
+            'isAnnouncement': true,
+            'placements': ['home_all_hero'],
+          }
+        ],
+      });
+    final dio = Dio(BaseOptions(baseUrl: 'https://backend.test/api/v1/'))
+      ..httpClientAdapter = adapter;
+    HostedAdsRepository.instance.configure(AdsRepository(dio));
+    addTearDown(() {
+      AdsPolicy.update(adFree: false);
+      HostedAdsRepository.instance.useFetcherForTesting((_) async => const []);
+      dio.close();
+    });
+
+    final guestCatalog =
+        await HostedAdsRepository.instance.load('https://scraper.test');
+    AdsPolicy.update(adFree: true);
+    final plusCatalog =
+        await HostedAdsRepository.instance.load('https://scraper.test');
+
+    expect(guestCatalog.single.isAnnouncement, true);
+    expect(plusCatalog.single.isAnnouncement, true);
+    expect(adapter.requests, hasLength(1));
+    expect(adapter.requests.single.extra['authRequired'], false);
   });
   test(
       'cached catalog revalidates and offline fallback stops at its fixed 24-hour deadline',

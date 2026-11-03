@@ -97,6 +97,11 @@ String billingMessage(BillingError error) {
     'coin_unavailable' => 'plus_error_coin_unavailable',
     'checkout_limit' => 'plus_error_checkout_limit',
     'topup_closed' => 'plus_error_topup_closed',
+    'patreon_unavailable' => 'plus_error_patreon_unavailable',
+    'patreon_busy' => 'plus_error_rate_limited',
+    'patreon_linked_elsewhere' => 'plus_error_patreon_linked_elsewhere',
+    'patreon_reauthorize' => 'plus_error_patreon_reauthorize',
+    'patreon_link_invalid' => 'plus_patreon_link_expired',
     _ => null,
   };
   if (key != null) return tr(key);
@@ -104,4 +109,28 @@ String billingMessage(BillingError error) {
     return tr('plus_error_rate_limited');
   }
   return tr('plus_error_generic');
+}
+
+/// The linked Patreon membership in one line: the pledge, a failed charge,
+/// or that there is no pledge yet.
+String patreonStatusLine(PatreonMembership patreon) {
+  if (patreon.declined) return tr('plus_patreon_declined');
+  if (!patreon.activePatron || patreon.monthlyCents < 1) {
+    return tr('plus_patreon_not_pledging');
+  }
+  final months = patreon.cadenceMonths ?? 1;
+  return months > 1
+      ? tr('plus_patreon_pledging_every',
+          args: [formatUsd(patreon.monthlyCents), '$months'])
+      : tr('plus_patreon_pledging', args: [formatUsd(patreon.monthlyCents)]);
+}
+
+/// Why a "connect Patreon" link ended without linking, or null.
+String? patreonLinkProblem(PatreonLink? link) {
+  if (link == null || link.isOpen || link.linked) return null;
+  return switch (link.errorCode) {
+    'patreon_linked_elsewhere' => tr('plus_error_patreon_linked_elsewhere'),
+    _ when link.status == 'expired' => tr('plus_patreon_link_expired'),
+    _ => tr('plus_patreon_link_failed'),
+  };
 }

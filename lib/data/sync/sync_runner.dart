@@ -18,15 +18,11 @@ class SyncRunner {
   Timer? _timer;
   bool _followUp = false;
   bool _disposed = false;
-  String? _lastOwner;
-  DateTime? _autoAt;
 
   void ownerChanged() {
     _timer?.cancel();
     _timer = null;
     _followUp = false;
-    _lastOwner = null;
-    _autoAt = null;
     lastSynced.value = null;
     status.value = 'idle';
   }
@@ -48,18 +44,20 @@ class SyncRunner {
     await sync();
   }
 
+  /// A sync nobody asked for, skipped while any sync for this account landed
+  /// within [autoInterval]. [lastSynced] is restored from storage when the
+  /// account is activated, so a relaunch counts the previous session's sync.
   Future<void> autoSync() async {
-    if (!canSync()) return;
-    final owner = LibraryScope.owner;
-    if (_lastOwner == owner &&
-        _autoAt != null &&
-        DateTime.now().difference(_autoAt!) < autoInterval) {
-      return;
-    }
-    if (await sync()) {
-      _lastOwner = owner;
-      _autoAt = DateTime.now();
-    }
+    if (!canSync() || isFresh) return;
+    await sync();
+  }
+
+  bool get isFresh {
+    final last = lastSynced.value;
+    if (last == null) return false;
+    final age = DateTime.now().difference(last);
+    // A clock set back would otherwise hold off syncing until it caught up.
+    return !age.isNegative && age < autoInterval;
   }
 
   Future<bool> sync() {

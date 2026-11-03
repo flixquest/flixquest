@@ -499,6 +499,216 @@ abstract class _TopupLimits extends TopupLimits {
       throw _privateConstructorUsedError;
 }
 
+PatreonOffer _$PatreonOfferFromJson(Map<String, dynamic> json) {
+  return _PatreonOffer.fromJson(json);
+}
+
+/// @nodoc
+mixin _$PatreonOffer {
+  bool get enabled => throw _privateConstructorUsedError;
+  @JsonKey(name: 'pledge_url')
+  String? get pledgeUrl => throw _privateConstructorUsedError;
+
+  /// The monthly pledge that pays for every Plus period on its own.
+  @JsonKey(name: 'recommended_cents')
+  int get recommendedCents => throw _privateConstructorUsedError;
+
+  /// Serializes this PatreonOffer to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of PatreonOffer
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $PatreonOfferCopyWith<PatreonOffer> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $PatreonOfferCopyWith<$Res> {
+  factory $PatreonOfferCopyWith(
+          PatreonOffer value, $Res Function(PatreonOffer) then) =
+      _$PatreonOfferCopyWithImpl<$Res, PatreonOffer>;
+  @useResult
+  $Res call(
+      {bool enabled,
+      @JsonKey(name: 'pledge_url') String? pledgeUrl,
+      @JsonKey(name: 'recommended_cents') int recommendedCents});
+}
+
+/// @nodoc
+class _$PatreonOfferCopyWithImpl<$Res, $Val extends PatreonOffer>
+    implements $PatreonOfferCopyWith<$Res> {
+  _$PatreonOfferCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of PatreonOffer
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? enabled = null,
+    Object? pledgeUrl = freezed,
+    Object? recommendedCents = null,
+  }) {
+    return _then(_value.copyWith(
+      enabled: null == enabled
+          ? _value.enabled
+          : enabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      pledgeUrl: freezed == pledgeUrl
+          ? _value.pledgeUrl
+          : pledgeUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      recommendedCents: null == recommendedCents
+          ? _value.recommendedCents
+          : recommendedCents // ignore: cast_nullable_to_non_nullable
+              as int,
+    ) as $Val);
+  }
+}
+
+/// @nodoc
+abstract class _$$PatreonOfferImplCopyWith<$Res>
+    implements $PatreonOfferCopyWith<$Res> {
+  factory _$$PatreonOfferImplCopyWith(
+          _$PatreonOfferImpl value, $Res Function(_$PatreonOfferImpl) then) =
+      __$$PatreonOfferImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call(
+      {bool enabled,
+      @JsonKey(name: 'pledge_url') String? pledgeUrl,
+      @JsonKey(name: 'recommended_cents') int recommendedCents});
+}
+
+/// @nodoc
+class __$$PatreonOfferImplCopyWithImpl<$Res>
+    extends _$PatreonOfferCopyWithImpl<$Res, _$PatreonOfferImpl>
+    implements _$$PatreonOfferImplCopyWith<$Res> {
+  __$$PatreonOfferImplCopyWithImpl(
+      _$PatreonOfferImpl _value, $Res Function(_$PatreonOfferImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of PatreonOffer
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? enabled = null,
+    Object? pledgeUrl = freezed,
+    Object? recommendedCents = null,
+  }) {
+    return _then(_$PatreonOfferImpl(
+      enabled: null == enabled
+          ? _value.enabled
+          : enabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      pledgeUrl: freezed == pledgeUrl
+          ? _value.pledgeUrl
+          : pledgeUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      recommendedCents: null == recommendedCents
+          ? _value.recommendedCents
+          : recommendedCents // ignore: cast_nullable_to_non_nullable
+              as int,
+    ));
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$PatreonOfferImpl implements _PatreonOffer {
+  const _$PatreonOfferImpl(
+      {this.enabled = false,
+      @JsonKey(name: 'pledge_url') this.pledgeUrl,
+      @JsonKey(name: 'recommended_cents') this.recommendedCents = 200});
+
+  factory _$PatreonOfferImpl.fromJson(Map<String, dynamic> json) =>
+      _$$PatreonOfferImplFromJson(json);
+
+  @override
+  @JsonKey()
+  final bool enabled;
+  @override
+  @JsonKey(name: 'pledge_url')
+  final String? pledgeUrl;
+
+  /// The monthly pledge that pays for every Plus period on its own.
+  @override
+  @JsonKey(name: 'recommended_cents')
+  final int recommendedCents;
+
+  @override
+  String toString() {
+    return 'PatreonOffer(enabled: $enabled, pledgeUrl: $pledgeUrl, recommendedCents: $recommendedCents)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$PatreonOfferImpl &&
+            (identical(other.enabled, enabled) || other.enabled == enabled) &&
+            (identical(other.pledgeUrl, pledgeUrl) ||
+                other.pledgeUrl == pledgeUrl) &&
+            (identical(other.recommendedCents, recommendedCents) ||
+                other.recommendedCents == recommendedCents));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode =>
+      Object.hash(runtimeType, enabled, pledgeUrl, recommendedCents);
+
+  /// Create a copy of PatreonOffer
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$PatreonOfferImplCopyWith<_$PatreonOfferImpl> get copyWith =>
+      __$$PatreonOfferImplCopyWithImpl<_$PatreonOfferImpl>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$PatreonOfferImplToJson(
+      this,
+    );
+  }
+}
+
+abstract class _PatreonOffer implements PatreonOffer {
+  const factory _PatreonOffer(
+          {final bool enabled,
+          @JsonKey(name: 'pledge_url') final String? pledgeUrl,
+          @JsonKey(name: 'recommended_cents') final int recommendedCents}) =
+      _$PatreonOfferImpl;
+
+  factory _PatreonOffer.fromJson(Map<String, dynamic> json) =
+      _$PatreonOfferImpl.fromJson;
+
+  @override
+  bool get enabled;
+  @override
+  @JsonKey(name: 'pledge_url')
+  String? get pledgeUrl;
+
+  /// The monthly pledge that pays for every Plus period on its own.
+  @override
+  @JsonKey(name: 'recommended_cents')
+  int get recommendedCents;
+
+  /// Create a copy of PatreonOffer
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$PatreonOfferImplCopyWith<_$PatreonOfferImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
 PlusCatalog _$PlusCatalogFromJson(Map<String, dynamic> json) {
   return _PlusCatalog.fromJson(json);
 }
@@ -509,6 +719,7 @@ mixin _$PlusCatalog {
   bool get purchasesEnabled => throw _privateConstructorUsedError;
   List<PlusPlan> get plans => throw _privateConstructorUsedError;
   TopupLimits get wallet => throw _privateConstructorUsedError;
+  PatreonOffer get patreon => throw _privateConstructorUsedError;
 
   /// Serializes this PlusCatalog to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -529,9 +740,11 @@ abstract class $PlusCatalogCopyWith<$Res> {
   $Res call(
       {@JsonKey(name: 'purchases_enabled') bool purchasesEnabled,
       List<PlusPlan> plans,
-      TopupLimits wallet});
+      TopupLimits wallet,
+      PatreonOffer patreon});
 
   $TopupLimitsCopyWith<$Res> get wallet;
+  $PatreonOfferCopyWith<$Res> get patreon;
 }
 
 /// @nodoc
@@ -552,6 +765,7 @@ class _$PlusCatalogCopyWithImpl<$Res, $Val extends PlusCatalog>
     Object? purchasesEnabled = null,
     Object? plans = null,
     Object? wallet = null,
+    Object? patreon = null,
   }) {
     return _then(_value.copyWith(
       purchasesEnabled: null == purchasesEnabled
@@ -566,6 +780,10 @@ class _$PlusCatalogCopyWithImpl<$Res, $Val extends PlusCatalog>
           ? _value.wallet
           : wallet // ignore: cast_nullable_to_non_nullable
               as TopupLimits,
+      patreon: null == patreon
+          ? _value.patreon
+          : patreon // ignore: cast_nullable_to_non_nullable
+              as PatreonOffer,
     ) as $Val);
   }
 
@@ -576,6 +794,16 @@ class _$PlusCatalogCopyWithImpl<$Res, $Val extends PlusCatalog>
   $TopupLimitsCopyWith<$Res> get wallet {
     return $TopupLimitsCopyWith<$Res>(_value.wallet, (value) {
       return _then(_value.copyWith(wallet: value) as $Val);
+    });
+  }
+
+  /// Create a copy of PlusCatalog
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $PatreonOfferCopyWith<$Res> get patreon {
+    return $PatreonOfferCopyWith<$Res>(_value.patreon, (value) {
+      return _then(_value.copyWith(patreon: value) as $Val);
     });
   }
 }
@@ -591,10 +819,13 @@ abstract class _$$PlusCatalogImplCopyWith<$Res>
   $Res call(
       {@JsonKey(name: 'purchases_enabled') bool purchasesEnabled,
       List<PlusPlan> plans,
-      TopupLimits wallet});
+      TopupLimits wallet,
+      PatreonOffer patreon});
 
   @override
   $TopupLimitsCopyWith<$Res> get wallet;
+  @override
+  $PatreonOfferCopyWith<$Res> get patreon;
 }
 
 /// @nodoc
@@ -613,6 +844,7 @@ class __$$PlusCatalogImplCopyWithImpl<$Res>
     Object? purchasesEnabled = null,
     Object? plans = null,
     Object? wallet = null,
+    Object? patreon = null,
   }) {
     return _then(_$PlusCatalogImpl(
       purchasesEnabled: null == purchasesEnabled
@@ -627,6 +859,10 @@ class __$$PlusCatalogImplCopyWithImpl<$Res>
           ? _value.wallet
           : wallet // ignore: cast_nullable_to_non_nullable
               as TopupLimits,
+      patreon: null == patreon
+          ? _value.patreon
+          : patreon // ignore: cast_nullable_to_non_nullable
+              as PatreonOffer,
     ));
   }
 }
@@ -637,7 +873,8 @@ class _$PlusCatalogImpl extends _PlusCatalog {
   const _$PlusCatalogImpl(
       {@JsonKey(name: 'purchases_enabled') this.purchasesEnabled = false,
       final List<PlusPlan> plans = const <PlusPlan>[],
-      this.wallet = const TopupLimits()})
+      this.wallet = const TopupLimits(),
+      this.patreon = const PatreonOffer()})
       : _plans = plans,
         super._();
 
@@ -659,10 +896,13 @@ class _$PlusCatalogImpl extends _PlusCatalog {
   @override
   @JsonKey()
   final TopupLimits wallet;
+  @override
+  @JsonKey()
+  final PatreonOffer patreon;
 
   @override
   String toString() {
-    return 'PlusCatalog(purchasesEnabled: $purchasesEnabled, plans: $plans, wallet: $wallet)';
+    return 'PlusCatalog(purchasesEnabled: $purchasesEnabled, plans: $plans, wallet: $wallet, patreon: $patreon)';
   }
 
   @override
@@ -673,13 +913,14 @@ class _$PlusCatalogImpl extends _PlusCatalog {
             (identical(other.purchasesEnabled, purchasesEnabled) ||
                 other.purchasesEnabled == purchasesEnabled) &&
             const DeepCollectionEquality().equals(other._plans, _plans) &&
-            (identical(other.wallet, wallet) || other.wallet == wallet));
+            (identical(other.wallet, wallet) || other.wallet == wallet) &&
+            (identical(other.patreon, patreon) || other.patreon == patreon));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(runtimeType, purchasesEnabled,
-      const DeepCollectionEquality().hash(_plans), wallet);
+      const DeepCollectionEquality().hash(_plans), wallet, patreon);
 
   /// Create a copy of PlusCatalog
   /// with the given fields replaced by the non-null parameter values.
@@ -701,7 +942,8 @@ abstract class _PlusCatalog extends PlusCatalog {
   const factory _PlusCatalog(
       {@JsonKey(name: 'purchases_enabled') final bool purchasesEnabled,
       final List<PlusPlan> plans,
-      final TopupLimits wallet}) = _$PlusCatalogImpl;
+      final TopupLimits wallet,
+      final PatreonOffer patreon}) = _$PlusCatalogImpl;
   const _PlusCatalog._() : super._();
 
   factory _PlusCatalog.fromJson(Map<String, dynamic> json) =
@@ -714,6 +956,8 @@ abstract class _PlusCatalog extends PlusCatalog {
   List<PlusPlan> get plans;
   @override
   TopupLimits get wallet;
+  @override
+  PatreonOffer get patreon;
 
   /// Create a copy of PlusCatalog
   /// with the given fields replaced by the non-null parameter values.
@@ -2675,6 +2919,9 @@ WalletTopup _$WalletTopupFromJson(Map<String, dynamic> json) {
 mixin _$WalletTopup {
   String get id => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
+
+  /// `nowpayments` (crypto) or `patreon` (a credited pledge charge).
+  String get provider => throw _privateConstructorUsedError;
   @JsonKey(name: 'amount_cents')
   int get amountCents => throw _privateConstructorUsedError;
   @JsonKey(name: 'credited_cents')
@@ -2720,6 +2967,7 @@ abstract class $WalletTopupCopyWith<$Res> {
   $Res call(
       {String id,
       String status,
+      String provider,
       @JsonKey(name: 'amount_cents') int amountCents,
       @JsonKey(name: 'credited_cents') int creditedCents,
       String currency,
@@ -2753,6 +3001,7 @@ class _$WalletTopupCopyWithImpl<$Res, $Val extends WalletTopup>
   $Res call({
     Object? id = null,
     Object? status = null,
+    Object? provider = null,
     Object? amountCents = null,
     Object? creditedCents = null,
     Object? currency = null,
@@ -2774,6 +3023,10 @@ class _$WalletTopupCopyWithImpl<$Res, $Val extends WalletTopup>
       status: null == status
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
+              as String,
+      provider: null == provider
+          ? _value.provider
+          : provider // ignore: cast_nullable_to_non_nullable
               as String,
       amountCents: null == amountCents
           ? _value.amountCents
@@ -2852,6 +3105,7 @@ abstract class _$$WalletTopupImplCopyWith<$Res>
   $Res call(
       {String id,
       String status,
+      String provider,
       @JsonKey(name: 'amount_cents') int amountCents,
       @JsonKey(name: 'credited_cents') int creditedCents,
       String currency,
@@ -2884,6 +3138,7 @@ class __$$WalletTopupImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? status = null,
+    Object? provider = null,
     Object? amountCents = null,
     Object? creditedCents = null,
     Object? currency = null,
@@ -2905,6 +3160,10 @@ class __$$WalletTopupImplCopyWithImpl<$Res>
       status: null == status
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
+              as String,
+      provider: null == provider
+          ? _value.provider
+          : provider // ignore: cast_nullable_to_non_nullable
               as String,
       amountCents: null == amountCents
           ? _value.amountCents
@@ -2964,6 +3223,7 @@ class _$WalletTopupImpl extends _WalletTopup {
   const _$WalletTopupImpl(
       {required this.id,
       required this.status,
+      this.provider = 'nowpayments',
       @JsonKey(name: 'amount_cents') required this.amountCents,
       @JsonKey(name: 'credited_cents') this.creditedCents = 0,
       this.currency = 'USD',
@@ -2985,6 +3245,11 @@ class _$WalletTopupImpl extends _WalletTopup {
   final String id;
   @override
   final String status;
+
+  /// `nowpayments` (crypto) or `patreon` (a credited pledge charge).
+  @override
+  @JsonKey()
+  final String provider;
   @override
   @JsonKey(name: 'amount_cents')
   final int amountCents;
@@ -3026,7 +3291,7 @@ class _$WalletTopupImpl extends _WalletTopup {
 
   @override
   String toString() {
-    return 'WalletTopup(id: $id, status: $status, amountCents: $amountCents, creditedCents: $creditedCents, currency: $currency, activatePlus: $activatePlus, nextAction: $nextAction, checkoutUrl: $checkoutUrl, checkoutStep: $checkoutStep, payment: $payment, payCurrency: $payCurrency, errorCode: $errorCode, createdAt: $createdAt, creditedAt: $creditedAt)';
+    return 'WalletTopup(id: $id, status: $status, provider: $provider, amountCents: $amountCents, creditedCents: $creditedCents, currency: $currency, activatePlus: $activatePlus, nextAction: $nextAction, checkoutUrl: $checkoutUrl, checkoutStep: $checkoutStep, payment: $payment, payCurrency: $payCurrency, errorCode: $errorCode, createdAt: $createdAt, creditedAt: $creditedAt)';
   }
 
   @override
@@ -3036,6 +3301,8 @@ class _$WalletTopupImpl extends _WalletTopup {
             other is _$WalletTopupImpl &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.status, status) || other.status == status) &&
+            (identical(other.provider, provider) ||
+                other.provider == provider) &&
             (identical(other.amountCents, amountCents) ||
                 other.amountCents == amountCents) &&
             (identical(other.creditedCents, creditedCents) ||
@@ -3067,6 +3334,7 @@ class _$WalletTopupImpl extends _WalletTopup {
       runtimeType,
       id,
       status,
+      provider,
       amountCents,
       creditedCents,
       currency,
@@ -3100,6 +3368,7 @@ abstract class _WalletTopup extends WalletTopup {
   const factory _WalletTopup(
           {required final String id,
           required final String status,
+          final String provider,
           @JsonKey(name: 'amount_cents') required final int amountCents,
           @JsonKey(name: 'credited_cents') final int creditedCents,
           final String currency,
@@ -3122,6 +3391,10 @@ abstract class _WalletTopup extends WalletTopup {
   String get id;
   @override
   String get status;
+
+  /// `nowpayments` (crypto) or `patreon` (a credited pledge charge).
+  @override
+  String get provider;
   @override
   @JsonKey(name: 'amount_cents')
   int get amountCents;
@@ -3183,6 +3456,9 @@ mixin _$WalletTransaction {
   int? get balanceAfterCents => throw _privateConstructorUsedError;
   @JsonKey(fromJson: _id)
   String? get reference => throw _privateConstructorUsedError;
+
+  /// Where a credit came from: `nowpayments` or `patreon`.
+  String? get source => throw _privateConstructorUsedError;
   @JsonKey(name: 'period_starts_at')
   DateTime? get periodStartsAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'period_ends_at')
@@ -3212,6 +3488,7 @@ abstract class $WalletTransactionCopyWith<$Res> {
       @JsonKey(name: 'amount_cents') int amountCents,
       @JsonKey(name: 'balance_after_cents') int? balanceAfterCents,
       @JsonKey(fromJson: _id) String? reference,
+      String? source,
       @JsonKey(name: 'period_starts_at') DateTime? periodStartsAt,
       @JsonKey(name: 'period_ends_at') DateTime? periodEndsAt,
       @JsonKey(name: 'created_at') DateTime? createdAt});
@@ -3237,6 +3514,7 @@ class _$WalletTransactionCopyWithImpl<$Res, $Val extends WalletTransaction>
     Object? amountCents = null,
     Object? balanceAfterCents = freezed,
     Object? reference = freezed,
+    Object? source = freezed,
     Object? periodStartsAt = freezed,
     Object? periodEndsAt = freezed,
     Object? createdAt = freezed,
@@ -3261,6 +3539,10 @@ class _$WalletTransactionCopyWithImpl<$Res, $Val extends WalletTransaction>
       reference: freezed == reference
           ? _value.reference
           : reference // ignore: cast_nullable_to_non_nullable
+              as String?,
+      source: freezed == source
+          ? _value.source
+          : source // ignore: cast_nullable_to_non_nullable
               as String?,
       periodStartsAt: freezed == periodStartsAt
           ? _value.periodStartsAt
@@ -3292,6 +3574,7 @@ abstract class _$$WalletTransactionImplCopyWith<$Res>
       @JsonKey(name: 'amount_cents') int amountCents,
       @JsonKey(name: 'balance_after_cents') int? balanceAfterCents,
       @JsonKey(fromJson: _id) String? reference,
+      String? source,
       @JsonKey(name: 'period_starts_at') DateTime? periodStartsAt,
       @JsonKey(name: 'period_ends_at') DateTime? periodEndsAt,
       @JsonKey(name: 'created_at') DateTime? createdAt});
@@ -3315,6 +3598,7 @@ class __$$WalletTransactionImplCopyWithImpl<$Res>
     Object? amountCents = null,
     Object? balanceAfterCents = freezed,
     Object? reference = freezed,
+    Object? source = freezed,
     Object? periodStartsAt = freezed,
     Object? periodEndsAt = freezed,
     Object? createdAt = freezed,
@@ -3339,6 +3623,10 @@ class __$$WalletTransactionImplCopyWithImpl<$Res>
       reference: freezed == reference
           ? _value.reference
           : reference // ignore: cast_nullable_to_non_nullable
+              as String?,
+      source: freezed == source
+          ? _value.source
+          : source // ignore: cast_nullable_to_non_nullable
               as String?,
       periodStartsAt: freezed == periodStartsAt
           ? _value.periodStartsAt
@@ -3365,6 +3653,7 @@ class _$WalletTransactionImpl implements _WalletTransaction {
       @JsonKey(name: 'amount_cents') required this.amountCents,
       @JsonKey(name: 'balance_after_cents') this.balanceAfterCents,
       @JsonKey(fromJson: _id) this.reference,
+      this.source,
       @JsonKey(name: 'period_starts_at') this.periodStartsAt,
       @JsonKey(name: 'period_ends_at') this.periodEndsAt,
       @JsonKey(name: 'created_at') this.createdAt});
@@ -3386,6 +3675,10 @@ class _$WalletTransactionImpl implements _WalletTransaction {
   @override
   @JsonKey(fromJson: _id)
   final String? reference;
+
+  /// Where a credit came from: `nowpayments` or `patreon`.
+  @override
+  final String? source;
   @override
   @JsonKey(name: 'period_starts_at')
   final DateTime? periodStartsAt;
@@ -3398,7 +3691,7 @@ class _$WalletTransactionImpl implements _WalletTransaction {
 
   @override
   String toString() {
-    return 'WalletTransaction(id: $id, type: $type, amountCents: $amountCents, balanceAfterCents: $balanceAfterCents, reference: $reference, periodStartsAt: $periodStartsAt, periodEndsAt: $periodEndsAt, createdAt: $createdAt)';
+    return 'WalletTransaction(id: $id, type: $type, amountCents: $amountCents, balanceAfterCents: $balanceAfterCents, reference: $reference, source: $source, periodStartsAt: $periodStartsAt, periodEndsAt: $periodEndsAt, createdAt: $createdAt)';
   }
 
   @override
@@ -3414,6 +3707,7 @@ class _$WalletTransactionImpl implements _WalletTransaction {
                 other.balanceAfterCents == balanceAfterCents) &&
             (identical(other.reference, reference) ||
                 other.reference == reference) &&
+            (identical(other.source, source) || other.source == source) &&
             (identical(other.periodStartsAt, periodStartsAt) ||
                 other.periodStartsAt == periodStartsAt) &&
             (identical(other.periodEndsAt, periodEndsAt) ||
@@ -3424,8 +3718,17 @@ class _$WalletTransactionImpl implements _WalletTransaction {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, type, amountCents,
-      balanceAfterCents, reference, periodStartsAt, periodEndsAt, createdAt);
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      type,
+      amountCents,
+      balanceAfterCents,
+      reference,
+      source,
+      periodStartsAt,
+      periodEndsAt,
+      createdAt);
 
   /// Create a copy of WalletTransaction
   /// with the given fields replaced by the non-null parameter values.
@@ -3451,6 +3754,7 @@ abstract class _WalletTransaction implements WalletTransaction {
           @JsonKey(name: 'amount_cents') required final int amountCents,
           @JsonKey(name: 'balance_after_cents') final int? balanceAfterCents,
           @JsonKey(fromJson: _id) final String? reference,
+          final String? source,
           @JsonKey(name: 'period_starts_at') final DateTime? periodStartsAt,
           @JsonKey(name: 'period_ends_at') final DateTime? periodEndsAt,
           @JsonKey(name: 'created_at') final DateTime? createdAt}) =
@@ -3473,6 +3777,10 @@ abstract class _WalletTransaction implements WalletTransaction {
   @override
   @JsonKey(fromJson: _id)
   String? get reference;
+
+  /// Where a credit came from: `nowpayments` or `patreon`.
+  @override
+  String? get source;
   @override
   @JsonKey(name: 'period_starts_at')
   DateTime? get periodStartsAt;
@@ -3488,6 +3796,985 @@ abstract class _WalletTransaction implements WalletTransaction {
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$WalletTransactionImplCopyWith<_$WalletTransactionImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+PatreonLink _$PatreonLinkFromJson(Map<String, dynamic> json) {
+  return _PatreonLink.fromJson(json);
+}
+
+/// @nodoc
+mixin _$PatreonLink {
+  String get id => throw _privateConstructorUsedError;
+
+  /// `pending`, `authorized`, `linked`, `failed`, `cancelled` or `expired`.
+  String get status => throw _privateConstructorUsedError;
+  @JsonKey(name: 'error_code')
+  String? get errorCode => throw _privateConstructorUsedError;
+  @JsonKey(name: 'expires_at')
+  DateTime? get expiresAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'completed_at')
+  DateTime? get completedAt => throw _privateConstructorUsedError;
+  String? get url => throw _privateConstructorUsedError;
+
+  /// Serializes this PatreonLink to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of PatreonLink
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $PatreonLinkCopyWith<PatreonLink> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $PatreonLinkCopyWith<$Res> {
+  factory $PatreonLinkCopyWith(
+          PatreonLink value, $Res Function(PatreonLink) then) =
+      _$PatreonLinkCopyWithImpl<$Res, PatreonLink>;
+  @useResult
+  $Res call(
+      {String id,
+      String status,
+      @JsonKey(name: 'error_code') String? errorCode,
+      @JsonKey(name: 'expires_at') DateTime? expiresAt,
+      @JsonKey(name: 'completed_at') DateTime? completedAt,
+      String? url});
+}
+
+/// @nodoc
+class _$PatreonLinkCopyWithImpl<$Res, $Val extends PatreonLink>
+    implements $PatreonLinkCopyWith<$Res> {
+  _$PatreonLinkCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of PatreonLink
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? status = null,
+    Object? errorCode = freezed,
+    Object? expiresAt = freezed,
+    Object? completedAt = freezed,
+    Object? url = freezed,
+  }) {
+    return _then(_value.copyWith(
+      id: null == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      status: null == status
+          ? _value.status
+          : status // ignore: cast_nullable_to_non_nullable
+              as String,
+      errorCode: freezed == errorCode
+          ? _value.errorCode
+          : errorCode // ignore: cast_nullable_to_non_nullable
+              as String?,
+      expiresAt: freezed == expiresAt
+          ? _value.expiresAt
+          : expiresAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      completedAt: freezed == completedAt
+          ? _value.completedAt
+          : completedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      url: freezed == url
+          ? _value.url
+          : url // ignore: cast_nullable_to_non_nullable
+              as String?,
+    ) as $Val);
+  }
+}
+
+/// @nodoc
+abstract class _$$PatreonLinkImplCopyWith<$Res>
+    implements $PatreonLinkCopyWith<$Res> {
+  factory _$$PatreonLinkImplCopyWith(
+          _$PatreonLinkImpl value, $Res Function(_$PatreonLinkImpl) then) =
+      __$$PatreonLinkImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call(
+      {String id,
+      String status,
+      @JsonKey(name: 'error_code') String? errorCode,
+      @JsonKey(name: 'expires_at') DateTime? expiresAt,
+      @JsonKey(name: 'completed_at') DateTime? completedAt,
+      String? url});
+}
+
+/// @nodoc
+class __$$PatreonLinkImplCopyWithImpl<$Res>
+    extends _$PatreonLinkCopyWithImpl<$Res, _$PatreonLinkImpl>
+    implements _$$PatreonLinkImplCopyWith<$Res> {
+  __$$PatreonLinkImplCopyWithImpl(
+      _$PatreonLinkImpl _value, $Res Function(_$PatreonLinkImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of PatreonLink
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? status = null,
+    Object? errorCode = freezed,
+    Object? expiresAt = freezed,
+    Object? completedAt = freezed,
+    Object? url = freezed,
+  }) {
+    return _then(_$PatreonLinkImpl(
+      id: null == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      status: null == status
+          ? _value.status
+          : status // ignore: cast_nullable_to_non_nullable
+              as String,
+      errorCode: freezed == errorCode
+          ? _value.errorCode
+          : errorCode // ignore: cast_nullable_to_non_nullable
+              as String?,
+      expiresAt: freezed == expiresAt
+          ? _value.expiresAt
+          : expiresAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      completedAt: freezed == completedAt
+          ? _value.completedAt
+          : completedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      url: freezed == url
+          ? _value.url
+          : url // ignore: cast_nullable_to_non_nullable
+              as String?,
+    ));
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$PatreonLinkImpl extends _PatreonLink {
+  const _$PatreonLinkImpl(
+      {required this.id,
+      required this.status,
+      @JsonKey(name: 'error_code') this.errorCode,
+      @JsonKey(name: 'expires_at') this.expiresAt,
+      @JsonKey(name: 'completed_at') this.completedAt,
+      this.url})
+      : super._();
+
+  factory _$PatreonLinkImpl.fromJson(Map<String, dynamic> json) =>
+      _$$PatreonLinkImplFromJson(json);
+
+  @override
+  final String id;
+
+  /// `pending`, `authorized`, `linked`, `failed`, `cancelled` or `expired`.
+  @override
+  final String status;
+  @override
+  @JsonKey(name: 'error_code')
+  final String? errorCode;
+  @override
+  @JsonKey(name: 'expires_at')
+  final DateTime? expiresAt;
+  @override
+  @JsonKey(name: 'completed_at')
+  final DateTime? completedAt;
+  @override
+  final String? url;
+
+  @override
+  String toString() {
+    return 'PatreonLink(id: $id, status: $status, errorCode: $errorCode, expiresAt: $expiresAt, completedAt: $completedAt, url: $url)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$PatreonLinkImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.status, status) || other.status == status) &&
+            (identical(other.errorCode, errorCode) ||
+                other.errorCode == errorCode) &&
+            (identical(other.expiresAt, expiresAt) ||
+                other.expiresAt == expiresAt) &&
+            (identical(other.completedAt, completedAt) ||
+                other.completedAt == completedAt) &&
+            (identical(other.url, url) || other.url == url));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+      runtimeType, id, status, errorCode, expiresAt, completedAt, url);
+
+  /// Create a copy of PatreonLink
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$PatreonLinkImplCopyWith<_$PatreonLinkImpl> get copyWith =>
+      __$$PatreonLinkImplCopyWithImpl<_$PatreonLinkImpl>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$PatreonLinkImplToJson(
+      this,
+    );
+  }
+}
+
+abstract class _PatreonLink extends PatreonLink {
+  const factory _PatreonLink(
+      {required final String id,
+      required final String status,
+      @JsonKey(name: 'error_code') final String? errorCode,
+      @JsonKey(name: 'expires_at') final DateTime? expiresAt,
+      @JsonKey(name: 'completed_at') final DateTime? completedAt,
+      final String? url}) = _$PatreonLinkImpl;
+  const _PatreonLink._() : super._();
+
+  factory _PatreonLink.fromJson(Map<String, dynamic> json) =
+      _$PatreonLinkImpl.fromJson;
+
+  @override
+  String get id;
+
+  /// `pending`, `authorized`, `linked`, `failed`, `cancelled` or `expired`.
+  @override
+  String get status;
+  @override
+  @JsonKey(name: 'error_code')
+  String? get errorCode;
+  @override
+  @JsonKey(name: 'expires_at')
+  DateTime? get expiresAt;
+  @override
+  @JsonKey(name: 'completed_at')
+  DateTime? get completedAt;
+  @override
+  String? get url;
+
+  /// Create a copy of PatreonLink
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$PatreonLinkImplCopyWith<_$PatreonLinkImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+PatreonMembership _$PatreonMembershipFromJson(Map<String, dynamic> json) {
+  return _PatreonMembership.fromJson(json);
+}
+
+/// @nodoc
+mixin _$PatreonMembership {
+  bool get enabled => throw _privateConstructorUsedError;
+  @JsonKey(name: 'pledge_url')
+  String? get pledgeUrl => throw _privateConstructorUsedError;
+  bool get linked => throw _privateConstructorUsedError;
+  @JsonKey(name: 'full_name')
+  String? get fullName => throw _privateConstructorUsedError;
+  String? get email => throw _privateConstructorUsedError;
+  @JsonKey(name: 'patron_status')
+  String? get patronStatus => throw _privateConstructorUsedError;
+  @JsonKey(name: 'active_patron')
+  bool get activePatron => throw _privateConstructorUsedError;
+  @JsonKey(name: 'pledge_cents')
+  int get pledgeCents => throw _privateConstructorUsedError;
+  @JsonKey(name: 'will_pay_cents')
+  int get willPayCents => throw _privateConstructorUsedError;
+  @JsonKey(name: 'pledge_cadence_months')
+  int? get cadenceMonths => throw _privateConstructorUsedError;
+
+  /// The pledge alone pays for every Plus period.
+  @JsonKey(name: 'covers_plus')
+  bool get coversPlus => throw _privateConstructorUsedError;
+  @JsonKey(name: 'last_charge_at')
+  DateTime? get lastChargeAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'last_charge_status')
+  String? get lastChargeStatus => throw _privateConstructorUsedError;
+  @JsonKey(name: 'next_charge_at')
+  DateTime? get nextChargeAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'free_trial')
+  bool get freeTrial => throw _privateConstructorUsedError;
+  @JsonKey(name: 'credited_cents')
+  int get creditedCents => throw _privateConstructorUsedError;
+
+  /// Plus starts from the balance once a charge covers a period.
+  @JsonKey(name: 'plus_pending')
+  bool get plusPending => throw _privateConstructorUsedError;
+  @JsonKey(name: 'needs_reauthorization')
+  bool get needsReauthorization => throw _privateConstructorUsedError;
+  @JsonKey(name: 'linked_at')
+  DateTime? get linkedAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'last_synced_at')
+  DateTime? get lastSyncedAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'last_error_code')
+  String? get lastErrorCode => throw _privateConstructorUsedError;
+  PatreonLink? get link => throw _privateConstructorUsedError;
+
+  /// Serializes this PatreonMembership to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of PatreonMembership
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $PatreonMembershipCopyWith<PatreonMembership> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $PatreonMembershipCopyWith<$Res> {
+  factory $PatreonMembershipCopyWith(
+          PatreonMembership value, $Res Function(PatreonMembership) then) =
+      _$PatreonMembershipCopyWithImpl<$Res, PatreonMembership>;
+  @useResult
+  $Res call(
+      {bool enabled,
+      @JsonKey(name: 'pledge_url') String? pledgeUrl,
+      bool linked,
+      @JsonKey(name: 'full_name') String? fullName,
+      String? email,
+      @JsonKey(name: 'patron_status') String? patronStatus,
+      @JsonKey(name: 'active_patron') bool activePatron,
+      @JsonKey(name: 'pledge_cents') int pledgeCents,
+      @JsonKey(name: 'will_pay_cents') int willPayCents,
+      @JsonKey(name: 'pledge_cadence_months') int? cadenceMonths,
+      @JsonKey(name: 'covers_plus') bool coversPlus,
+      @JsonKey(name: 'last_charge_at') DateTime? lastChargeAt,
+      @JsonKey(name: 'last_charge_status') String? lastChargeStatus,
+      @JsonKey(name: 'next_charge_at') DateTime? nextChargeAt,
+      @JsonKey(name: 'free_trial') bool freeTrial,
+      @JsonKey(name: 'credited_cents') int creditedCents,
+      @JsonKey(name: 'plus_pending') bool plusPending,
+      @JsonKey(name: 'needs_reauthorization') bool needsReauthorization,
+      @JsonKey(name: 'linked_at') DateTime? linkedAt,
+      @JsonKey(name: 'last_synced_at') DateTime? lastSyncedAt,
+      @JsonKey(name: 'last_error_code') String? lastErrorCode,
+      PatreonLink? link});
+
+  $PatreonLinkCopyWith<$Res>? get link;
+}
+
+/// @nodoc
+class _$PatreonMembershipCopyWithImpl<$Res, $Val extends PatreonMembership>
+    implements $PatreonMembershipCopyWith<$Res> {
+  _$PatreonMembershipCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of PatreonMembership
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? enabled = null,
+    Object? pledgeUrl = freezed,
+    Object? linked = null,
+    Object? fullName = freezed,
+    Object? email = freezed,
+    Object? patronStatus = freezed,
+    Object? activePatron = null,
+    Object? pledgeCents = null,
+    Object? willPayCents = null,
+    Object? cadenceMonths = freezed,
+    Object? coversPlus = null,
+    Object? lastChargeAt = freezed,
+    Object? lastChargeStatus = freezed,
+    Object? nextChargeAt = freezed,
+    Object? freeTrial = null,
+    Object? creditedCents = null,
+    Object? plusPending = null,
+    Object? needsReauthorization = null,
+    Object? linkedAt = freezed,
+    Object? lastSyncedAt = freezed,
+    Object? lastErrorCode = freezed,
+    Object? link = freezed,
+  }) {
+    return _then(_value.copyWith(
+      enabled: null == enabled
+          ? _value.enabled
+          : enabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      pledgeUrl: freezed == pledgeUrl
+          ? _value.pledgeUrl
+          : pledgeUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      linked: null == linked
+          ? _value.linked
+          : linked // ignore: cast_nullable_to_non_nullable
+              as bool,
+      fullName: freezed == fullName
+          ? _value.fullName
+          : fullName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      email: freezed == email
+          ? _value.email
+          : email // ignore: cast_nullable_to_non_nullable
+              as String?,
+      patronStatus: freezed == patronStatus
+          ? _value.patronStatus
+          : patronStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
+      activePatron: null == activePatron
+          ? _value.activePatron
+          : activePatron // ignore: cast_nullable_to_non_nullable
+              as bool,
+      pledgeCents: null == pledgeCents
+          ? _value.pledgeCents
+          : pledgeCents // ignore: cast_nullable_to_non_nullable
+              as int,
+      willPayCents: null == willPayCents
+          ? _value.willPayCents
+          : willPayCents // ignore: cast_nullable_to_non_nullable
+              as int,
+      cadenceMonths: freezed == cadenceMonths
+          ? _value.cadenceMonths
+          : cadenceMonths // ignore: cast_nullable_to_non_nullable
+              as int?,
+      coversPlus: null == coversPlus
+          ? _value.coversPlus
+          : coversPlus // ignore: cast_nullable_to_non_nullable
+              as bool,
+      lastChargeAt: freezed == lastChargeAt
+          ? _value.lastChargeAt
+          : lastChargeAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      lastChargeStatus: freezed == lastChargeStatus
+          ? _value.lastChargeStatus
+          : lastChargeStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
+      nextChargeAt: freezed == nextChargeAt
+          ? _value.nextChargeAt
+          : nextChargeAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      freeTrial: null == freeTrial
+          ? _value.freeTrial
+          : freeTrial // ignore: cast_nullable_to_non_nullable
+              as bool,
+      creditedCents: null == creditedCents
+          ? _value.creditedCents
+          : creditedCents // ignore: cast_nullable_to_non_nullable
+              as int,
+      plusPending: null == plusPending
+          ? _value.plusPending
+          : plusPending // ignore: cast_nullable_to_non_nullable
+              as bool,
+      needsReauthorization: null == needsReauthorization
+          ? _value.needsReauthorization
+          : needsReauthorization // ignore: cast_nullable_to_non_nullable
+              as bool,
+      linkedAt: freezed == linkedAt
+          ? _value.linkedAt
+          : linkedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      lastSyncedAt: freezed == lastSyncedAt
+          ? _value.lastSyncedAt
+          : lastSyncedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      lastErrorCode: freezed == lastErrorCode
+          ? _value.lastErrorCode
+          : lastErrorCode // ignore: cast_nullable_to_non_nullable
+              as String?,
+      link: freezed == link
+          ? _value.link
+          : link // ignore: cast_nullable_to_non_nullable
+              as PatreonLink?,
+    ) as $Val);
+  }
+
+  /// Create a copy of PatreonMembership
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $PatreonLinkCopyWith<$Res>? get link {
+    if (_value.link == null) {
+      return null;
+    }
+
+    return $PatreonLinkCopyWith<$Res>(_value.link!, (value) {
+      return _then(_value.copyWith(link: value) as $Val);
+    });
+  }
+}
+
+/// @nodoc
+abstract class _$$PatreonMembershipImplCopyWith<$Res>
+    implements $PatreonMembershipCopyWith<$Res> {
+  factory _$$PatreonMembershipImplCopyWith(_$PatreonMembershipImpl value,
+          $Res Function(_$PatreonMembershipImpl) then) =
+      __$$PatreonMembershipImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call(
+      {bool enabled,
+      @JsonKey(name: 'pledge_url') String? pledgeUrl,
+      bool linked,
+      @JsonKey(name: 'full_name') String? fullName,
+      String? email,
+      @JsonKey(name: 'patron_status') String? patronStatus,
+      @JsonKey(name: 'active_patron') bool activePatron,
+      @JsonKey(name: 'pledge_cents') int pledgeCents,
+      @JsonKey(name: 'will_pay_cents') int willPayCents,
+      @JsonKey(name: 'pledge_cadence_months') int? cadenceMonths,
+      @JsonKey(name: 'covers_plus') bool coversPlus,
+      @JsonKey(name: 'last_charge_at') DateTime? lastChargeAt,
+      @JsonKey(name: 'last_charge_status') String? lastChargeStatus,
+      @JsonKey(name: 'next_charge_at') DateTime? nextChargeAt,
+      @JsonKey(name: 'free_trial') bool freeTrial,
+      @JsonKey(name: 'credited_cents') int creditedCents,
+      @JsonKey(name: 'plus_pending') bool plusPending,
+      @JsonKey(name: 'needs_reauthorization') bool needsReauthorization,
+      @JsonKey(name: 'linked_at') DateTime? linkedAt,
+      @JsonKey(name: 'last_synced_at') DateTime? lastSyncedAt,
+      @JsonKey(name: 'last_error_code') String? lastErrorCode,
+      PatreonLink? link});
+
+  @override
+  $PatreonLinkCopyWith<$Res>? get link;
+}
+
+/// @nodoc
+class __$$PatreonMembershipImplCopyWithImpl<$Res>
+    extends _$PatreonMembershipCopyWithImpl<$Res, _$PatreonMembershipImpl>
+    implements _$$PatreonMembershipImplCopyWith<$Res> {
+  __$$PatreonMembershipImplCopyWithImpl(_$PatreonMembershipImpl _value,
+      $Res Function(_$PatreonMembershipImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of PatreonMembership
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? enabled = null,
+    Object? pledgeUrl = freezed,
+    Object? linked = null,
+    Object? fullName = freezed,
+    Object? email = freezed,
+    Object? patronStatus = freezed,
+    Object? activePatron = null,
+    Object? pledgeCents = null,
+    Object? willPayCents = null,
+    Object? cadenceMonths = freezed,
+    Object? coversPlus = null,
+    Object? lastChargeAt = freezed,
+    Object? lastChargeStatus = freezed,
+    Object? nextChargeAt = freezed,
+    Object? freeTrial = null,
+    Object? creditedCents = null,
+    Object? plusPending = null,
+    Object? needsReauthorization = null,
+    Object? linkedAt = freezed,
+    Object? lastSyncedAt = freezed,
+    Object? lastErrorCode = freezed,
+    Object? link = freezed,
+  }) {
+    return _then(_$PatreonMembershipImpl(
+      enabled: null == enabled
+          ? _value.enabled
+          : enabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      pledgeUrl: freezed == pledgeUrl
+          ? _value.pledgeUrl
+          : pledgeUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
+      linked: null == linked
+          ? _value.linked
+          : linked // ignore: cast_nullable_to_non_nullable
+              as bool,
+      fullName: freezed == fullName
+          ? _value.fullName
+          : fullName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      email: freezed == email
+          ? _value.email
+          : email // ignore: cast_nullable_to_non_nullable
+              as String?,
+      patronStatus: freezed == patronStatus
+          ? _value.patronStatus
+          : patronStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
+      activePatron: null == activePatron
+          ? _value.activePatron
+          : activePatron // ignore: cast_nullable_to_non_nullable
+              as bool,
+      pledgeCents: null == pledgeCents
+          ? _value.pledgeCents
+          : pledgeCents // ignore: cast_nullable_to_non_nullable
+              as int,
+      willPayCents: null == willPayCents
+          ? _value.willPayCents
+          : willPayCents // ignore: cast_nullable_to_non_nullable
+              as int,
+      cadenceMonths: freezed == cadenceMonths
+          ? _value.cadenceMonths
+          : cadenceMonths // ignore: cast_nullable_to_non_nullable
+              as int?,
+      coversPlus: null == coversPlus
+          ? _value.coversPlus
+          : coversPlus // ignore: cast_nullable_to_non_nullable
+              as bool,
+      lastChargeAt: freezed == lastChargeAt
+          ? _value.lastChargeAt
+          : lastChargeAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      lastChargeStatus: freezed == lastChargeStatus
+          ? _value.lastChargeStatus
+          : lastChargeStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
+      nextChargeAt: freezed == nextChargeAt
+          ? _value.nextChargeAt
+          : nextChargeAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      freeTrial: null == freeTrial
+          ? _value.freeTrial
+          : freeTrial // ignore: cast_nullable_to_non_nullable
+              as bool,
+      creditedCents: null == creditedCents
+          ? _value.creditedCents
+          : creditedCents // ignore: cast_nullable_to_non_nullable
+              as int,
+      plusPending: null == plusPending
+          ? _value.plusPending
+          : plusPending // ignore: cast_nullable_to_non_nullable
+              as bool,
+      needsReauthorization: null == needsReauthorization
+          ? _value.needsReauthorization
+          : needsReauthorization // ignore: cast_nullable_to_non_nullable
+              as bool,
+      linkedAt: freezed == linkedAt
+          ? _value.linkedAt
+          : linkedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      lastSyncedAt: freezed == lastSyncedAt
+          ? _value.lastSyncedAt
+          : lastSyncedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      lastErrorCode: freezed == lastErrorCode
+          ? _value.lastErrorCode
+          : lastErrorCode // ignore: cast_nullable_to_non_nullable
+              as String?,
+      link: freezed == link
+          ? _value.link
+          : link // ignore: cast_nullable_to_non_nullable
+              as PatreonLink?,
+    ));
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$PatreonMembershipImpl extends _PatreonMembership {
+  const _$PatreonMembershipImpl(
+      {this.enabled = false,
+      @JsonKey(name: 'pledge_url') this.pledgeUrl,
+      this.linked = false,
+      @JsonKey(name: 'full_name') this.fullName,
+      this.email,
+      @JsonKey(name: 'patron_status') this.patronStatus,
+      @JsonKey(name: 'active_patron') this.activePatron = false,
+      @JsonKey(name: 'pledge_cents') this.pledgeCents = 0,
+      @JsonKey(name: 'will_pay_cents') this.willPayCents = 0,
+      @JsonKey(name: 'pledge_cadence_months') this.cadenceMonths,
+      @JsonKey(name: 'covers_plus') this.coversPlus = false,
+      @JsonKey(name: 'last_charge_at') this.lastChargeAt,
+      @JsonKey(name: 'last_charge_status') this.lastChargeStatus,
+      @JsonKey(name: 'next_charge_at') this.nextChargeAt,
+      @JsonKey(name: 'free_trial') this.freeTrial = false,
+      @JsonKey(name: 'credited_cents') this.creditedCents = 0,
+      @JsonKey(name: 'plus_pending') this.plusPending = false,
+      @JsonKey(name: 'needs_reauthorization') this.needsReauthorization = false,
+      @JsonKey(name: 'linked_at') this.linkedAt,
+      @JsonKey(name: 'last_synced_at') this.lastSyncedAt,
+      @JsonKey(name: 'last_error_code') this.lastErrorCode,
+      this.link})
+      : super._();
+
+  factory _$PatreonMembershipImpl.fromJson(Map<String, dynamic> json) =>
+      _$$PatreonMembershipImplFromJson(json);
+
+  @override
+  @JsonKey()
+  final bool enabled;
+  @override
+  @JsonKey(name: 'pledge_url')
+  final String? pledgeUrl;
+  @override
+  @JsonKey()
+  final bool linked;
+  @override
+  @JsonKey(name: 'full_name')
+  final String? fullName;
+  @override
+  final String? email;
+  @override
+  @JsonKey(name: 'patron_status')
+  final String? patronStatus;
+  @override
+  @JsonKey(name: 'active_patron')
+  final bool activePatron;
+  @override
+  @JsonKey(name: 'pledge_cents')
+  final int pledgeCents;
+  @override
+  @JsonKey(name: 'will_pay_cents')
+  final int willPayCents;
+  @override
+  @JsonKey(name: 'pledge_cadence_months')
+  final int? cadenceMonths;
+
+  /// The pledge alone pays for every Plus period.
+  @override
+  @JsonKey(name: 'covers_plus')
+  final bool coversPlus;
+  @override
+  @JsonKey(name: 'last_charge_at')
+  final DateTime? lastChargeAt;
+  @override
+  @JsonKey(name: 'last_charge_status')
+  final String? lastChargeStatus;
+  @override
+  @JsonKey(name: 'next_charge_at')
+  final DateTime? nextChargeAt;
+  @override
+  @JsonKey(name: 'free_trial')
+  final bool freeTrial;
+  @override
+  @JsonKey(name: 'credited_cents')
+  final int creditedCents;
+
+  /// Plus starts from the balance once a charge covers a period.
+  @override
+  @JsonKey(name: 'plus_pending')
+  final bool plusPending;
+  @override
+  @JsonKey(name: 'needs_reauthorization')
+  final bool needsReauthorization;
+  @override
+  @JsonKey(name: 'linked_at')
+  final DateTime? linkedAt;
+  @override
+  @JsonKey(name: 'last_synced_at')
+  final DateTime? lastSyncedAt;
+  @override
+  @JsonKey(name: 'last_error_code')
+  final String? lastErrorCode;
+  @override
+  final PatreonLink? link;
+
+  @override
+  String toString() {
+    return 'PatreonMembership(enabled: $enabled, pledgeUrl: $pledgeUrl, linked: $linked, fullName: $fullName, email: $email, patronStatus: $patronStatus, activePatron: $activePatron, pledgeCents: $pledgeCents, willPayCents: $willPayCents, cadenceMonths: $cadenceMonths, coversPlus: $coversPlus, lastChargeAt: $lastChargeAt, lastChargeStatus: $lastChargeStatus, nextChargeAt: $nextChargeAt, freeTrial: $freeTrial, creditedCents: $creditedCents, plusPending: $plusPending, needsReauthorization: $needsReauthorization, linkedAt: $linkedAt, lastSyncedAt: $lastSyncedAt, lastErrorCode: $lastErrorCode, link: $link)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$PatreonMembershipImpl &&
+            (identical(other.enabled, enabled) || other.enabled == enabled) &&
+            (identical(other.pledgeUrl, pledgeUrl) ||
+                other.pledgeUrl == pledgeUrl) &&
+            (identical(other.linked, linked) || other.linked == linked) &&
+            (identical(other.fullName, fullName) ||
+                other.fullName == fullName) &&
+            (identical(other.email, email) || other.email == email) &&
+            (identical(other.patronStatus, patronStatus) ||
+                other.patronStatus == patronStatus) &&
+            (identical(other.activePatron, activePatron) ||
+                other.activePatron == activePatron) &&
+            (identical(other.pledgeCents, pledgeCents) ||
+                other.pledgeCents == pledgeCents) &&
+            (identical(other.willPayCents, willPayCents) ||
+                other.willPayCents == willPayCents) &&
+            (identical(other.cadenceMonths, cadenceMonths) ||
+                other.cadenceMonths == cadenceMonths) &&
+            (identical(other.coversPlus, coversPlus) ||
+                other.coversPlus == coversPlus) &&
+            (identical(other.lastChargeAt, lastChargeAt) ||
+                other.lastChargeAt == lastChargeAt) &&
+            (identical(other.lastChargeStatus, lastChargeStatus) ||
+                other.lastChargeStatus == lastChargeStatus) &&
+            (identical(other.nextChargeAt, nextChargeAt) ||
+                other.nextChargeAt == nextChargeAt) &&
+            (identical(other.freeTrial, freeTrial) ||
+                other.freeTrial == freeTrial) &&
+            (identical(other.creditedCents, creditedCents) ||
+                other.creditedCents == creditedCents) &&
+            (identical(other.plusPending, plusPending) ||
+                other.plusPending == plusPending) &&
+            (identical(other.needsReauthorization, needsReauthorization) ||
+                other.needsReauthorization == needsReauthorization) &&
+            (identical(other.linkedAt, linkedAt) ||
+                other.linkedAt == linkedAt) &&
+            (identical(other.lastSyncedAt, lastSyncedAt) ||
+                other.lastSyncedAt == lastSyncedAt) &&
+            (identical(other.lastErrorCode, lastErrorCode) ||
+                other.lastErrorCode == lastErrorCode) &&
+            (identical(other.link, link) || other.link == link));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        enabled,
+        pledgeUrl,
+        linked,
+        fullName,
+        email,
+        patronStatus,
+        activePatron,
+        pledgeCents,
+        willPayCents,
+        cadenceMonths,
+        coversPlus,
+        lastChargeAt,
+        lastChargeStatus,
+        nextChargeAt,
+        freeTrial,
+        creditedCents,
+        plusPending,
+        needsReauthorization,
+        linkedAt,
+        lastSyncedAt,
+        lastErrorCode,
+        link
+      ]);
+
+  /// Create a copy of PatreonMembership
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$PatreonMembershipImplCopyWith<_$PatreonMembershipImpl> get copyWith =>
+      __$$PatreonMembershipImplCopyWithImpl<_$PatreonMembershipImpl>(
+          this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$PatreonMembershipImplToJson(
+      this,
+    );
+  }
+}
+
+abstract class _PatreonMembership extends PatreonMembership {
+  const factory _PatreonMembership(
+      {final bool enabled,
+      @JsonKey(name: 'pledge_url') final String? pledgeUrl,
+      final bool linked,
+      @JsonKey(name: 'full_name') final String? fullName,
+      final String? email,
+      @JsonKey(name: 'patron_status') final String? patronStatus,
+      @JsonKey(name: 'active_patron') final bool activePatron,
+      @JsonKey(name: 'pledge_cents') final int pledgeCents,
+      @JsonKey(name: 'will_pay_cents') final int willPayCents,
+      @JsonKey(name: 'pledge_cadence_months') final int? cadenceMonths,
+      @JsonKey(name: 'covers_plus') final bool coversPlus,
+      @JsonKey(name: 'last_charge_at') final DateTime? lastChargeAt,
+      @JsonKey(name: 'last_charge_status') final String? lastChargeStatus,
+      @JsonKey(name: 'next_charge_at') final DateTime? nextChargeAt,
+      @JsonKey(name: 'free_trial') final bool freeTrial,
+      @JsonKey(name: 'credited_cents') final int creditedCents,
+      @JsonKey(name: 'plus_pending') final bool plusPending,
+      @JsonKey(name: 'needs_reauthorization') final bool needsReauthorization,
+      @JsonKey(name: 'linked_at') final DateTime? linkedAt,
+      @JsonKey(name: 'last_synced_at') final DateTime? lastSyncedAt,
+      @JsonKey(name: 'last_error_code') final String? lastErrorCode,
+      final PatreonLink? link}) = _$PatreonMembershipImpl;
+  const _PatreonMembership._() : super._();
+
+  factory _PatreonMembership.fromJson(Map<String, dynamic> json) =
+      _$PatreonMembershipImpl.fromJson;
+
+  @override
+  bool get enabled;
+  @override
+  @JsonKey(name: 'pledge_url')
+  String? get pledgeUrl;
+  @override
+  bool get linked;
+  @override
+  @JsonKey(name: 'full_name')
+  String? get fullName;
+  @override
+  String? get email;
+  @override
+  @JsonKey(name: 'patron_status')
+  String? get patronStatus;
+  @override
+  @JsonKey(name: 'active_patron')
+  bool get activePatron;
+  @override
+  @JsonKey(name: 'pledge_cents')
+  int get pledgeCents;
+  @override
+  @JsonKey(name: 'will_pay_cents')
+  int get willPayCents;
+  @override
+  @JsonKey(name: 'pledge_cadence_months')
+  int? get cadenceMonths;
+
+  /// The pledge alone pays for every Plus period.
+  @override
+  @JsonKey(name: 'covers_plus')
+  bool get coversPlus;
+  @override
+  @JsonKey(name: 'last_charge_at')
+  DateTime? get lastChargeAt;
+  @override
+  @JsonKey(name: 'last_charge_status')
+  String? get lastChargeStatus;
+  @override
+  @JsonKey(name: 'next_charge_at')
+  DateTime? get nextChargeAt;
+  @override
+  @JsonKey(name: 'free_trial')
+  bool get freeTrial;
+  @override
+  @JsonKey(name: 'credited_cents')
+  int get creditedCents;
+
+  /// Plus starts from the balance once a charge covers a period.
+  @override
+  @JsonKey(name: 'plus_pending')
+  bool get plusPending;
+  @override
+  @JsonKey(name: 'needs_reauthorization')
+  bool get needsReauthorization;
+  @override
+  @JsonKey(name: 'linked_at')
+  DateTime? get linkedAt;
+  @override
+  @JsonKey(name: 'last_synced_at')
+  DateTime? get lastSyncedAt;
+  @override
+  @JsonKey(name: 'last_error_code')
+  String? get lastErrorCode;
+  @override
+  PatreonLink? get link;
+
+  /// Create a copy of PatreonMembership
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$PatreonMembershipImplCopyWith<_$PatreonMembershipImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
 
@@ -3507,6 +4794,7 @@ mixin _$PlusAccount {
   WalletBalance? get wallet => throw _privateConstructorUsedError;
   @JsonKey(name: 'pending_topups')
   List<WalletTopup> get pendingTopups => throw _privateConstructorUsedError;
+  PatreonMembership? get patreon => throw _privateConstructorUsedError;
 
   /// Serializes this PlusAccount to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -3530,11 +4818,13 @@ abstract class $PlusAccountCopyWith<$Res> {
       @JsonKey(name: 'refresh_after_seconds') int refreshAfterSeconds,
       @JsonKey(name: 'subscription') PlusRenewal? renewal,
       WalletBalance? wallet,
-      @JsonKey(name: 'pending_topups') List<WalletTopup> pendingTopups});
+      @JsonKey(name: 'pending_topups') List<WalletTopup> pendingTopups,
+      PatreonMembership? patreon});
 
   $PlusEntitlementCopyWith<$Res> get entitlements;
   $PlusRenewalCopyWith<$Res>? get renewal;
   $WalletBalanceCopyWith<$Res>? get wallet;
+  $PatreonMembershipCopyWith<$Res>? get patreon;
 }
 
 /// @nodoc
@@ -3558,6 +4848,7 @@ class _$PlusAccountCopyWithImpl<$Res, $Val extends PlusAccount>
     Object? renewal = freezed,
     Object? wallet = freezed,
     Object? pendingTopups = null,
+    Object? patreon = freezed,
   }) {
     return _then(_value.copyWith(
       entitlements: null == entitlements
@@ -3584,6 +4875,10 @@ class _$PlusAccountCopyWithImpl<$Res, $Val extends PlusAccount>
           ? _value.pendingTopups
           : pendingTopups // ignore: cast_nullable_to_non_nullable
               as List<WalletTopup>,
+      patreon: freezed == patreon
+          ? _value.patreon
+          : patreon // ignore: cast_nullable_to_non_nullable
+              as PatreonMembership?,
     ) as $Val);
   }
 
@@ -3624,6 +4919,20 @@ class _$PlusAccountCopyWithImpl<$Res, $Val extends PlusAccount>
       return _then(_value.copyWith(wallet: value) as $Val);
     });
   }
+
+  /// Create a copy of PlusAccount
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $PatreonMembershipCopyWith<$Res>? get patreon {
+    if (_value.patreon == null) {
+      return null;
+    }
+
+    return $PatreonMembershipCopyWith<$Res>(_value.patreon!, (value) {
+      return _then(_value.copyWith(patreon: value) as $Val);
+    });
+  }
 }
 
 /// @nodoc
@@ -3640,7 +4949,8 @@ abstract class _$$PlusAccountImplCopyWith<$Res>
       @JsonKey(name: 'refresh_after_seconds') int refreshAfterSeconds,
       @JsonKey(name: 'subscription') PlusRenewal? renewal,
       WalletBalance? wallet,
-      @JsonKey(name: 'pending_topups') List<WalletTopup> pendingTopups});
+      @JsonKey(name: 'pending_topups') List<WalletTopup> pendingTopups,
+      PatreonMembership? patreon});
 
   @override
   $PlusEntitlementCopyWith<$Res> get entitlements;
@@ -3648,6 +4958,8 @@ abstract class _$$PlusAccountImplCopyWith<$Res>
   $PlusRenewalCopyWith<$Res>? get renewal;
   @override
   $WalletBalanceCopyWith<$Res>? get wallet;
+  @override
+  $PatreonMembershipCopyWith<$Res>? get patreon;
 }
 
 /// @nodoc
@@ -3669,6 +4981,7 @@ class __$$PlusAccountImplCopyWithImpl<$Res>
     Object? renewal = freezed,
     Object? wallet = freezed,
     Object? pendingTopups = null,
+    Object? patreon = freezed,
   }) {
     return _then(_$PlusAccountImpl(
       entitlements: null == entitlements
@@ -3695,6 +5008,10 @@ class __$$PlusAccountImplCopyWithImpl<$Res>
           ? _value._pendingTopups
           : pendingTopups // ignore: cast_nullable_to_non_nullable
               as List<WalletTopup>,
+      patreon: freezed == patreon
+          ? _value.patreon
+          : patreon // ignore: cast_nullable_to_non_nullable
+              as PatreonMembership?,
     ));
   }
 }
@@ -3709,7 +5026,8 @@ class _$PlusAccountImpl implements _PlusAccount {
       @JsonKey(name: 'subscription') this.renewal,
       this.wallet,
       @JsonKey(name: 'pending_topups')
-      final List<WalletTopup> pendingTopups = const <WalletTopup>[]})
+      final List<WalletTopup> pendingTopups = const <WalletTopup>[],
+      this.patreon})
       : _pendingTopups = pendingTopups;
 
   factory _$PlusAccountImpl.fromJson(Map<String, dynamic> json) =>
@@ -3739,8 +5057,11 @@ class _$PlusAccountImpl implements _PlusAccount {
   }
 
   @override
+  final PatreonMembership? patreon;
+
+  @override
   String toString() {
-    return 'PlusAccount(entitlements: $entitlements, serverTime: $serverTime, refreshAfterSeconds: $refreshAfterSeconds, renewal: $renewal, wallet: $wallet, pendingTopups: $pendingTopups)';
+    return 'PlusAccount(entitlements: $entitlements, serverTime: $serverTime, refreshAfterSeconds: $refreshAfterSeconds, renewal: $renewal, wallet: $wallet, pendingTopups: $pendingTopups, patreon: $patreon)';
   }
 
   @override
@@ -3757,7 +5078,8 @@ class _$PlusAccountImpl implements _PlusAccount {
             (identical(other.renewal, renewal) || other.renewal == renewal) &&
             (identical(other.wallet, wallet) || other.wallet == wallet) &&
             const DeepCollectionEquality()
-                .equals(other._pendingTopups, _pendingTopups));
+                .equals(other._pendingTopups, _pendingTopups) &&
+            (identical(other.patreon, patreon) || other.patreon == patreon));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -3769,7 +5091,8 @@ class _$PlusAccountImpl implements _PlusAccount {
       refreshAfterSeconds,
       renewal,
       wallet,
-      const DeepCollectionEquality().hash(_pendingTopups));
+      const DeepCollectionEquality().hash(_pendingTopups),
+      patreon);
 
   /// Create a copy of PlusAccount
   /// with the given fields replaced by the non-null parameter values.
@@ -3794,8 +5117,8 @@ abstract class _PlusAccount implements PlusAccount {
       @JsonKey(name: 'refresh_after_seconds') final int refreshAfterSeconds,
       @JsonKey(name: 'subscription') final PlusRenewal? renewal,
       final WalletBalance? wallet,
-      @JsonKey(name: 'pending_topups')
-      final List<WalletTopup> pendingTopups}) = _$PlusAccountImpl;
+      @JsonKey(name: 'pending_topups') final List<WalletTopup> pendingTopups,
+      final PatreonMembership? patreon}) = _$PlusAccountImpl;
 
   factory _PlusAccount.fromJson(Map<String, dynamic> json) =
       _$PlusAccountImpl.fromJson;
@@ -3816,6 +5139,8 @@ abstract class _PlusAccount implements PlusAccount {
   @override
   @JsonKey(name: 'pending_topups')
   List<WalletTopup> get pendingTopups;
+  @override
+  PatreonMembership? get patreon;
 
   /// Create a copy of PlusAccount
   /// with the given fields replaced by the non-null parameter values.

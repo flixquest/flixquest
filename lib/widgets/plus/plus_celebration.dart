@@ -93,85 +93,90 @@ class _PlusCelebrationState extends State<PlusCelebration>
     if (!_showing) return const SizedBox.shrink();
     final until = _until;
     final scale = widget.television ? 1.25 : 1.0;
-    return Focus(
-      focusNode: _focus,
-      onKeyEvent: (_, event) {
-        if (event is KeyDownEvent) unawaited(_close());
-        return KeyEventResult.handled;
-      },
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _close,
-        child: FadeTransition(
-          opacity: CurvedAnimation(parent: _entrance, curve: Curves.easeOut),
-          child: Semantics(
-            liveRegion: true,
-            label: tr('plus_welcome_title'),
-            child: PlusAurora(
-              energy: 1.5,
-              child: Stack(
-                fit: StackFit.expand,
-                children: <Widget>[
-                  const ColoredBox(color: Color(0x66000000)),
-                  IgnorePointer(
-                    child: CustomPaint(painter: _ConfettiPainter(_burst)),
-                  ),
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          ScaleTransition(
-                            scale: CurvedAnimation(
-                                parent: _entrance, curve: Curves.elasticOut),
-                            child: PlusEmblem(size: 104 * scale),
-                          ),
-                          SizedBox(height: 28 * scale),
-                          PlusWordmark(size: 26 * scale),
-                          SizedBox(height: 18 * scale),
-                          Text(
-                            tr('plus_welcome_title'),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: 'FigtreeBold',
-                              fontSize: 28 * scale,
-                              height: 1.15,
-                              letterSpacing: -.5,
-                              color: PlusColors.ink,
+    // Above the navigator there is no Material, so text would fall back to
+    // the yellow-underlined debug style.
+    return Material(
+      type: MaterialType.transparency,
+      child: Focus(
+        focusNode: _focus,
+        onKeyEvent: (_, event) {
+          if (event is KeyDownEvent) unawaited(_close());
+          return KeyEventResult.handled;
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _close,
+          child: FadeTransition(
+            opacity: CurvedAnimation(parent: _entrance, curve: Curves.easeOut),
+            child: Semantics(
+              liveRegion: true,
+              label: tr('plus_welcome_title'),
+              child: PlusAurora(
+                energy: 1.5,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: <Widget>[
+                    const ColoredBox(color: Color(0x66000000)),
+                    IgnorePointer(
+                      child: CustomPaint(painter: _ConfettiPainter(_burst)),
+                    ),
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            ScaleTransition(
+                              scale: CurvedAnimation(
+                                  parent: _entrance, curve: Curves.elasticOut),
+                              child: PlusEmblem(size: 104 * scale),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            until == null
-                                ? tr('plus_welcome_body')
-                                : tr('plus_welcome_until',
-                                    args: [formatDay(context, until)]),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: 'Figtree',
-                              fontSize: 15 * scale,
-                              height: 1.4,
-                              color: PlusColors.mutedInk,
+                            SizedBox(height: 28 * scale),
+                            PlusWordmark(size: 26 * scale),
+                            SizedBox(height: 18 * scale),
+                            Text(
+                              tr('plus_welcome_title'),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'FigtreeBold',
+                                fontSize: 28 * scale,
+                                height: 1.15,
+                                letterSpacing: -.5,
+                                color: PlusColors.ink,
+                              ),
                             ),
-                          ),
-                          SizedBox(height: 30 * scale),
-                          Text(
-                            widget.television
-                                ? tr('plus_press_any_key')
-                                : tr('plus_tap_to_continue'),
-                            style: TextStyle(
-                              fontFamily: 'FigtreeSB',
-                              fontSize: 12 * scale,
-                              letterSpacing: 1.2,
-                              color: PlusColors.mutedInk,
+                            const SizedBox(height: 10),
+                            Text(
+                              until == null
+                                  ? tr('plus_welcome_body')
+                                  : tr('plus_welcome_until',
+                                      args: [formatDay(context, until)]),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Figtree',
+                                fontSize: 15 * scale,
+                                height: 1.4,
+                                color: PlusColors.mutedInk,
+                              ),
                             ),
-                          ),
-                        ],
+                            SizedBox(height: 30 * scale),
+                            Text(
+                              widget.television
+                                  ? tr('plus_press_any_key')
+                                  : tr('plus_tap_to_continue'),
+                              style: TextStyle(
+                                fontFamily: 'FigtreeSB',
+                                fontSize: 12 * scale,
+                                letterSpacing: 1.2,
+                                color: PlusColors.mutedInk,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

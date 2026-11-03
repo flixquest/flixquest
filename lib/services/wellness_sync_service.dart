@@ -41,6 +41,12 @@ class WellnessSyncService {
 
   Future<bool> pushPending() => syncNow();
 
+  /// Whether this account synced recently enough to skip an automatic pull.
+  bool get isFresh {
+    bind();
+    return _runner?.isFresh ?? false;
+  }
+
   void dispose() {
     _runner?.status.removeListener(_onStatus);
     _runner?.lastSynced.removeListener(_onSynced);

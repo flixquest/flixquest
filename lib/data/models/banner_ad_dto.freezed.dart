@@ -31,6 +31,7 @@ mixin _$BannerAdDto {
   double? get width => throw _privateConstructorUsedError;
   double? get height => throw _privateConstructorUsedError;
   List<String> get placements => throw _privateConstructorUsedError;
+  bool get isAnnouncement => throw _privateConstructorUsedError;
 
   /// Serializes this BannerAdDto to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -59,7 +60,8 @@ abstract class $BannerAdDtoCopyWith<$Res> {
       double aspectRatio,
       double? width,
       double? height,
-      List<String> placements});
+      List<String> placements,
+      bool isAnnouncement});
 }
 
 /// @nodoc
@@ -88,6 +90,7 @@ class _$BannerAdDtoCopyWithImpl<$Res, $Val extends BannerAdDto>
     Object? width = freezed,
     Object? height = freezed,
     Object? placements = null,
+    Object? isAnnouncement = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -134,6 +137,10 @@ class _$BannerAdDtoCopyWithImpl<$Res, $Val extends BannerAdDto>
           ? _value.placements
           : placements // ignore: cast_nullable_to_non_nullable
               as List<String>,
+      isAnnouncement: null == isAnnouncement
+          ? _value.isAnnouncement
+          : isAnnouncement // ignore: cast_nullable_to_non_nullable
+              as bool,
     ) as $Val);
   }
 }
@@ -157,7 +164,8 @@ abstract class _$$BannerAdDtoImplCopyWith<$Res>
       double aspectRatio,
       double? width,
       double? height,
-      List<String> placements});
+      List<String> placements,
+      bool isAnnouncement});
 }
 
 /// @nodoc
@@ -184,6 +192,7 @@ class __$$BannerAdDtoImplCopyWithImpl<$Res>
     Object? width = freezed,
     Object? height = freezed,
     Object? placements = null,
+    Object? isAnnouncement = null,
   }) {
     return _then(_$BannerAdDtoImpl(
       id: null == id
@@ -230,6 +239,10 @@ class __$$BannerAdDtoImplCopyWithImpl<$Res>
           ? _value._placements
           : placements // ignore: cast_nullable_to_non_nullable
               as List<String>,
+      isAnnouncement: null == isAnnouncement
+          ? _value.isAnnouncement
+          : isAnnouncement // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -248,7 +261,8 @@ class _$BannerAdDtoImpl extends _BannerAdDto {
       this.aspectRatio = 2.2,
       this.width,
       this.height,
-      final List<String> placements = const []})
+      final List<String> placements = const [],
+      this.isAnnouncement = false})
       : _placements = placements,
         super._();
 
@@ -288,8 +302,12 @@ class _$BannerAdDtoImpl extends _BannerAdDto {
   }
 
   @override
+  @JsonKey()
+  final bool isAnnouncement;
+
+  @override
   String toString() {
-    return 'BannerAdDto(id: $id, key: $key, name: $name, imageUrl: $imageUrl, targetUrl: $targetUrl, altText: $altText, shape: $shape, aspectRatio: $aspectRatio, width: $width, height: $height, placements: $placements)';
+    return 'BannerAdDto(id: $id, key: $key, name: $name, imageUrl: $imageUrl, targetUrl: $targetUrl, altText: $altText, shape: $shape, aspectRatio: $aspectRatio, width: $width, height: $height, placements: $placements, isAnnouncement: $isAnnouncement)';
   }
 
   @override
@@ -311,7 +329,9 @@ class _$BannerAdDtoImpl extends _BannerAdDto {
             (identical(other.width, width) || other.width == width) &&
             (identical(other.height, height) || other.height == height) &&
             const DeepCollectionEquality()
-                .equals(other._placements, _placements));
+                .equals(other._placements, _placements) &&
+            (identical(other.isAnnouncement, isAnnouncement) ||
+                other.isAnnouncement == isAnnouncement));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -328,7 +348,8 @@ class _$BannerAdDtoImpl extends _BannerAdDto {
       aspectRatio,
       width,
       height,
-      const DeepCollectionEquality().hash(_placements));
+      const DeepCollectionEquality().hash(_placements),
+      isAnnouncement);
 
   /// Create a copy of BannerAdDto
   /// with the given fields replaced by the non-null parameter values.
@@ -358,7 +379,8 @@ abstract class _BannerAdDto extends BannerAdDto {
       final double aspectRatio,
       final double? width,
       final double? height,
-      final List<String> placements}) = _$BannerAdDtoImpl;
+      final List<String> placements,
+      final bool isAnnouncement}) = _$BannerAdDtoImpl;
   const _BannerAdDto._() : super._();
 
   factory _BannerAdDto.fromJson(Map<String, dynamic> json) =
@@ -386,6 +408,8 @@ abstract class _BannerAdDto extends BannerAdDto {
   double? get height;
   @override
   List<String> get placements;
+  @override
+  bool get isAnnouncement;
 
   /// Create a copy of BannerAdDto
   /// with the given fields replaced by the non-null parameter values.

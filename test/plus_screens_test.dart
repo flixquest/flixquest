@@ -554,6 +554,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 900));
 
     expect(find.text('Welcome to Plus'), findsOneWidget);
+    // Shown above the navigator, it brings its own Material so text is not
+    // drawn in the yellow-underlined fallback style.
+    expect(
+        find.ancestor(
+            of: find.text('Welcome to Plus'), matching: find.byType(Material)),
+        findsWidgets);
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('Welcome to Plus'));
     await tester.pump(const Duration(seconds: 1));

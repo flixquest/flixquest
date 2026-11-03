@@ -11,6 +11,7 @@ import '../models/adsterra_playback_ads_config.dart';
 import '../provider/app_dependency_provider.dart';
 import '../widgets/ad_block_gate.dart';
 import '../widgets/adsterra_playback_ad_screen.dart';
+import 'ad_delivery.dart';
 import 'device_presentation_service.dart';
 import 'playback_ad_input_service.dart';
 import 'playback_ad_browser_service.dart';
@@ -29,11 +30,19 @@ class AdsterraPlaybackAdsService {
     this.browserLauncher,
     this.continueTap,
     DateTime Function()? now,
+    AdBlockGate? adBlockGate,
   })  : _preferences = preferences ?? SharedPreferences.getInstance,
-        _now = now ?? DateTime.now {
+        _now = now ?? DateTime.now,
+        _adBlockGate = adBlockGate {
     AdsPolicy.addListener(_onPlusChanged);
   }
   static final instance = AdsterraPlaybackAdsService();
+
+  final AdBlockGate? _adBlockGate;
+  AdBlockGate get _gate => _adBlockGate ?? AdBlockGate.instance;
+
+  /// Where a blocker stopped the popup being shown, and how.
+  ({String host, AdDelivery delivery})? _blocked;
 
   /// A popup owed from before Plus started is settled, never replayed
   /// later when Plus ends.
@@ -105,7 +114,7 @@ class AdsterraPlaybackAdsService {
       return context.mounted;
     }
     if (!context.mounted) return false;
-    if (!await AdBlockGate.instance.allowPlayback(context,
+    if (!await _gate.allowPlayback(context,
             download: download, television: television) ||
         !context.mounted) {
       return false;
@@ -343,8 +352,9 @@ class AdsterraPlaybackAdsService {
     if (_popupCoolingDown(resolved, _frequencyFor(provider, resolved, tv))) {
       return null;
     }
-    final placement = _placementFor(
-        provider, resolved, tv ? selection.tvNetwork : selection.network, tv);
+    final placement = _placementsFor(provider, resolved,
+            tv ? selection.tvNetwork : selection.network, tv)
+        .firstOrNull;
     if (placement == null) return null;
     late final PlaybackAdPreload preload;
     void onConfigChanged() {
@@ -365,7 +375,39 @@ class AdsterraPlaybackAdsService {
     return preload;
   }
 
+  /// Shows the popup for [requested]. When a blocker stopped its network
+  /// before playback starts (the Social Bar, stream found or a switch),
+  /// playback waits for [AdBlockGate.popupBlocked]; **I turned it off** shows
+  /// the popup again instead of trusting the tap.
   Future<bool> show(BuildContext context, PlaybackAdStage requested,
+      {bool download = false,
+      bool television = false,
+      PlaybackAdPreload? preload}) async {
+    for (var attempt = 0;; attempt++) {
+      if (attempt > 0 && !context.mounted) return false;
+      _blocked = null;
+      final proceed = await _present(context, requested,
+          download: download,
+          television: television,
+          preload: attempt == 0 ? preload : null);
+      final blocked = _blocked;
+      if (blocked == null ||
+          !proceed ||
+          !(requested == PlaybackAdStage.beforeLoader ||
+              requested.startsPlayback)) {
+        return proceed;
+      }
+      if (!context.mounted) return false;
+      final verdict = await _gate.popupBlocked(context, blocked.host,
+          delivery: blocked.delivery,
+          download: download,
+          television: television,
+          again: attempt > 0);
+      if (verdict != null) return verdict;
+    }
+  }
+
+  Future<bool> _present(BuildContext context, PlaybackAdStage requested,
       {bool download = false,
       bool television = false,
       PlaybackAdPreload? preload}) async {
@@ -414,8 +456,10 @@ class AdsterraPlaybackAdsService {
             ? selection?.tvNetwork
             : selection?.network;
     final config = selection?.adsterra;
-    var placement =
-        provider == null ? null : _placementFor(provider, stage, network, tv);
+    final placements = provider == null
+        ? const <PlaybackAdPlacement>[]
+        : _placementsFor(provider, stage, network, tv);
+    var placement = placements.firstOrNull;
     if (provider == null || placement == null) {
       _logSkip(stage,
           'network=${network?.name ?? 'none'} television=$tv trigger=${provider?.popupTrigger(stage)} adsterraEnabled=${config?.enabled ?? false} popupEnabled=${selection?.popunders[network]?.enabled ?? false}; stage disabled or invalid/missing ${tv ? 'tv_popunder' : 'config'}');
@@ -457,6 +501,7 @@ class AdsterraPlaybackAdsService {
       String? variantId;
       final experiment = stage == PlaybackAdStage.streamFound &&
               network == AdNetwork.adsterra &&
+              placement.network == AdNetwork.adsterra &&
               !tv
           ? config?.streamFoundExperiment
           : null;
@@ -492,14 +537,20 @@ class AdsterraPlaybackAdsService {
       final route = MaterialPageRoute<void>(
         settings: RouteSettings(
             name: '/${selectedPlacement.network.name}/${stage.name}'),
-        builder: (_) => AdsterraPlaybackAdScreen(
-          placement: selectedPlacement,
+        builder: (_) => PlaybackAdChainScreen(
+          placements: [selectedPlacement, ...placements.skip(1)],
           stage: stage,
           storeLauncher: storeLauncher,
           browserLauncher: browserLauncher,
           television: tv,
           preload: prepared,
           continueTap: continueTap,
+          onDelivery: (host, delivery) {
+            if (delivery != AdDelivery.reached) {
+              _blocked = (host: host, delivery: delivery);
+            }
+            _gate.observeDelivery(host, delivery);
+          },
           onAdShown: stage == PlaybackAdStage.beforeLoader
               ? null
               : () {
@@ -548,6 +599,22 @@ class AdsterraPlaybackAdsService {
       stage.isSwitch && (tv || provider?.popupTrigger(stage) == null)
           ? PlaybackAdStage.streamFound
           : stage;
+
+  /// The selected network's placement for [stage], then each fallback
+  /// network's, skipping networks that have none. The Social Bar stays with
+  /// Adsterra alone.
+  List<PlaybackAdPlacement> _placementsFor(AppDependencyProvider provider,
+      PlaybackAdStage stage, AdNetwork? network, bool tv) {
+    if (network == null) return const [];
+    final networks = stage == PlaybackAdStage.beforeLoader
+        ? {network}
+        : {network, ...provider.playbackAdsSelection.fallbackNetworks};
+    return [
+      for (final candidate in networks)
+        if (_placementFor(provider, stage, candidate, tv) case final placement?)
+          placement,
+    ];
+  }
 
   PlaybackAdPlacement? _placementFor(AppDependencyProvider provider,
       PlaybackAdStage stage, AdNetwork? network, bool tv) {

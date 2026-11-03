@@ -128,6 +128,10 @@ class PlaylistProvider extends ChangeNotifier {
   /// Syncs now, when signed in; the lists reload when it lands.
   Future<bool> sync() async => await runner?.sync() ?? false;
 
+  /// Syncs unless this account did recently; pulling to refresh still forces
+  /// one with [sync].
+  Future<void> autoSync() async => await runner?.autoSync();
+
   /// Makes a list called [name], with [first] (or every one of [items], as
   /// when saving a copy of someone's list) in it, and returns its id.
   Future<String> create(String name,

@@ -70,6 +70,66 @@ void main() {
       expect(_params(query.url('en'))['sort_by'], 'popularity.desc');
     });
 
+    test('countries: any of them, by origin', () {
+      final query = DiscoverQuery(MediaKind.series)
+        ..countries.addAll(<String>['KR', 'JP']);
+      final params = _params(query.url('en'));
+      // A bar asks TMDB for titles from either; a comma would ask for both.
+      expect(params['with_origin_country'], 'KR|JP');
+      expect(query.activeCount, 2);
+      query.clear();
+      expect(query.countries, isEmpty);
+      expect(
+        _params(query.url('en')).containsKey('with_origin_country'),
+        isFalse,
+      );
+    });
+
+    test('a flag for each country that has one', () {
+      expect(DiscoverQuery.flag('KR'), '\u{1F1F0}\u{1F1F7}');
+      expect(DiscoverQuery.flag('et'), '\u{1F1EA}\u{1F1F9}');
+      // The Soviet Union and Yugoslavia are gone, and so are their flags.
+      expect(DiscoverQuery.flag('SU'), isNull);
+      expect(DiscoverQuery.flag('YU'), isNull);
+      expect(DiscoverQuery.flag('1A'), isNull);
+    });
+
+    test('countries are found by either name or code, prefixes first', () {
+      const all = <DiscoverCountry>[
+        (code: 'ES', name: 'España', englishName: 'Spain'),
+        (code: 'KR', name: 'Corea del Sur', englishName: 'South Korea'),
+        (code: 'KP', name: 'Corea del Norte', englishName: 'North Korea'),
+        (code: 'ZA', name: 'Sudáfrica', englishName: 'South Africa'),
+      ];
+      List<String> codes(String search) =>
+          DiscoverQuery.matchCountries(all, search).map((c) => c.code).toList();
+      expect(codes('corea'), <String>['KR', 'KP']);
+      // The English name finds it in any language, for the TV's keyboard.
+      expect(codes('spain'), <String>['ES']);
+      expect(codes('korea'), <String>['KR', 'KP']);
+      expect(codes('south'), <String>['KR', 'ZA']);
+      expect(codes('za'), <String>['ZA']);
+      expect(codes(''), hasLength(4));
+    });
+
+    test('browsing: the chosen first, then the popular, then A to Z', () {
+      const all = <DiscoverCountry>[
+        (code: 'AR', name: 'Argentina', englishName: 'Argentina'),
+        (code: 'ET', name: 'Ethiopia', englishName: 'Ethiopia'),
+        (code: 'KR', name: 'Korea', englishName: 'South Korea'),
+      ];
+      final order = DiscoverQuery.browseCountries(all, <String>{'ET', 'KR'});
+      expect(order.first.code, 'ET');
+      // A popular one stays with the popular, named as TMDB names it.
+      expect(order.where((c) => c.code == 'KR').single.name, 'Korea');
+      expect(
+        order.map((c) => c.code).skip(1).take(16),
+        DiscoverQuery.featuredCountries.map((c) => c.code),
+      );
+      expect(order.last.code, 'AR');
+      expect(order, hasLength(1 + 16 + 1));
+    });
+
     test('years run from this one back to 1950', () {
       final years = DiscoverQuery.years(now: DateTime(2031, 1, 1));
       expect(years.first, '2031');
@@ -174,6 +234,76 @@ void main() {
     await tester.tap(find.text('clear_all'));
     await settle();
     expect(find.byIcon(PhosphorIcons.x()), findsNothing);
+  });
+
+  testWidgets('countries: popular ones at hand, any other by search',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final opened = <MediaCollection>[];
+    final counted = <String>[];
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsProvider()),
+          ChangeNotifierProvider(create: (_) => AppDependencyProvider()),
+        ],
+        child: MaterialApp(
+          home: DiscoverScreen(
+            openResults: (_, results) => opened.add(results),
+            countResults: (url) async {
+              counted.add(url);
+              return 1234;
+            },
+            loadCountries: (_) async => const <DiscoverCountry>[
+              (code: 'ET', name: 'Ethiopia', englishName: 'Ethiopia'),
+              (code: 'JP', name: 'Japan', englishName: 'Japan'),
+              (code: 'KR', name: 'South Korea', englishName: 'South Korea'),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final list = find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    );
+    Future<void> settle() async {
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+    }
+
+    final korea = find.textContaining('South Korea');
+    await tester.scrollUntilVisible(korea, 200, scrollable: list);
+    await tester.tap(korea);
+    await settle();
+    expect(
+        Uri.parse(counted.last).queryParameters['with_origin_country'], 'KR');
+
+    // One that isn't popular, found by name.
+    await tester.tap(find.text('more_countries'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'eth');
+    await tester.pumpAndSettle();
+    expect(find.text('Japan'), findsNothing);
+    await tester.tap(find.text('Ethiopia'));
+    await tester.pumpAndSettle();
+    Navigator.of(tester.element(find.text('Ethiopia'))).pop();
+    await settle();
+    expect(
+      Uri.parse(counted.last).queryParameters['with_origin_country'],
+      'KR|ET',
+    );
+    // It joins the popular ones, chosen, to take back in place.
+    await tester.drag(list, const Offset(0, 3000));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(PhosphorIcons.x()), findsNWidgets(2));
+
+    await tester.tap(find.text('show_titles'));
+    await tester.pumpAndSettle();
+    expect(opened.single.id, contains('with_origin_country=KR%7CET'));
   });
 
   for (final size in const <Size>[Size(768, 1024), Size(1024, 768)]) {

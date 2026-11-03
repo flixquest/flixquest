@@ -18,14 +18,10 @@ class WellnessProvider extends ChangeNotifier {
   static const guestOwnerId = 'guest';
   static const _deviceIdKey = 'wellness.device_id.v1';
 
-  /// The least time between automatic pulls for one account. Launch and the
-  /// auth stream both ask for one as the app starts.
-  static const _autoSyncInterval = Duration(minutes: 2);
-
   /// Coalesces the saves a player makes in a burst (pause, background,
   /// completion and dispose can all land within seconds of each other).
   static const _urgentPushDelay = Duration(seconds: 10);
-  static const _routinePushDelay = Duration(minutes: 2);
+  static const _routinePushDelay = Duration(minutes: 5);
 
   final WellnessDatabaseController _database =
       WellnessDatabaseController.instance;
@@ -33,8 +29,6 @@ class WellnessProvider extends ChangeNotifier {
   ValueListenable<String?>? _laravelOwner;
   Timer? _syncDebounce;
   DateTime? _pushDueAt;
-  String? _lastAutoSyncOwner;
-  DateTime? _lastAutoSyncAt;
   List<WellnessViewingSession> _sessions = const <WellnessViewingSession>[];
   WellnessRange _range = WellnessRange.week;
   bool _loading = true;
@@ -123,20 +117,11 @@ class WellnessProvider extends ChangeNotifier {
     return '${DateTime.now().microsecondsSinceEpoch}-$entropy';
   }
 
-  /// A pull the user did not ask for, skipped when this account pulled
-  /// within [_autoSyncInterval].
+  /// A pull the user did not ask for, skipped when this account synced
+  /// within the sync runner's interval.
   Future<void> _autoSync() async {
-    final owner = _ownerId;
-    final lastAt = _lastAutoSyncAt;
-    if (_lastAutoSyncOwner == owner &&
-        lastAt != null &&
-        DateTime.now().difference(lastAt) < _autoSyncInterval) {
-      return;
-    }
-    if (await syncNow()) {
-      _lastAutoSyncOwner = owner;
-      _lastAutoSyncAt = DateTime.now();
-    }
+    if (_syncService.isFresh) return;
+    await syncNow();
   }
 
   /// Pushes after [delay], unless a push is already due sooner.

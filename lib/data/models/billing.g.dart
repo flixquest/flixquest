@@ -43,6 +43,20 @@ Map<String, dynamic> _$$TopupLimitsImplToJson(_$TopupLimitsImpl instance) =>
       'suggested_topups_cents': instance.suggestedCents,
     };
 
+_$PatreonOfferImpl _$$PatreonOfferImplFromJson(Map<String, dynamic> json) =>
+    _$PatreonOfferImpl(
+      enabled: json['enabled'] as bool? ?? false,
+      pledgeUrl: json['pledge_url'] as String?,
+      recommendedCents: (json['recommended_cents'] as num?)?.toInt() ?? 200,
+    );
+
+Map<String, dynamic> _$$PatreonOfferImplToJson(_$PatreonOfferImpl instance) =>
+    <String, dynamic>{
+      'enabled': instance.enabled,
+      'pledge_url': instance.pledgeUrl,
+      'recommended_cents': instance.recommendedCents,
+    };
+
 _$PlusCatalogImpl _$$PlusCatalogImplFromJson(Map<String, dynamic> json) =>
     _$PlusCatalogImpl(
       purchasesEnabled: json['purchases_enabled'] as bool? ?? false,
@@ -53,6 +67,9 @@ _$PlusCatalogImpl _$$PlusCatalogImplFromJson(Map<String, dynamic> json) =>
       wallet: json['wallet'] == null
           ? const TopupLimits()
           : TopupLimits.fromJson(json['wallet'] as Map<String, dynamic>),
+      patreon: json['patreon'] == null
+          ? const PatreonOffer()
+          : PatreonOffer.fromJson(json['patreon'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$$PlusCatalogImplToJson(_$PlusCatalogImpl instance) =>
@@ -60,6 +77,7 @@ Map<String, dynamic> _$$PlusCatalogImplToJson(_$PlusCatalogImpl instance) =>
       'purchases_enabled': instance.purchasesEnabled,
       'plans': instance.plans.map((e) => e.toJson()).toList(),
       'wallet': instance.wallet.toJson(),
+      'patreon': instance.patreon.toJson(),
     };
 
 _$PlusEntitlementImpl _$$PlusEntitlementImplFromJson(
@@ -228,6 +246,7 @@ _$WalletTopupImpl _$$WalletTopupImplFromJson(Map<String, dynamic> json) =>
     _$WalletTopupImpl(
       id: json['id'] as String,
       status: json['status'] as String,
+      provider: json['provider'] as String? ?? 'nowpayments',
       amountCents: (json['amount_cents'] as num).toInt(),
       creditedCents: (json['credited_cents'] as num?)?.toInt() ?? 0,
       currency: json['currency'] as String? ?? 'USD',
@@ -252,6 +271,7 @@ Map<String, dynamic> _$$WalletTopupImplToJson(_$WalletTopupImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'status': instance.status,
+      'provider': instance.provider,
       'amount_cents': instance.amountCents,
       'credited_cents': instance.creditedCents,
       'currency': instance.currency,
@@ -274,6 +294,7 @@ _$WalletTransactionImpl _$$WalletTransactionImplFromJson(
       amountCents: (json['amount_cents'] as num).toInt(),
       balanceAfterCents: (json['balance_after_cents'] as num?)?.toInt(),
       reference: _id(json['reference']),
+      source: json['source'] as String?,
       periodStartsAt: json['period_starts_at'] == null
           ? null
           : DateTime.parse(json['period_starts_at'] as String),
@@ -293,9 +314,98 @@ Map<String, dynamic> _$$WalletTransactionImplToJson(
       'amount_cents': instance.amountCents,
       'balance_after_cents': instance.balanceAfterCents,
       'reference': instance.reference,
+      'source': instance.source,
       'period_starts_at': instance.periodStartsAt?.toIso8601String(),
       'period_ends_at': instance.periodEndsAt?.toIso8601String(),
       'created_at': instance.createdAt?.toIso8601String(),
+    };
+
+_$PatreonLinkImpl _$$PatreonLinkImplFromJson(Map<String, dynamic> json) =>
+    _$PatreonLinkImpl(
+      id: json['id'] as String,
+      status: json['status'] as String,
+      errorCode: json['error_code'] as String?,
+      expiresAt: json['expires_at'] == null
+          ? null
+          : DateTime.parse(json['expires_at'] as String),
+      completedAt: json['completed_at'] == null
+          ? null
+          : DateTime.parse(json['completed_at'] as String),
+      url: json['url'] as String?,
+    );
+
+Map<String, dynamic> _$$PatreonLinkImplToJson(_$PatreonLinkImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'status': instance.status,
+      'error_code': instance.errorCode,
+      'expires_at': instance.expiresAt?.toIso8601String(),
+      'completed_at': instance.completedAt?.toIso8601String(),
+      'url': instance.url,
+    };
+
+_$PatreonMembershipImpl _$$PatreonMembershipImplFromJson(
+        Map<String, dynamic> json) =>
+    _$PatreonMembershipImpl(
+      enabled: json['enabled'] as bool? ?? false,
+      pledgeUrl: json['pledge_url'] as String?,
+      linked: json['linked'] as bool? ?? false,
+      fullName: json['full_name'] as String?,
+      email: json['email'] as String?,
+      patronStatus: json['patron_status'] as String?,
+      activePatron: json['active_patron'] as bool? ?? false,
+      pledgeCents: (json['pledge_cents'] as num?)?.toInt() ?? 0,
+      willPayCents: (json['will_pay_cents'] as num?)?.toInt() ?? 0,
+      cadenceMonths: (json['pledge_cadence_months'] as num?)?.toInt(),
+      coversPlus: json['covers_plus'] as bool? ?? false,
+      lastChargeAt: json['last_charge_at'] == null
+          ? null
+          : DateTime.parse(json['last_charge_at'] as String),
+      lastChargeStatus: json['last_charge_status'] as String?,
+      nextChargeAt: json['next_charge_at'] == null
+          ? null
+          : DateTime.parse(json['next_charge_at'] as String),
+      freeTrial: json['free_trial'] as bool? ?? false,
+      creditedCents: (json['credited_cents'] as num?)?.toInt() ?? 0,
+      plusPending: json['plus_pending'] as bool? ?? false,
+      needsReauthorization: json['needs_reauthorization'] as bool? ?? false,
+      linkedAt: json['linked_at'] == null
+          ? null
+          : DateTime.parse(json['linked_at'] as String),
+      lastSyncedAt: json['last_synced_at'] == null
+          ? null
+          : DateTime.parse(json['last_synced_at'] as String),
+      lastErrorCode: json['last_error_code'] as String?,
+      link: json['link'] == null
+          ? null
+          : PatreonLink.fromJson(json['link'] as Map<String, dynamic>),
+    );
+
+Map<String, dynamic> _$$PatreonMembershipImplToJson(
+        _$PatreonMembershipImpl instance) =>
+    <String, dynamic>{
+      'enabled': instance.enabled,
+      'pledge_url': instance.pledgeUrl,
+      'linked': instance.linked,
+      'full_name': instance.fullName,
+      'email': instance.email,
+      'patron_status': instance.patronStatus,
+      'active_patron': instance.activePatron,
+      'pledge_cents': instance.pledgeCents,
+      'will_pay_cents': instance.willPayCents,
+      'pledge_cadence_months': instance.cadenceMonths,
+      'covers_plus': instance.coversPlus,
+      'last_charge_at': instance.lastChargeAt?.toIso8601String(),
+      'last_charge_status': instance.lastChargeStatus,
+      'next_charge_at': instance.nextChargeAt?.toIso8601String(),
+      'free_trial': instance.freeTrial,
+      'credited_cents': instance.creditedCents,
+      'plus_pending': instance.plusPending,
+      'needs_reauthorization': instance.needsReauthorization,
+      'linked_at': instance.linkedAt?.toIso8601String(),
+      'last_synced_at': instance.lastSyncedAt?.toIso8601String(),
+      'last_error_code': instance.lastErrorCode,
+      'link': instance.link?.toJson(),
     };
 
 _$PlusAccountImpl _$$PlusAccountImplFromJson(Map<String, dynamic> json) =>
@@ -319,6 +429,9 @@ _$PlusAccountImpl _$$PlusAccountImplFromJson(Map<String, dynamic> json) =>
               ?.map((e) => WalletTopup.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const <WalletTopup>[],
+      patreon: json['patreon'] == null
+          ? null
+          : PatreonMembership.fromJson(json['patreon'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$$PlusAccountImplToJson(_$PlusAccountImpl instance) =>
@@ -329,6 +442,7 @@ Map<String, dynamic> _$$PlusAccountImplToJson(_$PlusAccountImpl instance) =>
       'subscription': instance.renewal?.toJson(),
       'wallet': instance.wallet?.toJson(),
       'pending_topups': instance.pendingTopups.map((e) => e.toJson()).toList(),
+      'patreon': instance.patreon?.toJson(),
     };
 
 _$CouponRedemptionImpl _$$CouponRedemptionImplFromJson(

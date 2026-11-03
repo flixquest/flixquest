@@ -64,4 +64,38 @@ void main() {
     runner.dispose();
     LibraryScope.activate(null);
   });
+  test('an automatic sync waits out the interval after any sync', () async {
+    LibraryScope.activate('user:1');
+    var runs = 0;
+    final runner = SyncRunner(
+        canSync: () => true,
+        run: (_, __) async => runs++,
+        autoInterval: const Duration(minutes: 10),
+        debounce: const Duration(seconds: 5));
+
+    // A sync the user asked for counts, as does one restored from storage.
+    await runner.sync();
+    await runner.autoSync();
+    expect(runs, 1);
+    runner.lastSynced.value =
+        DateTime.now().subtract(const Duration(minutes: 9));
+    await runner.autoSync();
+    expect(runs, 1);
+
+    runner.lastSynced.value =
+        DateTime.now().subtract(const Duration(minutes: 11));
+    await runner.autoSync();
+    expect(runs, 2);
+
+    // A stamp from the future (the clock was set back) does not hold it off.
+    runner.lastSynced.value = DateTime.now().add(const Duration(hours: 1));
+    await runner.autoSync();
+    expect(runs, 3);
+
+    runner.ownerChanged();
+    await runner.autoSync();
+    expect(runs, 4);
+    runner.dispose();
+    LibraryScope.activate(null);
+  });
 }

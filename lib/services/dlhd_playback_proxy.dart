@@ -7,6 +7,8 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as image;
 
+import 'live_hls_probe.dart';
+
 /// Adapts DLHD's browser-only loader to the native HLS player. All upstream
 /// requests, including viewer-bound token requests, originate on this device.
 class DlhdPlaybackProxy {
@@ -65,17 +67,25 @@ class DlhdPlaybackProxy {
   final _pathsByResource = <String, String>{};
   int _nextResource = 0;
 
-  /// Validates the signed playlist before exposing a loopback playback URL.
+  /// Validates the signed playlist and media before exposing a loopback URL.
   Future<String> start() async {
-    final response = await _playlist(source);
-    _requirePlaylist(response);
+    if (_closed || _server != null) {
+      throw StateError('DLHD playback session already started or closed');
+    }
+    final playable = await probeLiveHls(
+      source,
+      client: _client,
+      headers: headers,
+      loadPlaylist: _playlist,
+      decodeSegment: (bytes) => Isolate.run(() => unwrapDlhdSegment(bytes)),
+    );
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     if (_closed) {
       await server.close(force: true);
       throw StateError('DLHD playback session closed');
     }
     _server = server;
-    _resources['/index.m3u8'] = _Resource(source, _ResourceKind.playlist);
+    _resources['/index.m3u8'] = _Resource(playable, _ResourceKind.playlist);
     server.listen((request) => unawaited(_serve(request)));
     return 'http://127.0.0.1:${server.port}/index.m3u8';
   }
@@ -159,7 +169,7 @@ class DlhdPlaybackProxy {
     }
     final extension = switch (kind) {
       _ResourceKind.playlist => 'm3u8',
-      _ResourceKind.segment => 'ts',
+      _ResourceKind.segment || _ResourceKind.encryptedSegment => 'ts',
       _ResourceKind.binary => 'bin',
     };
     final path = '/media/${_nextResource++}.$extension';
@@ -177,10 +187,14 @@ class DlhdPlaybackProxy {
 
   String _rewritePlaylist(String body, Uri base) {
     var nextIsPlaylist = false;
+    var encrypted = false;
     return const LineSplitter().convert(body).map((line) {
       final trimmed = line.trim();
       if (trimmed.isEmpty) return line;
       if (trimmed.startsWith('#')) {
+        if (trimmed.startsWith('#EXT-X-KEY:')) {
+          encrypted = !RegExp(r'METHOD=NONE(?:,|$)').hasMatch(trimmed);
+        }
         if (trimmed.startsWith('#EXT-X-STREAM-INF:')) nextIsPlaylist = true;
         final kind = trimmed.startsWith('#EXT-X-MEDIA:') ||
                 trimmed.startsWith('#EXT-X-I-FRAME-STREAM-INF:') ||
@@ -188,7 +202,9 @@ class DlhdPlaybackProxy {
             ? _ResourceKind.playlist
             : trimmed.startsWith('#EXT-X-PART:') ||
                     trimmed.startsWith('#EXT-X-PRELOAD-HINT:')
-                ? _ResourceKind.segment
+                ? (encrypted
+                    ? _ResourceKind.encryptedSegment
+                    : _ResourceKind.segment)
                 : _ResourceKind.binary;
         return line.replaceAllMapped(RegExp('URI="([^"]+)"'), (match) {
           return 'URI="${_register(base.resolve(match.group(1)!), kind)}"';
@@ -197,7 +213,9 @@ class DlhdPlaybackProxy {
       final uri = base.resolve(trimmed);
       final kind = nextIsPlaylist || uri.path.endsWith('.m3u8')
           ? _ResourceKind.playlist
-          : _ResourceKind.segment;
+          : (encrypted
+              ? _ResourceKind.encryptedSegment
+              : _ResourceKind.segment);
       nextIsPlaylist = false;
       return _register(uri, kind);
     }).join('\n');
@@ -226,7 +244,7 @@ class DlhdPlaybackProxy {
         _requirePlaylist(response);
         bytes = utf8.encode(_rewritePlaylist(
           utf8.decode(response.bodyBytes),
-          resource.uri,
+          response.request?.url ?? resource.uri,
         ));
       } else if (resource.kind == _ResourceKind.segment) {
         final wrapped = response.bodyBytes;
@@ -258,7 +276,7 @@ class DlhdPlaybackProxy {
   }
 }
 
-enum _ResourceKind { playlist, segment, binary }
+enum _ResourceKind { playlist, segment, encryptedSegment, binary }
 
 class _Resource {
   const _Resource(this.uri, this.kind);

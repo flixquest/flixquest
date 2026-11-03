@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'support/fake_adsterra_webview.dart';
 import 'support/tv_localization.dart';
 
 const message = 'Playback stopped because an ad blocker was detected. '
@@ -33,7 +34,9 @@ void main() {
   var stops = 0;
   var disposals = 0;
   setUp(() {
-    provider = AppDependencyProvider()..adBlockGateEnabled = true;
+    provider = AppDependencyProvider()
+      ..setBannerAdsConfig(testAdsterraConfig())
+      ..adBlockGateEnabled = true;
     stops = 0;
     disposals = 0;
   });
@@ -45,7 +48,7 @@ void main() {
       cache: AdBlockCheckCache(now: tester.binding.clock.now),
       detector:
           AdBlockDetector(lookup: (_) async => [InternetAddress('1.1.1.1')]),
-      additionalChecks: [(_) => evidence.future],
+      additionalChecks: [(_, __) => evidence.future],
     );
     if (rootPlayer) {
       await tester.pumpWidget(ChangeNotifierProvider.value(

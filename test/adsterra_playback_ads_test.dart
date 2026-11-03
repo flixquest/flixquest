@@ -5,9 +5,11 @@ import 'dart:io';
 import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/models/adsterra_playback_ads_config.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
+import 'package:flixquest/services/ad_block_detector.dart';
 import 'package:flixquest/services/adsterra_playback_ads_service.dart';
 import 'package:flixquest/services/app_remote_config.dart';
 import 'package:flixquest/services/device_presentation_service.dart';
+import 'package:flixquest/widgets/ad_block_gate.dart';
 import 'package:flixquest/widgets/adsterra_playback_ad_screen.dart';
 import 'package:flixquest/widgets/adsterra_playback_gate.dart';
 import 'package:flutter/foundation.dart';
@@ -21,6 +23,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'support/fake_adsterra_webview.dart';
 import 'support/fake_remote_config.dart';
+import 'support/tv_localization.dart';
 
 const catalog = '''{
   "interstitial":{"enabled":true,"script_url":"https://ads.example/social","load_timeout_ms":1000,"max_duration_seconds":5,"cooldown_seconds":60},
@@ -901,7 +904,9 @@ void main() {
         enabled: true);
     expect(supplied.streamFoundExperiment, isNull);
     final smartlink = supplied.forStage(PlaybackAdStage.streamFound)!;
-    expect(smartlink.smartlinkUrl!.host, 'directyp.org');
+    // FlixQuest redirects to the current Smartlink, passing the sub-ID on.
+    expect(smartlink.smartlinkUrl,
+        Uri.parse('https://flix.quest/api/adsterra-popup'));
     expect(smartlink.trackedSmartlinkUrl!.queryParameters['psid'],
         'fqsmartpagev1');
     // Each trigger reports under its own sub-ID on the same Smartlink.
@@ -4123,5 +4128,246 @@ void main() {
       await tester.pumpAndSettle();
       expect(await result, isTrue);
     }, variant: android);
+  });
+
+  group('popup fallback networks', () {
+    initializeTvTranslations();
+    const exoclickSmartlink = '''{
+  "popunder":{"enabled":true,"mode":"smartlink","url":"https://exo.example/smartlink","load_timeout_ms":10000,"max_duration_seconds":30}
+}''';
+    final exoclick = Uri.parse('https://exo.example/smartlink');
+    final adsterra = Uri.parse('https://ads.example/smartlink');
+    List<Uri> web(FakeAdsterraWebViewController controller) =>
+        controller.requests.where((uri) => uri.scheme == 'https').toList();
+
+    setUp(() => provider
+      ..setAdsterraPlaybackAdsConfig(
+          AdsterraPlaybackAdsConfig.parse(slowSmartlinkCatalog, enabled: true))
+      ..setPopunderAdsConfig(PopunderAdsConfig.parse(exoclickSmartlink,
+          network: AdNetwork.exoclick, enabled: true))
+      ..setPlaybackPopunderNetwork(AdNetwork.exoclick)
+      ..setPlaybackPopunderFallbackNetworks([AdNetwork.adsterra]));
+
+    Future<void> close(WidgetTester tester, Future<bool> result) async {
+      provider.setPlaybackPopunderNetwork(null);
+      await tester.pumpAndSettle();
+      expect(await result, isTrue);
+    }
+
+    testWidgets('an ExoClick popup with no ad hands over to Adsterra in place',
+        (tester) async {
+      final observer = _PlaybackRouteObserver();
+      await pumpHost(tester, observer: observer);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final first = platform.controllers.single;
+      expect(web(first), [exoclick]);
+      await first.delegate!.onNavigationRequest!(const NavigationRequest(
+          url: 'https://www.google.com/', isMainFrame: true));
+      await pumpAd(tester);
+      expect(platform.controllers, hasLength(2));
+      expect(web(platform.controllers.last), [adsterra]);
+      expect(first.javaScriptMode, JavaScriptMode.disabled);
+      // One ad screen throughout: no second route slides in.
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      expect(
+          observer.pushed
+              .where((route) => route.settings.name == '/exoclick/streamFound'),
+          hasLength(1));
+      expect(observer.pushed, hasLength(2));
+      await close(tester, result);
+    }, variant: android);
+
+    testWidgets('Adsterra hands over to ExoClick when its page never loads',
+        (tester) async {
+      provider
+        // Production default: a lone network's timeout offers the way on.
+        ..setPlaybackPopupBrowserBehavior(
+            autoClose: false, externalBrowserOnTap: false)
+        ..setAdsterraPlaybackAdsConfig(
+            AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true))
+        ..setPlaybackPopunderNetwork(AdNetwork.adsterra)
+        ..setPlaybackPopunderFallbackNetworks([AdNetwork.exoclick]);
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      expect(web(platform.controllers.single), [adsterra]);
+      await tester.pump(const Duration(seconds: 1));
+      await pumpAd(tester);
+      expect(platform.controllers, hasLength(2));
+      expect(web(platform.controllers.last), [exoclick]);
+      // The last network keeps the usual behaviour: the way on, no close.
+      await tester.pump(const Duration(seconds: 10));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      expect(find.byTooltip('Close ad'), findsOneWidget);
+      expect(platform.controllers, hasLength(2));
+      await close(tester, result);
+    }, variant: android);
+
+    testWidgets('the next network shares the popup\'s close fallback',
+        (tester) async {
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      await tester.pump(const Duration(seconds: 6));
+      await platform.controllers.single.delegate!.onNavigationRequest!(
+          const NavigationRequest(
+              url: 'https://www.google.com/', isMainFrame: true));
+      await pumpAd(tester);
+      expect(web(platform.controllers.last), [adsterra]);
+      await tester.pump(const Duration(milliseconds: 7500));
+      expect(find.byTooltip('Close ad'), findsNothing);
+      await tester.pump(const Duration(milliseconds: 1500));
+      expect(find.byTooltip('Close ad'), findsOneWidget);
+      await close(tester, result);
+    }, variant: android);
+
+    const blockedExoclick = WebResourceError(
+        errorCode: -2,
+        description: 'net::ERR_NAME_NOT_RESOLVED',
+        isForMainFrame: true,
+        url: 'https://exo.example/smartlink');
+
+    testWidgets('a blocked ExoClick hands over only while the check is off',
+        (tester) async {
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      platform.controllers.single.delegate!
+          .onWebResourceError!(blockedExoclick);
+      await pumpAd(tester);
+      expect(web(platform.controllers.last), [adsterra]);
+      await close(tester, result);
+    }, variant: android);
+
+    testWidgets(
+        'with the check on, a blocked ExoClick holds the stream until its '
+        'popup loads', (tester) async {
+      provider.adBlockGateEnabled = true;
+      var blockerOn = true;
+      service = AdsterraPlaybackAdsService(
+        storeLauncher: recordStoreLaunch,
+        adBlockGate: AdBlockGate(
+          // Blocker DNS: the unreachable ExoClick host is sinkholed here.
+          detector: AdBlockDetector(
+            lookup: (host) async => [
+              InternetAddress(host == 'exo.example' && blockerOn
+                  ? '0.0.0.0'
+                  : '1.1.1.1')
+            ],
+            publicLookup: (_) async => true,
+          ),
+        ),
+      );
+      await pumpHost(tester);
+      var proceeded = false;
+      final result =
+          service.streamFound(host).whenComplete(() => proceeded = true);
+      await pumpAd(tester);
+      platform.controllers.single.delegate!
+          .onWebResourceError!(blockedExoclick);
+      await tester.pumpAndSettle();
+      // No fallback, no stream: the viewer is asked first.
+      expect(platform.controllers, hasLength(1));
+      expect(find.text('Turn off your ad blocker'), findsOneWidget);
+      expect(proceeded, isFalse);
+
+      // Still sinkholed: the dialog stays rather than replaying the popup.
+      await tester.tap(find.text('I turned it off'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('still on'), findsOneWidget);
+      expect(platform.controllers, hasLength(1));
+
+      // Gone from DNS: the real popup is shown again as the test.
+      blockerOn = false;
+      await tester.tap(find.text('I turned it off'));
+      await pumpAd(tester);
+      expect(platform.controllers, hasLength(2));
+      expect(web(platform.controllers.last), [exoclick]);
+      expect(proceeded, isFalse);
+
+      // ExoClick answers this time (no ad): the stream may start.
+      await platform.controllers.last.delegate!.onNavigationRequest!(
+          const NavigationRequest(
+              url: 'https://www.google.com/', isMainFrame: true));
+      await pumpAd(tester);
+      await close(tester, result);
+    }, variant: android);
+
+    testWidgets('cancelling after a blocked popup stops the stream',
+        (tester) async {
+      provider.adBlockGateEnabled = true;
+      service = AdsterraPlaybackAdsService(
+        storeLauncher: recordStoreLaunch,
+        adBlockGate: AdBlockGate(
+          // Blocker DNS: the unreachable ExoClick host is sinkholed here.
+          detector: AdBlockDetector(
+            lookup: (host) async => [
+              InternetAddress(host == 'exo.example' ? '0.0.0.0' : '1.1.1.1')
+            ],
+            publicLookup: (_) async => true,
+          ),
+        ),
+      );
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      platform.controllers.single.delegate!
+          .onWebResourceError!(blockedExoclick);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(await result, isFalse);
+    }, variant: android);
+
+    testWidgets('an ad the viewer saw is never followed by another network',
+        (tester) async {
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      final page = platform.controllers.single;
+      page.delegate!.onPageStarted!('https://offer.example/ad');
+      page.delegate!.onPageFinished!('https://offer.example/ad');
+      await tester.pump();
+      expect(find.text('Sponsored · offer.example'), findsOneWidget);
+      page.delegate!.onWebResourceError!(const WebResourceError(
+          errorCode: -2,
+          description: 'net::ERR_FAILED',
+          isForMainFrame: true,
+          url: 'https://offer.example/ad'));
+      await tester.pumpAndSettle();
+      expect(platform.controllers, hasLength(1));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+      expect(await result, isTrue);
+    }, variant: android);
+
+    testWidgets('a switched-off network is skipped; none still shows nothing',
+        (tester) async {
+      provider.setPopunderAdsConfig(PopunderAdsConfig.parse(exoclickSmartlink,
+          network: AdNetwork.exoclick, enabled: false));
+      await pumpHost(tester);
+      final result = service.streamFound(host);
+      await pumpAd(tester);
+      expect(web(platform.controllers.single), [adsterra]);
+      await close(tester, result);
+      provider.setPlaybackPopunderNetwork(null);
+      expect(await service.streamFound(host), isTrue);
+      await tester.pumpAndSettle();
+      expect(platform.controllers, hasLength(1));
+    }, variant: android);
+
+    test('fallbacks apply from Remote Config', () async {
+      final remote = FakeFirebaseRemoteConfig();
+      final config = AppDependencyProvider();
+      await AppRemoteConfig.configure(remote);
+      expect(remote.defaults[AppRemoteConfig.playbackPopunderFallbackKey], '');
+      AppRemoteConfig.apply(remote, config);
+      expect(config.playbackPopunderFallbackNetworks, isEmpty);
+      remote.setMockString(
+          AppRemoteConfig.playbackPopunderFallbackKey, ' ExoClick, nope');
+      AppRemoteConfig.apply(remote, config);
+      expect(config.playbackPopunderFallbackNetworks, [AdNetwork.exoclick]);
+      expect(config.playbackAdsSelection.fallbackNetworks, [AdNetwork.exoclick]);
+    });
   });
 }

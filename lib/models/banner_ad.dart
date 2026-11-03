@@ -11,6 +11,7 @@ class BannerAd {
     this.placements = const [],
     this.width,
     this.height,
+    this.isAnnouncement = false,
   });
 
   final String key;
@@ -24,6 +25,7 @@ class BannerAd {
   final List<String> placements;
   final double? width;
   final double? height;
+  final bool isAnnouncement;
 
   /// Whether the backend targets this ad at [placement].
   ///
@@ -44,6 +46,7 @@ class BannerAd {
       imageUrl: json['imageUrl']?.toString() ?? '',
       targetUrl: json['targetUrl']?.toString() ?? '',
       altText: json['altText']?.toString() ?? '',
+      isAnnouncement: json['isAnnouncement'] == true,
       shape: json['shape']?.toString() ?? 'rectangle',
       aspectRatio: (json['aspectRatio'] as num?)?.toDouble() ?? 2.2,
       placements: (json['placements'] is List)
