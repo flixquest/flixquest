@@ -921,6 +921,7 @@ void main() {
       PlaybackAdStage.download: 'fqsmartdlv1',
       PlaybackAdStage.episodeSwitch: 'fqsmartepv1',
       PlaybackAdStage.movieSwitch: 'fqsmartmoviev1',
+      PlaybackAdStage.midPlay: 'fqsmartmidv1',
     });
     expect(
         supplied
@@ -1435,6 +1436,7 @@ void main() {
         'download_popup_enabled',
         'episode_switch_popup_enabled',
         'movie_switch_popup_enabled',
+        'mid_play_popup_enabled',
       ]);
       expect(AppRemoteConfig.popupFrequencyMinutesKey(PlaybackAdStage.download),
           'download_popup_frequency_minutes');
@@ -1489,7 +1491,8 @@ void main() {
         "player_exit":{"enabled":true,"mode":"smartlink","url":"https://ads.example/player_exit"},
         "download":{"enabled":true,"mode":"smartlink","url":"https://ads.example/download"},
         "episode_switch":{"enabled":true,"mode":"smartlink","url":"https://ads.example/episode_switch"},
-        "movie_switch":{"enabled":true,"mode":"smartlink","url":"https://ads.example/movie_switch"}
+        "movie_switch":{"enabled":true,"mode":"smartlink","url":"https://ads.example/movie_switch"},
+        "mid_play":{"enabled":true,"mode":"smartlink","url":"https://ads.example/mid_play"}
       }''';
       final adsterra = AdsterraPlaybackAdsConfig.parse(ownZones, enabled: true);
       final clickadu = PopunderAdsConfig.parse(ownZones,
@@ -1658,6 +1661,65 @@ void main() {
       await closeVisibleAd(tester);
       expect(await shown, isTrue);
       expect(platform.controllers, hasLength(2));
+    }, variant: android);
+
+    testWidgets('mid-play opens over a fullscreen route above the player',
+        (tester) async {
+      provider.setPopupTrigger(PlaybackAdStage.midPlay,
+          enabled: true, frequencyMinutes: 0);
+      await pumpHost(tester);
+      final player = await pushRoute(tester, 'Player');
+      // Fullscreen playback is its own route, so the player's is not current.
+      await pushRoute(tester, 'Fullscreen');
+      var pauses = 0;
+      final shown = service.midPlay(player, pause: () {
+        pauses++;
+        return true;
+      });
+      await closeVisibleAd(tester);
+      await shown;
+      expect(pauses, 1);
+      expect(platform.controllers, hasLength(1));
+      expect(
+          sharedPrefsSingleton
+              .getInt('playback_ads.last_mid_play_popup_shown_at'),
+          now.millisecondsSinceEpoch);
+      expect(sharedPrefsSingleton.getInt(streamFoundKey), isNull);
+      expect(find.text('Fullscreen'), findsOneWidget);
+    }, variant: android);
+
+    testWidgets('mid-play never pauses when it cannot open', (tester) async {
+      await pumpHost(tester);
+      final player = await pushRoute(tester, 'Player');
+      var pauses = 0;
+      bool pause() {
+        pauses++;
+        return true;
+      }
+
+      // Unpublished.
+      await service.midPlay(player, pause: pause);
+      provider.setPopupTrigger(PlaybackAdStage.midPlay,
+          enabled: false, frequencyMinutes: 0);
+      await service.midPlay(player, pause: pause);
+      expect(pauses, 0);
+
+      provider.setPopupTrigger(PlaybackAdStage.midPlay,
+          enabled: true, frequencyMinutes: 0);
+      DevicePresentationService.instance.isTelevision = true;
+      await service.midPlay(player, pause: pause);
+      DevicePresentationService.instance.isTelevision = false;
+      expect(pauses, 0);
+
+      // The player stopped wanting it (paused, left or finished meanwhile).
+      await service.midPlay(player, pause: () {
+        pauses++;
+        return false;
+      });
+      await tester.pumpAndSettle();
+      expect(pauses, 1);
+      expect(platform.controllers, isEmpty);
+      expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
     }, variant: android);
 
     testWidgets('unpublished switches keep the stream-found popup',
@@ -4233,8 +4295,8 @@ void main() {
       await pumpHost(tester);
       final result = service.streamFound(host);
       await pumpAd(tester);
-      platform.controllers.single.delegate!
-          .onWebResourceError!(blockedExoclick);
+      platform
+          .controllers.single.delegate!.onWebResourceError!(blockedExoclick);
       await pumpAd(tester);
       expect(web(platform.controllers.last), [adsterra]);
       await close(tester, result);
@@ -4251,9 +4313,8 @@ void main() {
           // Blocker DNS: the unreachable ExoClick host is sinkholed here.
           detector: AdBlockDetector(
             lookup: (host) async => [
-              InternetAddress(host == 'exo.example' && blockerOn
-                  ? '0.0.0.0'
-                  : '1.1.1.1')
+              InternetAddress(
+                  host == 'exo.example' && blockerOn ? '0.0.0.0' : '1.1.1.1')
             ],
             publicLookup: (_) async => true,
           ),
@@ -4264,8 +4325,8 @@ void main() {
       final result =
           service.streamFound(host).whenComplete(() => proceeded = true);
       await pumpAd(tester);
-      platform.controllers.single.delegate!
-          .onWebResourceError!(blockedExoclick);
+      platform
+          .controllers.single.delegate!.onWebResourceError!(blockedExoclick);
       await tester.pumpAndSettle();
       // No fallback, no stream: the viewer is asked first.
       expect(platform.controllers, hasLength(1));
@@ -4312,8 +4373,8 @@ void main() {
       await pumpHost(tester);
       final result = service.streamFound(host);
       await pumpAd(tester);
-      platform.controllers.single.delegate!
-          .onWebResourceError!(blockedExoclick);
+      platform
+          .controllers.single.delegate!.onWebResourceError!(blockedExoclick);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
@@ -4367,7 +4428,8 @@ void main() {
           AppRemoteConfig.playbackPopunderFallbackKey, ' ExoClick, nope');
       AppRemoteConfig.apply(remote, config);
       expect(config.playbackPopunderFallbackNetworks, [AdNetwork.exoclick]);
-      expect(config.playbackAdsSelection.fallbackNetworks, [AdNetwork.exoclick]);
+      expect(
+          config.playbackAdsSelection.fallbackNetworks, [AdNetwork.exoclick]);
     });
   });
 }

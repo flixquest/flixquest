@@ -51,6 +51,7 @@ class AdsterraPlaybackAdsService {
       unawaited(_settleOwedPlayerExit());
     }
   }
+
   static String _lastPopupShownKey(PlaybackAdStage stage) =>
       stage == PlaybackAdStage.streamFound
           ? 'playback_ads.last_popup_shown_at'
@@ -142,6 +143,24 @@ class AdsterraPlaybackAdsService {
   /// Call from a loader that queued a download, just before it pops itself.
   void afterDownloadQueued(BuildContext loaderContext) => _afterRouteGone(
       loaderContext, (context) => show(context, PlaybackAdStage.download));
+
+  /// At a slot of the player's mid-play schedule, over the player itself,
+  /// fullscreen or not. [pause] runs just before the popup opens and says
+  /// whether the player still wants it (it pauses the video when it does);
+  /// the player resumes the video itself once this completes. Nothing
+  /// opens, and [pause] never runs, when the trigger is off, cooling down or
+  /// has no placement.
+  Future<void> midPlay(BuildContext playerContext,
+      {required bool Function() pause}) async {
+    if (!playerContext.mounted || ContentAdScope.adFreeAt(playerContext)) {
+      return;
+    }
+    // Fullscreen playback is its own route above the player's, so the popup
+    // is pushed from the navigator rather than from the player's route.
+    final navigator = Navigator.of(playerContext, rootNavigator: true);
+    await _present(navigator.context, PlaybackAdStage.midPlay,
+        beforePresent: pause);
+  }
 
   /// The popup opens over the screen the viewer returns to once the route
   /// around [routeContext] has gone, so Back itself is never held.
@@ -407,10 +426,13 @@ class AdsterraPlaybackAdsService {
     }
   }
 
+  /// [beforePresent] runs just before the popup's route is pushed; false
+  /// cancels it.
   Future<bool> _present(BuildContext context, PlaybackAdStage requested,
       {bool download = false,
       bool television = false,
-      PlaybackAdPreload? preload}) async {
+      PlaybackAdPreload? preload,
+      bool Function()? beforePresent}) async {
     if (!context.mounted) {
       _logSkip(requested, 'playback screen disposed');
       return false;
@@ -521,6 +543,11 @@ class AdsterraPlaybackAdsService {
       }
       final state = WidgetsBinding.instance.lifecycleState;
       if (state != null && state != AppLifecycleState.resumed) return true;
+      if (beforePresent != null && !beforePresent()) {
+        preload?.dispose();
+        _logSkip(stage, 'caller no longer wants it');
+        return false;
+      }
       final selectedPlacement = placement;
       // An empty view also works for another arm of this same experiment;
       // preparation never selects or requests that arm's ad.

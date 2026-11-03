@@ -56,6 +56,7 @@ import 'player/player_local_subtitles.dart';
 import 'player/player_episode_selection.dart';
 import 'player/player_movie_recommendations.dart';
 import 'player/player_next_episode_policy.dart';
+import 'player/player_mid_play_popups.dart';
 import 'player/player_sheet_ui.dart';
 import 'player/player_feedback_ui.dart';
 import 'player/stream_feedback_prompt.dart';
@@ -158,6 +159,11 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   bool _showNextEpisodeButton = false;
   bool _nextEpisodeButtonDismissed = false;
   bool _preRollActive = false;
+
+  /// Where the mid-play popup opens in this video; rebuilt when its length
+  /// is first known or really changes.
+  MidPlayPopupSchedule? _midPlaySchedule;
+  bool _midPlayPopupOpen = false;
 
   /// The video ad playing as the pre-roll, if any. Its timeline is separate
   /// from the content's: progress, subtitles and resume points ignore it.
@@ -846,6 +852,61 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     }
   }
 
+  /// Phones only. Content time only: the pre-roll and the post-play surface
+  /// never reach here.
+  void _observeMidPlaySlot(
+      Duration position, Duration duration, VideoPlayerValue value) {
+    if (_midPlayPopupOpen) return;
+    var schedule = _midPlaySchedule;
+    if (schedule == null || !schedule.fits(duration)) {
+      schedule = _midPlaySchedule = MidPlayPopupSchedule(duration);
+    }
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    final eligible = value.isPlaying &&
+        !value.isBuffering &&
+        (lifecycle == null || lifecycle == AppLifecycleState.resumed);
+    if (schedule.observe(position, eligible: eligible)) {
+      debugPrint('[Player] mid-play popup due at ${position.inSeconds}s '
+          'of ${duration.inSeconds}s');
+      unawaited(_showMidPlayPopup());
+    }
+  }
+
+  /// Pauses only once the popup is really about to open, and resumes the
+  /// video when it closes. A popup that is off, cooling down or unfilled
+  /// leaves playback alone.
+  Future<void> _showMidPlayPopup() async {
+    if (!mounted) return;
+    _midPlayPopupOpen = true;
+    var paused = false;
+    try {
+      await AdsterraPlaybackAdsService.instance.midPlay(context, pause: () {
+        final value = _betterPlayerController.videoPlayerController?.value;
+        // The viewer paused, left or finished while the popup was resolving.
+        if (!mounted ||
+            _playbackCompletionHandled ||
+            _preRollActive ||
+            value?.isPlaying != true) {
+          return false;
+        }
+        paused = true;
+        unawaited(_betterPlayerController.pause());
+        return true;
+      });
+    } catch (error) {
+      debugPrint('[Player] mid-play popup unavailable: $error');
+    } finally {
+      _midPlayPopupOpen = false;
+      if (paused && mounted && !_playbackCompletionHandled) {
+        try {
+          await _betterPlayerController.play();
+        } catch (error) {
+          debugPrint('[Player] resume after mid-play popup failed: $error');
+        }
+      }
+    }
+  }
+
   void _updatePlayerControlsVisibility(bool visible) {
     if (_playerControlsVisible == visible) return;
     _playerControlsVisible = visible;
@@ -933,6 +994,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               _hideNextEpisodeOverlay();
             }
             return;
+          }
+
+          if (!widget.useTvControls) {
+            _observeMidPlaySlot(position, duration, value);
           }
 
           _updateIntroDbSegment(position, duration);

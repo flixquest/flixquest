@@ -312,8 +312,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _durationTimer =
-        Timer(_remaining(widget.placement.maxDuration), () {
+    _durationTimer = Timer(_remaining(widget.placement.maxDuration), () {
       if (_phase == _Phase.page) {
         _pageTimeout('max_duration');
       } else {
@@ -1455,6 +1454,8 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   String get _continueLabel {
     if (!widget.holdClose) return 'Back to video';
     if (widget.stage == PlaybackAdStage.beforeLoader) return 'Continue';
+    // A mid-play popup goes back to the paused video.
+    if (widget.stage == PlaybackAdStage.midPlay) return 'Resume';
     // Nothing plays after a player-exit or download popup.
     if (!widget.stage.startsPlayback) return 'Close';
     return _phase == _Phase.script ? 'Skip' : 'Play now';
@@ -1465,6 +1466,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     if (widget.stage == PlaybackAdStage.beforeLoader) {
       return Icons.arrow_forward;
     }
+    if (widget.stage == PlaybackAdStage.midPlay) return Icons.play_arrow;
     if (!widget.stage.startsPlayback) return Icons.close;
     return _phase == _Phase.script ? Icons.skip_next : Icons.play_arrow;
   }
@@ -1919,6 +1921,7 @@ String playbackAdHtml(PlaybackAdPlacement placement, PlaybackAdStage stage) {
   final (title, ready) = switch (stage) {
     PlaybackAdStage.playerExit => ('Thanks for watching', 'Continue'),
     PlaybackAdStage.download => ('Your download has started', 'Continue'),
+    PlaybackAdStage.midPlay => ('Your video is paused', '\u25B6  Resume'),
     _ => ('Your video is ready', '\u25B6  Play now'),
   };
   // Clickadu's tag fetches its ad (`/adx/get/`) a few seconds after its script

@@ -45,6 +45,14 @@
     "load_timeout_ms": 10000,
     "max_duration_seconds": 30
   },
+  "mid_play": {
+    "enabled": true,
+    "mode": "smartlink",
+    "url": "https://flix.quest/api/adsterra-popup",
+    "sub_id": "fqsmartmidv1",
+    "load_timeout_ms": 10000,
+    "max_duration_seconds": 30
+  },
   "tv_popunder": {
     "enabled": true,
     "mode": "smartlink",

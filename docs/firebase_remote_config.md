@@ -937,7 +937,8 @@ enable configured stages. Each stage also requires its own `enabled=true`. The
 supplied catalog enables both stages. It opens the Smartlink in FlixQuest's
 ad page on every stream-found attempt by default, with `psid=fqsmartpagev1`. It
 has no experiment. It also gives each popup trigger the same Smartlink under its
-own sub-ID (`fqsmartexitv1`, `fqsmartdlv1`, `fqsmartepv1`, `fqsmartmoviev1`),
+own sub-ID (`fqsmartexitv1`, `fqsmartdlv1`, `fqsmartepv1`, `fqsmartmoviev1`,
+`fqsmartmidv1`),
 so the Adsterra stats report each trigger apart; these apply only once the
 trigger is published (see [Popup triggers](#popup-triggers)). Set `playback_popup_frequency_minutes` to space out these
 popups as described below. Old per-placement `cooldown_seconds` fields remain
@@ -1270,7 +1271,7 @@ A future timestamp after a device clock correction does not block popup ads.
 
 ### Popup triggers
 
-Besides the stream-found popup, phones can show a popup at four more moments,
+Besides the stream-found popup, phones can show a popup at five more moments,
 each with its own switch, its own interval and its own saved timestamp, so no
 popup uses up another's interval:
 
@@ -1280,9 +1281,18 @@ popup uses up another's interval:
 | `download` | After a movie or episode download is queued from its loader, over the screen the viewer returns to. A download started from inside the player shows none, so playback is not interrupted. |
 | `episode_switch` | In place of the stream-found popup when the player itself moves to another episode: next-episode card or autoplay, or the in-player episode picker. |
 | `movie_switch` | In place of the stream-found popup when the player itself moves to another movie from its recommendations. |
+| `mid_play` | While a streamed movie or episode plays, at evenly spaced points: none in a video under 15 minutes, once from 15 to under 20 minutes (halfway), twice from 20 to under 30, three times from 30 minutes to under an hour, four times from an hour (a 2-hour movie: 24, 48, 72 and 96 minutes). The video pauses while the popup is open and resumes when it closes. |
 
 For `player_exit` and `download`, Back is never held: the player or loader
 closes first, and the popup opens once its exit transition has finished.
+
+A `mid_play` slot opens only when playback reaches it on its own, playing and
+not buffering, with the app in the foreground. Slots the viewer resumes past or
+seeks past are dropped, and a rewind never brings a passed slot back, so a seek
+never lands on a popup. It opens over the player, fullscreen or not, and never
+in Live TV, on Android TV, during the pre-roll, after the video has finished,
+or for Kids and Family titles. A slot that is off, cooling down or has no
+placement leaves the video playing.
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
@@ -1295,6 +1305,8 @@ closes first, and the popup opens once its exit transition has finished.
 | `episode_switch_popup_frequency_minutes` | Number | `0` | Minimum whole minutes between visible episode-switch popups, once `episode_switch_popup_enabled` is published. |
 | `movie_switch_popup_enabled` | Boolean | Unpublished (follows stream found) | As `episode_switch_popup_enabled`, for in-player movie switches. |
 | `movie_switch_popup_frequency_minutes` | Number | `0` | As `episode_switch_popup_frequency_minutes`, for movie switches. |
+| `mid_play_popup_enabled` | Boolean | Unpublished (off) | Switch for the mid-play popup. Must be published remotely. |
+| `mid_play_popup_frequency_minutes` | Number | `0` | Minimum whole minutes between visible mid-play popups. Keep it `0`, or below the gap between slots (about 6:40 in a 20-minute video), or later slots in the same video are skipped. |
 
 Missing, invalid or negative intervals fall back to `0`. Turning a switch off
 closes an open popup of that trigger.
@@ -1332,7 +1344,7 @@ the next launch:
 Every trigger uses the network `playback_popunder_network` selects, and that
 network's own `<network>_playback_enabled` switch still applies. Each popup
 catalog may name a placement per trigger, keyed `player_exit`, `download`,
-`episode_switch` or `movie_switch`, with the same fields as `popunder`, to
+`episode_switch`, `movie_switch` or `mid_play`, with the same fields as `popunder`, to
 report it under its own zone or Smartlink. Without one, the catalog's
 `popunder` is used (for Adsterra, the experiment's first arm when an
 experiment replaces it). Only an unpublished switch trigger, which is the
@@ -1344,7 +1356,8 @@ ordinary stream-found popup, takes part in the experiment.
   "player_exit": {"enabled": true, "mode": "smartlink", "url": "https://…exit Smartlink…"},
   "download": {"enabled": true, "mode": "smartlink", "url": "https://…download Smartlink…"},
   "episode_switch": {"enabled": true, "mode": "smartlink", "url": "https://…episode switch Smartlink…"},
-  "movie_switch": {"enabled": true, "mode": "smartlink", "url": "https://…movie switch Smartlink…"}
+  "movie_switch": {"enabled": true, "mode": "smartlink", "url": "https://…movie switch Smartlink…"},
+  "mid_play": {"enabled": true, "mode": "smartlink", "url": "https://…mid-play Smartlink…"}
 }
 ```
 

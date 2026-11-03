@@ -7,8 +7,9 @@ export 'ad_network.dart';
 /// Where a playback ad opens. Besides the Social Bar ([beforeLoader]) and the
 /// stream-found popup, each trigger has its own switch and interval:
 /// [playerExit] after leaving a player, [download] after a download is queued,
-/// and [episodeSwitch] / [movieSwitch] in place of stream found when the
-/// player itself moves to another episode or movie. A trigger shows the
+/// [episodeSwitch] / [movieSwitch] in place of stream found when the
+/// player itself moves to another episode or movie, and [midPlay] at evenly
+/// spaced points while a movie or episode plays. A trigger shows the
 /// catalog's `popunder` unless the catalog names its own placement.
 enum PlaybackAdStage {
   beforeLoader,
@@ -16,7 +17,8 @@ enum PlaybackAdStage {
   playerExit,
   download,
   episodeSwitch,
-  movieSwitch;
+  movieSwitch,
+  midPlay;
 
   /// The trigger's own placement in a popup catalog and its Remote Config
   /// prefix, such as `player_exit`; null for the two playback stages.
@@ -26,6 +28,7 @@ enum PlaybackAdStage {
         download => 'download',
         episodeSwitch => 'episode_switch',
         movieSwitch => 'movie_switch',
+        midPlay => 'mid_play',
       };
 
   /// Replaces stream found for a load the player started itself.
@@ -34,7 +37,13 @@ enum PlaybackAdStage {
   /// Playback follows the popup, so it ends with Play now.
   bool get startsPlayback => this == streamFound || isSwitch;
 
-  static const triggers = [playerExit, download, episodeSwitch, movieSwitch];
+  static const triggers = [
+    playerExit,
+    download,
+    episodeSwitch,
+    movieSwitch,
+    midPlay,
+  ];
 }
 
 /// A trigger's own switch and interval, apart from stream found's. [minWatch]
