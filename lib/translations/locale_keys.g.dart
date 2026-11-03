@@ -1924,5 +1924,9 @@ abstract class  LocaleKeys {
   static const tv_subtitle_outline = 'tv_subtitle_outline';
   static const tv_subtitle_outline_color = 'tv_subtitle_outline_color';
   static const tv_subtitle_outline_width = 'tv_subtitle_outline_width';
+  static const subtitle_offset_live_hint = 'subtitle_offset_live_hint';
+  static const subtitle_outline_subtitle = 'subtitle_outline_subtitle';
+  static const subtitle_outline_enable = 'subtitle_outline_enable';
+  static const preview = 'preview';
 
 }

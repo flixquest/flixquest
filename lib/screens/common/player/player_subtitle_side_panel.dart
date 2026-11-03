@@ -184,7 +184,7 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
     final timingOffsetStr = _subtitleOffsetValue(_offset);
     final outlineStatus = widget.settings.subtitleOutlineEnabled
         ? '${widget.settings.subtitleOutlineSize}px'
-        : tr('off');
+        : tr('player_off');
     final options = _currentOptions;
 
     return Column(
@@ -230,7 +230,7 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
                 _buildToolChip(
                   colors: colors,
                   icon: PhosphorIcons.magnifyingGlass(),
-                  label: tr('search_online'),
+                  label: tr('search_subtitles'),
                   onTap: widget.onSearchOnline,
                 ),
                 const SizedBox(width: 8),
@@ -258,6 +258,19 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
                           (currentSource?.name == option.source.name &&
                               currentSource?.name != null)));
 
+              final rawName = option.name?.trim();
+              final label = option.isOff
+                  ? (tr('player_off') != 'player_off' ? tr('player_off') : (rawName ?? 'Off'))
+                  : (rawName?.isNotEmpty == true
+                      ? (languageDisplayName(rawName).isNotEmpty
+                          ? languageDisplayName(rawName)
+                          : rawName!)
+                      : tr('player_default'));
+              final titleText = option.number != null && option.number! > 1
+                  ? '$label #${option.number}'
+                  : label;
+              final subtitleText = option.isOff || option.provider.isEmpty ? null : option.provider;
+
               return Container(
                 margin: const EdgeInsets.symmetric(vertical: 3),
                 decoration: BoxDecoration(
@@ -274,13 +287,22 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
                     dense: true,
                     visualDensity: const VisualDensity(vertical: -1),
                     title: Text(
-                      option.name ?? tr('subtitles_off'),
+                      titleText,
                       style: TextStyle(
                         fontFamily: isSelected ? 'FigtreeBold' : 'FigtreeSB',
                         fontSize: 14,
                         color: isSelected ? colors.foreground : colors.muted,
                       ),
                     ),
+                    subtitle: subtitleText != null
+                        ? Text(
+                            subtitleText,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.muted,
+                            ),
+                          )
+                        : null,
                     trailing: isSelected
                         ? Icon(
                             PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
@@ -421,9 +443,7 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          tr('subtitle_offset_live_hint') != 'subtitle_offset_live_hint'
-                              ? tr('subtitle_offset_live_hint')
-                              : 'Perubahan waktu subtitle langsung diterapkan pada video di sebelah kiri secara real-time.',
+                          tr('subtitle_offset_live_hint'),
                           style: TextStyle(color: colors.muted, fontSize: 12),
                         ),
                       ),
@@ -499,7 +519,7 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
               // Outline Color
               if (settings.subtitleOutlineEnabled) ...[
                 Text(
-                  tr('subtitle_outline_color'),
+                  tr('outline_color'),
                   style: TextStyle(
                     fontFamily: 'FigtreeBold',
                     fontSize: 14,
@@ -553,7 +573,7 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      tr('subtitle_outline_width'),
+                      tr('outline_width'),
                       style: TextStyle(
                         fontFamily: 'FigtreeBold',
                         fontSize: 14,
@@ -583,7 +603,7 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
                 const SizedBox(height: 20),
                 // Live Preview Card
                 Text(
-                  'Pratinjau / Preview',
+                  tr('preview'),
                   style: TextStyle(
                     fontFamily: 'FigtreeBold',
                     fontSize: 13,
@@ -604,10 +624,11 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
                     children: [
                       if (settings.subtitleOutlineEnabled)
                         Text(
-                          'Contoh Subtitle Outline',
+                          tr('sample_player_text'),
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: 'FigtreeBold',
-                            fontSize: 18,
+                            fontSize: 16,
                             foreground: Paint()
                               ..style = PaintingStyle.stroke
                               ..strokeWidth = settings.subtitleOutlineSize.toDouble()
@@ -618,10 +639,11 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
                           ),
                         ),
                       Text(
-                        'Contoh Subtitle Outline',
+                        tr('sample_player_text'),
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontFamily: 'FigtreeBold',
-                          fontSize: 18,
+                          fontSize: 16,
                           color: parseStoredSubtitleColor(
                             settings.subtitleForegroundColor,
                             fallback: Colors.white,
@@ -650,6 +672,16 @@ class _PlayerSubtitleSidePanelState extends State<PlayerSubtitleSidePanel> {
       final code = lang.code.toLowerCase();
       return native.contains(query) || code.contains(query);
     }).toList();
+
+    if (query.isEmpty) {
+      languages.sort((a, b) {
+        if (a.code == 'id') return -1;
+        if (b.code == 'id') return 1;
+        if (a.code == 'en') return -1;
+        if (b.code == 'en') return 1;
+        return tr(a.translationKey).compareTo(tr(b.translationKey));
+      });
+    }
 
     return Column(
       children: [

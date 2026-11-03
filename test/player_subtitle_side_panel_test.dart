@@ -73,7 +73,10 @@ void main() {
 
     // Verify track list is shown
     expect(find.text('Off'), findsOneWidget);
-    expect(find.text('English'), findsOneWidget);
+    expect(
+      find.textContaining(RegExp(r'english', caseSensitive: false)),
+      findsOneWidget,
+    );
 
     // Tap Timing chip
     final timingChip = find.byIcon(PhosphorIcons.timer());

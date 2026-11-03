@@ -2024,5 +2024,9 @@
   "outline_width": "रूपरेखा की चौड़ाई",
   "tv_subtitle_outline": "सबटाइटल रूपरेखा",
   "tv_subtitle_outline_color": "सबटाइटल रूपरेखा का रंग",
-  "tv_subtitle_outline_width": "सबटाइटल रूपरेखा की चौड़ाई"
+  "tv_subtitle_outline_width": "सबटाइटल रूपरेखा की चौड़ाई",
+  "subtitle_offset_live_hint": "उपशीर्षक समय परिवर्तन वास्तविक समय में बाईं ओर के वीडियो पर लागू होते हैं।",
+  "subtitle_outline_subtitle": "उपशीर्षक सीमा स्ट्रोक और रंग कस्टमाइज़ करें",
+  "subtitle_outline_enable": "आउटलाइन स्ट्रोक सक्षम करें",
+  "preview": "पूर्वावलोकन"
 }

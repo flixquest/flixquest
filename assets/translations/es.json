@@ -2024,5 +2024,9 @@
   "outline_width": "Grosor del borde",
   "tv_subtitle_outline": "Borde de subtítulos",
   "tv_subtitle_outline_color": "Color del borde del subtítulo",
-  "tv_subtitle_outline_width": "Grosor del borde del subtítulo"
+  "tv_subtitle_outline_width": "Grosor del borde del subtítulo",
+  "subtitle_offset_live_hint": "Los cambios en el tiempo de los subtítulos se aplican al video de la izquierda en tiempo real.",
+  "subtitle_outline_subtitle": "Personaliza el trazo y color del borde de los subtítulos",
+  "subtitle_outline_enable": "Activar contorno de borde",
+  "preview": "Vista previa"
 }

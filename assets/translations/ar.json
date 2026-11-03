@@ -2095,5 +2095,9 @@
   "outline_width": "عرض المخطط",
   "tv_subtitle_outline": "مخطط الترجمة",
   "tv_subtitle_outline_color": "لون مخطط الترجمة",
-  "tv_subtitle_outline_width": "عرض مخطط الترجمة"
+  "tv_subtitle_outline_width": "عرض مخطط الترجمة",
+  "subtitle_offset_live_hint": "يتم تطبيق تغييرات توقيت الترجمة على الفيديو على اليسار في الوقت الفعلي.",
+  "subtitle_outline_subtitle": "تخصيص خط حدود الترجمة ولونها",
+  "subtitle_outline_enable": "تمكين حد المخطط التفصيلي",
+  "preview": "معاينة"
 }

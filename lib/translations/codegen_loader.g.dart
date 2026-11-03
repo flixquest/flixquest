@@ -2111,7 +2111,11 @@ class CodegenLoader extends AssetLoader{
   "outline_width": "عرض المخطط",
   "tv_subtitle_outline": "مخطط الترجمة",
   "tv_subtitle_outline_color": "لون مخطط الترجمة",
-  "tv_subtitle_outline_width": "عرض مخطط الترجمة"
+  "tv_subtitle_outline_width": "عرض مخطط الترجمة",
+  "subtitle_offset_live_hint": "يتم تطبيق تغييرات توقيت الترجمة على الفيديو على اليسار في الوقت الفعلي.",
+  "subtitle_outline_subtitle": "تخصيص خط حدود الترجمة ولونها",
+  "subtitle_outline_enable": "تمكين حد المخطط التفصيلي",
+  "preview": "معاينة"
 };
 static const Map<String,dynamic> _en = {
   "popularity_descending": "Popularity descending",
@@ -4139,7 +4143,11 @@ static const Map<String,dynamic> _en = {
   "outline_width": "Outline width",
   "tv_subtitle_outline": "Subtitle outline",
   "tv_subtitle_outline_color": "Subtitle outline color",
-  "tv_subtitle_outline_width": "Subtitle outline width"
+  "tv_subtitle_outline_width": "Subtitle outline width",
+  "subtitle_offset_live_hint": "Subtitle timing changes are applied to the video on the left in real-time.",
+  "subtitle_outline_subtitle": "Customize subtitle border stroke and color",
+  "subtitle_outline_enable": "Enable outline stroke",
+  "preview": "Preview"
 };
 static const Map<String,dynamic> _es = {
   "popularity_descending": "Popularidad descendiente",
@@ -6167,7 +6175,11 @@ static const Map<String,dynamic> _es = {
   "outline_width": "Grosor del borde",
   "tv_subtitle_outline": "Borde de subtítulos",
   "tv_subtitle_outline_color": "Color del borde del subtítulo",
-  "tv_subtitle_outline_width": "Grosor del borde del subtítulo"
+  "tv_subtitle_outline_width": "Grosor del borde del subtítulo",
+  "subtitle_offset_live_hint": "Los cambios en el tiempo de los subtítulos se aplican al video de la izquierda en tiempo real.",
+  "subtitle_outline_subtitle": "Personaliza el trazo y color del borde de los subtítulos",
+  "subtitle_outline_enable": "Activar contorno de borde",
+  "preview": "Vista previa"
 };
 static const Map<String,dynamic> _hi = {
   "popularity_descending": "लोकप्रियता घटती",
@@ -8195,7 +8207,11 @@ static const Map<String,dynamic> _hi = {
   "outline_width": "रूपरेखा की चौड़ाई",
   "tv_subtitle_outline": "सबटाइटल रूपरेखा",
   "tv_subtitle_outline_color": "सबटाइटल रूपरेखा का रंग",
-  "tv_subtitle_outline_width": "सबटाइटल रूपरेखा की चौड़ाई"
+  "tv_subtitle_outline_width": "सबटाइटल रूपरेखा की चौड़ाई",
+  "subtitle_offset_live_hint": "उपशीर्षक समय परिवर्तन वास्तविक समय में बाईं ओर के वीडियो पर लागू होते हैं।",
+  "subtitle_outline_subtitle": "उपशीर्षक सीमा स्ट्रोक और रंग कस्टमाइज़ करें",
+  "subtitle_outline_enable": "आउटलाइन स्ट्रोक सक्षम करें",
+  "preview": "पूर्वावलोकन"
 };
 static const Map<String,dynamic> _id = {
   "popularity_descending": "Popularitas menurun",
@@ -8423,13 +8439,13 @@ static const Map<String,dynamic> _id = {
   "choose_subtitle_language": "Pilih Bahasa Subtitle",
   "loading_subtitles": "Memuat subtitle",
   "subtitle_timing": "Waktu subtitle",
-  "subtitle_timing_help": "Jika teks berada di belakang dialog, pindahkan lebih awal. Jika mereka di depan, pindahkan nanti.",
-  "subtitle_earlier": "Sebelumnya",
-  "subtitle_later": "Nanti",
+  "subtitle_timing_help": "Jika teks tertinggal dari dialog, atur lebih awal. Jika teks mendahului dialog, atur lebih lambat.",
+  "subtitle_earlier": "Lebih Awal",
+  "subtitle_later": "Lebih Lambat",
   "subtitle_timing_reset": "Setel ulang",
   "subtitle_timing_synced": "Disinkronkan",
-  "subtitle_offset_earlier": "{offset}s sebelumnya",
-  "subtitle_offset_later": "{offset}s nanti",
+  "subtitle_offset_earlier": "{offset}s lebih awal",
+  "subtitle_offset_later": "{offset}s lebih lambat",
   "finished_sync_local": "Selesai menyinkronkan ke bookmark lokal/offline",
   "finished_sync_online": "Selesai menyinkronkan ke bookmark online",
   "sync": "Sinkronisasi",
@@ -10223,7 +10239,11 @@ static const Map<String,dynamic> _id = {
   "outline_width": "Lebar garis tepi",
   "tv_subtitle_outline": "Garis tepi subtitle",
   "tv_subtitle_outline_color": "Warna garis tepi subtitle",
-  "tv_subtitle_outline_width": "Lebar garis tepi subtitle"
+  "tv_subtitle_outline_width": "Lebar garis tepi subtitle",
+  "subtitle_offset_live_hint": "Perubahan waktu subtitle langsung diterapkan pada video di sebelah kiri secara real-time.",
+  "subtitle_outline_subtitle": "Sesuaikan garis tepi dan warna subtitle",
+  "subtitle_outline_enable": "Aktifkan garis tepi",
+  "preview": "Pratinjau"
 };
 static const Map<String, Map<String,dynamic>> mapLocales = {"ar": _ar, "en": _en, "es": _es, "hi": _hi, "id": _id};
 }
