@@ -36,6 +36,8 @@ import '../../widgets/common_widgets.dart';
 
 import 'package:flutter/material.dart';
 import '../../screens/common/player.dart';
+import '../../services/subtitle_translation_service.dart';
+import '../../screens/common/sublanguage_choose.dart' show subtitleLanguageName;
 import '../../screens/common/download_selection_sheets.dart';
 import '../../screens/common/manual_source_picker.dart';
 import '../../tv/player/tv_player_screen.dart';
@@ -293,7 +295,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
         videos = VideoUtils.convertVideoLinksToMap(result.videoLinks!);
         tvVideoLinks = result.videoLinks;
         tvVideoSubs = result.subtitleLinks;
-        _addSubtitles(result.subtitleLinks);
+        await _addSubtitles(result.subtitleLinks);
       }
 
       // Check if we found a working provider
@@ -679,18 +681,35 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
         );
   }
 
-  void _addSubtitles(List<RegularSubtitleLinks>? subtitleLinks) {
+  Future<void> _addSubtitles(List<RegularSubtitleLinks>? subtitleLinks) async {
     if (subtitleLinks == null || subtitleLinks.isEmpty) return;
-    final preferredLang = settings.defaultSubtitleLanguage.toLowerCase();
+    final preferredLang = (settings.defaultSubtitleLanguage.isNotEmpty &&
+            settings.defaultSubtitleLanguage != 'en'
+        ? settings.defaultSubtitleLanguage
+        : (settings.appLanguage.isNotEmpty
+            ? settings.appLanguage
+            : settings.defaultSubtitleLanguage)).toLowerCase();
 
+    bool matchesLanguage(String normalized, String target) {
+      if (target.isEmpty) return false;
+      if (normalized == target) return true;
+      if (normalized.startsWith(target)) return true;
+      if (target == 'en' && normalized.startsWith('english')) return true;
+      if (target == 'id' &&
+          (normalized.startsWith('ind') ||
+              normalized == 'in' ||
+              normalized == 'id')) {
+        return true;
+      }
+      return false;
+    }
+
+    var hasPreferred = false;
     for (final subLink in subtitleLinks) {
       final subLanguage = subLink.language ?? 'Unknown';
       final normalizedLanguage = subLanguage.toLowerCase();
-      final isPreferred = preferredLang.isNotEmpty &&
-          (normalizedLanguage.startsWith(preferredLang) ||
-              normalizedLanguage == preferredLang ||
-              (preferredLang == 'en' &&
-                  normalizedLanguage.startsWith('english')));
+      final isPreferred = matchesLanguage(normalizedLanguage, preferredLang);
+      if (isPreferred) hasPreferred = true;
       subs.add(
         BetterPlayerSubtitlesSource(
           type: BetterPlayerSubtitlesSourceType.network,
@@ -700,6 +719,45 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           headers: subLink.headers,
         ),
       );
+    }
+
+    if (!hasPreferred &&
+        settings.autoTranslateSubtitles &&
+        preferredLang.isNotEmpty &&
+        preferredLang != 'en') {
+      final fallback = subtitleLinks.firstWhere(
+        (s) => (s.language ?? '').toLowerCase().startsWith('en') && s.url?.isNotEmpty == true,
+        orElse: () => subtitleLinks.firstWhere(
+          (s) => s.url?.isNotEmpty == true,
+          orElse: () => subtitleLinks.first,
+        ),
+      );
+
+      if (fallback.url?.isNotEmpty == true) {
+        try {
+          final translated = await SubtitleTranslationService.instance
+              .translateUrlOrFile(
+                pathOrUrl: fallback.url!,
+                targetLanguageCode: preferredLang,
+                headers: fallback.headers,
+              )
+              .timeout(const Duration(seconds: 5));
+          if (translated != null && translated.isNotEmpty) {
+            final targetName = subtitleLanguageName(preferredLang);
+            subs.insert(
+              0,
+              BetterPlayerSubtitlesSource(
+                type: BetterPlayerSubtitlesSourceType.memory,
+                name: '$targetName (${tr("auto_translated")})',
+                content: translated,
+                selectedByDefault: true,
+              ),
+            );
+          }
+        } catch (e) {
+          debugPrint('[AutoTranslateSubtitles] Non-blocking fallback: $e');
+        }
+      }
     }
   }
 

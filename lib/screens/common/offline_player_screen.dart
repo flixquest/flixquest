@@ -140,6 +140,9 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
           foregroundColor: settings.subtitleForegroundColor,
           fontSize: settings.subtitleFontSize,
           textStyle: settings.subtitleTextStyle,
+          outlineEnabled: settings.subtitleOutlineEnabled,
+          outlineColor: settings.subtitleOutlineColor,
+          outlineSize: settings.subtitleOutlineSize.toDouble(),
         ),
         showPlaceholderUntilPlay: true,
         errorBuilder: (_, __) => _OfflinePlaybackError(

@@ -48,10 +48,12 @@ import '../movie/movie_video_loader.dart';
 import '../tv/tv_video_loader.dart';
 import 'player/player_data_management.dart';
 import 'player/player_background_save.dart';
+import '../../services/subtitle_translation_service.dart';
+import 'sublanguage_choose.dart' show subtitleLanguageName;
 import 'player/player_preroll_ad.dart';
 import 'player/player_completion_detector.dart';
 import 'player/tv_subtitle_timing_panel.dart';
-import 'player/player_subtitle_timing_sheet.dart';
+import 'player/player_subtitle_side_panel.dart';
 import 'player/player_external_subtitles.dart';
 import 'player/player_local_subtitles.dart';
 import 'player/player_episode_selection.dart';
@@ -510,6 +512,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               fontSize: widget.settings.subtitleFontSize,
               textStyle:
                   widget.subtitleStyle ?? widget.settings.subtitleTextStyle,
+              outlineEnabled: widget.settings.subtitleOutlineEnabled,
+              outlineColor: widget.settings.subtitleOutlineColor,
+              outlineSize: widget.settings.subtitleOutlineSize.toDouble(),
             ));
 
     final dataSource = _buildDataSource(
@@ -2914,7 +2919,13 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       return PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) _exitPlayer();
+          if (!didPop) {
+            if (_betterPlayerController.isSidePanelOpen) {
+              _betterPlayerController.closeSidePanel();
+              return;
+            }
+            _exitPlayer();
+          }
         },
         // The page around the video follows the app's mode; the video
         // itself stays black.
@@ -2932,6 +2943,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) {
+          if (_betterPlayerController.isSidePanelOpen) {
+            _betterPlayerController.closeSidePanel();
+            return;
+          }
           if (widget.useTvControls && _handleTvOverlayBack()) return;
           if (widget.useTvControls && _tvControlsController.handleBack()) {
             return;
@@ -3729,6 +3744,11 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   void _showSubtitleSwitcher() {
+    if (_betterPlayerController.isSidePanelOpen) {
+      _betterPlayerController.closeSidePanel();
+      return;
+    }
+
     final subtitles = List<BetterPlayerSubtitlesSource>.of(
       _betterPlayerController.betterPlayerSubtitlesSourceList,
     );
@@ -3748,20 +3768,16 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
 
     final options = buildSubtitleOptions(subtitles);
 
-    showPlayerSheet<void>(
-      context: context,
-      builder: (sheetContext) {
-        void then(VoidCallback action) {
-          Navigator.pop(sheetContext);
-          action();
-        }
-
-        return _SubtitleSwitcherSheet(
+    _betterPlayerController.openSidePanel(
+      PlayerTheme(
+        onVideo: true,
+        child: PlayerSubtitleSidePanel(
           controller: _betterPlayerController,
           options: options,
-          onClose: () => Navigator.pop(sheetContext),
-          onTiming: () => then(_showSubtitleTimingAdjuster),
-          onSearchOnline: () => then(() {
+          settings: widget.settings,
+          onClose: () => _betterPlayerController.closeSidePanel(),
+          onSearchOnline: () {
+            _betterPlayerController.closeSidePanel();
             _externalSubtitles.showExternalSubtitlesMenu(
               context: context,
               colors: widget.colors,
@@ -3771,27 +3787,117 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               tvMetadata: widget.tvMetadata,
               betterPlayerController: _betterPlayerController,
             );
-          }),
-          onUpload: () => then(() {
+          },
+          onUpload: () {
+            _betterPlayerController.closeSidePanel();
             _localSubtitles.showLocalSubtitlesUpload(
               context: context,
               colors: widget.colors,
               betterPlayerController: _betterPlayerController,
             );
-          }),
-        );
-      },
+          },
+          onAutoTranslate: (targetLang) {
+            _translateActiveOrFallbackSubtitle(targetLang: targetLang);
+          },
+        ),
+      ),
     );
   }
 
-  void _showSubtitleTimingAdjuster() {
-    showPlayerSheet<void>(
-      context: context,
-      builder: (sheetContext) => PlayerSubtitleTimingSheet(
-        controller: _betterPlayerController,
-        onClose: () => Navigator.pop(sheetContext),
-      ),
-    );
+
+  Future<void> _translateActiveOrFallbackSubtitle({required String targetLang}) async {
+    final currentSource = _betterPlayerController.betterPlayerSubtitlesSource;
+    final allSources = _betterPlayerController.betterPlayerSubtitlesSourceList
+        .where((s) => s.type != BetterPlayerSubtitlesSourceType.none)
+        .toList();
+
+    BetterPlayerSubtitlesSource? sourceToTranslate;
+    if (currentSource != null && currentSource.type != BetterPlayerSubtitlesSourceType.none) {
+      sourceToTranslate = currentSource;
+    } else if (allSources.isNotEmpty) {
+      sourceToTranslate = allSources.firstWhere(
+        (s) => (s.name ?? '').toLowerCase().contains('eng'),
+        orElse: () => allSources.first,
+      );
+    }
+
+    if (sourceToTranslate == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(tr('subtitle_unavailable_pick_another'))),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(tr('translating_subtitles')),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+
+    try {
+      String? rawContent;
+      final firstUrl = sourceToTranslate.urls != null && sourceToTranslate.urls!.isNotEmpty
+          ? sourceToTranslate.urls!.first
+          : null;
+      if (sourceToTranslate.type == BetterPlayerSubtitlesSourceType.memory &&
+          sourceToTranslate.content?.isNotEmpty == true) {
+        rawContent = await SubtitleTranslationService.instance.translateSubtitleContent(
+          sourceToTranslate.content!,
+          targetLanguage: targetLang,
+        );
+      } else if (firstUrl != null && firstUrl.isNotEmpty) {
+        rawContent = await SubtitleTranslationService.instance.translateUrlOrFile(
+          pathOrUrl: firstUrl,
+          targetLanguageCode: targetLang,
+          headers: sourceToTranslate.headers,
+        );
+      }
+
+      if (rawContent == null && sourceToTranslate.content?.isNotEmpty == true) {
+        rawContent = await SubtitleTranslationService.instance.translateSubtitleContent(
+          sourceToTranslate.content!,
+          targetLanguage: targetLang,
+        );
+      }
+
+      if (rawContent != null && rawContent.isNotEmpty) {
+        final targetName = subtitleLanguageName(targetLang);
+        final translatedSource = BetterPlayerSubtitlesSource(
+          type: BetterPlayerSubtitlesSourceType.memory,
+          name: '$targetName (${tr("auto_translated")})',
+          content: rawContent,
+          selectedByDefault: true,
+        );
+
+        _activeSubtitles.insert(0, translatedSource);
+        _betterPlayerController.betterPlayerSubtitlesSourceList.insert(0, translatedSource);
+        await _betterPlayerController.setupSubtitleSource(translatedSource);
+        if (mounted) setState(() {});
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(tr('subtitle_added'))),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(tr('failed_upload_subtitle'))),
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(tr('failed_upload_subtitle'))),
+        );
+      }
+    }
   }
 
   Widget _buildCustomPlayerErrorWidget(BuildContext context) {
@@ -4199,6 +4305,7 @@ class _SubtitleSwitcherSheet extends StatefulWidget {
     required this.onTiming,
     required this.onSearchOnline,
     required this.onUpload,
+    this.onAutoTranslate,
   });
 
   final BetterPlayerController controller;
@@ -4207,6 +4314,7 @@ class _SubtitleSwitcherSheet extends StatefulWidget {
   final VoidCallback onTiming;
   final VoidCallback onSearchOnline;
   final VoidCallback onUpload;
+  final VoidCallback? onAutoTranslate;
 
   @override
   State<_SubtitleSwitcherSheet> createState() => _SubtitleSwitcherSheetState();
@@ -4335,6 +4443,7 @@ class _SubtitleSwitcherSheetState extends State<_SubtitleSwitcherSheet> {
           onTiming: widget.onTiming,
           onSearchOnline: widget.onSearchOnline,
           onUpload: widget.onUpload,
+          onAutoTranslate: widget.onAutoTranslate,
         ),
         child: ListView(
           controller: scrollController,
@@ -4352,11 +4461,13 @@ class _SubtitleTools extends StatelessWidget {
     required this.onTiming,
     required this.onSearchOnline,
     required this.onUpload,
+    this.onAutoTranslate,
   });
 
   final VoidCallback onTiming;
   final VoidCallback onSearchOnline;
   final VoidCallback onUpload;
+  final VoidCallback? onAutoTranslate;
 
   @override
   Widget build(BuildContext context) {
@@ -4397,6 +4508,14 @@ class _SubtitleTools extends StatelessWidget {
                 tr('upload_subtitles'),
                 onUpload,
               ),
+              if (onAutoTranslate != null) ...[
+                const SizedBox(width: 8),
+                tool(
+                  PhosphorIcons.translate(),
+                  tr('auto_translate'),
+                  onAutoTranslate!,
+                ),
+              ],
             ],
           ),
         ),

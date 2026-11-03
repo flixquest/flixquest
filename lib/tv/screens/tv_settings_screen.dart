@@ -248,6 +248,13 @@ class TvSettingsScreen extends StatelessWidget {
             onActivate: () => _showSubtitleLanguagePicker(context),
           ),
           _TvSettingTile(
+            key: const ValueKey<String>('auto-translate-subtitles'),
+            label: tr('auto_translate_subtitles'),
+            value: settings.autoTranslateSubtitles ? tr('tv_on') : tr('player_off'),
+            icon: PhosphorIcons.translate(),
+            onActivate: () => settings.autoTranslateSubtitles = !settings.autoTranslateSubtitles,
+          ),
+          _TvSettingTile(
             key: const ValueKey<String>('subtitle-settings'),
             label: tr('tv_subtitle_settings'),
             value: _subtitleSummary(settings),
@@ -778,6 +785,67 @@ class TvSettingsScreen extends StatelessWidget {
       ],
     );
   }
+
+  static Map<String, Color> get _subtitleOutlineColors => <String, Color>{
+        tr('tv_black'): Colors.black,
+        tr('tv_black_70'): const Color(0xB3000000),
+        tr('tv_white'): Colors.white,
+        tr('tv_yellow'): Colors.yellow,
+        tr('tv_cyan'): Colors.cyan,
+      };
+
+  static Future<void> _showSubtitleOutlineColorPicker(
+    BuildContext context,
+    SettingsProvider settings,
+  ) {
+    final current = parseStoredSubtitleColor(
+      settings.subtitleOutlineColor,
+      fallback: Colors.black,
+    );
+    final palette = _subtitleOutlineColors;
+    return showTvDialog<void>(
+      context: context,
+      title: tr('tv_subtitle_outline_color'),
+      content: Text(tr('tv_choose_a_color_for_subtitles')),
+      actions: <TvDialogAction>[
+        for (final entry in palette.entries)
+          TvDialogAction(
+            label: entry.key,
+            autofocus: current.toARGB32() == entry.value.toARGB32(),
+            isPrimary: current.toARGB32() == entry.value.toARGB32(),
+            onPressed: () {
+              settings.subtitleOutlineColor =
+                  serializeSubtitleColor(entry.value);
+              Navigator.of(context).pop();
+            },
+          ),
+      ],
+    );
+  }
+
+  static Future<void> _showSubtitleOutlineWidthPicker(
+    BuildContext context,
+    SettingsProvider settings,
+  ) {
+    const options = <int>[1, 2, 3, 4, 5, 6];
+    return showTvDialog<void>(
+      context: context,
+      title: tr('tv_subtitle_outline_width'),
+      content: Text(tr('tv_choose_the_subtitle_text_size')),
+      actions: <TvDialogAction>[
+        for (final size in options)
+          TvDialogAction(
+            label: _pixels(size),
+            autofocus: settings.subtitleOutlineSize == size,
+            isPrimary: settings.subtitleOutlineSize == size,
+            onPressed: () {
+              settings.subtitleOutlineSize = size;
+              Navigator.of(context).pop();
+            },
+          ),
+      ],
+    );
+  }
 }
 
 class _TvAppLanguagePicker extends StatelessWidget {
@@ -927,6 +995,10 @@ class _TvSubtitleSettingsContent extends StatelessWidget {
       settings.subtitleBackgroundColor,
       fallback: Colors.black45,
     );
+    final outline = parseStoredSubtitleColor(
+      settings.subtitleOutlineColor,
+      fallback: Colors.black,
+    );
     final weight =
         switch (normalizeSubtitleTextStyle(settings.subtitleTextStyle)) {
       'light' => tr('tv_font_weight_light'),
@@ -974,6 +1046,35 @@ class _TvSubtitleSettingsContent extends StatelessWidget {
             settings,
           ),
         ),
+        _TvSubtitleOption(
+          label: tr('subtitle_outline'),
+          value: settings.subtitleOutlineEnabled
+              ? tr('tv_on')
+              : tr('player_off'),
+          onActivate: () => settings.subtitleOutlineEnabled =
+              !settings.subtitleOutlineEnabled,
+        ),
+        if (settings.subtitleOutlineEnabled) ...[
+          _TvSubtitleOption(
+            label: tr('outline_color'),
+            value: TvSettingsScreen._colorName(outline),
+            color: outline,
+            onActivate: () =>
+                TvSettingsScreen._showSubtitleOutlineColorPicker(
+              context,
+              settings,
+            ),
+          ),
+          _TvSubtitleOption(
+            label: tr('outline_width'),
+            value: TvSettingsScreen._pixels(settings.subtitleOutlineSize),
+            onActivate: () =>
+                TvSettingsScreen._showSubtitleOutlineWidthPicker(
+              context,
+              settings,
+            ),
+          ),
+        ],
       ],
     );
   }

@@ -6,6 +6,15 @@ typedef VixSrcResult = ProviderLoadResult;
 abstract final class VixSrc {
   static const String _baseUrl = 'https://vixsrc.to';
 
+  static const Map<String, String> defaultHeaders = {
+    'accept': '*/*',
+    'origin': 'https://vixsrc.to',
+    'referer': 'https://vixsrc.to/',
+    'user-agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+        '(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  };
+
   static Future<ProviderLoadResult> loadMovie(int movieId) {
     return _load('$_baseUrl/api/movie/$movieId');
   }
@@ -63,6 +72,7 @@ abstract final class VixSrc {
             url: playlistUrl,
             quality: 'auto',
             isM3U8: true,
+            headers: defaultHeaders,
           ),
         ],
         subtitleLinks: await _parseSubtitles(playlist, playlistUrl),
@@ -133,6 +143,7 @@ abstract final class VixSrc {
             _resolveUrl(path, playlistUrl),
           ),
           language: attributes['NAME'] ?? attributes['LANGUAGE'] ?? 'Unknown',
+          headers: defaultHeaders,
         ),
       );
     }

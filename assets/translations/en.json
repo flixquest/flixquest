@@ -2013,5 +2013,20 @@
   "device_platform_tv": "TV",
   "device_platform_ios": "iPhone or iPad",
   "device_platform_android": "Android device",
-  "device_last_used": "Last used {date}"
+  "device_last_used": "Last used {date}",
+  "auto_translate_subtitles": "Auto translate subtitles",
+  "auto_translate": "Auto Translate",
+  "auto_translated": "Auto-translated",
+  "translating_subtitles": "Translating subtitles...",
+  "auto_translate_description": "Automatically translate subtitles to your preferred language when not available.",
+  "subtitle_outline": "Subtitle outline",
+  "outline_color": "Outline color",
+  "outline_width": "Outline width",
+  "tv_subtitle_outline": "Subtitle outline",
+  "tv_subtitle_outline_color": "Subtitle outline color",
+  "tv_subtitle_outline_width": "Subtitle outline width",
+  "subtitle_offset_live_hint": "Subtitle timing changes are applied to the video on the left in real-time.",
+  "subtitle_outline_subtitle": "Customize subtitle border stroke and color",
+  "subtitle_outline_enable": "Enable outline stroke",
+  "preview": "Preview"
 }

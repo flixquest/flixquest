@@ -136,6 +136,15 @@ class SettingsPreferences {
     return sharedPrefsSingleton.getString(DEFAULT_SUBTITLE) ?? 'en';
   }
 
+  static const AUTO_TRANSLATE_SUBTITLES = 'auto_translate_subtitles';
+  setAutoTranslateSubtitles(bool mode) async {
+    sharedPrefsSingleton.setBool(AUTO_TRANSLATE_SUBTITLES, mode);
+  }
+
+  Future<bool> getAutoTranslateSubtitles() async {
+    return sharedPrefsSingleton.getBool(AUTO_TRANSLATE_SUBTITLES) ?? false;
+  }
+
   static const DEFAULT_FULL_SCREEN = 'default_full_screen';
   setDefaultFullScreen(bool mode) async {
     sharedPrefsSingleton.setBool(DEFAULT_FULL_SCREEN, mode);
@@ -181,6 +190,34 @@ class SettingsPreferences {
 
   Future<bool> getSubtitleMode() async {
     return sharedPrefsSingleton.getBool(SUBTITLE_MODE) ?? false;
+  }
+
+  static const SUBTITLE_OUTLINE_ENABLED = 'subtitle_outline_enabled';
+  setSubtitleOutlineEnabled(bool mode) async {
+    sharedPrefsSingleton.setBool(SUBTITLE_OUTLINE_ENABLED, mode);
+  }
+
+  Future<bool> getSubtitleOutlineEnabled() async {
+    return sharedPrefsSingleton.getBool(SUBTITLE_OUTLINE_ENABLED) ?? false;
+  }
+
+  static const SUBTITLE_OUTLINE_COLOR = 'subtitle_outline_color';
+  setSubtitleOutlineColor(String color) async {
+    sharedPrefsSingleton.setString(SUBTITLE_OUTLINE_COLOR, color);
+  }
+
+  Future<String> subtitleOutlineColor() async {
+    return sharedPrefsSingleton.getString(SUBTITLE_OUTLINE_COLOR) ??
+        '0xff000000';
+  }
+
+  static const SUBTITLE_OUTLINE_SIZE = 'subtitle_outline_size';
+  setSubtitleOutlineSize(int size) async {
+    sharedPrefsSingleton.setInt(SUBTITLE_OUTLINE_SIZE, size);
+  }
+
+  Future<int> getSubtitleOutlineSize() async {
+    return sharedPrefsSingleton.getInt(SUBTITLE_OUTLINE_SIZE) ?? 2;
   }
 
   static const APP_LANGUAGE_CODE = 'en';

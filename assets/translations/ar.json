@@ -2084,5 +2084,20 @@
   "device_platform_tv": "تلفاز",
   "device_platform_ios": "iPhone أو iPad",
   "device_platform_android": "جهاز Android",
-  "device_last_used": "آخر استخدام {date}"
+  "device_last_used": "آخر استخدام {date}",
+  "auto_translate_subtitles": "ترجمة الترجمة تلقائيًا",
+  "auto_translate": "ترجمة تلقائية",
+  "auto_translated": "مترجم تلقائياً",
+  "translating_subtitles": "جارٍ ترجمة الترجمة...",
+  "auto_translate_description": "ترجمة الترجمة تلقائيًا إلى لغتك المفضلة عندما لا تكون متاحة.",
+  "subtitle_outline": "مخطط الترجمة",
+  "outline_color": "لون المخطط",
+  "outline_width": "عرض المخطط",
+  "tv_subtitle_outline": "مخطط الترجمة",
+  "tv_subtitle_outline_color": "لون مخطط الترجمة",
+  "tv_subtitle_outline_width": "عرض مخطط الترجمة",
+  "subtitle_offset_live_hint": "يتم تطبيق تغييرات توقيت الترجمة على الفيديو على اليسار في الوقت الفعلي.",
+  "subtitle_outline_subtitle": "تخصيص خط حدود الترجمة ولونها",
+  "subtitle_outline_enable": "تمكين حد المخطط التفصيلي",
+  "preview": "معاينة"
 }

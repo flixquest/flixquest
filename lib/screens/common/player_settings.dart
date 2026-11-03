@@ -139,6 +139,10 @@ class _PlayerSettingsState extends State<PlayerSettings>
       settingValues.subtitleForegroundColor,
       fallback: Colors.white,
     );
+    final outlineColor = parseStoredSubtitleColor(
+      settingValues.subtitleOutlineColor,
+      fallback: Colors.black,
+    );
 
     return Scaffold(
       backgroundColor: palette.page,
@@ -176,17 +180,49 @@ class _PlayerSettingsState extends State<PlayerSettings>
                               start: 12,
                               end: 12,
                               bottom: 12,
-                              child: Text(
-                                tr('sample_player_text'),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  backgroundColor: backgroundColor,
-                                  color: foregroundColor,
-                                  fontFamily: subtitleFontFamily(
-                                    settingValues.subtitleTextStyle,
+                              child: Center(
+                                child: Container(
+                                  color: backgroundColor,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 2,
                                   ),
-                                  fontSize:
-                                      settingValues.subtitleFontSize.toDouble(),
+                                  child: Stack(
+                                    children: [
+                                      if (settingValues.subtitleOutlineEnabled)
+                                        Text(
+                                          tr('sample_player_text'),
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontFamily: subtitleFontFamily(
+                                              settingValues.subtitleTextStyle,
+                                            ),
+                                            fontSize: settingValues
+                                                .subtitleFontSize
+                                                .toDouble(),
+                                            foreground: Paint()
+                                              ..style = PaintingStyle.stroke
+                                              ..strokeWidth = settingValues
+                                                  .subtitleOutlineSize
+                                                  .toDouble()
+                                              ..color = outlineColor,
+                                          ),
+                                        ),
+                                      Text(
+                                        tr('sample_player_text'),
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: foregroundColor,
+                                          fontFamily: subtitleFontFamily(
+                                            settingValues.subtitleTextStyle,
+                                          ),
+                                          fontSize: settingValues
+                                              .subtitleFontSize
+                                              .toDouble(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -243,6 +279,38 @@ class _PlayerSettingsState extends State<PlayerSettings>
                       () => settingValues.subtitleTextStyle = value,
                     ),
                   ),
+                  SwitchRow(
+                    icon: PhosphorIcons.textT(),
+                    label: tr('subtitle_outline'),
+                    value: settingValues.subtitleOutlineEnabled,
+                    onChanged: (value) => setState(
+                      () => settingValues.subtitleOutlineEnabled = value,
+                    ),
+                  ),
+                  if (settingValues.subtitleOutlineEnabled) ...[
+                    ListRow(
+                      icon: PhosphorIcons.palette(),
+                      label: tr('outline_color'),
+                      trailing: ColorDot(outlineColor),
+                      onTap: () => _pickSubtitleColor(
+                        initialColor: outlineColor,
+                        title: tr('outline_color'),
+                        onSaved: (color) => settingValues
+                            .subtitleOutlineColor = serializeSubtitleColor(
+                          color,
+                        ),
+                      ),
+                    ),
+                    _SliderRow(
+                      icon: PhosphorIcons.paintBrush(),
+                      label: tr('outline_width'),
+                      value: settingValues.subtitleOutlineSize,
+                      min: minimumSubtitleOutlineSize,
+                      max: maximumSubtitleOutlineSize,
+                      onChanged: (value) =>
+                          settingValues.subtitleOutlineSize = value,
+                    ),
+                  ],
                   ListRow(
                     icon: PhosphorIcons.closedCaptioning(),
                     label: tr('subtitle_language'),
@@ -250,6 +318,14 @@ class _PlayerSettingsState extends State<PlayerSettings>
                       settingValues.defaultSubtitleLanguage,
                     ),
                     onTap: () => _push(const SubLangChoose()),
+                  ),
+                  SwitchRow(
+                    icon: PhosphorIcons.translate(),
+                    label: tr('auto_translate_subtitles'),
+                    value: settingValues.autoTranslateSubtitles,
+                    onChanged: (value) => setState(
+                      () => settingValues.autoTranslateSubtitles = value,
+                    ),
                   ),
                   SwitchRow(
                     icon: PhosphorIcons.translate(),

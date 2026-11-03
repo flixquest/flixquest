@@ -32,6 +32,11 @@ List<AppLanguages> appLanguageChoices() => <AppLanguages>[
         languageName: tr('hindi'),
         languageCode: 'hi',
       ),
+      AppLanguages(
+        languageFlag: 'assets/images/country_flags/indonesia.png',
+        languageName: tr('indonesian'),
+        languageCode: 'id',
+      ),
     ];
 
 class AppLanguageChoose extends StatelessWidget {
@@ -66,6 +71,11 @@ class AppLanguageChoose extends StatelessWidget {
                       selected: settings.appLanguage == language.languageCode,
                       onTap: () {
                         settings.appLanguage = language.languageCode;
+                        if (settings.defaultSubtitleLanguage.isEmpty ||
+                            settings.defaultSubtitleLanguage == 'en') {
+                          settings.defaultSubtitleLanguage =
+                              language.languageCode;
+                        }
                         EasyLocalization.of(context)!
                             .setLocale(Locale(language.languageCode));
                       },

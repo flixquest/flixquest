@@ -1,4 +1,5 @@
-import 'package:better_player_plus/better_player_plus.dart';
+// ignore: implementation_imports
+import 'package:better_player_plus/src/subtitles/better_player_subtitles_configuration.dart';
 import 'package:flutter/material.dart';
 
 import 'subtitle_style.dart';
@@ -9,6 +10,9 @@ BetterPlayerSubtitlesConfiguration buildPlayerSubtitleConfiguration({
   required String foregroundColor,
   required int fontSize,
   required String textStyle,
+  bool outlineEnabled = false,
+  String outlineColor = '0xff000000',
+  double outlineSize = 2.0,
 }) {
   return BetterPlayerSubtitlesConfiguration(
     backgroundColor: parseStoredSubtitleColor(
@@ -20,7 +24,12 @@ BetterPlayerSubtitlesConfiguration buildPlayerSubtitleConfiguration({
       fallback: Colors.white,
     ),
     fontFamily: subtitleFontFamily(textStyle),
-    outlineEnabled: false,
+    outlineEnabled: outlineEnabled,
+    outlineColor: parseStoredSubtitleColor(
+      outlineColor,
+      fallback: Colors.black,
+    ),
+    outlineSize: outlineSize,
     fontSize: normalizeSubtitleFontSize(fontSize).toDouble(),
   );
 }
