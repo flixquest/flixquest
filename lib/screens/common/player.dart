@@ -26,6 +26,7 @@ import '../../functions/player_buffering_configuration.dart';
 import '../../functions/language_names.dart';
 import '../../functions/subtitle_options.dart';
 import '/constants/app_constants.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -478,7 +479,23 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               ]
             // Subtitle timing, searching online and uploading live in the
             // Subtitles panel.
-            : const []);
+            : [
+                // Debug builds only: play the hidden mid-play ad now so its
+                // loading can be checked without waiting for a slot.
+                if (kDebugMode) ...[
+                  BetterPlayerOverflowMenuItem(
+                    PhosphorIcons.bug(),
+                    'Simulate mid-play ad (hidden)',
+                    () => unawaited(_showMidPlayPopup(force: true)),
+                  ),
+                  BetterPlayerOverflowMenuItem(
+                    PhosphorIcons.eye(),
+                    'Simulate mid-play ad (visible)',
+                    () => unawaited(
+                        _showMidPlayPopup(force: true, hidden: false)),
+                  ),
+                ],
+              ]);
     BetterPlayerConfiguration betterPlayerConfiguration =
         BetterPlayerConfiguration(
             autoDetectFullscreenDeviceOrientation: !widget.useTvControls,
@@ -872,38 +889,21 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     }
   }
 
-  /// Pauses only once the popup is really about to open, and resumes the
-  /// video when it closes. A popup that is off, cooling down or unfilled
-  /// leaves playback alone.
-  Future<void> _showMidPlayPopup() async {
-    if (!mounted) return;
+  /// Loads the popup invisibly over the playing video; it closes itself at
+  /// its configured maximum duration, so playback is never interrupted. A
+  /// popup that is off, cooling down or unfilled leaves playback alone.
+  /// [force] is the debug simulator's path: it ignores those switches.
+  /// [hidden] false shows the debug simulation visibly.
+  Future<void> _showMidPlayPopup({bool force = false, bool? hidden}) async {
+    if (!mounted || _midPlayPopupOpen) return;
     _midPlayPopupOpen = true;
-    var paused = false;
     try {
-      await AdsterraPlaybackAdsService.instance.midPlay(context, pause: () {
-        final value = _betterPlayerController.videoPlayerController?.value;
-        // The viewer paused, left or finished while the popup was resolving.
-        if (!mounted ||
-            _playbackCompletionHandled ||
-            _preRollActive ||
-            value?.isPlaying != true) {
-          return false;
-        }
-        paused = true;
-        unawaited(_betterPlayerController.pause());
-        return true;
-      });
+      await AdsterraPlaybackAdsService.instance
+          .midPlay(context, force: force, hidden: hidden);
     } catch (error) {
       debugPrint('[Player] mid-play popup unavailable: $error');
     } finally {
       _midPlayPopupOpen = false;
-      if (paused && mounted && !_playbackCompletionHandled) {
-        try {
-          await _betterPlayerController.play();
-        } catch (error) {
-          debugPrint('[Player] resume after mid-play popup failed: $error');
-        }
-      }
     }
   }
 

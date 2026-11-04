@@ -205,6 +205,19 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// How long the final ad must stay visible before the way on appears.
+  int _playbackPopupMinimumViewSeconds = 3;
+  int get playbackPopupMinimumViewSeconds => _playbackPopupMinimumViewSeconds;
+  Duration get playbackPopupMinimumView =>
+      Duration(seconds: _playbackPopupMinimumViewSeconds);
+
+  void setPlaybackPopupMinimumViewSeconds(int seconds) {
+    final normalized = seconds < 1 ? 1 : (seconds > 15 ? 15 : seconds);
+    if (_playbackPopupMinimumViewSeconds == normalized) return;
+    _playbackPopupMinimumViewSeconds = normalized;
+    notifyListeners();
+  }
+
   /// Popup browser behavior, shared by every network and trigger.
   bool _playbackPopupAutoClose = false;
   bool get playbackPopupAutoClose => _playbackPopupAutoClose;

@@ -127,6 +127,7 @@ class AdsterraPlaybackAdScreen extends StatefulWidget {
       this.browserLauncher,
       this.holdClose = true,
       this.television = false,
+      this.hidden = false,
       this.preload,
       this.continueTap,
       this.onAdShown,
@@ -141,9 +142,10 @@ class AdsterraPlaybackAdScreen extends StatefulWidget {
   final PlaybackAdPreload? preload;
   final PlaybackContinueTap? continueTap;
 
-  /// Called once when advertiser content first becomes visible. This is a
-  /// local presentation signal, not a network-confirmed paid impression.
-  final VoidCallback? onAdShown;
+  /// Called once when advertiser content first becomes visible, with the
+  /// network that actually served it. This is a local presentation signal,
+  /// not a network-confirmed paid impression.
+  final void Function(AdNetwork network)? onAdShown;
 
   /// How long the popup was already open for networks that had no ad. The
   /// placement's close fallback and maximum duration count from when the
@@ -188,6 +190,11 @@ class AdsterraPlaybackAdScreen extends StatefulWidget {
 
   /// Android TV: larger type, overscan margins and D-pad focus.
   final bool television;
+
+  /// Mid-play: the ad loads in place but paints nothing and takes no input,
+  /// so the video underneath keeps playing. It always closes itself at
+  /// [PlaybackAdPlacement.maxDuration].
+  final bool hidden;
 
   /// How long the final ad stays up before the viewer moves on, counted from
   /// when it first shows content, so the advertiser gets a real view.
@@ -241,6 +248,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   int _secondsLeft = 0;
   String? _advertiserHost;
   bool _checkingContent = false;
+  String? _contentDiagnostic;
   int _documentGeneration = 0;
   DateTime? _lastPointer;
   bool _finished = false;
@@ -251,10 +259,13 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   bool _launchingBrowser = false;
   bool _popupAutoClose = false;
   bool _externalBrowserOnTap = true;
+  Duration _minimumView = AdsterraPlaybackAdScreen.minimumView;
   Completer<void>? _visibilityWait;
 
   bool get _autoClose =>
-      widget.stage == PlaybackAdStage.beforeLoader || _popupAutoClose;
+      widget.hidden ||
+      widget.stage == PlaybackAdStage.beforeLoader ||
+      _popupAutoClose;
 
   @override
   void didChangeDependencies() {
@@ -263,6 +274,8 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     _popupAutoClose = config?.playbackPopupAutoClose ?? false;
     _adBlockGateOn = config?.adBlockGateEnabled ?? false;
     _externalBrowserOnTap = config?.playbackPopupExternalBrowserOnTap ?? true;
+    _minimumView = config?.playbackPopupMinimumView ??
+        AdsterraPlaybackAdScreen.minimumView;
     // A popup may have stayed open beyond its deadline while automatic close
     // was disabled. Enabling it remotely must still honor that deadline.
     if (_autoClose && _durationTimer?.isActive == false) {
@@ -277,7 +290,19 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     // to it instead of offering the way on.
     final tryNext =
         reason == 'page_load_timeout' && !_adShown && widget.onNoFill != null;
-    if (_autoClose || tryNext) {
+    if (tryNext) {
+      _finish(reason);
+      return;
+    }
+    // A hidden mid-play ad has no viewer waiting on a close control. The last
+    // network keeps loading until max_duration instead of being dropped at
+    // the load timeout; slow landing pages need that extra time.
+    if (widget.hidden && reason == 'page_load_timeout' && !_adShown) {
+      _log('hidden ad still loading at load_timeout; '
+          'waiting until max_duration');
+      return;
+    }
+    if (_autoClose) {
       _finish(reason);
     } else {
       _allowClose(reason);
@@ -302,8 +327,10 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       widget.placement.network == AdNetwork.monetag && _automaticContinue;
 
   // The Social Bar page keeps an immediate close. Every other surface waits
-  // for its ad to be seen, or for the placement's fallback.
+  // for its ad to be seen, or for the placement's fallback. A hidden mid-play
+  // ad has no surface to hold: Back dismisses it at once.
   bool get _closable =>
+      widget.hidden ||
       !widget.holdClose ||
       _closeAllowed ||
       (_phase == _Phase.script && widget.stage == PlaybackAdStage.beforeLoader);
@@ -324,8 +351,9 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     // tag page loads its network out of sight, so it reports nothing.
     _noteNavigation(
         widget.placement.smartlinkUrl ?? widget.placement.scriptUrl);
-    _log(
-        'starting mode=${widget.placement.mode} loadTimeoutMs=${widget.placement.loadTimeout.inMilliseconds}');
+    _log('starting mode=${widget.placement.mode} '
+        'loadTimeoutMs=${widget.placement.loadTimeout.inMilliseconds} '
+        'maxDurationMs=${widget.placement.maxDuration.inMilliseconds}');
     if (smartlink != null) {
       unawaited(_openPage(smartlink));
     } else {
@@ -464,11 +492,11 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         onNavigationRequest: _onScriptNavigation,
         onPageStarted: (url) {
           if (!mounted || _finished) return;
-          _log('script document started ${_origin(url)}');
+          _log('script document started $url');
         },
         onPageFinished: (url) {
           if (!mounted || _finished) return;
-          _log('script document finished ${_origin(url)}');
+          _log('script document finished $url');
           if (Uri.tryParse(url)?.host == hostedPage?.host) {
             _hostedPageLoaded = true;
           }
@@ -477,13 +505,13 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         onWebResourceError: (error) {
           _noteLoadError(error, scriptOnly: true);
           _log(
-              'script resource error code=${error.errorCode} ${error.description} origin=${_origin(error.url ?? '')} path=${Uri.tryParse(error.url ?? '')?.path ?? ''} mainFrame=${error.isForMainFrame}');
+              'script resource error code=${error.errorCode} ${error.description} url=${error.url ?? ''} mainFrame=${error.isForMainFrame}');
           if (error.isForMainFrame == true) _finish('script_main_frame_error');
         },
         onHttpError: (error) {
           if ((error.response?.statusCode ?? 0) >= 400) {
             _log(
-                'script HTTP ${error.response?.statusCode} ${_origin((error.request?.uri ?? error.response?.uri).toString())}');
+                'script HTTP ${error.response?.statusCode} ${error.request?.uri ?? error.response?.uri ?? ''}');
           }
         },
       ));
@@ -674,7 +702,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       return NavigationDecision.navigate;
     }
     _log(
-        'script main-frame navigation scheme=${uri?.scheme} origin=${_origin(request.url)}');
+        'script main-frame navigation scheme=${uri?.scheme} url=${request.url}');
     // Monetag's tag detects the WebView and hands its ad to Chrome with an
     // intent:// link instead of a popup; show that link's web page here.
     final target = _webUrl(uri)
@@ -710,10 +738,10 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     // Social Bar advertiser links require a real touch. Popunder URLs may
     // arrive from the tag's delayed trigger after the Continue tap.
     if (widget.stage == PlaybackAdStage.beforeLoader && !_tappedRecently) {
-      _log('popup ignored without a recent tap ${_origin(uri.toString())}');
+      _log('popup ignored without a recent tap $uri');
       return;
     }
-    _log('popup URL received ${_origin(uri.toString())}');
+    _log('popup URL received $uri');
     unawaited(_openPage(uri));
   }
 
@@ -722,8 +750,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   Future<void> _openPage(Uri uri) async {
     if (!mounted || _finished || _openingPage) return;
     _openingPage = true;
-    _log(
-        'opening ad page ${_origin(uri.toString())} subId=${widget.placement.subId ?? 'none'}');
+    _log('opening ad page $uri subId=${widget.placement.subId ?? 'none'}');
     var mainUrl = uri;
     try {
       final page = await _createController(
@@ -746,7 +773,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         if (!_finished &&
             _samePageDocument(failedUrl, _pageDocument ?? mainUrl) &&
             status >= 400) {
-          _log('page HTTP $status ${_origin(failedUrl.toString())}');
+          _log('page HTTP $status $failedUrl');
           // A server answered: no ad for this viewer, not a blocker.
           _reportDelivery(AdDelivery.reached);
           _finish('page_http_error');
@@ -795,12 +822,11 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
             if (_webUrl(failed) &&
                 _pageDocument != null &&
                 !_samePageDocument(failed, _pageDocument)) {
-              _log('ignored error from an earlier redirect '
-                  '${_origin(error.url!)}');
+              _log('ignored error from an earlier redirect ${error.url}');
               return;
             }
             _log(
-                'page error code=${error.errorCode} ${error.description} origin=${_origin(error.url ?? '')}');
+                'page error code=${error.errorCode} ${error.description} url=${error.url ?? ''}');
             _finish('page_main_frame_error');
           }
         },
@@ -821,7 +847,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
 
   void _onPageStarted(String url) {
     if (url == 'about:blank' || _finished) return;
-    _log('page started ${_origin(url)}');
+    _log('page started $url');
     final started = Uri.tryParse(url);
     if (isNoAdFallback(started)) {
       _onNoAd(started!);
@@ -838,6 +864,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     _documentGeneration++;
     _served = false;
     _minimumViewDone = false;
+    _contentDiagnostic = null;
     _contentTimer?.cancel();
     _settleTimer?.cancel();
     _minimumViewTimer?.cancel();
@@ -860,7 +887,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   /// Trackers send traffic they will not pay for to a search engine's home
   /// page. There is no ad to see, so continue at once.
   void _onNoAd(Uri fallback) {
-    _log('redirect chain ended on ${fallback.origin}, not an ad');
+    _log('redirect chain ended on $fallback, not an ad');
     _reportDelivery(AdDelivery.reached);
     _finish('no_ad_fallback');
   }
@@ -876,7 +903,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       return;
     }
     _pageDocument ??= document;
-    _log('page finished ${_origin(url)}; checking content');
+    _log('page finished $url; checking content');
     final host = Uri.tryParse(url)?.host;
     if (host != null && host.isNotEmpty) {
       _advertiserHost = host.startsWith('www.') ? host.substring(4) : host;
@@ -896,12 +923,11 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           .timeout(AdsterraPlaybackAdScreen.contentCheckTimeout);
       if (!mounted || _finished || generation != _documentGeneration) return;
       if (_samePageDocument(Uri.tryParse(current ?? ''), Uri.tryParse(url))) {
-        _log(
-            'confirmed final redirect without a start callback ${_origin(url)}');
+        _log('confirmed final redirect without a start callback $url');
         _beginPageNavigation(url);
         _inspectPage(page, url);
       } else {
-        _log('ignored page finish from an earlier redirect ${_origin(url)}');
+        _log('ignored page finish from an earlier redirect $url');
       }
     } catch (error) {
       _log('could not verify redirect finish ($error)');
@@ -934,9 +960,21 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       // must belong to this finished document, with its load event complete.
       final actualUrl = report is Map ? report['url'] : null;
       final readyState = report is Map ? report['readyState'] : null;
-      if ((actualUrl is String &&
-              !_samePageDocument(Uri.tryParse(actualUrl), Uri.tryParse(url))) ||
-          (readyState is String && readyState != 'complete')) {
+      if (actualUrl is String &&
+          !_samePageDocument(Uri.tryParse(actualUrl), Uri.tryParse(url))) {
+        _logContentWait('url mismatch',
+            url: url,
+            actualUrl: actualUrl,
+            readyState: readyState,
+            report: report);
+        return;
+      }
+      if (readyState is String && readyState != 'complete') {
+        _logContentWait('document not complete',
+            url: url,
+            actualUrl: actualUrl,
+            readyState: readyState,
+            report: report);
         return;
       }
       // A link that answers with XML, JSON or text (such as an ad server's
@@ -951,11 +989,36 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         return;
       }
       final ready = report is Map ? report['ready'] == true : report == true;
-      if (ready) {
-        _log(report is Map
-            ? 'visible page content text=${report['textLength']} elements=${report['visibleElements']} title=${report['title']}'
-            : 'page content present');
+      // A hidden WebView can leave the body's rect/opacity unusable for the
+      // visibility check while the ad page itself has clearly loaded. Accept
+      // that page when it has real text and a title, but not a blank
+      // redirect/interstitial.
+      final title = report is Map ? report['title'] : null;
+      final text = report is Map ? report['textLength'] : null;
+      final normalizedTitle = title is String ? title.trim().toLowerCase() : '';
+      final textOnly = !ready &&
+          widget.hidden &&
+          readyState == 'complete' &&
+          text is int &&
+          text > 20 &&
+          normalizedTitle.isNotEmpty &&
+          !normalizedTitle.startsWith('redirect') &&
+          !normalizedTitle.startsWith('waiting');
+      if (ready || textOnly) {
+        // One line per document, not one per 500 ms content check.
+        if (_visibleGeneration != generation) {
+          final loaded = widget.hidden ? 'in-stream ad loaded' : 'ad loaded';
+          _log(report is Map
+              ? '$loaded url=$url hidden=${widget.hidden} text=${report['textLength']} elements=${report['visibleElements']} title=${report['title']}${textOnly ? ' source=text' : ''}'
+              : '$loaded url=$url hidden=${widget.hidden}');
+        }
         _onContentVisible(generation);
+      } else {
+        _logContentWait('content not visible enough',
+            url: url,
+            actualUrl: actualUrl,
+            readyState: readyState,
+            report: report);
       }
     } on TimeoutException {
       // Dropped while the document was replaced: the next tick asks again.
@@ -971,6 +1034,36 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     }
   }
 
+  /// Why a loaded document has not been accepted yet. Logged once per
+  /// distinct state so a slow redirect chain does not fill logcat.
+  void _logContentWait(String reason,
+      {required String url,
+      Object? actualUrl,
+      Object? readyState,
+      Object? report}) {
+    final type = report is Map ? report['type'] : null;
+    final text = report is Map ? report['textLength'] : null;
+    final elements = report is Map ? report['visibleElements'] : null;
+    final title = report is Map ? report['title'] : null;
+    final raw = report is Map ? '' : ' raw=$report';
+    // Keep the state readable: the stats come first so long redirect URLs
+    // cannot push them past logcat's line limit.
+    final message = 'content waiting reason=$reason '
+        'hidden=${widget.hidden} readyState=${readyState ?? 'unknown'} '
+        'type=${type ?? 'unknown'} text=${text ?? 'unknown'} '
+        'elements=${elements ?? 'unknown'} title=${title ?? ''} '
+        'expected=${_shortUrl(url)} '
+        'actual=${_shortUrl(actualUrl)}$raw';
+    if (message == _contentDiagnostic) return;
+    _contentDiagnostic = message;
+    _log(message);
+  }
+
+  static String _shortUrl(Object? value) {
+    final text = value is String ? value : 'unknown';
+    return text.length <= 180 ? text : '${text.substring(0, 177)}...';
+  }
+
   void _onContentVisible(int generation) {
     _contentTimer?.cancel();
     _loadTimer?.cancel();
@@ -980,11 +1073,11 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
     setState(() {
       _pageReady = true;
       _revealed = true;
-      _secondsLeft = AdsterraPlaybackAdScreen.minimumView.inSeconds;
+      _secondsLeft = _minimumView.inSeconds;
     });
     if (!_adShown) {
       _adShown = true;
-      widget.onAdShown?.call();
+      widget.onAdShown?.call(widget.placement.network);
     }
     // The ad is final only if no further redirect starts in the settle
     // window, and the viewer moves on once it has been up [minimumView].
@@ -995,7 +1088,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       if (_minimumViewDone) _allowClose('ad_served');
     });
     _minimumViewTimer?.cancel();
-    _minimumViewTimer = Timer(AdsterraPlaybackAdScreen.minimumView, () {
+    _minimumViewTimer = Timer(_minimumView, () {
       if (generation != _documentGeneration) return;
       _minimumViewDone = true;
       if (_served) _allowClose('ad_served');
@@ -1102,8 +1195,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       if (opened || !mounted || _finished) return;
     }
     if (link.web != null) {
-      _log(
-          'loading web fallback ${_origin(link.web.toString())} for scheme=${target.scheme}');
+      _log('loading web fallback ${link.web} for scheme=${target.scheme}');
       _beginPageNavigation(link.web.toString());
       await page.loadRequest(link.web!);
     } else {
@@ -1131,11 +1223,6 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
               path: actual.path.isEmpty ? '/' : actual.path, fragment: '') ==
           expected.replace(
               path: expected.path.isEmpty ? '/' : expected.path, fragment: '');
-
-  String _origin(String url) {
-    final uri = Uri.tryParse(url);
-    return _webUrl(uri) ? uri!.origin : 'unknown';
-  }
 
   void _log(String message) => debugPrint(
       '[AdsterraPage] ${widget.placement.network.name}/${widget.stage.name}: $message');
@@ -1271,7 +1358,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
         ]),
       ),
     );
-    return PopScope(
+    final content = PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
@@ -1285,6 +1372,16 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       child: widget.television
           ? Focus(autofocus: true, onKeyEvent: _onRemoteKey, child: screen)
           : screen,
+    );
+    if (!widget.hidden) return content;
+    // Keep the WebView loaded and laid out, but paint nothing over the video
+    // and let every touch reach the player below.
+    return IgnorePointer(
+      child: Opacity(
+        key: const ValueKey('mid-play-hidden-ad'),
+        opacity: 0,
+        child: content,
+      ),
     );
   }
 
@@ -1385,7 +1482,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
           else if (_phase == _Phase.page)
             _WaitPill(
               secondsLeft: _pageReady ? _secondsLeft : null,
-              total: AdsterraPlaybackAdScreen.minimumView.inSeconds,
+              total: _minimumView.inSeconds,
               emphasized: _waitHint,
               scale: scale,
             ),
@@ -1583,6 +1680,7 @@ class PlaybackAdChainScreen extends StatefulWidget {
       this.storeLauncher,
       this.browserLauncher,
       this.television = false,
+      this.hidden = false,
       this.preload,
       this.continueTap,
       this.onAdShown,
@@ -1597,10 +1695,15 @@ class PlaybackAdChainScreen extends StatefulWidget {
   final PlaybackBrowserLauncher? browserLauncher;
   final bool television;
 
+  /// See [AdsterraPlaybackAdScreen.hidden].
+  final bool hidden;
+
   /// Prepared for the first placement only.
   final PlaybackAdPreload? preload;
   final PlaybackContinueTap? continueTap;
-  final VoidCallback? onAdShown;
+
+  /// See [AdsterraPlaybackAdScreen.onAdShown].
+  final void Function(AdNetwork network)? onAdShown;
 
   /// Each network's [AdsterraPlaybackAdScreen.onDelivery].
   final void Function(String host, AdDelivery delivery)? onDelivery;
@@ -1621,14 +1724,19 @@ class _PlaybackAdChainScreenState extends State<PlaybackAdChainScreen> {
   }
 
   bool _next() {
-    final openFor = clock.now().difference(_openedAt);
+    final elapsed = clock.now().difference(_openedAt);
+    // A visible popup shares one close budget across its networks. A hidden
+    // one has no viewer waiting, so each fallback gets its own full budget;
+    // otherwise a slow first network leaves the next one too little time.
+    final openFor = widget.hidden ? Duration.zero : elapsed;
     final from = widget.placements[_index].network.name;
-    if (!mounted || openFor >= widget.placements.first.maxDuration) {
+    if (!mounted ||
+        (!widget.hidden && openFor >= widget.placements.first.maxDuration)) {
       return false;
     }
     debugPrint('[AdsterraPage] $from/${widget.stage.name}: trying '
         '${widget.placements[_index + 1].network.name} after '
-        '${openFor.inMilliseconds}ms');
+        '${elapsed.inMilliseconds}ms');
     setState(() {
       _index++;
       _openFor = openFor;
@@ -1644,6 +1752,7 @@ class _PlaybackAdChainScreenState extends State<PlaybackAdChainScreen> {
         storeLauncher: widget.storeLauncher,
         browserLauncher: widget.browserLauncher,
         television: widget.television,
+        hidden: widget.hidden,
         preload: _index == 0 ? widget.preload : null,
         continueTap: widget.continueTap,
         onAdShown: widget.onAdShown,

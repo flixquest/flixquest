@@ -989,10 +989,11 @@ WebView that follows the network's redirect chain:
   video** for a video ad's click-through) and system Back appear only once the
   final ad has been seen. Seen means the last page of the redirect chain shows
   visible content, starts no new navigation for 800 ms, and has been on screen
-  for 3 seconds since its content appeared. An earlier page that redirects
-  restarts the count with the next one. Until the final page has content the
-  pill where the button will be says "Ad loading"; then it counts "Continue in
-  3…1". Pressing Back (or OK on a remote) early briefly highlights it.
+  for `playback_popup_minimum_view_seconds` (3 by default) since its content
+  appeared. An earlier page that redirects restarts the count with the next
+  one. Until the final page has content the pill where the button will be says
+  "Ad loading"; then it counts down that configured value. Pressing Back (or
+  OK on a remote) early briefly highlights it.
 - If the ad never gets there (a chain that keeps redirecting, say), the button
   appears at the placement's `close_fallback_seconds`, 15 by default, and the
   placeholder gives way to whatever the page shows. Google Play's
@@ -1041,6 +1042,7 @@ unpublished. Both update an open popup when remote config changes.
 | --- | --- | --- |
 | `playback_popup_auto_close_enabled` | `false` | When false, an advertiser popup stays open past `max_duration_seconds`, `load_timeout_ms` and app backgrounding; timeouts make the close control available. When true, those timeouts and backgrounding close it automatically. Manual close, failed requests, no-ad fallbacks and disabling/changing the selected ad configuration still work. Also applies on Android TV. |
 | `playback_popup_external_browser_on_tap` | `true` | On phones/tablets, tapping the revealed advertiser body opens its current HTTP(S) URL in external Chrome on Android, with the external default browser as fallback if Chrome is unavailable. Other platforms use their external browser (preferring Chrome on iOS when available). Redirects, query strings and fragments are preserved. The tap replaces in-page interaction while enabled; publish `false` to keep taps inside the page. The close bar and loading placeholder never launch a browser. TV remote controls stay in-app. |
+| `playback_popup_minimum_view_seconds` | `3` | 1–15 seconds. How long the final ad must stay visible before **Play now** appears. The loading pill counts down this value. Ignored when the ad never loads and `close_fallback_seconds` takes over. |
 
 For example, publish `playback_popup_auto_close_enabled=false` and
 `playback_popup_external_browser_on_tap=true` to keep the popup open and let
@@ -1057,7 +1059,7 @@ Per-stage fields:
 | `script_url` | Empty | In script mode, exact generated HTTPS `src`; numeric dashboard IDs are not script URLs. |
 | `url` | Empty | In Smartlink mode, exact HTTPS direct link. |
 | `sub_id` | Empty | Smartlink tracking label: 1–64 letters, digits, underscores or hyphens. Appends `psid` to the URL while preserving other query parameters. Prefer alphanumeric labels per Adsterra's guide. |
-| `load_timeout_ms` | `5000` | 500–10,000 milliseconds (up to 30,000 for Monetag). Bounds script loading and each ad-page document until it shows content. Tag timeouts continue playback; advertiser-page timeouts expose close unless automatic close is enabled. |
+| `load_timeout_ms` | `5000` | 500–30,000 milliseconds. Bounds script loading and each ad-page document until it shows content. Tag timeouts continue playback; advertiser-page timeouts expose close unless automatic close is enabled. |
 | `max_duration_seconds` | `30` | 5–120 seconds; upper bound for setup and tag pages. On an advertiser page, exposes close by default, or closes it if `playback_popup_auto_close_enabled=true`. The viewer can leave sooner once **Play now** appears. |
 | `close_fallback_seconds` | `15` | 5–15 seconds. When **Play now** appears if the final ad never finishes loading. |
 
@@ -1281,7 +1283,7 @@ popup uses up another's interval:
 | `download` | After a movie or episode download is queued from its loader, over the screen the viewer returns to. A download started from inside the player shows none, so playback is not interrupted. |
 | `episode_switch` | In place of the stream-found popup when the player itself moves to another episode: next-episode card or autoplay, or the in-player episode picker. |
 | `movie_switch` | In place of the stream-found popup when the player itself moves to another movie from its recommendations. |
-| `mid_play` | While a streamed movie or episode plays, at evenly spaced points: none in a video under 15 minutes, once from 15 to under 20 minutes (halfway), twice from 20 to under 30, three times from 30 minutes to under an hour, four times from an hour (a 2-hour movie: 24, 48, 72 and 96 minutes). The video pauses while the popup is open and resumes when it closes. |
+| `mid_play` | While a streamed movie or episode plays, at evenly spaced points: none in a video under 15 minutes, once from 15 to under 20 minutes (halfway), twice from 20 to under 30, three times from 30 minutes to under an hour, four times from an hour (a 2-hour movie: 24, 48, 72 and 96 minutes). The ad loads invisibly over the playing video, takes no taps, and closes itself at its `max_duration_seconds`; playback never pauses. |
 
 For `player_exit` and `download`, Back is never held: the player or loader
 closes first, and the popup opens once its exit transition has finished.
@@ -1289,10 +1291,11 @@ closes first, and the popup opens once its exit transition has finished.
 A `mid_play` slot opens only when playback reaches it on its own, playing and
 not buffering, with the app in the foreground. Slots the viewer resumes past or
 seeks past are dropped, and a rewind never brings a passed slot back, so a seek
-never lands on a popup. It opens over the player, fullscreen or not, and never
-in Live TV, on Android TV, during the pre-roll, after the video has finished,
-or for Kids and Family titles. A slot that is off, cooling down or has no
-placement leaves the video playing.
+never lands on a popup. It opens invisibly above the player, fullscreen or not,
+and never in Live TV, on Android TV, during the pre-roll, after the video has
+finished, or for Kids and Family titles. ExoClick is skipped for `mid_play`;
+the next configured network (Adsterra by default) serves it. A slot that is
+off, cooling down or has no placement leaves the video playing.
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
@@ -1306,7 +1309,7 @@ placement leaves the video playing.
 | `movie_switch_popup_enabled` | Boolean | Unpublished (follows stream found) | As `episode_switch_popup_enabled`, for in-player movie switches. |
 | `movie_switch_popup_frequency_minutes` | Number | `0` | As `episode_switch_popup_frequency_minutes`, for movie switches. |
 | `mid_play_popup_enabled` | Boolean | Unpublished (off) | Switch for the mid-play popup. Must be published remotely. |
-| `mid_play_popup_frequency_minutes` | Number | `0` | Minimum whole minutes between visible mid-play popups. Keep it `0`, or below the gap between slots (about 6:40 in a 20-minute video), or later slots in the same video are skipped. |
+| `mid_play_popup_frequency_minutes` | Number | `0` | Minimum whole minutes between mid-play popups. Keep it `0`, or below the gap between slots (about 6:40 in a 20-minute video), or later slots in the same video are skipped. |
 
 Missing, invalid or negative intervals fall back to `0`. Turning a switch off
 closes an open popup of that trigger.
@@ -1570,7 +1573,8 @@ the following, replacing the placeholder with that link:
 
 The app follows the Direct Link's redirects inside its ad page and enables
 **Play now** once the final page's content has settled and been up for
-3 seconds, or at `close_fallback_seconds`.
+`playback_popup_minimum_view_seconds` (3 by default), or at
+`close_fallback_seconds`.
 The hosted page in `monetag_playback_ads.json` uses Onclick zone 11983408.
 Onclick and push zone IDs cannot be substituted for a Direct Link; use the
 link issued for its own zone.

@@ -145,21 +145,43 @@ class AdsterraPlaybackAdsService {
       loaderContext, (context) => show(context, PlaybackAdStage.download));
 
   /// At a slot of the player's mid-play schedule, over the player itself,
-  /// fullscreen or not. [pause] runs just before the popup opens and says
-  /// whether the player still wants it (it pauses the video when it does);
-  /// the player resumes the video itself once this completes. Nothing
-  /// opens, and [pause] never runs, when the trigger is off, cooling down or
-  /// has no placement.
+  /// fullscreen or not, in a transparent route. The ad loads invisibly and
+  /// closes itself at its configured maximum duration, so playback keeps
+  /// going. Nothing opens when the trigger is off, cooling down or has no
+  /// placement.
+  ///
+  /// [force] is for the player's debug simulator: it ignores the trigger
+  /// switch, the frequency cooldown and an ad-free title or Plus, so the ad
+  /// can be checked without waiting for a slot or publishing the switch.
+  /// [hidden] overrides the invisible surface: the debug simulator passes
+  /// false to show the same ad visibly while the video keeps playing.
   Future<void> midPlay(BuildContext playerContext,
-      {required bool Function() pause}) async {
-    if (!playerContext.mounted || ContentAdScope.adFreeAt(playerContext)) {
+      {bool force = false, bool? hidden}) async {
+    if (!playerContext.mounted ||
+        (!force && ContentAdScope.adFreeAt(playerContext))) {
       return;
+    }
+    final mode = hidden == false ? 'visible' : 'hidden';
+    final started = force ? DateTime.now() : null;
+    AdNetwork? shownNetwork;
+    if (force) {
+      debugPrint('[MidPlaySimulator] start mode=$mode');
+      debugPrint('[AdsterraPlayback] midPlay: simulator requested '
+          'hidden=${hidden ?? true}');
     }
     // Fullscreen playback is its own route above the player's, so the popup
     // is pushed from the navigator rather than from the player's route.
     final navigator = Navigator.of(playerContext, rootNavigator: true);
     await _present(navigator.context, PlaybackAdStage.midPlay,
-        beforePresent: pause);
+        force: force,
+        hiddenOverride: hidden,
+        onShown: (network) => shownNetwork = network);
+    if (started != null) {
+      debugPrint('[MidPlaySimulator] finish mode=$mode '
+          'result=${shownNetwork == null ? 'no_fill' : 'filled'} '
+          'network=${shownNetwork?.name ?? 'none'} '
+          'elapsedMs=${DateTime.now().difference(started).inMilliseconds}');
+    }
   }
 
   /// The popup opens over the screen the viewer returns to once the route
@@ -426,18 +448,18 @@ class AdsterraPlaybackAdsService {
     }
   }
 
-  /// [beforePresent] runs just before the popup's route is pushed; false
-  /// cancels it.
   Future<bool> _present(BuildContext context, PlaybackAdStage requested,
       {bool download = false,
       bool television = false,
       PlaybackAdPreload? preload,
-      bool Function()? beforePresent}) async {
+      bool force = false,
+      bool? hiddenOverride,
+      void Function(AdNetwork network)? onShown}) async {
     if (!context.mounted) {
       _logSkip(requested, 'playback screen disposed');
       return false;
     }
-    if (AdsPolicy.adFree) {
+    if (!force && AdsPolicy.adFree) {
       preload?.dispose();
       if (requested == PlaybackAdStage.playerExit) {
         await _settleOwedPlayerExit();
@@ -445,7 +467,7 @@ class AdsterraPlaybackAdsService {
       _logSkip(requested, 'FlixQuest Plus');
       return true;
     }
-    if (ContentAdScope.adFreeAt(context)) {
+    if (!force && ContentAdScope.adFreeAt(context)) {
       preload?.dispose();
       _logSkip(requested, 'Kids or Family title');
       return true;
@@ -480,7 +502,7 @@ class AdsterraPlaybackAdsService {
     final config = selection?.adsterra;
     final placements = provider == null
         ? const <PlaybackAdPlacement>[]
-        : _placementsFor(provider, stage, network, tv);
+        : _placementsFor(provider, stage, network, tv, force: force);
     var placement = placements.firstOrNull;
     if (provider == null || placement == null) {
       _logSkip(stage,
@@ -494,13 +516,16 @@ class AdsterraPlaybackAdsService {
         provider.playbackAdsSelection != selection ||
         provider.popupTrigger(stage) != trigger;
     // Plus that starts while the ad is loading or showing skips it; the
-    // content still plays.
+    // content still plays. The debug simulator skips this too.
     bool plusStarted() =>
-        AdsPolicy.adFree ||
-        (context.mounted && ContentAdScope.adFreeAt(context));
+        !force &&
+        (AdsPolicy.adFree ||
+            (context.mounted && ContentAdScope.adFreeAt(context)));
     final frequencyMinutes = _frequencyFor(provider, stage, tv);
     try {
-      if (stage != PlaybackAdStage.beforeLoader && frequencyMinutes > 0) {
+      if (!force &&
+          stage != PlaybackAdStage.beforeLoader &&
+          frequencyMinutes > 0) {
         await _loadPopupHistory(stage);
         // A config update or navigation while reading storage must not hand
         // playback to an obsolete loader, even when the popup would be skipped.
@@ -543,11 +568,6 @@ class AdsterraPlaybackAdsService {
       }
       final state = WidgetsBinding.instance.lifecycleState;
       if (state != null && state != AppLifecycleState.resumed) return true;
-      if (beforePresent != null && !beforePresent()) {
-        preload?.dispose();
-        _logSkip(stage, 'caller no longer wants it');
-        return false;
-      }
       final selectedPlacement = placement;
       // An empty view also works for another arm of this same experiment;
       // preparation never selects or requests that arm's ad.
@@ -561,34 +581,50 @@ class AdsterraPlaybackAdsService {
       if (prepared == null) preload?.dispose();
       prepared?.claim();
       final navigator = Navigator.of(context);
-      final route = MaterialPageRoute<void>(
-        settings: RouteSettings(
-            name: '/${selectedPlacement.network.name}/${stage.name}'),
-        builder: (_) => PlaybackAdChainScreen(
-          placements: [selectedPlacement, ...placements.skip(1)],
-          stage: stage,
-          storeLauncher: storeLauncher,
-          browserLauncher: browserLauncher,
-          television: tv,
-          preload: prepared,
-          continueTap: continueTap,
-          onDelivery: (host, delivery) {
-            if (delivery != AdDelivery.reached) {
-              _blocked = (host: host, delivery: delivery);
-            }
-            _gate.observeDelivery(host, delivery);
-          },
-          onAdShown: stage == PlaybackAdStage.beforeLoader
-              ? null
-              : () {
-                  unawaited(_recordPopupShown(stage));
-                  // Seen: closing the app now no longer owes it again.
-                  if (stage == PlaybackAdStage.playerExit) {
-                    unawaited(_settleOwedPlayerExit());
-                  }
-                },
-        ),
+      // A mid-play ad normally renders invisibly over the playing video, so
+      // its route must stay transparent instead of covering the player with
+      // a page. The debug simulator may ask for a visible one instead.
+      final hidden = hiddenOverride ?? stage == PlaybackAdStage.midPlay;
+      final settings = RouteSettings(
+          name: '/${selectedPlacement.network.name}/${stage.name}');
+      final screen = PlaybackAdChainScreen(
+        placements: [selectedPlacement, ...placements.skip(1)],
+        stage: stage,
+        storeLauncher: storeLauncher,
+        browserLauncher: browserLauncher,
+        television: tv,
+        hidden: hidden,
+        preload: prepared,
+        continueTap: continueTap,
+        onDelivery: (host, delivery) {
+          if (delivery != AdDelivery.reached) {
+            _blocked = (host: host, delivery: delivery);
+          }
+          _gate.observeDelivery(host, delivery);
+        },
+        onAdShown: stage == PlaybackAdStage.beforeLoader
+            ? null
+            : (network) {
+                onShown?.call(network);
+                debugPrint('[AdsterraPlayback] ${stage.name}: ad shown '
+                    'network=${network.name} hidden=$hidden force=$force');
+                // A simulated ad must not use up the real trigger's interval.
+                if (!force) unawaited(_recordPopupShown(stage));
+                // Seen: closing the app now no longer owes it again.
+                if (stage == PlaybackAdStage.playerExit) {
+                  unawaited(_settleOwedPlayerExit());
+                }
+              },
       );
+      final route = hidden
+          ? _TransparentPlaybackAdRoute<void>(
+              settings: settings,
+              builder: (_) => screen,
+            )
+          : MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => screen,
+            );
       // Compare the catalogs and network, not the chosen arm: unrelated
       // provider updates must not close a selected B/C variant.
       void onConfigChanged() {
@@ -598,7 +634,7 @@ class AdsterraPlaybackAdsService {
       }
 
       debugPrint(
-          '[AdsterraPlayback] ${stage.name}: presenting ${selectedPlacement.network.name} ${selectedPlacement.mode} variant=${variantId ?? 'legacy'} television=$tv preloaded=${prepared != null}');
+          '[AdsterraPlayback] ${stage.name}: presenting ${selectedPlacement.network.name} ${selectedPlacement.mode} variant=${variantId ?? 'legacy'} television=$tv hidden=$hidden force=$force preloaded=${prepared != null}');
       provider.addListener(onConfigChanged);
       AdsPolicy.addListener(onConfigChanged);
       try {
@@ -631,21 +667,29 @@ class AdsterraPlaybackAdsService {
   /// network's, skipping networks that have none. The Social Bar stays with
   /// Adsterra alone.
   List<PlaybackAdPlacement> _placementsFor(AppDependencyProvider provider,
-      PlaybackAdStage stage, AdNetwork? network, bool tv) {
+      PlaybackAdStage stage, AdNetwork? network, bool tv,
+      {bool force = false}) {
     if (network == null) return const [];
     final networks = stage == PlaybackAdStage.beforeLoader
         ? {network}
         : {network, ...provider.playbackAdsSelection.fallbackNetworks};
     return [
       for (final candidate in networks)
-        if (_placementFor(provider, stage, candidate, tv) case final placement?)
-          placement,
+        // ExoClick's popunder chain does not settle in the hidden mid-play
+        // WebView; leave midroll to the next configured network.
+        if (!(stage == PlaybackAdStage.midPlay &&
+            candidate == AdNetwork.exoclick))
+          if (_placementFor(provider, stage, candidate, tv, force: force)
+              case final placement?)
+            placement,
     ];
   }
 
   PlaybackAdPlacement? _placementFor(AppDependencyProvider provider,
-      PlaybackAdStage stage, AdNetwork? network, bool tv) {
-    if (stage.triggerKey != null &&
+      PlaybackAdStage stage, AdNetwork? network, bool tv,
+      {bool force = false}) {
+    if (!force &&
+        stage.triggerKey != null &&
         provider.popupTrigger(stage)?.enabled != true) {
       return null;
     }
@@ -751,6 +795,23 @@ Future<bool> _waitForForeground() async {
   } finally {
     WidgetsBinding.instance.removeObserver(waiter);
   }
+}
+
+/// Carries the hidden mid-play ad above the player without painting over it
+/// or taking its touches. [PageRoute] would otherwise block the routes below
+/// with its modal barrier, even when that barrier has no color.
+class _TransparentPlaybackAdRoute<T> extends PageRouteBuilder<T> {
+  _TransparentPlaybackAdRoute({required WidgetBuilder builder, super.settings})
+      : super(
+          opaque: false,
+          requestFocus: false,
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+          pageBuilder: (context, _, __) => builder(context),
+        );
+
+  @override
+  Widget buildModalBarrier() => const IgnorePointer(child: SizedBox.shrink());
 }
 
 class _PlaybackForegroundWaiter extends WidgetsBindingObserver {

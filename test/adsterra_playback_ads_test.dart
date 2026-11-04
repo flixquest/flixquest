@@ -179,6 +179,36 @@ void main() {
     expect(await result, isTrue);
   }, variant: android);
 
+  test('popup minimum view is bounded to 1-15 seconds', () {
+    final config = AppDependencyProvider();
+    expect(config.playbackPopupMinimumView, const Duration(seconds: 3));
+    config.setPlaybackPopupMinimumViewSeconds(0);
+    expect(config.playbackPopupMinimumView, const Duration(seconds: 1));
+    config.setPlaybackPopupMinimumViewSeconds(999);
+    expect(config.playbackPopupMinimumView, const Duration(seconds: 15));
+  });
+
+  testWidgets('the minimum ad view follows Remote Config', (tester) async {
+    provider
+      ..setAdsterraPlaybackAdsConfig(
+          AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true))
+      ..setPlaybackPopupMinimumViewSeconds(1);
+    await pumpHost(tester);
+    final result = service.streamFound(host);
+    await pumpAd(tester);
+    final page = platform.controllers.single;
+    page.delegate!.onPageStarted!('https://advertiser.example/offer');
+    page.delegate!.onPageFinished!('https://advertiser.example/offer');
+    await tester.pump();
+    expect(find.text('Continue in 1'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Close ad'), findsOneWidget);
+    await tester.tap(find.byTooltip('Close ad'));
+    await tester.pumpAndSettle();
+    expect(await result, isTrue);
+  }, variant: android);
+
   testWidgets('remote automatic close ends a loaded popup at its max duration',
       (tester) async {
     provider.setAdsterraPlaybackAdsConfig(
@@ -834,7 +864,7 @@ void main() {
             }),
             enabled: true)
         .popunder!;
-    expect(config.loadTimeout, const Duration(seconds: 10));
+    expect(config.loadTimeout, const Duration(seconds: 30));
     expect(config.maxDuration, const Duration(seconds: 5));
   });
 
@@ -1448,8 +1478,12 @@ void main() {
           false);
       expect(remote.defaults[AppRemoteConfig.playerExitPopupMinWatchSecondsKey],
           60);
+      expect(
+          remote.defaults[AppRemoteConfig.playbackPopupMinimumViewSecondsKey],
+          3);
       provider = AppDependencyProvider();
       AppRemoteConfig.apply(remote, provider);
+      expect(provider.playbackPopupMinimumViewSeconds, 3);
       for (final stage in PlaybackAdStage.triggers) {
         expect(provider.popupTrigger(stage), isNull);
       }
@@ -1461,6 +1495,7 @@ void main() {
                 PlaybackAdStage.playerExit),
             45)
         ..setMockInt(AppRemoteConfig.playerExitPopupMinWatchSecondsKey, 120)
+        ..setMockInt(AppRemoteConfig.playbackPopupMinimumViewSecondsKey, 5)
         ..setMockBool(
             AppRemoteConfig.popupEnabledKey(PlaybackAdStage.episodeSwitch),
             false)
@@ -1470,6 +1505,7 @@ void main() {
             AppRemoteConfig.popupFrequencyMinutesKey(PlaybackAdStage.download),
             -5);
       AppRemoteConfig.apply(remote, provider);
+      expect(provider.playbackPopupMinimumViewSeconds, 5);
       expect(provider.popupTrigger(PlaybackAdStage.playerExit), (
         enabled: true,
         frequencyMinutes: 45,
@@ -1663,63 +1699,192 @@ void main() {
       expect(platform.controllers, hasLength(2));
     }, variant: android);
 
-    testWidgets('mid-play opens over a fullscreen route above the player',
+    testWidgets(
+        'mid-play loads invisibly over a fullscreen route and closes itself',
         (tester) async {
-      provider.setPopupTrigger(PlaybackAdStage.midPlay,
-          enabled: true, frequencyMinutes: 0);
-      await pumpHost(tester);
+      provider
+        ..setPlaybackPopupBrowserBehavior(
+            autoClose: false, externalBrowserOnTap: false)
+        ..setPopupTrigger(PlaybackAdStage.midPlay,
+            enabled: true, frequencyMinutes: 0);
+      final observer = _PlaybackRouteObserver();
+      await pumpHost(tester, observer: observer);
       final player = await pushRoute(tester, 'Player');
       // Fullscreen playback is its own route, so the player's is not current.
-      await pushRoute(tester, 'Fullscreen');
-      var pauses = 0;
-      final shown = service.midPlay(player, pause: () {
-        pauses++;
-        return true;
-      });
-      await closeVisibleAd(tester);
-      await shown;
-      expect(pauses, 1);
+      var taps = 0;
+      unawaited(Navigator.of(player).push(MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: TextButton(
+              onPressed: () => taps++,
+              child: const Text('Fullscreen'),
+            ),
+          ),
+        ),
+      )));
+      await tester.pumpAndSettle();
+      final shown = service.midPlay(player);
+      await pumpAd(tester);
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
       expect(platform.controllers, hasLength(1));
+      final route = observer.pushed.last;
+      expect(route is PageRoute && !route.opaque, isTrue);
+      expect(find.byKey(const ValueKey('mid-play-hidden-ad')), findsOneWidget);
+      // The hidden ad paints nothing and takes no taps, so the player below
+      // still shows and handles input.
+      await tester.tap(find.text('Fullscreen'));
+      await tester.pump();
+      expect(taps, 1);
+      final page = platform.controllers.last;
+      page.delegate!.onPageStarted!('https://advertiser.example/offer');
+      page.delegate!.onPageFinished!('https://advertiser.example/offer');
+      await tester.pump();
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
       expect(
           sharedPrefsSingleton
               .getInt('playback_ads.last_mid_play_popup_shown_at'),
           now.millisecondsSinceEpoch);
       expect(sharedPrefsSingleton.getInt(streamFoundKey), isNull);
+      // Hidden ads always close at their configured maximum duration, even
+      // with remote automatic close off.
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+      expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+      await shown;
       expect(find.text('Fullscreen'), findsOneWidget);
     }, variant: android);
 
-    testWidgets('mid-play never pauses when it cannot open', (tester) async {
+    testWidgets('mid-play stays closed when it cannot open', (tester) async {
       await pumpHost(tester);
       final player = await pushRoute(tester, 'Player');
-      var pauses = 0;
-      bool pause() {
-        pauses++;
-        return true;
-      }
 
       // Unpublished.
-      await service.midPlay(player, pause: pause);
+      await service.midPlay(player);
       provider.setPopupTrigger(PlaybackAdStage.midPlay,
           enabled: false, frequencyMinutes: 0);
-      await service.midPlay(player, pause: pause);
-      expect(pauses, 0);
+      await service.midPlay(player);
+      expect(platform.controllers, isEmpty);
 
       provider.setPopupTrigger(PlaybackAdStage.midPlay,
           enabled: true, frequencyMinutes: 0);
       DevicePresentationService.instance.isTelevision = true;
-      await service.midPlay(player, pause: pause);
+      await service.midPlay(player);
       DevicePresentationService.instance.isTelevision = false;
-      expect(pauses, 0);
-
-      // The player stopped wanting it (paused, left or finished meanwhile).
-      await service.midPlay(player, pause: () {
-        pauses++;
-        return false;
-      });
       await tester.pumpAndSettle();
-      expect(pauses, 1);
       expect(platform.controllers, isEmpty);
       expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+    }, variant: android);
+
+    testWidgets('mid-play simulator opens even when the trigger is off',
+        (tester) async {
+      provider
+        ..setAdsterraPlaybackAdsConfig(
+            AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true))
+        ..setPlaybackPopupBrowserBehavior(
+            autoClose: false, externalBrowserOnTap: false);
+      await pumpHost(tester);
+      final player = await pushRoute(tester, 'Player');
+      final shown = service.midPlay(player, force: true);
+      await pumpAd(tester);
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      expect(platform.controllers, hasLength(1));
+      final page = platform.controllers.single;
+      page.delegate!.onPageStarted!('https://advertiser.example/offer');
+      page.delegate!.onPageFinished!('https://advertiser.example/offer');
+      await tester.pump();
+      await tester.pump(AdsterraPlaybackAdScreen.minimumView);
+      // A simulated ad does not use up the real trigger's interval.
+      expect(
+          sharedPrefsSingleton
+              .getInt('playback_ads.last_mid_play_popup_shown_at'),
+          isNull);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+      await shown;
+    }, variant: android);
+
+    testWidgets('mid-play simulator can show the ad visibly', (tester) async {
+      final observer = _PlaybackRouteObserver();
+      await pumpHost(tester, observer: observer);
+      final player = await pushRoute(tester, 'Player');
+      final shown = service.midPlay(player, force: true, hidden: false);
+      await pumpAd(tester);
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      final route = observer.pushed.last;
+      expect(route is PageRoute && route.opaque, isTrue);
+      expect(find.byKey(const ValueKey('mid-play-hidden-ad')), findsNothing);
+      await closeVisibleAd(tester);
+      await shown;
+    }, variant: android);
+
+    testWidgets('hidden mid-play waits past load timeout until max duration',
+        (tester) async {
+      provider
+        ..setAdsterraPlaybackAdsConfig(
+            AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true))
+        ..setPlaybackPopupBrowserBehavior(
+            autoClose: false, externalBrowserOnTap: false);
+      await pumpHost(tester);
+      final player = await pushRoute(tester, 'Player');
+      final shown = service.midPlay(player, force: true);
+      await pumpAd(tester);
+      final page = platform.controllers.single;
+      page.contentReport = jsonEncode({
+        'ready': false,
+        'readyState': 'complete',
+        'textLength': 0,
+        'visibleElements': 0,
+        'title': 'Redirect',
+        'type': 'text/html',
+      });
+      page.delegate!.onPageStarted!('https://melbet.example/en');
+      page.delegate!.onPageFinished!('https://melbet.example/en');
+      await tester.pump();
+      // The 1s load timeout has passed, but a hidden ad keeps waiting.
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.byType(AdsterraPlaybackAdScreen), findsOneWidget);
+      // max_duration_seconds=5 still closes it.
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+      await shown;
+    }, variant: android);
+
+    testWidgets('hidden mid-play accepts text content without visible elements',
+        (tester) async {
+      provider
+        ..setPopupTrigger(PlaybackAdStage.midPlay,
+            enabled: true, frequencyMinutes: 0)
+        ..setAdsterraPlaybackAdsConfig(
+            AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true))
+        ..setPlaybackPopupBrowserBehavior(
+            autoClose: false, externalBrowserOnTap: false);
+      await pumpHost(tester);
+      final player = await pushRoute(tester, 'Player');
+      final shown = service.midPlay(player);
+      await pumpAd(tester);
+      final page = platform.controllers.single;
+      page.contentReport = jsonEncode({
+        'ready': false,
+        'readyState': 'complete',
+        'textLength': 152,
+        'visibleElements': 0,
+        'title': 'AdZilla: The Ad-Eating Dino of Solana',
+        'type': 'text/html',
+      });
+      page.delegate!.onPageStarted!('https://adzilla.example/burn/');
+      page.delegate!.onPageFinished!('https://adzilla.example/burn/');
+      await tester.pump();
+      await tester.pump();
+      // Accepted as a loaded ad, so the trigger timestamp is recorded.
+      expect(
+          sharedPrefsSingleton
+              .getInt('playback_ads.last_mid_play_popup_shown_at'),
+          now.millisecondsSinceEpoch);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      await shown;
     }, variant: android);
 
     testWidgets('unpublished switches keep the stream-found popup',
@@ -4215,6 +4380,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(await result, isTrue);
     }
+
+    testWidgets('mid-play skips ExoClick and starts with the next network',
+        (tester) async {
+      provider.setAdsterraPlaybackAdsConfig(
+          AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));
+      await pumpHost(tester);
+      final shown = service.midPlay(host, force: true);
+      await pumpAd(tester);
+      expect(platform.controllers, hasLength(1));
+      expect(web(platform.controllers.single), [adsterra]);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.byType(AdsterraPlaybackAdScreen), findsNothing);
+      await shown;
+    }, variant: android);
 
     testWidgets('an ExoClick popup with no ad hands over to Adsterra in place',
         (tester) async {

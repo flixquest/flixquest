@@ -26,6 +26,7 @@ class AppRemoteConfig {
   static const enableWatchNowKey = 'enable_stream';
   static const enableDownloadKey = 'enable_download';
   static const enableLiveTvKey = 'enable_live_tv';
+
   /// The ad-blocker check that judges only live Adsterra/ExoClick hosts and
   /// popups. Builds before it read `ad_block_gate_enabled`, whose generic
   /// probes stopped viewers who still saw ads; that key stays off for them.
@@ -58,6 +59,8 @@ class AppRemoteConfig {
       'playback_popup_auto_close_enabled';
   static const playbackPopupExternalBrowserOnTapKey =
       'playback_popup_external_browser_on_tap';
+  static const playbackPopupMinimumViewSecondsKey =
+      'playback_popup_minimum_view_seconds';
   static const tvPlaybackPopunderNetworkKey = 'tv_playback_popunder_network';
   static const tvPlaybackPopupFrequencyMinutesKey =
       'tv_playback_popup_frequency_minutes';
@@ -154,6 +157,7 @@ class AppRemoteConfig {
         playbackPopupFrequencyMinutesKey: 0,
         playbackPopupAutoCloseEnabledKey: false,
         playbackPopupExternalBrowserOnTapKey: true,
+        playbackPopupMinimumViewSecondsKey: 3,
         for (final stage in PlaybackAdStage.triggers) ...{
           popupEnabledKey(stage): false,
           popupFrequencyMinutesKey(stage): 0,
@@ -358,6 +362,8 @@ class AppRemoteConfig {
         remoteConfig.getString(playbackPopunderFallbackKey)));
     provider.setPlaybackPopupFrequencyMinutes(
         remoteConfig.getValue(playbackPopupFrequencyMinutesKey).asInt());
+    provider.setPlaybackPopupMinimumViewSeconds(
+        remoteConfig.getValue(playbackPopupMinimumViewSecondsKey).asInt());
     provider.setPlaybackPopupBrowserBehavior(
       autoClose: remoteConfig.getBool(playbackPopupAutoCloseEnabledKey),
       externalBrowserOnTap:

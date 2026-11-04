@@ -277,8 +277,7 @@ class PlaybackAdPlacement {
       network: network,
       zoneId: network == AdNetwork.adsterra ? null : zoneId,
       loadTimeout: Duration(
-          milliseconds: _bounded(value['load_timeout_ms'], 5000, 500,
-              network == AdNetwork.monetag ? 30000 : 10000)),
+          milliseconds: _bounded(value['load_timeout_ms'], 5000, 500, 30000)),
       maxDuration: Duration(
           seconds: _bounded(value['max_duration_seconds'], 30, 5, 120)),
       closeFallback: Duration(
