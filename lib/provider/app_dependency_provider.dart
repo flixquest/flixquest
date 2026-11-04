@@ -10,6 +10,7 @@ import '../models/banner_ad.dart';
 import '../preferences/app_dependency_preferences.dart';
 import '../models/banner_ads_config.dart';
 import '../models/adsterra_playback_ads_config.dart';
+import '../models/mid_play_schedule_config.dart';
 import '../models/vast_preroll_config.dart';
 
 class AppDependencyProvider extends ChangeNotifier {
@@ -215,6 +216,16 @@ class AppDependencyProvider extends ChangeNotifier {
     final normalized = seconds < 1 ? 1 : (seconds > 15 ? 15 : seconds);
     if (_playbackPopupMinimumViewSeconds == normalized) return;
     _playbackPopupMinimumViewSeconds = normalized;
+    notifyListeners();
+  }
+
+  /// How many mid-play ads each video length gets.
+  MidPlayScheduleConfig _midPlaySchedule = const MidPlayScheduleConfig();
+  MidPlayScheduleConfig get midPlaySchedule => _midPlaySchedule;
+
+  void setMidPlaySchedule(MidPlayScheduleConfig config) {
+    if (_midPlaySchedule == config) return;
+    _midPlaySchedule = config;
     notifyListeners();
   }
 

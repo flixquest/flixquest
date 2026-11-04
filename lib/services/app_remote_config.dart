@@ -9,6 +9,7 @@ import '../models/banner_ad.dart';
 import '../provider/app_dependency_provider.dart';
 import '../models/banner_ads_config.dart';
 import '../models/adsterra_playback_ads_config.dart';
+import '../models/mid_play_schedule_config.dart';
 import '../models/vast_preroll_config.dart';
 import 'app_update_service.dart';
 import 'remote_config_refresh_controller.dart';
@@ -61,6 +62,7 @@ class AppRemoteConfig {
       'playback_popup_external_browser_on_tap';
   static const playbackPopupMinimumViewSecondsKey =
       'playback_popup_minimum_view_seconds';
+  static const midPlayPopupScheduleKey = 'mid_play_popup_schedule';
   static const tvPlaybackPopunderNetworkKey = 'tv_playback_popunder_network';
   static const tvPlaybackPopupFrequencyMinutesKey =
       'tv_playback_popup_frequency_minutes';
@@ -158,6 +160,7 @@ class AppRemoteConfig {
         playbackPopupAutoCloseEnabledKey: false,
         playbackPopupExternalBrowserOnTapKey: true,
         playbackPopupMinimumViewSecondsKey: 3,
+        midPlayPopupScheduleKey: '{}',
         for (final stage in PlaybackAdStage.triggers) ...{
           popupEnabledKey(stage): false,
           popupFrequencyMinutesKey(stage): 0,
@@ -364,6 +367,8 @@ class AppRemoteConfig {
         remoteConfig.getValue(playbackPopupFrequencyMinutesKey).asInt());
     provider.setPlaybackPopupMinimumViewSeconds(
         remoteConfig.getValue(playbackPopupMinimumViewSecondsKey).asInt());
+    provider.setMidPlaySchedule(MidPlayScheduleConfig.parse(
+        remoteConfig.getString(midPlayPopupScheduleKey)));
     provider.setPlaybackPopupBrowserBehavior(
       autoClose: remoteConfig.getBool(playbackPopupAutoCloseEnabledKey),
       externalBrowserOnTap:

@@ -1521,6 +1521,17 @@ void main() {
       expect(provider.popupTrigger(PlaybackAdStage.movieSwitch), isNull);
     });
 
+    test('mid-play counts come from Remote Config', () async {
+      final remote = FakeFirebaseRemoteConfig();
+      await AppRemoteConfig.configure(remote);
+      expect(remote.defaults[AppRemoteConfig.midPlayPopupScheduleKey], '{}');
+      remote.setMockString(AppRemoteConfig.midPlayPopupScheduleKey,
+          '{"ranges":[{"min_duration_minutes":0,"count":2}]}');
+      final config = AppDependencyProvider();
+      AppRemoteConfig.apply(remote, config);
+      expect(config.midPlaySchedule.countFor(const Duration(minutes: 30)), 2);
+    });
+
     test('a catalog may give each its own zone, else it uses the popunder', () {
       const ownZones = '''{
         "popunder":{"enabled":true,"script_url":"https://ads.example/pop"},

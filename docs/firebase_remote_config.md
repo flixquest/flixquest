@@ -1310,6 +1310,24 @@ off, cooling down or has no placement leaves the video playing.
 | `movie_switch_popup_frequency_minutes` | Number | `0` | As `episode_switch_popup_frequency_minutes`, for movie switches. |
 | `mid_play_popup_enabled` | Boolean | Unpublished (off) | Switch for the mid-play popup. Must be published remotely. |
 | `mid_play_popup_frequency_minutes` | Number | `0` | Minimum whole minutes between mid-play popups. Keep it `0`, or below the gap between slots (about 6:40 in a 20-minute video), or later slots in the same video are skipped. |
+| `mid_play_popup_schedule` | String (JSON) | `{}` | How many mid-play ads each video length gets. `{}` or an unpublished key keeps the built-in counts (none under 15 minutes, 1 under 20, 2 under 30, 3 under 60, 4 from 60). `{"ranges":[]}` disables mid-play ads. Each range has `min_duration_minutes`, an optional `max_duration_minutes` (omitted means no upper bound) and `count` (0–10). Ranges are half-open and must not overlap; invalid JSON keeps the default. |
+
+For example, this publishes the built-in schedule explicitly:
+
+```json
+{
+  "ranges": [
+    {"min_duration_minutes": 15, "max_duration_minutes": 20, "count": 1},
+    {"min_duration_minutes": 20, "max_duration_minutes": 30, "count": 2},
+    {"min_duration_minutes": 30, "max_duration_minutes": 60, "count": 3},
+    {"min_duration_minutes": 60, "count": 4}
+  ]
+}
+```
+
+Slots are still spread evenly through the video. A 21-minute video with
+`count: 2` gets ads at 7:00 and 14:00; a 2-hour video with `count: 4` gets them
+at 24, 48, 72 and 96 minutes.
 
 Missing, invalid or negative intervals fall back to `0`. Turning a switch off
 closes an open popup of that trigger.

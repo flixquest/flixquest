@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flixquest/models/mid_play_schedule_config.dart';
 import 'package:flixquest/screens/common/player/player_mid_play_popups.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -30,6 +33,65 @@ void main() {
 
     test('an unknown length has none', () {
       expect(MidPlayPopupSchedule.slotsFor(Duration.zero), isEmpty);
+    });
+  });
+
+  group('config', () {
+    test('missing or malformed JSON keeps the built-in ranges', () {
+      expect(MidPlayScheduleConfig.parse('{}'), const MidPlayScheduleConfig());
+      expect(MidPlayScheduleConfig.parse('not json'),
+          const MidPlayScheduleConfig());
+      expect(MidPlayScheduleConfig.parse('{"ranges":"nope"}'),
+          const MidPlayScheduleConfig());
+    });
+
+    test('custom ranges set the count for each half-open range', () {
+      final config = MidPlayScheduleConfig.parse(jsonEncode({
+        'ranges': [
+          {'min_duration_minutes': 0, 'max_duration_minutes': 10, 'count': 2},
+          {'min_duration_minutes': 10, 'count': 1},
+        ],
+      }));
+      expect(MidPlayPopupSchedule.slotsFor(minutes(9), config: config),
+          [minutes(3), minutes(6)]);
+      expect(MidPlayPopupSchedule.slotsFor(minutes(10), config: config),
+          [minutes(5)]);
+      expect(MidPlayPopupSchedule.slotsFor(minutes(120), config: config),
+          [minutes(60)]);
+    });
+
+    test('an empty range list disables mid-play ads', () {
+      final config = MidPlayScheduleConfig.parse('{"ranges":[]}');
+      expect(config.ranges, isEmpty);
+      expect(
+          MidPlayPopupSchedule.slotsFor(minutes(120), config: config), isEmpty);
+    });
+
+    test('overlapping or invalid ranges keep the built-in ranges', () {
+      expect(
+          MidPlayScheduleConfig.parse(jsonEncode({
+            'ranges': [
+              {
+                'min_duration_minutes': 0,
+                'max_duration_minutes': 20,
+                'count': 2
+              },
+              {
+                'min_duration_minutes': 10,
+                'max_duration_minutes': 30,
+                'count': 1
+              },
+            ],
+          })),
+          const MidPlayScheduleConfig());
+      expect(
+          MidPlayScheduleConfig.parse(
+              '{"ranges":[{"min_duration_minutes":30,"max_duration_minutes":20,"count":1}]}'),
+          const MidPlayScheduleConfig());
+      expect(
+          MidPlayScheduleConfig.parse(
+              '{"ranges":[{"min_duration_minutes":0,"count":11}]}'),
+          const MidPlayScheduleConfig());
     });
   });
 

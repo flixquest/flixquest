@@ -1,6 +1,7 @@
 import 'package:flixquest/widgets/adsterra_playback_gate.dart';
 import 'package:flixquest/data/ads/content_ads.dart';
 import 'package:flixquest/models/adsterra_playback_ads_config.dart';
+import 'package:flixquest/models/mid_play_schedule_config.dart';
 import 'package:flixquest/services/adsterra_playback_ads_service.dart';
 import 'package:flixquest/widgets/playback_action.dart';
 // ignore_for_file: deprecated_member_use
@@ -874,9 +875,16 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   void _observeMidPlaySlot(
       Duration position, Duration duration, VideoPlayerValue value) {
     if (_midPlayPopupOpen) return;
+    final scheduleConfig =
+        Provider.of<AppDependencyProvider?>(context, listen: false)
+                ?.midPlaySchedule ??
+            const MidPlayScheduleConfig();
     var schedule = _midPlaySchedule;
-    if (schedule == null || !schedule.fits(duration)) {
-      schedule = _midPlaySchedule = MidPlayPopupSchedule(duration);
+    if (schedule == null ||
+        !schedule.fits(duration) ||
+        schedule.config != scheduleConfig) {
+      schedule = _midPlaySchedule =
+          MidPlayPopupSchedule(duration, config: scheduleConfig);
     }
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     final eligible = value.isPlaying &&
