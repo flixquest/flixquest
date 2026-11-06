@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -15,18 +16,21 @@ import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../design/skeleton.dart';
 import '../../mobile/widgets/filter_chips.dart';
+import '../../mobile/widgets/media_art.dart' show ArtSize, tmdbImageUrl;
 import '../../mobile/widgets/page_kit.dart';
 import '../../mobile/widgets/pill_button.dart';
 import '../../mobile/widgets/settings_kit.dart' show SheetTitle;
 import '../../models/wellness.dart';
 import '../../models/wellness_insights.dart';
 import '../../models/wellness_recap.dart';
+import '../../models/wellness_recap_story.dart';
 import '../../models/wellness_time_series.dart';
 import '../../provider/wellness_provider.dart';
 import '../../services/wellness_sync_service.dart';
 import '../../ui_components/app_ui_components.dart';
 import '../../widgets/wellness_charts.dart';
 import 'widgets/insights_dashboard.dart';
+import 'widgets/share_recap_card.dart';
 
 class WellnessScreen extends StatefulWidget {
   const WellnessScreen({super.key});
@@ -462,8 +466,6 @@ class _InsightsActionsSheet extends StatelessWidget {
   }
 }
 
-enum _RecapStyle { light, dark, lightsOut }
-
 class _ShareRecapSheet extends StatefulWidget {
   const _ShareRecapSheet({
     required this.sessions,
@@ -479,9 +481,11 @@ class _ShareRecapSheet extends StatefulWidget {
 
 class _ShareRecapSheetState extends State<_ShareRecapSheet> {
   final GlobalKey _recapKey = GlobalKey();
-  late _RecapStyle _style;
+  late ShareRecapStyle _style;
   late WellnessRecapPeriod _period;
-  bool _includeTopTitle = true;
+  ShareRecapFormat _format = ShareRecapFormat.post;
+  bool _includeTitles = true;
+  bool _includeHabits = true;
   bool _sharing = false;
 
   @override
@@ -490,32 +494,80 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
     if (!mounted || _styleInitialized) return;
     final theme = Theme.of(context);
     _style = theme.brightness == Brightness.light
-        ? _RecapStyle.light
+        ? ShareRecapStyle.light
         : _isLightsOut(context)
-            ? _RecapStyle.lightsOut
-            : _RecapStyle.dark;
+            ? ShareRecapStyle.lightsOut
+            : ShareRecapStyle.dark;
     _period = widget.initialPeriod;
     _styleInitialized = true;
   }
 
   bool _styleInitialized = false;
 
-  WellnessInsights get _insights => WellnessInsights.fromSessions(
+  WellnessRecapStory? _cachedStory;
+
+  /// Rebuilt only when the period changes: the sheet rebuilds on every toggle
+  /// and this walks the whole history.
+  WellnessRecapStory get _story {
+    final cached = _cachedStory;
+    if (cached != null && cached.period.id == _period.id) return cached;
+    final story = WellnessRecapStory.of(
+      WellnessInsights.fromSessions(
         widget.sessions,
         period: _period.wellnessPeriod,
-      );
+      ),
+      _period,
+    );
+    _cachedStory = story;
+    return story;
+  }
 
   String get _caption {
-    final insights = _insights;
-    final title = _includeTopTitle && insights.topTitles.isNotEmpty
+    final story = _story;
+    final insights = story.insights;
+    final title = _includeTitles && insights.topTitles.isNotEmpty
         ? tr('ins_caption_top',
             namedArgs: {'title': insights.topTitles.first.label})
         : '';
+    final profile = _includeHabits ? story.profile : null;
+    final type = profile == null
+        ? ''
+        : tr('ins_caption_type',
+            namedArgs: {'type': shareRecapTypeName(profile.type)});
     return '${tr('ins_caption', namedArgs: {
           'period': _recapCaptionLabel(_period),
           'time': _duration(insights.totalWatchedMs),
           'days': plural('ins_active_days', insights.activeDays),
-        })}$title';
+        })}$title$type flix.quest';
+  }
+
+  /// Session artwork is a TMDB path, except that downloads record whatever
+  /// they were saved with: a full URL or a file on this device.
+  ImageProvider? _artFor(String path, ShareRecapArtKind kind) {
+    if (path.startsWith('http')) return CachedNetworkImageProvider(path);
+    if (path.lastIndexOf('/') > 0) return FileImage(File(path));
+    final url = tmdbImageUrl(
+      context,
+      path,
+      size: kind == ShareRecapArtKind.poster ? 'w500/' : ArtSize.still,
+      listen: false,
+    );
+    return url == null ? null : CachedNetworkImageProvider(url);
+  }
+
+  /// Waits for the artwork the card draws. One that fails is left to the
+  /// card's fallback, and a slow network can't hold the export forever.
+  Future<void> _loadArtwork() async {
+    final artwork = ShareRecapCard.artworkOf(
+      story: _story,
+      format: _format,
+      includeTitles: _includeTitles,
+      artFor: _artFor,
+    );
+    await Future.wait<void>([
+      for (final image in artwork)
+        precacheImage(image, context, onError: (_, __) {}),
+    ]).timeout(const Duration(seconds: 8), onTimeout: () => const []);
   }
 
   Future<void> _copyCaption() async {
@@ -533,16 +585,23 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
         const AssetImage('assets/images/logo.png'),
         context,
       );
+      await _loadArtwork();
+      if (!mounted) return;
+      // One frame for the images to swap in, one for it to reach the layer
+      // the boundary captures.
+      await WidgetsBinding.instance.endOfFrame;
       await WidgetsBinding.instance.endOfFrame;
       final boundary = _recapKey.currentContext?.findRenderObject()
           as RenderRepaintBoundary?;
       if (boundary == null) throw StateError('Recap preview is not ready');
-      final image = await boundary.toImage(pixelRatio: 3.5);
+      final image = await boundary.toImage(
+        pixelRatio: _format.pixelRatioFor(boundary.size.width),
+      );
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) throw StateError('Could not render recap image');
       final directory = await getTemporaryDirectory();
       final file = File(
-        '${directory.path}/flixquest-${_period.id}-recap.png',
+        '${directory.path}/flixquest-${_period.id}-${_format.name}-recap.png',
       );
       await file.writeAsBytes(byteData.buffer.asUint8List(), flush: true);
       if (!mounted) return;
@@ -567,10 +626,26 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
     }
   }
 
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 18, bottom: 8),
+      child: Text(
+        text.toUpperCase(),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontFamily: 'FigtreeSB',
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.1,
+            ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final insights = _insights;
+    final story = _story;
+    final isEmpty = story.insights.isEmpty;
     final periods = WellnessRecapPeriod.available(
       widget.sessions,
       DateTime.now(),
@@ -584,193 +659,238 @@ class _ShareRecapSheetState extends State<_ShareRecapSheet> {
       clipBehavior: Clip.antiAlias,
       child: DraggableScrollableSheet(
         expand: false,
-        initialChildSize: .9,
+        initialChildSize: .92,
         minChildSize: .65,
         maxChildSize: .96,
-        builder: (context, scrollController) => ListView(
-          controller: scrollController,
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+        builder: (context, scrollController) => Column(
           children: [
-            Center(
-              child: Container(
-                width: 38,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: colors.outlineVariant,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tr('ins_share_story'),
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        tr('ins_share_story_desc'),
-                        style: TextStyle(color: colors.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  tooltip: tr('close'),
-                  onPressed: () => Navigator.pop(context),
-                  icon: Icon(PhosphorIcons.x()),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Text(
-              tr('ins_recap_period').toUpperCase(),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                    fontFamily: 'FigtreeSB',
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.1,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 40,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: periods.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final period = periods[index];
-                  final selected = period.id == _period.id;
-                  return ChoicePill(
-                    spec: FilterChipSpec(
-                      label: _recapPeriodLabel(period),
-                      selected: selected,
-                      onTap: () => setState(() => _period = period),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              tr('ins_themes').toUpperCase(),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                    fontFamily: 'FigtreeSB',
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.1,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _RecapStyleChip(
-                    label: tr('ins_theme_light'),
-                    colors: const [Color(0xFFFAF9FC), Color(0xFFF57C00)],
-                    selected: _style == _RecapStyle.light,
-                    onTap: () => setState(() => _style = _RecapStyle.light),
-                  ),
-                  const SizedBox(width: 8),
-                  _RecapStyleChip(
-                    label: tr('ins_theme_dark'),
-                    colors: const [Color(0xFF181A1D), Color(0xFFF57C00)],
-                    selected: _style == _RecapStyle.dark,
-                    onTap: () => setState(() => _style = _RecapStyle.dark),
-                  ),
-                  const SizedBox(width: 8),
-                  _RecapStyleChip(
-                    label: tr('ins_theme_lights_out'),
-                    colors: const [Color(0xFF000000), Color(0xFFF57C00)],
-                    selected: _style == _RecapStyle.lightsOut,
-                    onTap: () => setState(() => _style = _RecapStyle.lightsOut),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 380),
-                child: RepaintBoundary(
-                  key: _recapKey,
-                  child: AspectRatio(
-                    aspectRatio: 4 / 5,
-                    child: FittedBox(
-                      fit: BoxFit.fill,
-                      child: SizedBox(
-                        width: 380,
-                        height: 475,
-                        child: _ShareRecapCard(
-                          insights: insights,
-                          period: _period,
-                          style: _style,
-                          includeTopTitle: _includeTopTitle,
+            Expanded(
+              // Not a ListView: the preview has to stay built and painted to
+              // be captured, however far the options below it are scrolled.
+              child: SingleChildScrollView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 38,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: colors.outlineVariant,
+                          borderRadius: BorderRadius.circular(99),
                         ),
                       ),
                     ),
-                  ),
-                ),
-              ),
-            ),
-            if (insights.isEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                tr('ins_not_enough', namedArgs: {
-                  'period': _recapPeriodLabel(_period).toLowerCase()
-                }),
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
+                    const SizedBox(height: 16),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                tr('ins_share_story'),
+                                style:
+                                    Theme.of(context).textTheme.headlineSmall,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                tr('ins_share_story_desc'),
+                                style:
+                                    TextStyle(color: colors.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: tr('close'),
+                          onPressed: () => Navigator.pop(context),
+                          icon: Icon(PhosphorIcons.x()),
+                        ),
+                      ],
                     ),
-              ),
-            ],
-            const SizedBox(height: 14),
-            Container(
-              decoration: BoxDecoration(
-                color: _insightSurface(context),
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: SwitchListTile.adaptive(
-                value: _includeTopTitle,
-                onChanged: (value) => setState(() => _includeTopTitle = value),
-                secondary: Icon(PhosphorIcons.eye()),
-                title: Text(tr('ins_include_top')),
-                subtitle: Text(tr('ins_include_top_desc')),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          // Small enough to keep the period and format choices
+                          // on screen beneath it.
+                          maxWidth:
+                              _format == ShareRecapFormat.post ? 280 : 240,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: RepaintBoundary(
+                            key: _recapKey,
+                            child: AspectRatio(
+                              aspectRatio: _format.aspectRatio,
+                              child: ShareRecapCard(
+                                story: story,
+                                format: _format,
+                                style: _style,
+                                includeTitles: _includeTitles,
+                                includeHabits: _includeHabits,
+                                artFor: _artFor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (isEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        tr('ins_not_enough', namedArgs: {
+                          'period': _recapPeriodLabel(_period).toLowerCase()
+                        }),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                    _sectionLabel(tr('ins_recap_period')),
+                    SizedBox(
+                      height: 40,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: periods.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final period = periods[index];
+                          return ChoicePill(
+                            spec: FilterChipSpec(
+                              label: _recapPeriodLabel(period),
+                              selected: period.id == _period.id,
+                              onTap: () => setState(() => _period = period),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    _sectionLabel(tr('ins_format')),
+                    Row(
+                      children: [
+                        for (final format in ShareRecapFormat.values) ...[
+                          ChoicePill(
+                            spec: FilterChipSpec(
+                              label: format == ShareRecapFormat.post
+                                  ? tr('ins_format_post')
+                                  : tr('ins_format_story'),
+                              selected: format == _format,
+                              onTap: () => setState(() => _format = format),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                      ],
+                    ),
+                    _sectionLabel(tr('ins_themes')),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _RecapStyleChip(
+                            label: tr('ins_theme_light'),
+                            colors: const [
+                              Color(0xFFFAF9FC),
+                              Color(0xFFF57C00)
+                            ],
+                            selected: _style == ShareRecapStyle.light,
+                            onTap: () =>
+                                setState(() => _style = ShareRecapStyle.light),
+                          ),
+                          const SizedBox(width: 8),
+                          _RecapStyleChip(
+                            label: tr('ins_theme_dark'),
+                            colors: const [
+                              Color(0xFF181A1D),
+                              Color(0xFFF57C00)
+                            ],
+                            selected: _style == ShareRecapStyle.dark,
+                            onTap: () =>
+                                setState(() => _style = ShareRecapStyle.dark),
+                          ),
+                          const SizedBox(width: 8),
+                          _RecapStyleChip(
+                            label: tr('ins_theme_lights_out'),
+                            colors: const [
+                              Color(0xFF000000),
+                              Color(0xFFF57C00)
+                            ],
+                            selected: _style == ShareRecapStyle.lightsOut,
+                            onTap: () => setState(
+                                () => _style = ShareRecapStyle.lightsOut),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: _insightSurface(context),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Column(
+                        children: [
+                          SwitchListTile.adaptive(
+                            value: _includeTitles,
+                            onChanged: (value) =>
+                                setState(() => _includeTitles = value),
+                            secondary: Icon(PhosphorIcons.filmStrip()),
+                            title: Text(tr('ins_include_top')),
+                            subtitle: Text(tr('ins_include_top_desc')),
+                          ),
+                          SwitchListTile.adaptive(
+                            value: _includeHabits,
+                            onChanged: (value) =>
+                                setState(() => _includeHabits = value),
+                            secondary: Icon(PhosphorIcons.eye()),
+                            title: Text(tr('ins_include_habits')),
+                            subtitle: Text(tr('ins_include_habits_desc')),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: PillButton(
-                    height: 48,
-                    onPressed: insights.isEmpty ? null : _copyCaption,
-                    icon: PhosphorIcons.copy(),
-                    label: tr('ins_copy_caption'),
+            // Pinned, so sharing never means scrolling past every option.
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                10,
+                20,
+                MediaQuery.paddingOf(context).bottom + 14,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: PillButton(
+                      height: 48,
+                      onPressed: isEmpty ? null : _copyCaption,
+                      icon: PhosphorIcons.copy(),
+                      label: tr('ins_copy_caption'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: PillButton(
-                    primary: true,
-                    height: 48,
-                    busy: _sharing,
-                    onPressed: insights.isEmpty ? null : _shareImage,
-                    icon: PhosphorIcons.shareNetwork(),
-                    label:
-                        _sharing ? tr('ins_creating') : tr('ins_share_image'),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: PillButton(
+                      primary: true,
+                      height: 48,
+                      busy: _sharing,
+                      onPressed: isEmpty ? null : _shareImage,
+                      icon: PhosphorIcons.shareNetwork(),
+                      label:
+                          _sharing ? tr('ins_creating') : tr('ins_share_image'),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -835,365 +955,6 @@ class _RecapStyleChip extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ShareRecapCard extends StatelessWidget {
-  const _ShareRecapCard({
-    required this.insights,
-    required this.period,
-    required this.style,
-    required this.includeTopTitle,
-  });
-
-  final WellnessInsights insights;
-  final WellnessRecapPeriod period;
-  final _RecapStyle style;
-  final bool includeTopTitle;
-
-  @override
-  Widget build(BuildContext context) {
-    const appAccent = Color(0xFFF57C00);
-    final palette = switch (style) {
-      _RecapStyle.light => (
-          const Color(0xFFFAF9FC),
-          const Color(0xFFF1EDF6),
-          const Color(0xFFEAE3F2),
-          appAccent,
-          const Color(0xFF211D26),
-        ),
-      _RecapStyle.dark => (
-          const Color(0xFF272A2E),
-          const Color(0xFF181A1D),
-          const Color(0xFF101113),
-          appAccent,
-          Colors.white,
-        ),
-      _RecapStyle.lightsOut => (
-          Colors.black,
-          const Color(0xFF080808),
-          const Color(0xFF131313),
-          appAccent,
-          Colors.white,
-        ),
-    };
-    final foreground = palette.$5;
-    final bars = _recapBarData(insights, period);
-    final maxBar =
-        bars.fold<int>(0, (max, item) => item.value > max ? item.value : max);
-    final topTitle = insights.topTitles.firstOrNull?.label;
-    final topGenre = insights.topGenres.firstOrNull?.label;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [palette.$1, palette.$2, palette.$3],
-          stops: const [0, .55, 1],
-        ),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Positioned(
-            right: -70,
-            top: -80,
-            child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: foreground.withValues(alpha: .09),
-                  width: 44,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: -40,
-            bottom: 80,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: palette.$4.withValues(alpha: .08),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(5),
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        width: 34,
-                        height: 34,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'FLIXQUEST',
-                      style: TextStyle(
-                        color: foreground,
-                        fontFamily: 'FigtreeSB',
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.15,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 9, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: foreground.withValues(alpha: .1),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: foreground.withValues(alpha: .13),
-                        ),
-                      ),
-                      child: Text(
-                        _recapPeriodLabel(period).toUpperCase(),
-                        style: TextStyle(
-                          color: foreground,
-                          fontFamily: 'FigtreeSB',
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: .8,
-                          fontSize: 9,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 25),
-                Text(
-                  tr('ins_card_story').toUpperCase(),
-                  style: TextStyle(
-                    color: foreground.withValues(alpha: .7),
-                    fontFamily: 'FigtreeSB',
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2.2,
-                    height: 1.12,
-                    fontSize: 11,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _duration(insights.totalWatchedMs),
-                  style: TextStyle(
-                    color: foreground,
-                    fontFamily: 'FigtreeBlack',
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -2,
-                    height: .98,
-                    fontSize: 45,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  tr('ins_card_playback'),
-                  style: TextStyle(
-                    color: foreground.withValues(alpha: .76),
-                    fontFamily: 'Figtree',
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
-                  ),
-                ),
-                const Spacer(),
-                if (includeTopTitle && topTitle != null) ...[
-                  Text(
-                    tr('ins_most_watched').toUpperCase(),
-                    style: TextStyle(
-                      color: palette.$4,
-                      fontFamily: 'FigtreeSB',
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.25,
-                      fontSize: 9,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    topTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: foreground,
-                      fontFamily: 'FigtreeSB',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (topGenre != null)
-                    Text(
-                      tr('ins_top_genre', namedArgs: {'genre': topGenre}),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: foreground.withValues(alpha: .62),
-                        fontFamily: 'Figtree',
-                        fontSize: 10,
-                      ),
-                    ),
-                  const SizedBox(height: 14),
-                ],
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: _RecapMetric(
-                        value: '${insights.completedTitles}',
-                        label: tr('ins_completed'),
-                        foreground: foreground,
-                      ),
-                    ),
-                    Expanded(
-                      child: _RecapMetric(
-                        value: '${insights.activeDays}',
-                        label: tr('ins_active_days_label'),
-                        foreground: foreground,
-                      ),
-                    ),
-                    Expanded(
-                      child: _RecapMetric(
-                        value: '${insights.sessionCount}',
-                        label: tr('ins_sessions'),
-                        foreground: foreground,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 15),
-                SizedBox(
-                  height: 42,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      for (final bar in bars)
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 2),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Expanded(
-                                  child: Align(
-                                    alignment: Alignment.bottomCenter,
-                                    child: FractionallySizedBox(
-                                      heightFactor: maxBar == 0
-                                          ? .08
-                                          : .12 + .88 * (bar.value / maxBar),
-                                      widthFactor: 1,
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          color:
-                                              maxBar > 0 && bar.value == maxBar
-                                                  ? palette.$4
-                                                  : foreground.withValues(
-                                                      alpha: .26,
-                                                    ),
-                                          borderRadius:
-                                              const BorderRadius.vertical(
-                                            top: Radius.circular(4),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  bar.label,
-                                  style: TextStyle(
-                                    color: foreground.withValues(alpha: .58),
-                                    fontFamily: 'Figtree',
-                                    fontSize: 7,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Icon(PhosphorIcons.lockKey(),
-                        color: foreground.withValues(alpha: .52), size: 10),
-                    const SizedBox(width: 4),
-                    Text(
-                      tr('ins_active_only'),
-                      style: TextStyle(
-                        color: foreground.withValues(alpha: .52),
-                        fontFamily: 'Figtree',
-                        fontSize: 8,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      DateFormat.yMMMd().format(DateTime.now()),
-                      style: TextStyle(
-                        color: foreground.withValues(alpha: .52),
-                        fontFamily: 'Figtree',
-                        fontSize: 8,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RecapMetric extends StatelessWidget {
-  const _RecapMetric({
-    required this.value,
-    required this.label,
-    required this.foreground,
-  });
-
-  final String value;
-  final String label;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            color: foreground,
-            fontFamily: 'FigtreeSB',
-            fontWeight: FontWeight.w800,
-            fontSize: 17,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            color: foreground.withValues(alpha: .6),
-            fontFamily: 'Figtree',
-            fontSize: 9,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -3798,14 +3559,7 @@ double _contrastRatio(Color first, Color second) {
   return (lighter + .05) / (darker + .05);
 }
 
-String _duration(int milliseconds) {
-  final duration = Duration(milliseconds: milliseconds.abs());
-  final hours = duration.inHours;
-  final minutes = duration.inMinutes.remainder(60);
-  if (hours == 0) return '${minutes}m';
-  if (minutes == 0) return '${hours}h';
-  return '${hours}h ${minutes}m';
-}
+String _duration(int milliseconds) => formatWatchedTime(milliseconds);
 
 String _share(int value, int total) =>
     total <= 0 ? '0%' : '${(value / total * 100).round()}%';
@@ -3898,21 +3652,6 @@ String _rangeName(WellnessRange range) => switch (range) {
       WellnessRange.year => tr('ins_range_year'),
       WellnessRange.allTime => tr('ins_range_all'),
     };
-
-/// The recap card's bars come from the same bucketing as the live chart, so a
-/// shared recap can never disagree with the screen it was shared from.
-List<WellnessBarDatum> _recapBarData(
-  WellnessInsights insights,
-  WellnessRecapPeriod period,
-) =>
-    WellnessTimeSeries.forRecap(insights, period)
-        .buckets
-        .map((bucket) => WellnessBarDatum(
-              label: bucket.label,
-              value: bucket.totalMs,
-              fullLabel: bucket.fullLabel,
-            ))
-        .toList(growable: false);
 
 /// Viewing Insights' shape while the history loads: the sync bar, the
 /// story card and the grid of counts.

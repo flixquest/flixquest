@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flixquest/models/wellness.dart';
 import 'package:flixquest/models/wellness_insights.dart';
 import 'package:flixquest/screens/wellness/widgets/insights_dashboard.dart';
+import 'package:flixquest/screens/wellness/widgets/share_recap_card.dart';
 import 'package:flixquest/screens/wellness/wellness_screen.dart';
 import 'package:flixquest/provider/wellness_provider.dart';
 import 'package:flixquest/services/wellness_sync_service.dart';
@@ -29,6 +30,53 @@ void main() {
     expect(tester.getTopLeft(taste).dy, lessThan(400));
     expect(tester.getBottomLeft(taste).dy, greaterThan(0));
     expect(find.byType(InsightsPlaybackPanel), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the share sheet switches format and hides habits on a phone',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final provider = _ReportProvider(_sample().sessions);
+    addTearDown(provider.dispose);
+    // The share button underneath spins while its sheet is open, so nothing
+    // ever settles.
+    Future<void> settle() => tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpWidget(_app(
+      ChangeNotifierProvider<WellnessProvider>.value(
+          value: provider, child: const WellnessScreen()),
+      scroll: false,
+    ));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Share recap'));
+    await tester.tap(find.text('Share recap'));
+    await settle();
+    await settle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Share image'), findsOneWidget);
+    final postWidth = tester.getSize(find.byType(ShareRecapCard)).width;
+
+    await tester.ensureVisible(find.text('Story'));
+    await settle();
+    await tester.tap(find.text('Story'));
+    await settle();
+    final storySize = tester.getSize(find.byType(ShareRecapCard));
+    expect(storySize.width, lessThan(postWidth));
+    expect(storySize.height / storySize.width, closeTo(16 / 9, .01));
+
+    final habits = find.text('Show my viewing habits');
+    await tester.ensureVisible(habits);
+    await settle();
+    await tester.tap(habits);
+    await settle();
+    final card = tester.widget<ShareRecapCard>(find.byType(ShareRecapCard));
+    expect(card.includeHabits, isFalse);
+    expect(card.includeTitles, isTrue);
+    // Sharing stays reachable, pinned below however far the options scroll.
+    expect(find.text('Share image').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
