@@ -11,14 +11,14 @@ This file contains no secrets. Never add the values from `.env.scraper` or
 
 | Repo | Path | Branch |
 |---|---|---|
-| Flutter app | `~/Documents/flutter_projects/personal/fq/flixquest` | `v4.3.2`, pushed, **waiting to merge into `main`** |
+| Flutter app | `~/Documents/flutter_projects/personal/fq/flixquest` | `v4.3.2` |
 | Scraper | `~/Documents/web/flixquest-scraper` | `main` |
 
 ## Current status
 
 **v3 is live in production at `https://scraper.flix.quest`. The scraper's code is
-on `main`. The Flutter code is on `v4.3.2` and not yet on `main`. No released app
-uses it yet.**
+on `main` and the Flutter code is on `v4.3.2`, both pushed. No released app uses it
+yet.**
 
 | Item | State |
 |---|---|
@@ -31,7 +31,7 @@ uses it yet.**
 
 Rollback, if needed: `ssh flixquest-vps`, then `sudo fq rollback scraper`.
 
-**Building Flutter from `v4.3.2` or `main` needs setup.** `.env.scraper` and the generated
+**Building Flutter from `v4.3.2` needs setup.** `.env.scraper` and the generated
 `lib/core/config/scraper_secrets.g.dart` are gitignored, so a fresh checkout won't
 compile until you follow [Setting up a new machine](#setting-up-a-new-machine).
 
@@ -52,16 +52,7 @@ v3 files were committed, so these are still uncommitted:
 
 Do these in order before releasing the app.
 
-1. **Merge `v4.3.2` into `main` through a pull request.** `main` is protected, so a
-   direct push is rejected. Past merges were done by the `flixquest` account, and
-   the `beamlakattunen` login in `gh` on this Mac has no push rights to the repo.
-   Open it at
-   <https://github.com/flixquest/flixquest/compare/main...v4.3.2?expand=1>. A trial
-   merge had no conflicts, and its contents exactly matched `v4.3.2`. The PR also
-   carries 7 earlier commits from this branch, including mid-play ad scheduling,
-   player controls, a TMDB fix and the new launcher icon and splash.
-
-2. **Fix the bundled default URL.** `.env` sets `FLIXQUEST_API_URL` to the Render
+1. **Fix the bundled default URL.** `.env` sets `FLIXQUEST_API_URL` to the Render
    deployment, and `.env.example` names `scraper-1.flixquest.app`, which doesn't
    resolve. Render had no v3 when checked: the request timed out. A device that
    hasn't loaded remote config yet falls back to the bundled URL, and stream lookups
@@ -69,7 +60,7 @@ Do these in order before releasing the app.
    `flixquest_api_url_v2` and the API instances in remote config only list scrapers
    with v3, because the app doesn't fall back to v2.
 
-3. **Compare the certificate with a published APK (recommended).** The release
+2. **Compare the certificate with a published APK (recommended).** The release
    hash below came from the release keystore. It is public, not a secret:
 
    ```text
@@ -83,7 +74,7 @@ Do these in order before releasing the app.
    If it differs, stop. Android refuses updates signed with a different
    certificate, and this key would not match builds signed with the other one.
 
-4. **Build from a clean checkout of `main` and release:**
+3. **Build from a clean checkout of `v4.3.2` and release:**
 
    ```bash
    fvm flutter build apk --release --flavor prod --obfuscate --split-debug-info=build/symbols
