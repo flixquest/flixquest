@@ -1,3 +1,4 @@
+import 'package:better_player_plus/better_player_plus.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -216,6 +217,21 @@ class TvSettingsScreen extends StatelessWidget {
               },
               onChanged: (value) => settings.defaultMaxBufferDuration = value,
             ),
+          ),
+          _TvSettingTile(
+            key: const ValueKey<String>('player-time-display'),
+            label: tr('player_time_display'),
+            value: settings.playerTimeDisplay ==
+                    BetterPlayerControlsConfiguration.timeModeTotal
+                ? tr('elapsed_total')
+                : tr('elapsed_remaining'),
+            icon: PhosphorIcons.clock(),
+            showsNext: false,
+            onActivate: () => settings.playerTimeDisplay =
+                settings.playerTimeDisplay ==
+                        BetterPlayerControlsConfiguration.timeModeTotal
+                    ? BetterPlayerControlsConfiguration.timeModeRemaining
+                    : BetterPlayerControlsConfiguration.timeModeTotal,
           ),
           _TvSettingTile(
             key: const ValueKey<String>('next-episode'),

@@ -1,3 +1,4 @@
+import 'package:better_player_plus/better_player_plus.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -416,8 +417,10 @@ class _PlayerSettingsState extends State<PlayerSettings>
                     label: tr('player_time_display'),
                     value: settingValues.playerTimeDisplay,
                     options: {
-                      1: tr('elapsed_total'),
-                      2: tr('elapsed_remaining'),
+                      BetterPlayerControlsConfiguration.timeModeRemaining:
+                          tr('elapsed_remaining'),
+                      BetterPlayerControlsConfiguration.timeModeTotal:
+                          tr('elapsed_total'),
                     },
                     onChanged: (value) => setState(
                       () => settingValues.playerTimeDisplay = value,

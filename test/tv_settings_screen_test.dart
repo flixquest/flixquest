@@ -257,6 +257,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the remote switches the player time display and keeps the choice',
+      (tester) async {
+    final settings = SettingsProvider();
+    await _pumpSettings(tester, settings);
+
+    await _focusLabel(tester, 'Player time display');
+    expect(find.text('Elapsed / Remaining'), findsOneWidget);
+
+    await _select(tester);
+    expect(settings.playerTimeDisplay, 2);
+    expect(
+        sharedPrefsSingleton.getInt(SettingsPreferences.PLAYER_STYLE_INDEX), 2);
+    expect(find.text('Elapsed / Total'), findsOneWidget);
+    expect(find.text('Elapsed / Remaining'), findsNothing);
+
+    await _select(tester);
+    expect(settings.playerTimeDisplay, 1);
+    expect(
+        sharedPrefsSingleton.getInt(SettingsPreferences.PLAYER_STYLE_INDEX), 1);
+    expect(find.text('Elapsed / Remaining'), findsOneWidget);
+  });
+
   testWidgets('clear cache removes both directories and ignores repeat presses',
       (tester) async {
     final root = Directory.systemTemp.createTempSync('flixquest-tv-cache-');

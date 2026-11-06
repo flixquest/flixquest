@@ -447,6 +447,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         controlBarHeight: 56,
         watchingText: tr('watching_text'),
         playerTimeMode: settings.playerTimeDisplay,
+        onPlayerTimeModeChanged: (mode) => settings.playerTimeDisplay = mode,
         // A source that won't play is fixed from the controls, not a menu
         // away: Switch Provider sits with the other playback actions.
         quickActions: [
@@ -514,7 +515,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
             // Better Player's own hold covers only its fullscreen route and
             // clears the flag on the way out, under whatever else needs it.
             allowedScreenSleep: true,
-            autoDetectFullscreenAspectRatio: !widget.useTvControls,
             errorBuilder: (context, _) =>
                 _buildCustomPlayerErrorWidget(context),
             // Provider links expire mid-movie; resolve the provider again

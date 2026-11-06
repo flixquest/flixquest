@@ -67,6 +67,8 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
     final accent = Theme.of(context).primaryColor;
     final settings = context.read<SettingsProvider>();
     final controls = BetterPlayerControlsConfiguration(
+      playerTimeMode: settings.playerTimeDisplay,
+      onPlayerTimeModeChanged: (mode) => settings.playerTimeDisplay = mode,
       gestureConfiguration: BetterPlayerGestureConfiguration(
         enableVolumeSwipe: true,
         enableBrightnessSwipe: true,
@@ -129,7 +131,6 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
     _controller = BetterPlayerController(
       BetterPlayerConfiguration(
         autoDetectFullscreenDeviceOrientation: true,
-        autoDetectFullscreenAspectRatio: true,
         autoPlay: true,
         fit: BoxFit.contain,
         autoDispose: true,

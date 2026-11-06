@@ -234,7 +234,6 @@ class _LivePlayerState extends State<LivePlayer> {
     BetterPlayerConfiguration betterPlayerConfiguration =
         BetterPlayerConfiguration(
       autoDetectFullscreenDeviceOrientation: !widget.useTvControls,
-      autoDetectFullscreenAspectRatio: !widget.useTvControls,
       looping: false,
       autoPlay: true,
       // PlaybackWakeLock keeps the screen on for the whole session. Better
