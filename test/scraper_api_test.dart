@@ -4,6 +4,7 @@ import 'package:flixquest/video_providers/scraper_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 import 'support/callback_dio.dart';
+import 'support/sealed_scraper.dart';
 
 void main() {
   group('ScraperApi', () {
@@ -128,7 +129,7 @@ void main() {
       late Uri requestedUri;
       final api = ScraperApi(
         'https://scraper.example/api/v2',
-        dio: scriptedDio((request) async {
+        dio: sealedScriptedDio((request) async {
           requestedUri = request.uri;
           return jsonResponse(
             jsonEncode({
@@ -176,7 +177,7 @@ void main() {
 
       final result = await api.loadMovie(providerId: 'vidsrc', movieId: 42);
 
-      expect(requestedUri.path, '/api/v2/stream-movie');
+      expect(requestedUri.path, '/api/v3/stream-movie');
       expect(requestedUri.queryParameters, {
         'tmdbId': '42',
         'provider': 'vidsrc',
@@ -202,7 +203,7 @@ void main() {
       late Uri requestedUri;
       final api = ScraperApi(
         'https://scraper.example',
-        dio: scriptedDio((request) async {
+        dio: sealedScriptedDio((request) async {
           requestedUri = request.uri;
           return jsonResponse(
             jsonEncode({
@@ -230,7 +231,7 @@ void main() {
       );
 
       expect(result.success, isTrue);
-      expect(requestedUri.path, '/api/v2/stream-tv');
+      expect(requestedUri.path, '/api/v3/stream-tv');
       expect(requestedUri.queryParameters, {
         'tmdbId': '99',
         'season': '2',
@@ -243,7 +244,7 @@ void main() {
       late Uri requestedUri;
       final api = ScraperApi(
         'https://scraper.example',
-        dio: scriptedDio((request) async {
+        dio: sealedScriptedDio((request) async {
           requestedUri = request.uri;
           return jsonResponse(
             jsonEncode({
@@ -276,7 +277,7 @@ void main() {
       late Uri requestedUri;
       final api = ScraperApi(
         'https://scraper.example',
-        dio: scriptedDio((request) async {
+        dio: sealedScriptedDio((request) async {
           requestedUri = request.uri;
           return jsonResponse(
             jsonEncode({
@@ -318,7 +319,7 @@ void main() {
       final requestedUris = <Uri>[];
       final api = ScraperApi(
         'https://scraper.example',
-        dio: scriptedDio((request) async {
+        dio: sealedScriptedDio((request) async {
           requestedUris.add(request.uri);
           if (request.uri.queryParameters['full'] == 'true') {
             return jsonResponse(
@@ -365,7 +366,7 @@ void main() {
       var requests = 0;
       final api = ScraperApi(
         'https://scraper.example',
-        dio: scriptedDio((request) async {
+        dio: sealedScriptedDio((request) async {
           requests++;
           return jsonResponse(
             jsonEncode({
@@ -389,7 +390,7 @@ void main() {
       late RequestOptions request;
       final api = ScraperApi(
         'https://scraper.example',
-        dio: scriptedDio((incoming) async {
+        dio: sealedScriptedDio((incoming) async {
           request = incoming;
           return jsonResponse(
             jsonEncode({
@@ -410,16 +411,16 @@ void main() {
       final estimate = await api.estimateStreamSize('signed-size-token');
 
       expect(request.method, 'POST');
-      expect(request.uri.path, '/api/v2/stream-size');
+      expect(request.uri.path, '/api/v3/stream-size');
       expect(request.contentType, contains('application/json'));
-      expect(request.data, {'token': 'signed-size-token'});
+      expect(request.uri.queryParameters, {'token': 'signed-size-token'});
       expect(estimate?.estimatedBytes, 1500000000);
     });
 
     test('maps an unavailable stream size response', () async {
       final api = ScraperApi(
         'https://scraper.example',
-        dio: scriptedDio(
+        dio: sealedScriptedDio(
           (_) async => jsonResponse(
             jsonEncode({
               'success': true,

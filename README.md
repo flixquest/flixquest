@@ -284,6 +284,40 @@ better_player_plus:
    universal APK in `app_download_url`. A device whose ABI can't be read, or
    whose key is empty, downloads the universal APK.
 
+   Add `--obfuscate --split-debug-info=build/symbols` to release builds so the
+   Dart code protecting the scraper key is harder to read. Crash stack traces
+   then need those symbols, so keep them for each release and upload them with
+   `firebase crashlytics:symbols:upload` or a similar step.
+
+7. **Set up the scraper key**:
+
+   Scraper stream lookups use encrypted `/api/v3` routes. Their key is derived
+   from `.env.scraper`, a native library, and the APK's signing certificate.
+   Create the inputs once, then generate the Dart values:
+
+   ```bash
+   dart run tool/scraper_key.dart init
+   dart run build_runner build --delete-conflicting-outputs
+   ```
+
+   Android builds fail without `.env.scraper`. Back it up privately: losing it
+   means releasing a new key.
+
+   Each signing certificate derives a different key. Debug builds use the dev
+   inputs and release builds use the prod inputs. Print the server value for
+   each certificate in your own terminal, and add it to `SCRAPER_V3_KEYS` on the
+   scraper as a comma-separated list:
+
+   ```bash
+   keytool -list -v -keystore <keystore> | grep SHA256:
+   dart run tool/scraper_key.dart server-key --mode prod --cert <sha256>
+   ```
+
+   Deploy the scraper with the key before releasing a build that needs it. To
+   replace a key, change that mode's `KID` and `FRAGMENT`, add the new server
+   value next to the old one, release, then remove the old value once old
+   builds have updated.
+
 ---
 
 ## 🤝 Contributing

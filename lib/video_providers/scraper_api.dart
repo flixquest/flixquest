@@ -7,12 +7,14 @@ import 'package:dio/dio.dart';
 import '../core/cache/cache_policies.dart';
 import '../core/cache/cache_policy.dart';
 import '../core/network/network_runtime.dart';
+import '../core/network/scraper_v3/scraper_v3_client.dart';
 
 import '../models/external_subtitles.dart';
 import 'common.dart';
 import 'names.dart';
 
-/// Client for the FlixQuest Scraper API v2 described in `openapi.json`.
+/// Client for the FlixQuest Scraper API described in `openapi.json`. Lookups
+/// that return playable sources use the encrypted v3 routes, the rest use v2.
 ///
 /// The API proxies streams by default. This is intentional: the returned URL
 /// can then be handed directly to Better Player without exposing provider
@@ -22,6 +24,20 @@ class ScraperApi {
 
   final String baseUrl;
   final Dio _dio;
+  late final ScraperV3Client _v3 =
+      ScraperV3Client((uri, envelope, timeout) async {
+    try {
+      final response = await _post(uri, envelope, timeout: timeout);
+      return ScraperV3RawResponse(
+          response.statusCode ?? 0, response.data ?? '');
+    } on DioException catch (error) {
+      // A 5xx that outlasted its retries still carries the sealed reason.
+      final response = error.response;
+      if (response == null) rethrow;
+      return ScraperV3RawResponse(
+          response.statusCode ?? 0, '${response.data ?? ''}');
+    }
+  });
 
   Future<List<VideoProvider>> getProviders() async {
     try {
@@ -119,19 +135,14 @@ class ScraperApi {
   /// callers can keep the resolution selectable.
   Future<StreamSizeEstimate?> estimateStreamSize(String token) async {
     try {
-      final uri = _endpoint('/stream-size');
-      _logRequest(uri, method: 'POST');
-      final response = await _post(
-        uri,
+      final response = await _v3.post(
+        baseUrl,
+        '/stream-size',
         {'token': token},
         timeout: const Duration(seconds: 10),
       );
-      _logResponse(uri, response);
-      final body = _decodeObject(response.data ?? '');
-      if ((response.statusCode ?? 0) < 200 ||
-          (response.statusCode ?? 0) >= 300) {
-        return null;
-      }
+      final body = _decodeObject(response.body);
+      if (!response.isSuccess) return null;
       if (body['success'] != true) return null;
       return StreamSizeEstimate.fromJson(body);
     } catch (_) {
@@ -227,20 +238,21 @@ class ScraperApi {
     Map<String, String> queryParameters,
   ) async {
     try {
-      final uri = _endpoint(path, queryParameters);
-      _logRequest(uri);
-      final response = await _get(uri, timeout: const Duration(minutes: 1));
-      _logResponse(uri, response);
-      final body = _decodeObject(response.data ?? '');
-      if ((response.statusCode ?? 0) < 200 ||
-          (response.statusCode ?? 0) >= 300) {
+      final response = await _v3.post(
+        baseUrl,
+        path,
+        queryParameters,
+        timeout: const Duration(minutes: 1),
+      );
+      final body = _decodeObject(response.body);
+      if (!response.isSuccess) {
         return ProviderLoadResult(
-          errorMessage: _messageFrom(body, (response.statusCode ?? 0)),
+          errorMessage: _messageFrom(body, response.statusCode),
         );
       }
       if (body['success'] != true) {
         return ProviderLoadResult(
-          errorMessage: _messageFrom(body, (response.statusCode ?? 0)),
+          errorMessage: _messageFrom(body, response.statusCode),
         );
       }
 
@@ -289,7 +301,7 @@ class ScraperApi {
 
       if (links.isEmpty) {
         return ProviderLoadResult(
-          errorMessage: _messageFrom(body, (response.statusCode ?? 0)),
+          errorMessage: _messageFrom(body, response.statusCode),
         );
       }
       return ProviderLoadResult(
@@ -340,7 +352,10 @@ class ScraperApi {
           contentType: Headers.jsonContentType,
           responseType: ResponseType.plain,
           receiveTimeout: timeout,
-          extra: {'cachePolicy': CachePolicy.noStore},
+          // 4xx replies are sealed answers. 5xx still goes through the retries
+          // these lookups had as GETs.
+          validateStatus: (status) => status != null && status < 500,
+          extra: {'cachePolicy': CachePolicy.noStore, 'retrySafe': true},
         ));
   }
 

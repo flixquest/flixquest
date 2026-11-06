@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../core/network/scraper_v3/scraper_v3_client.dart';
 import '../models/live_tv.dart';
 import 'dlhd_playback_proxy.dart';
 import 'live_hls_probe.dart';
@@ -171,6 +172,8 @@ class DaddyLiveService implements LiveTvService {
       : _baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), ''),
         _client = client ?? http.Client();
 
+  late final ScraperV3Client _v3 = ScraperV3Client.http(_client);
+
   static const String _browserUserAgent =
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
@@ -285,8 +288,9 @@ class DaddyLiveService implements LiveTvService {
     // each playlist and keeps searching sibling frames, where /embeds stops
     // at the first page with a playlist link.
     try {
-      final json = await _getJson(
-        _uri('/api/v2/dlhd/channels/${Uri.encodeComponent(channelId)}/stream'),
+      final json = await _postSealedJson(
+        '/dlhd/stream',
+        <String, String>{'id': channelId},
       );
       final metadata = DaddyLiveStream.fromJson(json);
       final embedUrl = metadata.embedUrl.trim();
@@ -341,8 +345,9 @@ class DaddyLiveService implements LiveTvService {
   /// answer without embeds).
   Future<List<_DlhdPlayer>?> _scraperEmbeds(String channelId) async {
     try {
-      final json = await _getJson(
-        _uri('/api/v2/dlhd/channels/${Uri.encodeComponent(channelId)}/embeds'),
+      final json = await _postSealedJson(
+        '/dlhd/embeds',
+        <String, String>{'id': channelId},
       );
       final listed = json['embeds'];
       final embeds = (listed is List<dynamic> ? listed : const <dynamic>[])
@@ -809,35 +814,44 @@ class DaddyLiveService implements LiveTvService {
   Future<Map<String, dynamic>> _getJson(Uri uri) async {
     final response =
         await _client.get(uri).timeout(const Duration(seconds: 60));
+    return _decodeJson(
+      uri.path,
+      response.statusCode,
+      utf8.decode(response.bodyBytes),
+    );
+  }
+
+  Future<Map<String, dynamic>> _postSealedJson(
+    String route,
+    Map<String, String> params,
+  ) async {
+    final response = await _v3.post(_baseUrl, route, params);
+    return _decodeJson(route, response.statusCode, response.body);
+  }
+
+  Map<String, dynamic> _decodeJson(String path, int statusCode, String body) {
     final dynamic decoded;
     try {
-      decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      decoded = jsonDecode(body);
     } on FormatException {
-      _log(
-        'scraper ${response.statusCode} non-JSON from ${uri.path}: '
-        '${_snippet(response.body)}',
-      );
+      _log('scraper $statusCode non-JSON from $path: ${_snippet(body)}');
       throw const DaddyLiveException(
           'The live TV service returned invalid data.');
     }
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      _log(
-        'scraper ${response.statusCode} from ${uri.path}: '
-        '${_snippet(response.body)}',
-      );
+    if (statusCode < 200 || statusCode >= 300) {
+      _log('scraper $statusCode from $path: ${_snippet(body)}');
       final message = decoded is Map<String, dynamic>
           ? decoded['message']?.toString() ?? decoded['error']?.toString()
           : null;
       throw DaddyLiveException(
-          message ?? 'Live TV request failed (${response.statusCode}).');
+          message ?? 'Live TV request failed ($statusCode).');
     }
     if (decoded is! Map<String, dynamic>) {
       throw const DaddyLiveException(
           'The live TV service returned an unexpected response.');
     }
     if (decoded['success'] == false) {
-      _log(
-          'scraper success=false from ${uri.path}: ${_snippet(response.body)}');
+      _log('scraper success=false from $path: ${_snippet(body)}');
       throw DaddyLiveException(
           decoded['message']?.toString() ?? 'Live TV request failed.');
     }

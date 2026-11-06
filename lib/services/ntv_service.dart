@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../core/network/scraper_v3/scraper_v3_client.dart';
 import '../models/live_tv.dart';
 import 'daddylive_service.dart';
 
@@ -29,6 +30,7 @@ class NtvService implements LiveTvService {
 
   final String _baseUrl;
   final http.Client _client;
+  late final ScraperV3Client _v3 = ScraperV3Client.http(_client);
 
   Uri _uri(String path, [Map<String, String>? query]) =>
       Uri.parse('$_baseUrl/api/v2/ntv$path').replace(queryParameters: query);
@@ -55,8 +57,12 @@ class NtvService implements LiveTvService {
     final id = channelId.startsWith(idPrefix)
         ? channelId.substring(idPrefix.length)
         : channelId;
-    final stream = DaddyLiveStream.fromJson(await _getJson(
-      _uri('/channels/${Uri.encodeComponent(id)}/stream'),
+    final response =
+        await _v3.post(_baseUrl, '/ntv/stream', <String, String>{'id': id});
+    final stream = DaddyLiveStream.fromJson(_decodeJson(
+      '/ntv/stream',
+      response.statusCode,
+      response.body,
       failure: _noStream,
     ));
     if (stream.url.isEmpty) throw const DaddyLiveException(_noStream);
@@ -91,19 +97,33 @@ class NtvService implements LiveTvService {
   }) async {
     final response =
         await _client.get(uri).timeout(const Duration(seconds: 60));
+    return _decodeJson(
+      uri.path,
+      response.statusCode,
+      utf8.decode(response.bodyBytes),
+      failure: failure,
+    );
+  }
+
+  Map<String, dynamic> _decodeJson(
+    String path,
+    int statusCode,
+    String body, {
+    required String failure,
+  }) {
     Object? decoded;
     try {
-      decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      decoded = jsonDecode(body);
     } on FormatException {
       decoded = null;
     }
-    if (response.statusCode >= 200 &&
-        response.statusCode < 300 &&
+    if (statusCode >= 200 &&
+        statusCode < 300 &&
         decoded is Map<String, dynamic> &&
         decoded['success'] != false) {
       return decoded;
     }
-    debugPrint('[NTV] ${response.statusCode} from ${uri.path}');
+    debugPrint('[NTV] $statusCode from $path');
     throw DaddyLiveException(failure);
   }
 

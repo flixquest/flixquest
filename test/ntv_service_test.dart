@@ -5,8 +5,9 @@ import 'package:flixquest/services/live_tv_source.dart';
 import 'package:flixquest/services/ntv_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'support/sealed_scraper.dart';
 
 void main() {
   group('NtvService', () {
@@ -15,7 +16,7 @@ void main() {
     ) {
       final ntv = NtvService(
         baseUrl: 'https://scraper.test/',
-        client: MockClient(handler),
+        client: sealedMockClient(handler),
       );
       addTearDown(ntv.close);
       return ntv;
@@ -64,7 +65,7 @@ void main() {
 
       final stream = await ntv.getStream('ntv:cdnlive-2');
 
-      expect(requested, <String>['/api/v2/ntv/channels/cdnlive-2/stream']);
+      expect(requested, <String>['/api/v3/ntv/stream']);
       expect(stream.url, 'https://cdn.test/live/index.m3u8?token=abc');
       expect(stream.headers['Referer'], 'https://player.test/');
     });

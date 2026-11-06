@@ -7,6 +7,7 @@ import 'package:flixquest/video_providers/scraper_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fake_dio.dart';
+import '../support/sealed_scraper.dart';
 
 void main() {
   late Dio dio;
@@ -18,7 +19,7 @@ void main() {
     adapter = FakeDioAdapter();
     dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
         httpCache: cache, debugLogging: false, retryDelay: (_) async {});
-    dio.httpClientAdapter = adapter;
+    dio.httpClientAdapter = SealingDioAdapter(adapter);
     api = ScraperApi('https://scraper.example', dio: dio);
   });
   tearDown(() async {
@@ -108,6 +109,7 @@ void main() {
     }, statusCode: 503);
     expect((await api.loadMovie(providerId: 'vixsrc', movieId: 7)).errorMessage,
         'Provider unavailable');
+    expect(adapter.requests, hasLength(3), reason: 'a 5xx is retried');
     for (var i = 0; i < 3; i++) {
       adapter.enqueueError(type: DioExceptionType.receiveTimeout);
     }

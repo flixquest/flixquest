@@ -99,6 +99,30 @@ void main() {
     expect(logs.join(' '), isNot(contains('secret')));
   });
 
+  test('resends a POST only when it is marked safe to resend', () async {
+    Future<int> attempts(Map<String, dynamic> extra) async {
+      var calls = 0;
+      final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+          debugLogging: false, retryDelay: (_) async {});
+      dio.httpClientAdapter = CallbackDioAdapter((request) async {
+        calls++;
+        throw DioException(
+            requestOptions: request,
+            error: const SocketException('offline'));
+      });
+      addTearDown(dio.close);
+      await expectLater(
+        dio.post<Object>('https://scraper.example/api/v3/stream-movie',
+            options: Options(extra: extra)),
+        throwsA(anything),
+      );
+      return calls;
+    }
+
+    expect(await attempts(const {}), 1);
+    expect(await attempts(const {'retrySafe': true}), greaterThan(1));
+  });
+
   test(
       'public defaults preserve custom Accept headers; proxies only affect TMDB',
       () async {

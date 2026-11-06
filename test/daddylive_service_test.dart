@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:flixquest/services/daddylive_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
+import 'support/sealed_scraper.dart';
 
 void main() {
   group('DaddyLiveService local DLHD resolution', () {
@@ -19,7 +19,7 @@ void main() {
       });
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
-        client: MockClient((request) async {
+        client: sealedMockClient((request) async {
           requests.add(request);
           if (request.url.host == 'metadata.example' &&
               request.url.path == '/api/v2/dlhd/channels') {
@@ -141,7 +141,7 @@ void main() {
     test('drops a failed player without losing later backup streams', () async {
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
-        client: MockClient((request) async {
+        client: sealedMockClient((request) async {
           if (request.url.path.endsWith('/segment.ts')) {
             return http.Response.bytes(_ts(), 200);
           }
@@ -189,7 +189,7 @@ void main() {
       final requested = <String>[];
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
-        client: MockClient((request) async {
+        client: sealedMockClient((request) async {
           requested.add(request.url.toString());
           if (request.url.path == '/watch.php') {
             return http.Response('''
@@ -228,7 +228,7 @@ void main() {
       final releaseBackup = Completer<http.Response>();
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
-        client: MockClient((request) async {
+        client: sealedMockClient((request) async {
           requested.add(request.url.toString());
           if (request.url.path == '/watch.php') {
             return http.Response('''
@@ -271,15 +271,15 @@ void main() {
       final requested = <String>[];
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
-        client: MockClient((request) async {
+        client: sealedMockClient((request) async {
           requested.add(request.url.toString());
           if (request.url.path == '/watch.php') {
             return http.Response('blocked', 403);
           }
-          if (request.url.path == '/api/v2/dlhd/channels/51/embeds') {
+          if (request.url.path == '/api/v3/dlhd/embeds') {
             return http.Response('Cannot GET', 404);
           }
-          if (request.url.path == '/api/v2/dlhd/channels/51/stream') {
+          if (request.url.path == '/api/v3/dlhd/stream') {
             return _jsonResponse(<String, dynamic>{
               'stream': <String, dynamic>{
                 'embedUrl': 'https://embed.test/channel/51',
@@ -313,15 +313,15 @@ void main() {
       final requested = <String>[];
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
-        client: MockClient((request) async {
+        client: sealedMockClient((request) async {
           requested.add(request.url.toString());
           if (request.url.path == '/watch.php') {
             return http.Response('blocked', 403);
           }
-          if (request.url.path == '/api/v2/dlhd/channels/51/embeds') {
+          if (request.url.path == '/api/v3/dlhd/embeds') {
             return http.Response('Cannot GET', 404);
           }
-          if (request.url.path == '/api/v2/dlhd/channels/51/stream') {
+          if (request.url.path == '/api/v3/dlhd/stream') {
             return _jsonResponse(<String, dynamic>{
               'stream': <String, dynamic>{
                 'embedUrl': 'https://embed.test/channel/51',
@@ -350,12 +350,12 @@ void main() {
       final requested = <http.Request>[];
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
-        client: MockClient((request) async {
+        client: sealedMockClient((request) async {
           requested.add(request);
           if (request.url.path == '/watch.php') {
             return http.Response('blocked', 403);
           }
-          if (request.url.path == '/api/v2/dlhd/channels/51/embeds') {
+          if (request.url.path == '/api/v3/dlhd/embeds') {
             return _jsonResponse(<String, dynamic>{
               'embeds': <Map<String, dynamic>>[
                 <String, dynamic>{
@@ -410,12 +410,12 @@ void main() {
       final requested = <String>[];
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
-        client: MockClient((request) async {
+        client: sealedMockClient((request) async {
           requested.add(request.url.path);
           if (request.url.path == '/watch.php') {
             return http.Response('blocked', 403);
           }
-          if (request.url.path == '/api/v2/dlhd/channels/51/embeds') {
+          if (request.url.path == '/api/v3/dlhd/embeds') {
             return _jsonResponse(<String, dynamic>{
               'embeds': <Map<String, dynamic>>[
                 <String, dynamic>{'embedUrl': 'https://down.test/e/51'},
@@ -425,7 +425,7 @@ void main() {
           if (request.url.host == 'down.test') {
             return http.Response('down', 503);
           }
-          if (request.url.path == '/api/v2/dlhd/channels/51/stream') {
+          if (request.url.path == '/api/v3/dlhd/stream') {
             return _jsonResponse(<String, dynamic>{
               'stream': <String, dynamic>{
                 'embedUrl': 'https://embed.test/channel/51',
@@ -450,7 +450,7 @@ void main() {
       final stream = await service.getStream('51');
 
       expect(stream.url, 'https://cdn.test/51.m3u8');
-      expect(requested, contains('/api/v2/dlhd/channels/51/stream'));
+      expect(requested, contains('/api/v3/dlhd/stream'));
     });
 
     test('treats an answer without embeds as a scraper that has none',
@@ -458,15 +458,15 @@ void main() {
       final requested = <String>[];
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
-        client: MockClient((request) async {
+        client: sealedMockClient((request) async {
           requested.add(request.url.path);
           if (request.url.path == '/watch.php') {
             return http.Response('blocked', 403);
           }
-          if (request.url.path == '/api/v2/dlhd/channels/51/embeds') {
+          if (request.url.path == '/api/v3/dlhd/embeds') {
             return _jsonResponse(<String, dynamic>{'success': true});
           }
-          if (request.url.path == '/api/v2/dlhd/channels/51/stream') {
+          if (request.url.path == '/api/v3/dlhd/stream') {
             return http.Response('{"success":false}', 502);
           }
           fail('Unexpected request: ${request.url}');
@@ -478,13 +478,13 @@ void main() {
         service.getStream('51'),
         throwsA(isA<DaddyLiveException>()),
       );
-      expect(requested, contains('/api/v2/dlhd/channels/51/stream'));
+      expect(requested, contains('/api/v3/dlhd/stream'));
     });
 
     test('keeps the channel catalog available when the EPG is down', () async {
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
-        client: MockClient((request) async {
+        client: sealedMockClient((request) async {
           if (request.url.path == '/api/v2/dlhd/channels') {
             return _jsonResponse(<String, dynamic>{
               'success': true,
