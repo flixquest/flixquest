@@ -494,11 +494,13 @@ class AdsterraPlaybackAdsService {
       return false;
     }
     final selection = provider?.playbackAdsSelection;
-    final network = stage == PlaybackAdStage.beforeLoader
-        ? AdNetwork.adsterra
-        : tv
-            ? selection?.tvNetwork
-            : selection?.network;
+    final network = stage == PlaybackAdStage.midPlay
+        ? provider?.midPlayNetworks.firstOrNull
+        : stage == PlaybackAdStage.beforeLoader
+            ? AdNetwork.adsterra
+            : tv
+                ? selection?.tvNetwork
+                : selection?.network;
     final config = selection?.adsterra;
     final placements = provider == null
         ? const <PlaybackAdPlacement>[]
@@ -663,25 +665,28 @@ class AdsterraPlaybackAdsService {
           ? PlaybackAdStage.streamFound
           : stage;
 
-  /// The selected network's placement for [stage], then each fallback
-  /// network's, skipping networks that have none. The Social Bar stays with
-  /// Adsterra alone.
+  /// The network order for [stage]. Mid-play has its own list; the Social Bar
+  /// stays with Adsterra alone; every other stage uses the selected popup
+  /// network and its fallbacks. Each network still supplies its own catalog,
+  /// and a network without a placement is skipped.
   List<PlaybackAdPlacement> _placementsFor(AppDependencyProvider provider,
       PlaybackAdStage stage, AdNetwork? network, bool tv,
       {bool force = false}) {
-    if (network == null) return const [];
-    final networks = stage == PlaybackAdStage.beforeLoader
-        ? {network}
-        : {network, ...provider.playbackAdsSelection.fallbackNetworks};
+    if (stage != PlaybackAdStage.midPlay && network == null) return const [];
+    final networks = stage == PlaybackAdStage.midPlay
+        ? provider.midPlayNetworks
+        : stage == PlaybackAdStage.beforeLoader
+            ? [if (network != null) network]
+            : [
+                if (network != null) network,
+                ...provider.playbackAdsSelection.fallbackNetworks,
+              ];
+    if (networks.isEmpty) return const [];
     return [
       for (final candidate in networks)
-        // ExoClick's popunder chain does not settle in the hidden mid-play
-        // WebView; leave midroll to the next configured network.
-        if (!(stage == PlaybackAdStage.midPlay &&
-            candidate == AdNetwork.exoclick))
-          if (_placementFor(provider, stage, candidate, tv, force: force)
-              case final placement?)
-            placement,
+        if (_placementFor(provider, stage, candidate, tv, force: force)
+            case final placement?)
+          placement,
     ];
   }
 

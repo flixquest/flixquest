@@ -1532,6 +1532,17 @@ void main() {
       expect(config.midPlaySchedule.countFor(const Duration(minutes: 30)), 2);
     });
 
+    test('mid-play networks come from Remote Config', () async {
+      final remote = FakeFirebaseRemoteConfig();
+      await AppRemoteConfig.configure(remote);
+      expect(remote.defaults[AppRemoteConfig.midPlayNetworksKey], 'adsterra');
+      remote.setMockString(
+          AppRemoteConfig.midPlayNetworksKey, 'adsterra, clickadu, adsterra');
+      final config = AppDependencyProvider();
+      AppRemoteConfig.apply(remote, config);
+      expect(config.midPlayNetworks, [AdNetwork.adsterra, AdNetwork.clickadu]);
+    });
+
     test('a catalog may give each its own zone, else it uses the popunder', () {
       const ownZones = '''{
         "popunder":{"enabled":true,"script_url":"https://ads.example/pop"},
@@ -4392,7 +4403,7 @@ void main() {
       expect(await result, isTrue);
     }
 
-    testWidgets('mid-play skips ExoClick and starts with the next network',
+    testWidgets('mid-play uses its own network list, not the stream-found one',
         (tester) async {
       provider.setAdsterraPlaybackAdsConfig(
           AdsterraPlaybackAdsConfig.parse(smartlinkCatalog, enabled: true));

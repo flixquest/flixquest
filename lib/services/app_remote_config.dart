@@ -63,6 +63,7 @@ class AppRemoteConfig {
   static const playbackPopupMinimumViewSecondsKey =
       'playback_popup_minimum_view_seconds';
   static const midPlayPopupScheduleKey = 'mid_play_popup_schedule';
+  static const midPlayNetworksKey = 'mid_play_networks';
   static const tvPlaybackPopunderNetworkKey = 'tv_playback_popunder_network';
   static const tvPlaybackPopupFrequencyMinutesKey =
       'tv_playback_popup_frequency_minutes';
@@ -161,6 +162,7 @@ class AppRemoteConfig {
         playbackPopupExternalBrowserOnTapKey: true,
         playbackPopupMinimumViewSecondsKey: 3,
         midPlayPopupScheduleKey: '{}',
+        midPlayNetworksKey: 'adsterra',
         for (final stage in PlaybackAdStage.triggers) ...{
           popupEnabledKey(stage): false,
           popupFrequencyMinutesKey(stage): 0,
@@ -369,6 +371,8 @@ class AppRemoteConfig {
         remoteConfig.getValue(playbackPopupMinimumViewSecondsKey).asInt());
     provider.setMidPlaySchedule(MidPlayScheduleConfig.parse(
         remoteConfig.getString(midPlayPopupScheduleKey)));
+    provider.setMidPlayNetworks(
+        AdNetwork.parseList(remoteConfig.getString(midPlayNetworksKey)));
     provider.setPlaybackPopupBrowserBehavior(
       autoClose: remoteConfig.getBool(playbackPopupAutoCloseEnabledKey),
       externalBrowserOnTap:

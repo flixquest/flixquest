@@ -229,6 +229,17 @@ class AppDependencyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The networks tried for mid-play ads, in order. This is independent of
+  /// the stream-found popup network.
+  List<AdNetwork> _midPlayNetworks = const [AdNetwork.adsterra];
+  List<AdNetwork> get midPlayNetworks => _midPlayNetworks;
+
+  void setMidPlayNetworks(List<AdNetwork> networks) {
+    if (listEquals(_midPlayNetworks, networks)) return;
+    _midPlayNetworks = List.unmodifiable(networks);
+    notifyListeners();
+  }
+
   /// Popup browser behavior, shared by every network and trigger.
   bool _playbackPopupAutoClose = false;
   bool get playbackPopupAutoClose => _playbackPopupAutoClose;
@@ -330,6 +341,7 @@ class AppDependencyProvider extends ChangeNotifier {
     int popupFrequencyMinutes,
     AdNetwork? tvNetwork,
     int tvPopupFrequencyMinutes,
+    List<AdNetwork> midPlayNetworks,
   }) get playbackAdsSelection => (
         network: _playbackPopunderNetwork,
         fallbackNetworks: _playbackPopunderFallbackNetworks,
@@ -338,6 +350,7 @@ class AppDependencyProvider extends ChangeNotifier {
         popupFrequencyMinutes: _playbackPopupFrequencyMinutes,
         tvNetwork: tvPlaybackPopunderNetwork,
         tvPopupFrequencyMinutes: tvPlaybackPopupFrequencyMinutes,
+        midPlayNetworks: _midPlayNetworks,
       );
 
   VastPrerollConfig _vastPreroll = const VastPrerollConfig();

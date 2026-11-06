@@ -1293,9 +1293,10 @@ not buffering, with the app in the foreground. Slots the viewer resumes past or
 seeks past are dropped, and a rewind never brings a passed slot back, so a seek
 never lands on a popup. It opens invisibly above the player, fullscreen or not,
 and never in Live TV, on Android TV, during the pre-roll, after the video has
-finished, or for Kids and Family titles. ExoClick is skipped for `mid_play`;
-the next configured network (Adsterra by default) serves it. A slot that is
-off, cooling down or has no placement leaves the video playing.
+finished, or for Kids and Family titles. Mid-play uses its own network order,
+`mid_play_networks` (Adsterra by default), independent of the stream-found
+network. A slot that is off, cooling down or has no placement leaves the video
+playing.
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
@@ -1311,6 +1312,7 @@ off, cooling down or has no placement leaves the video playing.
 | `mid_play_popup_enabled` | Boolean | Unpublished (off) | Switch for the mid-play popup. Must be published remotely. |
 | `mid_play_popup_frequency_minutes` | Number | `0` | Minimum whole minutes between mid-play popups. Keep it `0`, or below the gap between slots (about 6:40 in a 20-minute video), or later slots in the same video are skipped. |
 | `mid_play_popup_schedule` | String (JSON) | `{}` | How many mid-play ads each video length gets. `{}` or an unpublished key keeps the built-in counts (none under 15 minutes, 1 under 20, 2 under 30, 3 under 60, 4 from 60). `{"ranges":[]}` disables mid-play ads. Each range has `min_duration_minutes`, an optional `max_duration_minutes` (omitted means no upper bound) and `count` (0–10). Ranges are half-open and must not overlap; invalid JSON keeps the default. |
+| `mid_play_networks` | String | `adsterra` | Comma-separated network order for mid-play, such as `adsterra,clickadu`. Independent of `playback_popunder_network`; each network still uses its own playback catalog. Empty disables mid-play ads. |
 
 For example, this publishes the built-in schedule explicitly:
 
