@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flixquest/core/cache/cache_policy.dart';
+import 'package:flixquest/functions/tmdb_request.dart';
 
 class TmdbApi {
   const TmdbApi(this.dio);
@@ -15,7 +16,7 @@ class TmdbApi {
     Duration? timeout,
   }) async {
     final response = await dio.get<Object>(
-      url,
+      tmdbUrlWithAdultFlag(url),
       cancelToken: cancelToken,
       options: Options(receiveTimeout: timeout, extra: {
         'cacheScope': 'tmdb',

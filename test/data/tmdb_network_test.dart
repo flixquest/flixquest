@@ -10,6 +10,7 @@ import 'package:flixquest/core/config/app_environment.dart';
 import 'package:flixquest/core/network/dio_factory.dart';
 import 'package:flixquest/core/network/network_runtime.dart';
 import 'package:flixquest/functions/network.dart';
+import 'package:flixquest/functions/tmdb_request.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../support/fake_dio.dart';
 
@@ -78,7 +79,9 @@ void main() {
       });
     NetworkRuntime.configure(publicDio: firstDio, httpCache: firstCache);
     expect((await fetchMovies(url, false, '')).single.id, 7);
-    final key = normalizedCacheKey(RequestOptions(path: url), scope: 'tmdb');
+    final key = normalizedCacheKey(
+        RequestOptions(path: tmdbUrlWithAdultFlag(url)),
+        scope: 'tmdb');
     final cached = (await firstCache.store.get(key))!;
     final old = DateTime.now().subtract(const Duration(hours: 1));
     await firstCache.store
