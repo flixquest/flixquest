@@ -436,6 +436,7 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
       await result.setJavaScriptMode(JavaScriptMode.unrestricted);
       await _prepareAndroid(result);
     }
+    await _applyHiddenMediaPolicy(result);
     if (!mounted || _finished) {
       unawaited(_stopPlaybackController(result));
       return null;
@@ -1209,6 +1210,20 @@ class _AdsterraPlaybackAdScreenState extends State<AdsterraPlaybackAdScreen>
   /// chrome://inspect.
   Future<void> _prepareAndroid(WebViewController controller) async {
     await _preparePlaybackController(controller, _log);
+  }
+
+  /// A hidden ad never gets a touch, so requiring a gesture keeps its media
+  /// from playing. iOS applies the same policy by default.
+  Future<void> _applyHiddenMediaPolicy(WebViewController controller) async {
+    if (!widget.hidden) return;
+    final platform = controller.platform;
+    if (platform is! AndroidWebViewController) return;
+    try {
+      await platform.setMediaPlaybackRequiresUserGesture(true);
+      _log('hidden ad media requires a user gesture');
+    } catch (error) {
+      _log('hidden ad media policy unavailable ($error)');
+    }
   }
 
   bool _webUrl(Uri? uri) =>

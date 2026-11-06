@@ -1295,8 +1295,9 @@ never lands on a popup. It opens invisibly above the player, fullscreen or not,
 and never in Live TV, on Android TV, during the pre-roll, after the video has
 finished, or for Kids and Family titles. Mid-play uses its own network order,
 `mid_play_networks` (Adsterra by default), independent of the stream-found
-network. A slot that is off, cooling down or has no placement leaves the video
-playing.
+network. Its hidden WebView requires a user gesture for media playback, so the
+ad's audio does not start on its own. A slot that is off, cooling down or has
+no placement leaves the video playing.
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
