@@ -31,6 +31,7 @@ http.createServer((req, res) => {
   if (url.pathname === '/backup-media/index.m3u8') {
     return send(200, '#EXTM3U\n#EXTINF:6,\nsegment.ts\n', 'application/vnd.apple.mpegurl');
   }
+  if (url.pathname === '/backup-media/segment.ts') return send(200, ts, 'video/mp2t');
   if (url.pathname === '/embed') {
     return send(200, `const SRC = "${origin}/premium110/index.m3u8";
 const EDGE = "${origin}";
