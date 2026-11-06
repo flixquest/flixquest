@@ -127,6 +127,8 @@ flutter:
       fonts:
         - asset: assets/fonts/imdb.ttf
 
+# Regenerating with flutter_native_splash:create rewrites values-v31 and values-night-v31 styles.
+# Afterwards, restore the animated icon (@drawable/splash_fq_animated) and its related items.
 flutter_native_splash:
   color: "#FFFFFF"
   color_dark: "#161716"

@@ -52,6 +52,18 @@
                 <action android:name="android.service.notification.ConditionProviderService" />
             </intent-filter>
         </service>
+        <!-- Android TV doesn't show the splash icon, so TV launches open here and hand over to
+             MainActivity. noHistory removes it once the app covers it. -->
+        <activity
+            android:name=".TvLaunchActivity"
+            android:theme="@style/TvLaunchTheme"
+            android:noHistory="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".MainActivity"
             android:supportsPictureInPicture="true"
@@ -79,10 +91,6 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
             <intent-filter>
                 <action android:name="es.antonborri.home_widget.action.LAUNCH" />
