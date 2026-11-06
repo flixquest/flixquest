@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launchers show the middle 72 of these 108 units; the F fills about 66% of that height. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.11"
+        android:scaleY="0.11"
+        android:translateX="38.934"
+        android:translateY="30.0742">
+        <path android:fillColor="#F57C00" android:pathData="M6 118 200 6l83.1 48L6 214z" />
+        <path android:fillColor="#F57C00" android:pathData="M6 250 162 159.9l83.1 48L6 346z" />
+        <path android:fillColor="#F57C00" android:pathData="M6 380 104 323.4v113.2z" />
+    </group>
+</vector>
