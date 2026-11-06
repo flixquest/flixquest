@@ -183,43 +183,131 @@ void main() {
       expect(discovery.variants.last.url, 'https://cdn.test/three.m3u8');
     });
 
-    test(
-        'tries Player 2 only after Player 1 fails and leaves Player 3 deferred',
+    test('holds the other players until Player 1 fails, then plays the fastest',
         () async {
       final requested = <String>[];
+      final releasePlayer1 = Completer<http.Response>();
+      final releasePlayer2 = Completer<http.Response>();
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
         client: sealedMockClient((request) async {
           requested.add(request.url.toString());
-          if (request.url.path == '/watch.php') {
-            return http.Response('''
-              <button class="player-btn" data-url="https://p1.test/embed" title="PLAYER 1"></button>
-              <button class="player-btn" data-url="https://p2.test/embed" title="PLAYER 2"></button>
-              <button class="player-btn" data-url="https://p3.test/embed" title="PLAYER 3"></button>
-            ''', 200);
+          if (request.url.path == '/watch.php') return _threePlayers();
+          if (request.url.host == 'p1.test') return releasePlayer1.future;
+          if (request.url.host == 'p2.test') return releasePlayer2.future;
+          if (request.url.host == 'p3.test') {
+            return http.Response('https://cdn.test/three.m3u8', 200);
           }
+          return _playable(request) ?? fail('Unexpected: ${request.url}');
+        }),
+      );
+      addTearDown(service.close);
+
+      final resolving = service.getStream('51');
+      await pumpEventQueue();
+      expect(requested, contains('https://p1.test/embed'));
+      expect(requested.any((url) => url.contains('p2.test')), isFalse);
+      expect(requested.any((url) => url.contains('p3.test')), isFalse);
+
+      releasePlayer1.complete(http.Response('down', 503));
+      final stream = await resolving;
+
+      expect(stream.title, 'Stream 3');
+      expect(stream.url, 'https://cdn.test/three.m3u8');
+      expect(requested, contains('https://p2.test/embed'),
+          reason: 'Player 2 raced too, it was just slower');
+
+      // The loser keeps going as a backup, without being fetched a second time.
+      final discovery = stream.discovery!;
+      releasePlayer2.complete(http.Response('https://cdn.test/two.m3u8', 200));
+      await discovery.resolveNext();
+      expect(discovery.variants.map((variant) => variant.title),
+          ['Stream 3', 'Stream 2']);
+      expect(
+        requested.where((url) => url == 'https://p2.test/embed'),
+        hasLength(1),
+      );
+    });
+
+    test('a raced player that finishes first without a stream does not win',
+        () async {
+      final service = DaddyLiveService(
+        baseUrl: 'https://metadata.example',
+        client: sealedMockClient((request) async {
+          if (request.url.path == '/watch.php') return _threePlayers();
           if (request.url.host == 'p1.test') return http.Response('down', 503);
-          if (request.url.host == 'p2.test') {
-            expect(requested, contains('https://p1.test/embed'));
-            return http.Response('https://cdn.test/two.m3u8', 200);
+          if (request.url.host == 'p2.test') return http.Response('down', 503);
+          if (request.url.host == 'p3.test') {
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+            return http.Response('https://cdn.test/three.m3u8', 200);
           }
-          if (request.url.path.endsWith('/segment.ts')) {
-            return http.Response.bytes(_ts(), 200);
-          }
-          if (request.url.host == 'cdn.test') {
-            return http.Response('#EXTM3U\n#EXTINF:4,\nsegment.ts', 200);
-          }
-          fail('Unexpected request: ${request.url}');
+          return _playable(request) ?? fail('Unexpected: ${request.url}');
         }),
       );
       addTearDown(service.close);
 
       final stream = await service.getStream('51');
 
-      expect(stream.title, 'Stream 2');
-      expect(stream.variants.single.url, 'https://cdn.test/two.m3u8');
-      expect(requested.any((url) => url.contains('p3.test')), isFalse);
-      expect(stream.discovery, isNotNull);
+      expect(stream.title, 'Stream 3');
+    });
+
+    test('moves on to the scraper when every raced player fails', () async {
+      final requested = <String>[];
+      final service = DaddyLiveService(
+        baseUrl: 'https://metadata.example',
+        client: sealedMockClient((request) async {
+          requested.add(request.url.toString());
+          if (request.url.path == '/watch.php') return _threePlayers();
+          if (request.url.host.endsWith('p1.test') ||
+              request.url.host.endsWith('p2.test') ||
+              request.url.host.endsWith('p3.test')) {
+            return http.Response('down', 503);
+          }
+          if (request.url.path == '/api/v3/dlhd/embeds') {
+            return http.Response('Cannot GET', 404);
+          }
+          if (request.url.path == '/api/v3/dlhd/stream') {
+            return http.Response('{"success":false}', 502);
+          }
+          fail('Unexpected: ${request.url}');
+        }),
+      );
+      addTearDown(service.close);
+
+      await expectLater(
+        service.getStream('51'),
+        throwsA(isA<DaddyLiveException>()),
+      );
+      expect(requested, contains('https://p2.test/embed'));
+      expect(requested, contains('https://p3.test/embed'));
+      expect(requested.any((url) => url.contains('/dlhd/embeds')), isTrue);
+    });
+
+    test('leaving a channel stops a raced player that lost', () async {
+      final requested = <String>[];
+      final releasePlayer2 = Completer<http.Response>();
+      final service = DaddyLiveService(
+        baseUrl: 'https://metadata.example',
+        client: sealedMockClient((request) async {
+          requested.add(request.url.toString());
+          if (request.url.path == '/watch.php') return _threePlayers();
+          if (request.url.host == 'p1.test') return http.Response('down', 503);
+          if (request.url.host == 'p2.test') return releasePlayer2.future;
+          if (request.url.host == 'p3.test') {
+            return http.Response('https://cdn.test/three.m3u8', 200);
+          }
+          return _playable(request) ?? fail('Unexpected: ${request.url}');
+        }),
+      );
+      addTearDown(service.close);
+
+      final stream = await service.getStream('51');
+      stream.discovery!.dispose();
+      releasePlayer2.complete(http.Response(
+          '<iframe src="https://late.embed.test/channel"></iframe>', 200));
+      await pumpEventQueue();
+
+      expect(requested.any((url) => url.contains('late.embed.test')), isFalse);
     });
 
     test('leaving a channel stops following a pending backup iframe', () async {
@@ -305,8 +393,8 @@ void main() {
 
       expect(stream.url, 'https://cdn.test/51.m3u8');
       expect(stream.embedUrl, 'https://embed.test/channel/51');
-      expect(requested.any((url) => url.contains('server-signed.test')),
-          isFalse);
+      expect(
+          requested.any((url) => url.contains('server-signed.test')), isFalse);
     });
 
     test('never plays the scraper-signed URL when its embed fails', () async {
@@ -341,13 +429,19 @@ void main() {
         service.getStream('51'),
         throwsA(isA<DaddyLiveException>()),
       );
-      expect(requested.any((url) => url.contains('server-signed.test')),
-          isFalse,
+      expect(
+          requested.any((url) => url.contains('server-signed.test')), isFalse,
           reason: 'the scraper URL is signed for the server IP, not ours');
     });
 
     test('scraper embeds play on the device, the rest as backups', () async {
       final requested = <http.Request>[];
+      final releaseLate = Completer<http.Response>();
+      addTearDown(() {
+        if (!releaseLate.isCompleted) {
+          releaseLate.complete(http.Response('down', 503));
+        }
+      });
       final service = DaddyLiveService(
         baseUrl: 'https://metadata.example',
         client: sealedMockClient((request) async {
@@ -376,6 +470,7 @@ void main() {
           if (request.url.host == 'embed.test') {
             return http.Response('https://cdn.test/51.m3u8', 200);
           }
+          if (request.url.host == 'late.test') return releaseLate.future;
           if (request.url.path.endsWith('/segment.ts')) {
             return http.Response.bytes(_ts(), 200);
           }
@@ -392,13 +487,11 @@ void main() {
       expect(stream.url, 'https://cdn.test/51.m3u8');
       expect(stream.title, 'Stream 2');
       expect(stream.discovery?.hasNext, isTrue,
-          reason: 'the third embed waits as a backup');
+          reason: 'the slower third embed carries on as a backup');
       final embedRequest =
           requested.firstWhere((request) => request.url.host == 'embed.test');
       expect(embedRequest.headers['Referer'],
           'https://mirror.test/cast/stream-51.php');
-      expect(requested.any((request) => request.url.host == 'late.test'),
-          isFalse);
       expect(
         requested.any((request) => request.url.path.endsWith('/stream')),
         isFalse,
@@ -508,6 +601,20 @@ void main() {
       expect(catalog.categories, isEmpty);
     });
   });
+}
+
+http.Response _threePlayers() => http.Response('''
+      <button class="player-btn" data-url="https://p1.test/embed" title="PLAYER 1"></button>
+      <button class="player-btn" data-url="https://p2.test/embed" title="PLAYER 2"></button>
+      <button class="player-btn" data-url="https://p3.test/embed" title="PLAYER 3"></button>
+    ''', 200);
+
+/// The playlist and media behind any `cdn.test` stream, or null for other hosts.
+http.Response? _playable(http.Request request) {
+  if (request.url.host != 'cdn.test') return null;
+  return request.url.path.endsWith('/segment.ts')
+      ? http.Response.bytes(_ts(), 200)
+      : http.Response('#EXTM3U\n#EXTINF:4,\nsegment.ts', 200);
 }
 
 http.Response _jsonResponse(Map<String, dynamic> value) => http.Response(

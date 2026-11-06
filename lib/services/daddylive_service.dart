@@ -241,9 +241,10 @@ class DaddyLiveService implements LiveTvService {
   /// signed playlists are bound to the IP that opened the final embed, so URLs
   /// extracted by the metadata API are intentionally not trusted here. The
   /// device fetches the watch page, follows every player/iframe chain, and
-  /// decodes the M3U8 configuration. Player 1 is tried first; later players are
-  /// tried only if it fails. Once content playback starts, the returned
-  /// discovery resolves the remaining players for selection and failover.
+  /// decodes the M3U8 configuration. Player 1 is tried first; if it fails, the
+  /// later players race and the first with a stream plays. Once content playback
+  /// starts, the returned discovery publishes the remaining players for
+  /// selection and failover.
   @override
   Future<DaddyLiveStream> getStream(String channelId) async {
     final stopwatch = Stopwatch()..start();
@@ -373,35 +374,61 @@ class DaddyLiveService implements LiveTvService {
     }
   }
 
-  /// The first of [players] that plays, with the rest resolving on demand as
-  /// its backups.
+  /// Player 1 alone, so a healthy channel asks nothing of the other mirrors.
+  /// If it fails, every other player races and the first with a stream plays.
+  /// The rest stay on as its backups: on demand after Player 1, or carrying on
+  /// from where they got to after a race.
   Future<DaddyLiveStream?> _resolvePlayers(
     List<_DlhdPlayer> players, {
     required String referer,
   }) async {
-    for (var index = 0; index < players.length && !_closed; index++) {
-      final resolved = await _resolvePlayer(players[index], referer: referer);
-      if (resolved == null) continue;
-      LiveStreamDiscovery? discovery;
-      if (index + 1 < players.length) {
-        discovery = LiveStreamDiscovery(
+    if (_closed || players.isEmpty) return null;
+    LiveStreamDiscovery? discovery;
+    Future<_ResolvedDlhdPlayer?> resolve(_DlhdPlayer player) => _resolvePlayer(
+          player,
+          referer: referer,
+          cancelled: () => discovery?.isDisposed == true,
+        );
+    DaddyLiveStream withBackups(
+      _ResolvedDlhdPlayer resolved,
+      List<Future<_ResolvedDlhdPlayer?> Function()> backups,
+    ) {
+      if (backups.isNotEmpty) {
+        final created = LiveStreamDiscovery(
           initial: resolved.variant,
           backups: [
-            for (final player in players.skip(index + 1))
-              () async => (await _resolvePlayer(
-                    player,
-                    referer: referer,
-                    cancelled: () => _closed || discovery!.isDisposed,
-                  ))
-                      ?.variant,
+            for (final backup in backups) () async => (await backup())?.variant,
           ],
         );
+        discovery = created;
         _discoveries.removeWhere((item) => item.isDisposed);
-        _discoveries.add(discovery);
+        _discoveries.add(created);
       }
       return _streamFromResolvedPlayers([resolved], discovery: discovery);
     }
-    return null;
+
+    final others = players.skip(1).toList(growable: false);
+    final first = await resolve(players.first);
+    if (first != null) {
+      return withBackups(first, [
+        for (final player in others) () => resolve(player),
+      ]);
+    }
+
+    final racers = [
+      for (final (index, player) in others.indexed)
+        resolve(player).then((resolved) => (index: index, resolved: resolved)),
+    ];
+    final winner = await Stream.fromFutures(racers).firstWhere(
+      (racer) => racer.resolved != null,
+      orElse: () => (index: -1, resolved: null),
+    );
+    final resolved = winner.resolved;
+    if (resolved == null) return null;
+    return withBackups(resolved, [
+      for (final (index, racer) in racers.indexed)
+        if (index != winner.index) () async => (await racer).resolved,
+    ]);
   }
 
   Future<DaddyLiveStream?> _resolveFromWatchPage(String watchUrl) async {
