@@ -293,7 +293,7 @@ better_player_plus:
 7. **Set up the scraper key**:
 
    Scraper stream lookups use encrypted `/api/v3` routes. Their key is derived
-   from `.env.scraper`, a native library, and the APK's signing certificate.
+   from values in `.env`, a native library, and the APK's signing certificate.
    Create the inputs once, then generate the Dart values:
 
    ```bash
@@ -301,11 +301,11 @@ better_player_plus:
    dart run build_runner build --delete-conflicting-outputs
    ```
 
-   **After editing `.env` or `.env.scraper`, run `dart run build_runner clean`
+   **After editing `.env`, run `dart run build_runner clean`
    before that build.** A plain build keeps the old values without warning, and
    `test/core/app_secrets_test.dart` fails if that happens.
 
-   Android builds fail without `.env.scraper`. Back it up privately: losing it
+   Android builds fail without those values in `.env`. Back it up privately: losing it
    means releasing a new key.
 
    Each signing certificate derives a different key. Debug builds use the dev

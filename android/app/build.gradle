@@ -32,7 +32,7 @@ if (keystorePropertiesFile.exists()) {
 
 // Compiled into libfqcore.so. See tool/scraper_key.dart.
 def scraperEnv = new Properties()
-def scraperEnvFile = rootProject.file('../.env.scraper')
+def scraperEnvFile = rootProject.file('../.env')
 if (scraperEnvFile.exists()) {
     scraperEnvFile.withReader('UTF-8') { reader -> scraperEnv.load(reader) }
 }

@@ -1,10 +1,10 @@
 # Scraper v3 encryption handoff
 
-Last updated: 2026-11-06. Start at [Current status](#current-status) and
+Last updated: 2026-11-07. Start at [Current status](#current-status) and
 [Next steps](#next-steps).
 
 This covers encrypted `/api/v3` routes between the Flutter app and the scraper.
-This file contains no secrets. Never add the values from `.env.scraper` or
+This file contains no secrets. Never add the values from `.env` or
 `SCRAPER_V3_KEYS` to it. Don't paste those values into an AI chat either.
 
 ## Repos
@@ -27,11 +27,11 @@ yet.**
 | `SCRAPER_V3_MODE` in production | Not set, which means `sealed` |
 | Server keys | `2026-11` (release) and `dev-2026-11` (debug) in `/etc/flixquest/scraper.env` |
 | Env backup on the VPS | `/etc/flixquest/scraper.env.before-v3-20261106T183038Z` |
-| `.env.scraper` | Only on the owner's Mac. It is gitignored and needs a private backup |
+| `.env` | Only on the owner's Mac. It holds the scraper key inputs, is gitignored and needs a private backup |
 
 Rollback, if needed: `ssh flixquest-vps`, then `sudo fq rollback scraper`.
 
-**Building Flutter from `v4.3.2` needs setup.** `.env.scraper` and the generated
+**Building Flutter from `v4.3.2` needs setup.** `.env` and the generated
 `lib/core/config/scraper_secrets.g.dart` are gitignored, so a fresh checkout won't
 compile until you follow [Setting up a new machine](#setting-up-a-new-machine).
 
@@ -223,7 +223,7 @@ root = HKDF-SHA256(ikm  = base64-decoded Dart fragment + mix,
 - Each signing certificate derives a different key, so a re-signed APK fails.
 - Release builds use `SCRAPER_PROD_*`. Debug and profile builds use
   `SCRAPER_DEV_*`.
-- The server only stores the final root key. It never needs `.env.scraper` or
+- The server only stores the final root key. It never needs `.env` or
   the `.jks`.
 
 ## Files
@@ -265,13 +265,12 @@ scraper's copy.
 
 ## Setting up a new machine
 
-1. Restore `.env` and `.env.scraper` from the private backup into the Flutter repo
-   root.
+1. Restore `.env` from the private backup into the Flutter repo root.
 2. Run `fvm dart run build_runner build --delete-conflicting-outputs`.
 
-Android builds fail without `.env.scraper`, and code generation fails without `.env`.
+Code generation and Android builds fail without `.env`.
 
-**After editing either file on any machine, run `fvm dart run build_runner clean`
+**After editing `.env` on any machine, run `fvm dart run build_runner clean`
 before that build.** A plain build reports success but keeps the old values.
 `test/core/app_secrets_test.dart` fails if the compiled values are stale. Only run `tool/scraper_key.dart init`
 if no key exists anywhere, because new inputs mean a new key and a new release.
@@ -284,7 +283,7 @@ keytool -list -v -keystore ~/.android/debug.keystore -storepass android | grep S
 
 ## Replacing a key
 
-1. Change `KID` and `FRAGMENT` for that mode in `.env.scraper`, then run
+1. Change `KID` and `FRAGMENT` for that mode in `.env`, then run
    `build_runner clean` followed by `build_runner build`.
 2. Generate the new value with `server-key`.
 3. Add it to `SCRAPER_V3_KEYS` next to the old one, separated by a comma.
@@ -300,9 +299,14 @@ Changing `SCRAPER_NATIVE_SECRET` affects both the prod and dev keys.
 - **Keep the `asm` barrier in `fq_core.cpp`.** Without it the compiler folds the
   mask away and stores the plain secret in the binary. This really happened.
   After native changes, confirm the secret bytes aren't in `libfqcore.so`.
-- **Never list `.env` or `.env.scraper` in `pubspec.yaml` assets.** Anything there
-  ships in the APK as a readable file. Both are compiled in with obfuscation instead,
-  through `app_secrets.dart` and `scraper_secrets.dart`.
+- **Never list `.env` in `pubspec.yaml` assets.** Anything there ships in the APK as
+  a readable file, including the scraper key inputs. Its values are compiled in with
+  obfuscation instead, through `app_secrets.dart` and `scraper_secrets.dart`.
+- **Don't build from a branch that still lists `.env` under assets.** `.env` is
+  gitignored, so it stays in the folder when you switch branches. Commits before
+  `0c57429`, including `v4.3.0` and `v4.3.1`, would ship the scraper key inputs in
+  plain text. Remove the line from `pubspec.yaml` before building one, and check with
+  `unzip -l <apk> | grep env`.
 - **Express 5's `req.query` is getter-only.** `v3.ts` uses
   `Object.defineProperty` because plain assignment throws.
 - **v3 mounts ahead of v2's global middleware,** which reads the plain query

@@ -2,9 +2,9 @@ import 'package:envied/envied.dart';
 
 part 'scraper_secrets.g.dart';
 
-/// Inputs to the scraper key, generated from `.env.scraper`, which is never
-/// bundled as an asset. Run `dart run tool/scraper_key.dart init` to create it.
-@Envied(path: '.env.scraper', requireEnvFile: true)
+/// Inputs to the scraper key, generated from `.env`, which is never bundled as an
+/// asset. Run `dart run tool/scraper_key.dart init` to add them to it.
+@Envied(path: '.env', requireEnvFile: true)
 abstract class ScraperSecrets {
   @EnviedField(varName: 'SCRAPER_PROD_KID', obfuscate: true)
   static final String prodKid = _ScraperSecrets.prodKid;

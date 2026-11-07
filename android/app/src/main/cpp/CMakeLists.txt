@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(fqcore CXX)
 
-# Comes from SCRAPER_NATIVE_SECRET in .env.scraper, through build.gradle.
+# Comes from SCRAPER_NATIVE_SECRET in .env, through build.gradle.
 if(NOT FQ_NATIVE_SECRET MATCHES "^[0-9a-f]+$")
   message(FATAL_ERROR
     "SCRAPER_NATIVE_SECRET is missing. Run: dart run tool/scraper_key.dart init")

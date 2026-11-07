@@ -12,7 +12,7 @@ import 'dart:math';
 import 'package:cryptography/cryptography.dart';
 import 'package:flixquest/core/network/scraper_v3/scraper_key_derivation.dart';
 
-const _envPath = '.env.scraper';
+const _envPath = '.env';
 const _packageName = 'dev.beamlak.flixquest_v2';
 
 Future<void> main(List<String> args) async {
@@ -40,9 +40,11 @@ List<int> _randomBytes(int length) {
 
 void _init() {
   final file = File(_envPath);
-  if (file.existsSync()) {
-    stderr.writeln('$_envPath already exists. Replacing it changes every key, '
-        'so move it away first if that is what you want.');
+  final existing = file.existsSync() ? file.readAsStringSync() : '';
+  if (existing.contains('SCRAPER_')) {
+    stderr.writeln('$_envPath already has scraper key inputs. Replacing them '
+        'changes every key, so remove those lines first if that is what you '
+        'want.');
     exitCode = 1;
     return;
   }
@@ -51,15 +53,20 @@ void _init() {
   final nativeSecret = _randomBytes(32)
       .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
       .join();
-  file.writeAsStringSync('''
-# Inputs to the scraper key. Never commit or bundle this file.
+  file.writeAsStringSync(
+    '''
+
+# Inputs to the scraper v3 key. Changing any of these changes the key.
 SCRAPER_PROD_KID=$month
 SCRAPER_PROD_FRAGMENT=${base64Encode(_randomBytes(32))}
 SCRAPER_DEV_KID=dev-$month
 SCRAPER_DEV_FRAGMENT=${base64Encode(_randomBytes(32))}
 SCRAPER_NATIVE_SECRET=$nativeSecret
-''');
-  stdout.writeln('Wrote $_envPath. Next: dart run build_runner build '
+''',
+    mode: FileMode.append,
+  );
+  stdout.writeln('Added scraper key inputs to $_envPath. Next: dart run '
+      'build_runner clean && dart run build_runner build '
       '--delete-conflicting-outputs');
 }
 

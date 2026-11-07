@@ -23,8 +23,8 @@ void main() {
     expect(dotenv.env.containsKey('FLIXQUEST_API_URL'), isTrue);
   });
 
-  // A plain build_runner build keeps old values when these files change.
-  group('compiled values match the env files', () {
+  // A plain build_runner build keeps old values when this file changes.
+  group('compiled values match the env file', () {
     Map<String, String> read(String path) => <String, String>{
           for (final line in File(path).readAsLinesSync())
             if (line.contains('=') && !line.trimLeft().startsWith('#'))
@@ -45,6 +45,10 @@ void main() {
         'FLIXQUEST_API_URL': AppSecrets.flixquestApiUrl,
         'LARAVEL_API_URL': AppSecrets.laravelApiUrl,
         'ONESIGNAL_APP_ID': AppSecrets.oneSignalAppId,
+        'SCRAPER_PROD_KID': ScraperSecrets.prodKid,
+        'SCRAPER_PROD_FRAGMENT': ScraperSecrets.prodFragment,
+        'SCRAPER_DEV_KID': ScraperSecrets.devKid,
+        'SCRAPER_DEV_FRAGMENT': ScraperSecrets.devFragment,
       };
       for (final entry in compiled.entries) {
         // Compared as a boolean so a failure can't print a secret.
@@ -52,23 +56,6 @@ void main() {
             reason: '${entry.key}: $regenerate');
       }
     }, skip: File('.env').existsSync() ? false : 'No .env on this machine');
-
-    test('.env.scraper', () {
-      final env = read('.env.scraper');
-      final compiled = <String, String>{
-        'SCRAPER_PROD_KID': ScraperSecrets.prodKid,
-        'SCRAPER_PROD_FRAGMENT': ScraperSecrets.prodFragment,
-        'SCRAPER_DEV_KID': ScraperSecrets.devKid,
-        'SCRAPER_DEV_FRAGMENT': ScraperSecrets.devFragment,
-      };
-      for (final entry in compiled.entries) {
-        expect(entry.value == env[entry.key], isTrue,
-            reason: '${entry.key}: $regenerate');
-      }
-    },
-        skip: File('.env.scraper').existsSync()
-            ? false
-            : 'No .env.scraper on this machine');
   });
 
   test('no env file is bundled as a readable asset', () {
