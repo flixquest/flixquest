@@ -15,7 +15,6 @@ import 'package:flixquest/tv/widgets/tv_navigation_rail.dart';
 import 'package:flixquest/tv/widgets/tv_top_ten_rank.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/callback_dio.dart';
 import 'package:provider/provider.dart';
@@ -125,9 +124,7 @@ Future<TvScreenFocusController> _pumpBrowse(
 
 void main() {
   initializeTvTranslations();
-  setUpAll(() {
-    dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://example.com');
-  });
+  setUpAll(() {});
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(<String, Object>{});

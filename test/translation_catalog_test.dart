@@ -123,7 +123,6 @@ void main() {
     final keyPattern = RegExp(r"(?:tr|plural)\('([a-z_0-9]+)'");
     final sources = <File>[
       ...Directory('lib/tv').listSync(recursive: true).whereType<File>(),
-      File('lib/screens/common/player/player_strings.dart'),
       File('lib/screens/common/update_screen.dart'),
       File('lib/catalog/catalog_controller.dart'),
     ];

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flixquest/tv/controllers/tv_title_logos.dart';
 import 'package:flixquest/services/tmdb_connectivity.dart';
 import 'package:flixquest/tv/models/tv_media_item.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -35,9 +34,7 @@ Map<String, dynamic> _logo(
     };
 
 void main() {
-  setUpAll(() {
-    dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://example.com');
-  });
+  setUpAll(() {});
 
   group('pickTitleLogo', () {
     test('prefers the app language, then English, then no text', () {

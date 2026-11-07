@@ -51,7 +51,8 @@ class MediaLink {
       RegExp(r'^fq-[A-Za-z0-9]{8}$', caseSensitive: false);
 
   /// A Plus code as Filament accepts it: letters, digits and dashes.
-  static final RegExp _flixquestCoupon = RegExp(r'^[A-Za-z0-9][A-Za-z0-9-]{2,39}$');
+  static final RegExp _flixquestCoupon =
+      RegExp(r'^[A-Za-z0-9][A-Za-z0-9-]{2,39}$');
 
   /// Shareable addresses for catalog titles and episodes on FlixQuest's verified domain.
   static Uri movieUrl(int movieId) => Uri.https(_flixquest, '/m/$movieId');
@@ -370,7 +371,6 @@ class LiveChannelLink extends MediaLinkTarget {
   final String channelId;
 }
 
-/// A FlixQuest Plus code to redeem, normalised to upper case as Laravel stores it.
 class CouponLink extends MediaLinkTarget {
   const CouponLink({required this.code});
 
@@ -403,6 +403,5 @@ class ImdbListLink extends MediaLinkTarget {
 class SharedListLink extends MediaLinkTarget {
   const SharedListLink({required this.code});
 
-  /// `fq-` and the code in capitals, as Laravel's link spells it.
   final String code;
 }

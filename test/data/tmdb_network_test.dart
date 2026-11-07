@@ -36,7 +36,7 @@ void main() {
           },
         ]
       });
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    final dio = createPublicDio(const AppEnvironment(),
         httpCache: cache, debugLogging: false);
     dio.httpClientAdapter = adapter;
     NetworkRuntime.configure(publicDio: dio, httpCache: cache);
@@ -60,7 +60,7 @@ void main() {
     const url = 'https://api.themoviedb.org/3/movie/popular';
     final firstCache = HttpCache(
         await ResponseCacheStore.open(factory: databaseFactoryFfi, path: path));
-    final firstDio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    final firstDio = createPublicDio(const AppEnvironment(),
         httpCache: firstCache, debugLogging: false);
     firstDio.httpClientAdapter = FakeDioAdapter()
       ..enqueueJson({
@@ -90,7 +90,7 @@ void main() {
     await firstCache.close();
     final cache = HttpCache(
         await ResponseCacheStore.open(factory: databaseFactoryFfi, path: path));
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    final dio = createPublicDio(const AppEnvironment(),
         httpCache: cache, debugLogging: false, retryDelay: (_) async {});
     dio.httpClientAdapter = FakeDioAdapter()
       ..enqueueError()

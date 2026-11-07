@@ -2,7 +2,6 @@
 
 import 'dart:convert';
 
-import '../constants/api_constants.dart';
 import '../constants/app_constants.dart';
 
 class AppDependencies {
@@ -18,23 +17,6 @@ class AppDependencies {
 
   Future<void> setFlixQuestUrl(String value) async {
     await sharedPrefsSingleton.setString(FLIXQUEST_LOGO_URL, value);
-  }
-
-  Future<String> getFQURL() async {
-    return sharedPrefsSingleton.getString(FLIXQUEST_API_URL) ?? flixquestApiUrl;
-  }
-
-  Future<void> setFlixquestAPIUrl(String value) async {
-    await sharedPrefsSingleton.setString(FLIXQUEST_API_URL, value);
-  }
-
-  Future<List<String>> getFQInstances() async {
-    return sharedPrefsSingleton.getStringList(FLIXQUEST_API_INSTANCES) ??
-        const [];
-  }
-
-  Future<void> setFlixquestAPIInstances(List<String> values) async {
-    await sharedPrefsSingleton.setStringList(FLIXQUEST_API_INSTANCES, values);
   }
 
   Future<String> getFlixQuestLogo() async {

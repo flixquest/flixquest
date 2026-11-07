@@ -1,6 +1,0 @@
-simulation: FlixQuest download recovery
-routing: path
-mocks:
-  - name: FlixQuest stream API and signed media
-    routeKey: downloads
-    path: ../mocks/download-recovery/config.yaml

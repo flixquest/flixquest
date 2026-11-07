@@ -6,11 +6,8 @@ import 'package:flutter/foundation.dart';
 import '../catalog/media_item.dart';
 import '../data/playlists/playlist.dart';
 import '../data/playlists/playlist_store.dart';
-import '../data/repositories/billing_repository.dart' show newIdempotencyKey;
-import '../data/repositories/playlist_repository.dart';
+import '../functions/new_local_id.dart';
 import '../data/sync/library_scope.dart';
-import '../data/sync/sync_runner.dart';
-import '../data/sync/sync_runtime.dart';
 
 /// Why an edit to a list was not made.
 enum PlaylistEditError {
@@ -27,12 +24,6 @@ class PlaylistEditException implements Exception {
   final PlaylistEditError error;
 }
 
-/// The signed-in account's (or this device's guest) custom lists.
-///
-/// Every edit is saved as a queued operation before the lists are re-read, so
-/// what the screen shows has already survived a restart; the sync runner then
-/// hands the queue to Laravel. Signed out, the lists stay on the device and
-/// move to the account the guest signs in to.
 class PlaylistProvider extends ChangeNotifier {
   PlaylistProvider({
     Future<PlaylistStore> Function(String owner)? openStore,
@@ -47,7 +38,6 @@ class PlaylistProvider extends ChangeNotifier {
   final Random? _random;
 
   static Future<PlaylistStore> _defaultStore(String owner) =>
-      SyncRuntime.coordinator?.openPlaylists(owner) ??
       PlaylistStore.forOwner(owner);
 
   static String _utcNow() => DateTime.now().toUtc().toIso8601String();
@@ -63,31 +53,7 @@ class PlaylistProvider extends ChangeNotifier {
   /// Whether the lists have been read at least once for this owner.
   bool get loaded => _loaded;
 
-  SyncRunner? _runner;
   Future<void> _edits = Future<void>.value();
-
-  /// The sync runner for lists, when this build syncs them.
-  SyncRunner? get runner {
-    _bind();
-    return _runner;
-  }
-
-  /// Repository for imports; null when this build has no Laravel sync.
-  PlaylistRepository? get repository =>
-      SyncRuntime.enabled ? SyncRuntime.coordinator?.playlistRepository : null;
-
-  void _bind() {
-    final next =
-        SyncRuntime.enabled ? SyncRuntime.coordinator?.playlists : null;
-    if (identical(next, _runner)) return;
-    _runner?.status.removeListener(_onSyncStatus);
-    _runner = next;
-    next?.status.addListener(_onSyncStatus);
-  }
-
-  void _onSyncStatus() {
-    if (_runner?.status.value == 'success') unawaited(load());
-  }
 
   Playlist? byId(String id) {
     for (final list in _lists) {
@@ -109,7 +75,6 @@ class PlaylistProvider extends ChangeNotifier {
   }
 
   Future<void> load() async {
-    _bind();
     final owner = LibraryScope.owner;
     final generation = LibraryScope.generation;
     _loading = true;
@@ -124,13 +89,6 @@ class PlaylistProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-
-  /// Syncs now, when signed in; the lists reload when it lands.
-  Future<bool> sync() async => await runner?.sync() ?? false;
-
-  /// Syncs unless this account did recently; pulling to refresh still forces
-  /// one with [sync].
-  Future<void> autoSync() async => await runner?.autoSync();
 
   /// Makes a list called [name], with [first] (or every one of [items], as
   /// when saving a copy of someone's list) in it, and returns its id.
@@ -162,32 +120,6 @@ class PlaylistProvider extends ChangeNotifier {
       if (list.record.shareCode?.toUpperCase() == normalized) return list;
     }
     return null;
-  }
-
-  /// Lets anyone with the link see list [id], or stops them; returns the
-  /// link while it is public. Needs a signed-in account, since the link is
-  /// served by Laravel, and so the list has to reach it first.
-  ///
-  /// Throws [PlaylistImportException] when Laravel cannot be reached.
-  Future<String?> setPublic(String id, bool public) async {
-    _require(id);
-    final repository = this.repository;
-    final runner = this.runner;
-    final owner = LibraryScope.owner;
-    if (repository == null || runner == null || !owner.startsWith('user:')) {
-      throw const PlaylistEditException(PlaylistEditError.signInRequired);
-    }
-    final generation = LibraryScope.generation;
-    await runner.sync();
-    final record =
-        await repository.setSharing(id, public: public, owner: owner);
-    final store = await _openStore(owner);
-    await store.saveRecord(record);
-    if (generation == LibraryScope.generation) {
-      _lists = await store.read();
-      notifyListeners();
-    }
-    return record.shareUrl;
   }
 
   Future<void> rename(String id, String name, {String? description}) async {
@@ -315,15 +247,8 @@ class PlaylistProvider extends ChangeNotifier {
       _lists = await store.read();
       _loaded = true;
       notifyListeners();
-      runner?.changed();
     });
     _edits = work.catchError((Object _) {});
     return work;
-  }
-
-  @override
-  void dispose() {
-    _runner?.status.removeListener(_onSyncStatus);
-    super.dispose();
   }
 }

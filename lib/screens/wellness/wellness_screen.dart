@@ -26,7 +26,6 @@ import '../../models/wellness_recap.dart';
 import '../../models/wellness_recap_story.dart';
 import '../../models/wellness_time_series.dart';
 import '../../provider/wellness_provider.dart';
-import '../../services/wellness_sync_service.dart';
 import '../../ui_components/app_ui_components.dart';
 import '../../widgets/wellness_charts.dart';
 import 'widgets/insights_dashboard.dart';
@@ -78,7 +77,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
           child: RefreshIndicator(
             color: palette.foreground,
             backgroundColor: palette.raisedSurface,
-            onRefresh: wellness.canSync ? wellness.syncNow : wellness.reload,
+            onRefresh: wellness.reload,
             child: AppResponsiveContent(
               maxWidth: 920,
               padding: EdgeInsets.zero,
@@ -95,8 +94,6 @@ class _WellnessScreenState extends State<WellnessScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (wellness.shouldOfferGuestMerge)
-                      _GuestMergeCard(provider: wellness),
                     _InsightsToolbar(
                       provider: wellness,
                     ),
@@ -315,7 +312,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                       const SizedBox(height: 14),
                       InsightsPlaybackPanel(insights: insights),
                       const SizedBox(height: 26),
-                      _PrivacyNote(canSync: wellness.canSync),
+                      const _PrivacyNote(canSync: false),
                     ],
                   ],
                 ),
@@ -372,8 +369,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
           context,
           icon: PhosphorIcons.trash(),
           title: tr('ins_clear_q'),
-          message:
-              wellness.canSync ? tr('ins_clear_synced') : tr('ins_clear_local'),
+          message: tr('ins_clear_local'),
           confirmLabel: tr('ins_clear_history'),
           destructive: true,
         );
@@ -1076,86 +1072,12 @@ class _InsightsToolbar extends StatelessWidget {
   final WellnessProvider provider;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final status = provider.syncService.status.value;
-    final syncing = status == WellnessSyncStatus.syncing;
-    final statusLabel = !provider.canSync
-        ? tr('on_this_device')
-        : syncing
-            ? tr('ins_syncing')
-            : status == WellnessSyncStatus.error
-                ? tr('ins_sync_paused')
-                : provider.syncService.lastSynced.value == null
-                    ? tr('ins_ready_sync')
-                    : tr('ins_synced', namedArgs: {
-                        'time': _relativeTime(
-                            provider.syncService.lastSynced.value!),
-                      });
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _insightSurface(context),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: AppPalette.of(context).idleFill,
-                  borderRadius: BorderRadius.circular(AppRadii.card),
-                ),
-                child: Icon(
-                  provider.canSync
-                      ? PhosphorIcons.cloudCheck()
-                      : PhosphorIcons.deviceMobile(),
-                  size: 18,
-                  color: AppPalette.of(context).foreground,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      tr('ins_private_story'),
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    Text(
-                      statusLabel,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: status == WellnessSyncStatus.error
-                                ? colors.error
-                                : colors.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              if (provider.canSync)
-                PillButton(
-                  busy: syncing,
-                  onPressed: provider.syncNow,
-                  icon: PhosphorIcons.arrowsClockwise(),
-                  label: tr('sync'),
-                ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _RangePicker(
-            selected: provider.range,
-            onSelected: provider.setRange,
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(tr('on_this_device')),
+        const SizedBox(height: 14),
+        _RangePicker(selected: provider.range, onSelected: provider.setRange),
+      ]);
 }
 
 class _RangePicker extends StatelessWidget {
@@ -3213,86 +3135,6 @@ class _CompletionPanel extends StatelessWidget {
   }
 }
 
-class _GuestMergeCard extends StatelessWidget {
-  const _GuestMergeCard({required this.provider});
-
-  final WellnessProvider provider;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(AppSpace.lg),
-      decoration: BoxDecoration(
-        color: _insightSurface(context),
-        borderRadius: BorderRadius.circular(AppRadii.hero),
-        border: Border.all(color: palette.hairline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: palette.idleFill,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  PhosphorIcons.usersThree(),
-                  size: 18,
-                  color: palette.foreground,
-                ),
-              ),
-              const SizedBox(width: AppSpace.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      tr('ins_guest_q'),
-                      style: AppType.cardTitle.copyWith(
-                        fontSize: 15,
-                        color: palette.foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      tr('ins_guest_desc'),
-                      style: AppType.body.copyWith(color: palette.mutedText),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpace.lg),
-          Wrap(
-            spacing: AppSpace.sm,
-            runSpacing: AppSpace.sm,
-            children: [
-              PillButton(
-                primary: true,
-                icon: PhosphorIcons.gitMerge(),
-                label: tr('ins_guest_merge'),
-                onPressed: provider.mergeGuestHistory,
-              ),
-              PillButton(
-                label: tr('ins_guest_keep'),
-                onPressed: provider.dismissGuestMerge,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _PrivacyNote extends StatelessWidget {
   const _PrivacyNote({required this.canSync});
 
@@ -3600,18 +3442,6 @@ String _trackingSince(List<WellnessViewingSession> sessions) {
       oldest.startedAtUtc.add(Duration(minutes: oldest.timezoneOffsetMinutes));
   return tr('ins_tracking_since',
       namedArgs: {'date': DateFormat.yMMMd().format(local)});
-}
-
-String _relativeTime(DateTime value) {
-  final difference = DateTime.now().difference(value);
-  if (difference.inMinutes < 1) return tr('just_now');
-  if (difference.inHours < 1) {
-    return tr('n_minutes_ago', namedArgs: {'n': '${difference.inMinutes}'});
-  }
-  if (difference.inDays < 1) {
-    return tr('n_hours_ago', namedArgs: {'n': '${difference.inHours}'});
-  }
-  return DateFormat.MMMd().format(value);
 }
 
 String _unitName(String unit) => switch (unit) {

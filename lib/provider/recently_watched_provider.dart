@@ -5,13 +5,9 @@ import '../catalog/up_next.dart';
 import '../constants/app_constants.dart';
 import '../controllers/recently_watched_database_controller.dart';
 import '../models/recently_watched.dart';
-import '../services/recently_watched_sync_service.dart';
 
 class RecentProvider extends ChangeNotifier {
-  RecentProvider({UpNextStore? upNextStore}) : _upNextStore = upNextStore {
-    RecentlyWatchedSyncService.instance.statusNotifier
-        .addListener(_onSyncStatusChanged);
-  }
+  RecentProvider({UpNextStore? upNextStore}) : _upNextStore = upNextStore;
 
   final RecentlyWatchedMoviesController _movieController =
       RecentlyWatchedMoviesController();
@@ -36,15 +32,17 @@ class RecentProvider extends ChangeNotifier {
     if (_bookOwner != owner && _upNextStore == null) _upNextBook = null;
     _bookOwner = owner;
     return _upNextBook ??= UpNextBook(
-        store: _upNextStore ?? _defaultStore(),
-        limit: upNextLimit,
-      );
+      store: _upNextStore ?? _defaultStore(),
+      limit: upNextLimit,
+    );
   }
 
   static UpNextStore? _defaultStore() {
     try {
-      return UpNextStore(sharedPrefsSingleton, storageKey: LibraryScope.enabled
-          ? 'sync.${LibraryScope.owner}.up_next' : UpNextStore.key,
+      return UpNextStore(sharedPrefsSingleton,
+          storageKey: LibraryScope.enabled
+              ? 'sync.${LibraryScope.owner}.up_next'
+              : UpNextStore.key,
           kvStore: LibraryScope.enabled ? LibraryScope.store : null);
     } catch (_) {
       // Preferences aren't ready: keep them in memory.
@@ -56,27 +54,21 @@ class RecentProvider extends ChangeNotifier {
   /// Kept on this device only.
   List<UpNext> get upNext => _book.entries;
 
-  /// A finished merge may have pulled progress from another device, so reload
-  /// both lists to show it.
-  void _onSyncStatusChanged() {
-    if (RecentlyWatchedSyncService.instance.statusNotifier.value !=
-        RecentSyncStatus.success) {
-      return;
-    }
-    fetchMovies();
-    fetchEpisodes();
-  }
-
   void resetForOwner() {
-    _movies = []; _episodes = []; _upNextBook = null; notifyListeners();
+    _movies = [];
+    _episodes = [];
+    _upNextBook = null;
+    notifyListeners();
   }
 
   Future<void> fetchMovies() async {
-    final owner = LibraryScope.owner; final generation = LibraryScope.generation;
+    final owner = LibraryScope.owner;
+    final generation = LibraryScope.generation;
     final db = await _movieController.databaseForOwner(owner);
     final movies = (await db.query(_movieController.tableName,
-        where: 'deleted_at_utc IS NULL', orderBy: 'date_watched DESC'))
-        .map(RecentMovie.fromMapObject).toList();
+            where: 'deleted_at_utc IS NULL', orderBy: 'date_watched DESC'))
+        .map(RecentMovie.fromMapObject)
+        .toList();
     if (generation != LibraryScope.generation) return;
     _movies = movies;
     notifyListeners();
@@ -85,13 +77,11 @@ class RecentProvider extends ChangeNotifier {
   Future<void> addMovie(RecentMovie movie) async {
     await _movieController.insertMovie(movie);
     await fetchMovies();
-    RecentlyWatchedSyncService.instance.onRecentChanged();
   }
 
   Future<void> updateMovie(RecentMovie movie, int id) async {
     await _movieController.updateMovie(movie, id);
     await fetchMovies();
-    RecentlyWatchedSyncService.instance.onRecentChanged();
   }
 
   /// Keeps a tombstone instead of dropping the row so the removal reaches the
@@ -99,17 +89,18 @@ class RecentProvider extends ChangeNotifier {
   Future<void> deleteMovie(int id) async {
     await _movieController.tombstoneMovie(id);
     await fetchMovies();
-    RecentlyWatchedSyncService.instance.onRecentChanged();
   }
 
   /// Episode
 
   Future<void> fetchEpisodes() async {
-    final owner = LibraryScope.owner; final generation = LibraryScope.generation;
+    final owner = LibraryScope.owner;
+    final generation = LibraryScope.generation;
     final db = await _episodeController.databaseForOwner(owner);
     final episodes = (await db.query(_episodeController.tableName,
-        where: 'deleted_at_utc IS NULL', orderBy: 'date_added DESC'))
-        .map(RecentEpisode.fromMapObject).toList();
+            where: 'deleted_at_utc IS NULL', orderBy: 'date_added DESC'))
+        .map(RecentEpisode.fromMapObject)
+        .toList();
     if (generation != LibraryScope.generation) return;
     _episodes = episodes;
     _book.reload();
@@ -132,27 +123,17 @@ class RecentProvider extends ChangeNotifier {
   Future<void> addEpisode(RecentEpisode episode) async {
     await _episodeController.insertTV(episode);
     await fetchEpisodes();
-    RecentlyWatchedSyncService.instance.onRecentChanged();
   }
 
   Future<void> updateEpisode(
       RecentEpisode episode, int id, int episodeNum, int seasonNum) async {
     await _episodeController.updateTV(episode, id, episodeNum, seasonNum);
     await fetchEpisodes();
-    RecentlyWatchedSyncService.instance.onRecentChanged();
   }
 
   /// See [deleteMovie] for why this tombstones rather than deletes.
   Future<void> deleteEpisode(int id, int episodeNum, int seasonNum) async {
     await _episodeController.tombstoneTV(id, episodeNum, seasonNum);
     await fetchEpisodes();
-    RecentlyWatchedSyncService.instance.onRecentChanged();
-  }
-
-  @override
-  void dispose() {
-    RecentlyWatchedSyncService.instance.statusNotifier
-        .removeListener(_onSyncStatusChanged);
-    super.dispose();
   }
 }

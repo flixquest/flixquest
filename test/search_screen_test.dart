@@ -19,7 +19,6 @@ import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
 import 'package:flixquest/services/app_session_state_store.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -80,7 +79,6 @@ Future<SearchSuggestions> _suggestions() async => SearchSuggestions(
 late SharedPreferences _prefs;
 
 Future<void> _setUp() async {
-  dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://example.com');
   SharedPreferences.setMockInitialValues(<String, Object>{});
   _prefs = await SharedPreferences.getInstance();
   sharedPrefsSingleton = _prefs;

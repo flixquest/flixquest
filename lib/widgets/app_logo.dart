@@ -140,11 +140,16 @@ class _SafeRemoteSvgState extends State<_SafeRemoteSvg> {
 
   static Future<String?> _fetchSvg(Uri uri) async {
     try {
-      final response = await NetworkRuntime.publicDio.get<List<int>>(uri.toString(),
-          options: Options(responseType: ResponseType.bytes,
-            receiveTimeout: const Duration(seconds: 12),
-            extra: {'cachePolicy': CachePolicy.logo}));
-      if ((response.statusCode ?? 0) < 200 || (response.statusCode ?? 0) >= 300) return null;
+      final response = await NetworkRuntime.publicDio.get<List<int>>(
+          uri.toString(),
+          options: Options(
+              responseType: ResponseType.bytes,
+              receiveTimeout: const Duration(seconds: 12),
+              extra: {'cachePolicy': CachePolicy.logo}));
+      if ((response.statusCode ?? 0) < 200 ||
+          (response.statusCode ?? 0) >= 300) {
+        return null;
+      }
       final bytes = response.data ?? const <int>[];
       if (bytes.isEmpty || bytes.length > _maximumLogoBytes) return null;
       final source = utf8.decode(bytes, allowMalformed: false).trim();

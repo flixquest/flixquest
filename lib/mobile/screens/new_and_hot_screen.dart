@@ -25,7 +25,6 @@ import '../widgets/media_art.dart';
 import '../widgets/pill_button.dart';
 import '../widgets/poster_card.dart';
 import '../widgets/title_sheet.dart';
-import 'home_screen.dart' show HomeAdSlot;
 
 /// New & Hot loads only the selected segment, then retains its result until
 /// the viewer refreshes that segment. Switching a pill starts at the top.
@@ -34,14 +33,12 @@ class NewAndHotScreen extends StatefulWidget {
     this.source,
     this.now,
     this.showTitleLogos = true,
-    this.adBuilder,
     super.key,
   });
 
   final NewAndHotSource? source;
   final DateTime Function()? now;
   final bool showTitleLogos;
-  final WidgetBuilder? adBuilder;
 
   @override
   State<NewAndHotScreen> createState() => _NewAndHotScreenState();
@@ -248,9 +245,7 @@ class _NewAndHotScreenState extends State<NewAndHotScreen> {
               showTitleLogos: widget.showTitleLogos,
             ),
           ),
-          if (index == 2)
-            widget.adBuilder?.call(context) ??
-                HomeAdSlot(placement: 'new_and_hot'),
+          if (index == 2) const SizedBox.shrink(),
         ],
       ];
     }

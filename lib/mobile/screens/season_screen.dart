@@ -4,7 +4,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../catalog/details_controller.dart';
-import '../../data/ads/content_ads.dart';
 import '../../catalog/details_play.dart';
 import '../../catalog/media_item.dart';
 import '../../catalog/season_source.dart';
@@ -12,7 +11,6 @@ import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../design/skeleton.dart';
 import '../../models/credits.dart';
-import '../../models/genres.dart';
 import '../../models/images.dart';
 import '../../models/tv.dart';
 import '../../models/videos.dart';
@@ -21,7 +19,6 @@ import '../../provider/recently_watched_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../screens/common/photoview.dart';
 import '../../services/ambient_theme_service.dart';
-import '../episode_playback.dart';
 import '../widgets/details_header.dart';
 import '../widgets/details_parts.dart';
 import '../widgets/episode_row.dart';
@@ -30,8 +27,6 @@ import '../widgets/page_kit.dart' show ReadableWidth;
 import '../widgets/section_header.dart';
 import 'credits_screen.dart';
 import 'episode_screen.dart';
-import '../../widgets/hosted_ads_banner.dart' show HostedBannerVariant;
-import 'home_screen.dart' show HomeAdSlot;
 
 /// A season's page: the series' artwork, the season's name (tapped, the
 /// other seasons), what to play, its synopsis, then its episodes, cast,
@@ -44,7 +39,6 @@ class SeasonScreen extends StatefulWidget {
     required this.seasonNumber,
     this.source,
     this.history,
-    this.adBuilder,
     this.now,
     super.key,
   });
@@ -61,7 +55,6 @@ class SeasonScreen extends StatefulWidget {
 
   /// What the viewer has watched; the recently watched store by default.
   final WatchHistory? history;
-  final WidgetBuilder? adBuilder;
   final DateTime Function()? now;
 
   @override
@@ -72,8 +65,7 @@ class _SeasonScreenState extends State<SeasonScreen>
     with CollapsingHeader<SeasonScreen> {
   late SeasonSource _source;
   late int _season = widget.seasonNumber;
-  late Future<TVDetails> _series;
-  late Future<List<Genres>> _genres;
+
   late Future<Credits> _credits;
   late Future<Videos> _videos;
   late Future<Images> _images;
@@ -81,7 +73,7 @@ class _SeasonScreenState extends State<SeasonScreen>
       <int, Future<List<EpisodeList>>>{};
   final AmbientThemeScopeController _ambient = AmbientThemeScopeController();
   bool _started = false;
-  bool _starting = false;
+
   bool _overviewOpen = false;
 
   int get _seriesId => widget.series.id;
@@ -101,8 +93,6 @@ class _SeasonScreenState extends State<SeasonScreen>
           settings: context.read<SettingsProvider>(),
           dependencies: context.read<AppDependencyProvider>(),
         );
-    _series = _source.series(_seriesId)..ignore();
-    _genres = _source.genres(_seriesId)..ignore();
     _loadSeason();
     _ambient.attach(context, widget.series.posterPath);
   }
@@ -160,51 +150,6 @@ class _SeasonScreenState extends State<SeasonScreen>
     );
   }
 
-  Future<InsightsMetadata> _insights() async {
-    Future<T?> quietly<T>(Future<T> future) async {
-      try {
-        return await future;
-      } catch (_) {
-        return null;
-      }
-    }
-
-    final genres = await quietly(_genres) ?? const <Genres>[];
-    return insightsMetadata(
-      genres: genres.map((genre) => genre.genreName ?? '').toList(),
-      series: await quietly(_series),
-      originalLanguage: widget.series.series?.originalLanguage,
-    );
-  }
-
-  Future<void> _run(Future<void> Function() action) async {
-    if (_starting) return;
-    setState(() => _starting = true);
-    try {
-      await action();
-    } finally {
-      if (mounted) setState(() => _starting = false);
-    }
-  }
-
-  Future<void> _play(
-    EpisodeList episode,
-    List<EpisodeList> seasonEpisodes, {
-    bool download = false,
-  }) async {
-    final insights = await _insights();
-    if (!mounted) return;
-    await playEpisode(
-      context,
-      series: widget.series,
-      episode: episode,
-      seasonEpisodes: seasonEpisodes,
-      allSeasons: widget.seasons,
-      insights: insights,
-      download: download,
-    );
-  }
-
   void _openEpisode(EpisodeList episode, List<EpisodeList> seasonEpisodes) {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -218,22 +163,14 @@ class _SeasonScreenState extends State<SeasonScreen>
     );
   }
 
-  /// A Kids or Family series' pages show no ads.
   @override
-  Widget build(BuildContext context) => ContentAdGate(
-        content: AdContent.of(widget.series),
-        child: Builder(builder: _page),
-      );
+  Widget build(BuildContext context) => Builder(builder: _page);
 
   Widget _page(BuildContext context) {
     final palette = AppPalette.of(context);
     final history = _history(context);
     final current = _current;
-    final ad = widget.adBuilder?.call(context) ??
-        HomeAdSlot(
-          placement: 'season_detail',
-          variant: HostedBannerVariant.tall,
-        );
+    final ad = const SizedBox.shrink();
     if (AppBreakpoints.isTablet(context) &&
         MediaQuery.sizeOf(context).width >= AppBreakpoints.wide) {
       // A wide tablet: the season beside its episodes, as a title's page.
@@ -405,15 +342,8 @@ class _SeasonScreenState extends State<SeasonScreen>
           now: widget.now?.call(),
         );
         if (plan == null) return const SizedBox.shrink();
-        final label = <String, String>{'episode': plan.label};
-        return DetailsPlayButton(
-          label: plan.resuming
-              ? tr('resume_episode', namedArgs: label)
-              : tr('play_episode', namedArgs: label),
-          resume: plan.resume,
-          busy: _starting,
-          onPressed: () => _run(() => _play(plan.episode, episodes)),
-        );
+
+        return const SizedBox.shrink();
       },
     );
   }
@@ -475,10 +405,8 @@ class _SeasonScreenState extends State<SeasonScreen>
                       ),
                       canPlay: dependencies?.displayWatchNowButton ?? true,
                       canDownload: dependencies?.displayDownloadButton ?? false,
-                      onPlay: () => _run(() => _play(episode, episodes)),
-                      onDownload: () => _run(
-                        () => _play(episode, episodes, download: true),
-                      ),
+                      onPlay: () => _openEpisode(episode, episodes),
+                      onDownload: null,
                       onOpen: () => _openEpisode(episode, episodes),
                     ),
                 ],

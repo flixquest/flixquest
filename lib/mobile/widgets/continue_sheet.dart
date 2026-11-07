@@ -1,4 +1,3 @@
-import 'package:flixquest/services/adsterra_playback_ads_service.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -7,14 +6,9 @@ import 'package:provider/provider.dart';
 import '../../catalog/continue_watching.dart';
 import '../../catalog/details_controller.dart';
 import '../../catalog/media_item.dart';
-import '../../data/ads/content_ads.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
-import '../../functions/function.dart';
-import '../../models/tv.dart';
 import '../../provider/recently_watched_provider.dart';
-import '../../screens/tv/tv_episode_picker_sheet.dart';
-import '../../screens/tv/tv_video_loader.dart';
 import '../../widgets/playback_action.dart';
 import '../playback.dart';
 import 'media_art.dart';
@@ -101,24 +95,7 @@ class _ContinueSheet extends StatelessWidget {
 
   Future<void> _episodes(BuildContext context) async {
     Navigator.of(context).pop();
-    final picked = await showTVEpisodePickerSheet(
-      host,
-      series: item.series ?? TV(id: item.id, name: item.title),
-    );
-    if (picked == null || !host.mounted) return;
-    await PlaybackAction.run(host, () async {
-      if (!await checkConnection() || !host.mounted) return;
-      if (!await AdsterraPlaybackAdsService.instance
-              .beforeLoader(host, content: AdContent.of(item)) ||
-          !host.mounted) {
-        return;
-      }
-      await Navigator.of(host).push<void>(
-        MaterialPageRoute<void>(
-          builder: (_) => TVVideoLoader(download: false, metadata: picked),
-        ),
-      );
-    });
+    await MobilePlayback.openDetails(host, item);
   }
 
   @override

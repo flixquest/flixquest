@@ -5,7 +5,6 @@ import '../models/default_home.dart';
 import '../preferences/setting_preferences.dart';
 import '../services/analytics_service.dart';
 import '../services/tmdb_connectivity.dart';
-import '../video_providers/names.dart';
 
 class SettingsProvider with ChangeNotifier {
   SettingsProvider() : _tmdbConnectivity = TmdbConnectivity.instance {
@@ -134,10 +133,6 @@ class SettingsProvider with ChangeNotifier {
 
   int _customAppColor = 0;
   int get customAppColor => _customAppColor;
-
-  List<String> _streamProviderOrder = const [];
-  List<String> get streamProviderOrder =>
-      List.unmodifiable(_streamProviderOrder);
 
   bool get enableProxy => _tmdbConnectivity.proxyEnabled;
 
@@ -422,40 +417,6 @@ class SettingsProvider with ChangeNotifier {
     _settingsPreferences.setAppCustomColor(value);
     _trackSetting('Custom App Color', value.toRadixString(16));
     notifyListeners();
-  }
-
-  Future<void> getStreamProviderOrder() async {
-    _streamProviderOrder = await _settingsPreferences.getStreamProviderOrder();
-  }
-
-  List<VideoProvider> orderStreamProviders(
-    Iterable<VideoProvider> availableProviders,
-  ) {
-    return VideoProviderOrder.apply(
-      availableProviders,
-      _streamProviderOrder,
-    );
-  }
-
-  void setStreamProviderOrder(Iterable<VideoProvider> providers) {
-    final codes = <String>{};
-    for (final provider in providers) {
-      codes.add(provider.codeName);
-    }
-    final value = codes.toList(growable: false);
-    if (_sameOrder(_streamProviderOrder, value)) return;
-    _streamProviderOrder = value;
-    _settingsPreferences.setStreamProviderOrder(value);
-    _trackSetting('Stream Provider Order', value.join(','));
-    notifyListeners();
-  }
-
-  bool _sameOrder(List<String> left, List<String> right) {
-    if (left.length != right.length) return false;
-    for (var index = 0; index < left.length; index++) {
-      if (left[index] != right[index]) return false;
-    }
-    return true;
   }
 
   Future<void> getPlayerTimeStyle() async {

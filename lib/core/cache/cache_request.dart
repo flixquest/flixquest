@@ -32,7 +32,7 @@ class CacheRequest {
         (!authScope.startsWith('user:') || authScope.length <= 5)) {
       return null;
     }
-    if (policy.scope == 'laravel' && hasCredentials && authScope == 'public') {
+    if (hasCredentials && authScope == 'public') {
       return null;
     }
     return CacheRequest(policy,

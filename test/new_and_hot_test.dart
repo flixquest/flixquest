@@ -1,10 +1,10 @@
+import 'package:flixquest/constants/api_constants.dart';
 import 'package:flixquest/api/endpoints.dart';
 import 'package:flixquest/catalog/media_item.dart';
 import 'package:flixquest/catalog/new_and_hot.dart';
 import 'package:flixquest/models/genres.dart';
 import 'package:flixquest/models/movie.dart';
 import 'package:flixquest/models/tv.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 MediaItem movie(int id, String? date,
@@ -63,9 +63,9 @@ class FakeHotSource implements NewAndHotSource {
 }
 
 void main() {
-  setUp(() =>
-      dotenv.testLoad(fileInput: 'TMDB_API_KEY=key\nFLIXQUEST_API_URL=x'));
-
+  setUp(() {
+    TMDB_API_KEY = 'key';
+  });
   test('premieres query covers sixty days and follows adult setting', () {
     final url = Endpoints.upcomingSeriesPremieresUrl(
       'ar',

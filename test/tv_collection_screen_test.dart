@@ -8,7 +8,6 @@ import 'package:flixquest/tv/models/tv_media_item.dart';
 import 'package:flixquest/tv/screens/tv_collection_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -64,9 +63,7 @@ Future<void> _pumpCollection(
 
 void main() {
   initializeTvTranslations();
-  setUpAll(() {
-    dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://example.com');
-  });
+  setUpAll(() {});
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(<String, Object>{});

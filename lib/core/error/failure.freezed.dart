@@ -34,10 +34,6 @@ Failure _$FailureFromJson(Map<String, dynamic> json) {
       return RateLimitedFailure.fromJson(json);
     case 'server':
       return ServerFailure.fromJson(json);
-    case 'clockSkew':
-      return ClockSkewFailure.fromJson(json);
-    case 'deviceLimit':
-      return DeviceLimitFailure.fromJson(json);
     case 'cache':
       return CacheFailure.fromJson(json);
     case 'unknown':
@@ -64,11 +60,6 @@ mixin _$Failure {
         validation,
     required TResult Function(int? retryAfter, String? message) rateLimited,
     required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
     required TResult Function(String? message) cache,
     required TResult Function(String? message) unknown,
   }) =>
@@ -85,10 +76,6 @@ mixin _$Failure {
         validation,
     TResult? Function(int? retryAfter, String? message)? rateLimited,
     TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult? Function(String? message)? cache,
     TResult? Function(String? message)? unknown,
   }) =>
@@ -105,10 +92,6 @@ mixin _$Failure {
         validation,
     TResult Function(int? retryAfter, String? message)? rateLimited,
     TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult Function(String? message)? cache,
     TResult Function(String? message)? unknown,
     required TResult orElse(),
@@ -125,8 +108,6 @@ mixin _$Failure {
     required TResult Function(ValidationFailure value) validation,
     required TResult Function(RateLimitedFailure value) rateLimited,
     required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
     required TResult Function(CacheFailure value) cache,
     required TResult Function(UnknownFailure value) unknown,
   }) =>
@@ -142,8 +123,6 @@ mixin _$Failure {
     TResult? Function(ValidationFailure value)? validation,
     TResult? Function(RateLimitedFailure value)? rateLimited,
     TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
     TResult? Function(CacheFailure value)? cache,
     TResult? Function(UnknownFailure value)? unknown,
   }) =>
@@ -159,8 +138,6 @@ mixin _$Failure {
     TResult Function(ValidationFailure value)? validation,
     TResult Function(RateLimitedFailure value)? rateLimited,
     TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
     TResult Function(CacheFailure value)? cache,
     TResult Function(UnknownFailure value)? unknown,
     required TResult orElse(),
@@ -299,11 +276,6 @@ class _$NetworkFailureImpl implements NetworkFailure {
         validation,
     required TResult Function(int? retryAfter, String? message) rateLimited,
     required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
     required TResult Function(String? message) cache,
     required TResult Function(String? message) unknown,
   }) {
@@ -323,10 +295,6 @@ class _$NetworkFailureImpl implements NetworkFailure {
         validation,
     TResult? Function(int? retryAfter, String? message)? rateLimited,
     TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult? Function(String? message)? cache,
     TResult? Function(String? message)? unknown,
   }) {
@@ -346,10 +314,6 @@ class _$NetworkFailureImpl implements NetworkFailure {
         validation,
     TResult Function(int? retryAfter, String? message)? rateLimited,
     TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult Function(String? message)? cache,
     TResult Function(String? message)? unknown,
     required TResult orElse(),
@@ -372,8 +336,6 @@ class _$NetworkFailureImpl implements NetworkFailure {
     required TResult Function(ValidationFailure value) validation,
     required TResult Function(RateLimitedFailure value) rateLimited,
     required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
     required TResult Function(CacheFailure value) cache,
     required TResult Function(UnknownFailure value) unknown,
   }) {
@@ -392,8 +354,6 @@ class _$NetworkFailureImpl implements NetworkFailure {
     TResult? Function(ValidationFailure value)? validation,
     TResult? Function(RateLimitedFailure value)? rateLimited,
     TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
     TResult? Function(CacheFailure value)? cache,
     TResult? Function(UnknownFailure value)? unknown,
   }) {
@@ -412,8 +372,6 @@ class _$NetworkFailureImpl implements NetworkFailure {
     TResult Function(ValidationFailure value)? validation,
     TResult Function(RateLimitedFailure value)? rateLimited,
     TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
     TResult Function(CacheFailure value)? cache,
     TResult Function(UnknownFailure value)? unknown,
     required TResult orElse(),
@@ -538,11 +496,6 @@ class _$TimeoutFailureImpl implements TimeoutFailure {
         validation,
     required TResult Function(int? retryAfter, String? message) rateLimited,
     required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
     required TResult Function(String? message) cache,
     required TResult Function(String? message) unknown,
   }) {
@@ -562,10 +515,6 @@ class _$TimeoutFailureImpl implements TimeoutFailure {
         validation,
     TResult? Function(int? retryAfter, String? message)? rateLimited,
     TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult? Function(String? message)? cache,
     TResult? Function(String? message)? unknown,
   }) {
@@ -585,10 +534,6 @@ class _$TimeoutFailureImpl implements TimeoutFailure {
         validation,
     TResult Function(int? retryAfter, String? message)? rateLimited,
     TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult Function(String? message)? cache,
     TResult Function(String? message)? unknown,
     required TResult orElse(),
@@ -611,8 +556,6 @@ class _$TimeoutFailureImpl implements TimeoutFailure {
     required TResult Function(ValidationFailure value) validation,
     required TResult Function(RateLimitedFailure value) rateLimited,
     required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
     required TResult Function(CacheFailure value) cache,
     required TResult Function(UnknownFailure value) unknown,
   }) {
@@ -631,8 +574,6 @@ class _$TimeoutFailureImpl implements TimeoutFailure {
     TResult? Function(ValidationFailure value)? validation,
     TResult? Function(RateLimitedFailure value)? rateLimited,
     TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
     TResult? Function(CacheFailure value)? cache,
     TResult? Function(UnknownFailure value)? unknown,
   }) {
@@ -651,8 +592,6 @@ class _$TimeoutFailureImpl implements TimeoutFailure {
     TResult Function(ValidationFailure value)? validation,
     TResult Function(RateLimitedFailure value)? rateLimited,
     TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
     TResult Function(CacheFailure value)? cache,
     TResult Function(UnknownFailure value)? unknown,
     required TResult orElse(),
@@ -777,11 +716,6 @@ class _$UnauthorizedFailureImpl implements UnauthorizedFailure {
         validation,
     required TResult Function(int? retryAfter, String? message) rateLimited,
     required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
     required TResult Function(String? message) cache,
     required TResult Function(String? message) unknown,
   }) {
@@ -801,10 +735,6 @@ class _$UnauthorizedFailureImpl implements UnauthorizedFailure {
         validation,
     TResult? Function(int? retryAfter, String? message)? rateLimited,
     TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult? Function(String? message)? cache,
     TResult? Function(String? message)? unknown,
   }) {
@@ -824,10 +754,6 @@ class _$UnauthorizedFailureImpl implements UnauthorizedFailure {
         validation,
     TResult Function(int? retryAfter, String? message)? rateLimited,
     TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult Function(String? message)? cache,
     TResult Function(String? message)? unknown,
     required TResult orElse(),
@@ -850,8 +776,6 @@ class _$UnauthorizedFailureImpl implements UnauthorizedFailure {
     required TResult Function(ValidationFailure value) validation,
     required TResult Function(RateLimitedFailure value) rateLimited,
     required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
     required TResult Function(CacheFailure value) cache,
     required TResult Function(UnknownFailure value) unknown,
   }) {
@@ -870,8 +794,6 @@ class _$UnauthorizedFailureImpl implements UnauthorizedFailure {
     TResult? Function(ValidationFailure value)? validation,
     TResult? Function(RateLimitedFailure value)? rateLimited,
     TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
     TResult? Function(CacheFailure value)? cache,
     TResult? Function(UnknownFailure value)? unknown,
   }) {
@@ -890,8 +812,6 @@ class _$UnauthorizedFailureImpl implements UnauthorizedFailure {
     TResult Function(ValidationFailure value)? validation,
     TResult Function(RateLimitedFailure value)? rateLimited,
     TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
     TResult Function(CacheFailure value)? cache,
     TResult Function(UnknownFailure value)? unknown,
     required TResult orElse(),
@@ -1017,11 +937,6 @@ class _$ForbiddenFailureImpl implements ForbiddenFailure {
         validation,
     required TResult Function(int? retryAfter, String? message) rateLimited,
     required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
     required TResult Function(String? message) cache,
     required TResult Function(String? message) unknown,
   }) {
@@ -1041,10 +956,6 @@ class _$ForbiddenFailureImpl implements ForbiddenFailure {
         validation,
     TResult? Function(int? retryAfter, String? message)? rateLimited,
     TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult? Function(String? message)? cache,
     TResult? Function(String? message)? unknown,
   }) {
@@ -1064,10 +975,6 @@ class _$ForbiddenFailureImpl implements ForbiddenFailure {
         validation,
     TResult Function(int? retryAfter, String? message)? rateLimited,
     TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult Function(String? message)? cache,
     TResult Function(String? message)? unknown,
     required TResult orElse(),
@@ -1090,8 +997,6 @@ class _$ForbiddenFailureImpl implements ForbiddenFailure {
     required TResult Function(ValidationFailure value) validation,
     required TResult Function(RateLimitedFailure value) rateLimited,
     required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
     required TResult Function(CacheFailure value) cache,
     required TResult Function(UnknownFailure value) unknown,
   }) {
@@ -1110,8 +1015,6 @@ class _$ForbiddenFailureImpl implements ForbiddenFailure {
     TResult? Function(ValidationFailure value)? validation,
     TResult? Function(RateLimitedFailure value)? rateLimited,
     TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
     TResult? Function(CacheFailure value)? cache,
     TResult? Function(UnknownFailure value)? unknown,
   }) {
@@ -1130,8 +1033,6 @@ class _$ForbiddenFailureImpl implements ForbiddenFailure {
     TResult Function(ValidationFailure value)? validation,
     TResult Function(RateLimitedFailure value)? rateLimited,
     TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
     TResult Function(CacheFailure value)? cache,
     TResult Function(UnknownFailure value)? unknown,
     required TResult orElse(),
@@ -1257,11 +1158,6 @@ class _$NotFoundFailureImpl implements NotFoundFailure {
         validation,
     required TResult Function(int? retryAfter, String? message) rateLimited,
     required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
     required TResult Function(String? message) cache,
     required TResult Function(String? message) unknown,
   }) {
@@ -1281,10 +1177,6 @@ class _$NotFoundFailureImpl implements NotFoundFailure {
         validation,
     TResult? Function(int? retryAfter, String? message)? rateLimited,
     TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult? Function(String? message)? cache,
     TResult? Function(String? message)? unknown,
   }) {
@@ -1304,10 +1196,6 @@ class _$NotFoundFailureImpl implements NotFoundFailure {
         validation,
     TResult Function(int? retryAfter, String? message)? rateLimited,
     TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult Function(String? message)? cache,
     TResult Function(String? message)? unknown,
     required TResult orElse(),
@@ -1330,8 +1218,6 @@ class _$NotFoundFailureImpl implements NotFoundFailure {
     required TResult Function(ValidationFailure value) validation,
     required TResult Function(RateLimitedFailure value) rateLimited,
     required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
     required TResult Function(CacheFailure value) cache,
     required TResult Function(UnknownFailure value) unknown,
   }) {
@@ -1350,8 +1236,6 @@ class _$NotFoundFailureImpl implements NotFoundFailure {
     TResult? Function(ValidationFailure value)? validation,
     TResult? Function(RateLimitedFailure value)? rateLimited,
     TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
     TResult? Function(CacheFailure value)? cache,
     TResult? Function(UnknownFailure value)? unknown,
   }) {
@@ -1370,8 +1254,6 @@ class _$NotFoundFailureImpl implements NotFoundFailure {
     TResult Function(ValidationFailure value)? validation,
     TResult Function(RateLimitedFailure value)? rateLimited,
     TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
     TResult Function(CacheFailure value)? cache,
     TResult Function(UnknownFailure value)? unknown,
     required TResult orElse(),
@@ -1497,11 +1379,6 @@ class _$ConflictFailureImpl implements ConflictFailure {
         validation,
     required TResult Function(int? retryAfter, String? message) rateLimited,
     required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
     required TResult Function(String? message) cache,
     required TResult Function(String? message) unknown,
   }) {
@@ -1521,10 +1398,6 @@ class _$ConflictFailureImpl implements ConflictFailure {
         validation,
     TResult? Function(int? retryAfter, String? message)? rateLimited,
     TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult? Function(String? message)? cache,
     TResult? Function(String? message)? unknown,
   }) {
@@ -1544,10 +1417,6 @@ class _$ConflictFailureImpl implements ConflictFailure {
         validation,
     TResult Function(int? retryAfter, String? message)? rateLimited,
     TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult Function(String? message)? cache,
     TResult Function(String? message)? unknown,
     required TResult orElse(),
@@ -1570,8 +1439,6 @@ class _$ConflictFailureImpl implements ConflictFailure {
     required TResult Function(ValidationFailure value) validation,
     required TResult Function(RateLimitedFailure value) rateLimited,
     required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
     required TResult Function(CacheFailure value) cache,
     required TResult Function(UnknownFailure value) unknown,
   }) {
@@ -1590,8 +1457,6 @@ class _$ConflictFailureImpl implements ConflictFailure {
     TResult? Function(ValidationFailure value)? validation,
     TResult? Function(RateLimitedFailure value)? rateLimited,
     TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
     TResult? Function(CacheFailure value)? cache,
     TResult? Function(UnknownFailure value)? unknown,
   }) {
@@ -1610,8 +1475,6 @@ class _$ConflictFailureImpl implements ConflictFailure {
     TResult Function(ValidationFailure value)? validation,
     TResult Function(RateLimitedFailure value)? rateLimited,
     TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
     TResult Function(CacheFailure value)? cache,
     TResult Function(UnknownFailure value)? unknown,
     required TResult orElse(),
@@ -1754,11 +1617,6 @@ class _$ValidationFailureImpl implements ValidationFailure {
         validation,
     required TResult Function(int? retryAfter, String? message) rateLimited,
     required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
     required TResult Function(String? message) cache,
     required TResult Function(String? message) unknown,
   }) {
@@ -1778,10 +1636,6 @@ class _$ValidationFailureImpl implements ValidationFailure {
         validation,
     TResult? Function(int? retryAfter, String? message)? rateLimited,
     TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult? Function(String? message)? cache,
     TResult? Function(String? message)? unknown,
   }) {
@@ -1801,10 +1655,6 @@ class _$ValidationFailureImpl implements ValidationFailure {
         validation,
     TResult Function(int? retryAfter, String? message)? rateLimited,
     TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult Function(String? message)? cache,
     TResult Function(String? message)? unknown,
     required TResult orElse(),
@@ -1827,8 +1677,6 @@ class _$ValidationFailureImpl implements ValidationFailure {
     required TResult Function(ValidationFailure value) validation,
     required TResult Function(RateLimitedFailure value) rateLimited,
     required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
     required TResult Function(CacheFailure value) cache,
     required TResult Function(UnknownFailure value) unknown,
   }) {
@@ -1847,8 +1695,6 @@ class _$ValidationFailureImpl implements ValidationFailure {
     TResult? Function(ValidationFailure value)? validation,
     TResult? Function(RateLimitedFailure value)? rateLimited,
     TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
     TResult? Function(CacheFailure value)? cache,
     TResult? Function(UnknownFailure value)? unknown,
   }) {
@@ -1867,8 +1713,6 @@ class _$ValidationFailureImpl implements ValidationFailure {
     TResult Function(ValidationFailure value)? validation,
     TResult Function(RateLimitedFailure value)? rateLimited,
     TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
     TResult Function(CacheFailure value)? cache,
     TResult Function(UnknownFailure value)? unknown,
     required TResult orElse(),
@@ -2005,11 +1849,6 @@ class _$RateLimitedFailureImpl implements RateLimitedFailure {
         validation,
     required TResult Function(int? retryAfter, String? message) rateLimited,
     required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
     required TResult Function(String? message) cache,
     required TResult Function(String? message) unknown,
   }) {
@@ -2029,10 +1868,6 @@ class _$RateLimitedFailureImpl implements RateLimitedFailure {
         validation,
     TResult? Function(int? retryAfter, String? message)? rateLimited,
     TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult? Function(String? message)? cache,
     TResult? Function(String? message)? unknown,
   }) {
@@ -2052,10 +1887,6 @@ class _$RateLimitedFailureImpl implements RateLimitedFailure {
         validation,
     TResult Function(int? retryAfter, String? message)? rateLimited,
     TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult Function(String? message)? cache,
     TResult Function(String? message)? unknown,
     required TResult orElse(),
@@ -2078,8 +1909,6 @@ class _$RateLimitedFailureImpl implements RateLimitedFailure {
     required TResult Function(ValidationFailure value) validation,
     required TResult Function(RateLimitedFailure value) rateLimited,
     required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
     required TResult Function(CacheFailure value) cache,
     required TResult Function(UnknownFailure value) unknown,
   }) {
@@ -2098,8 +1927,6 @@ class _$RateLimitedFailureImpl implements RateLimitedFailure {
     TResult? Function(ValidationFailure value)? validation,
     TResult? Function(RateLimitedFailure value)? rateLimited,
     TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
     TResult? Function(CacheFailure value)? cache,
     TResult? Function(UnknownFailure value)? unknown,
   }) {
@@ -2118,8 +1945,6 @@ class _$RateLimitedFailureImpl implements RateLimitedFailure {
     TResult Function(ValidationFailure value)? validation,
     TResult Function(RateLimitedFailure value)? rateLimited,
     TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
     TResult Function(CacheFailure value)? cache,
     TResult Function(UnknownFailure value)? unknown,
     required TResult orElse(),
@@ -2255,11 +2080,6 @@ class _$ServerFailureImpl implements ServerFailure {
         validation,
     required TResult Function(int? retryAfter, String? message) rateLimited,
     required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
     required TResult Function(String? message) cache,
     required TResult Function(String? message) unknown,
   }) {
@@ -2279,10 +2099,6 @@ class _$ServerFailureImpl implements ServerFailure {
         validation,
     TResult? Function(int? retryAfter, String? message)? rateLimited,
     TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult? Function(String? message)? cache,
     TResult? Function(String? message)? unknown,
   }) {
@@ -2302,10 +2118,6 @@ class _$ServerFailureImpl implements ServerFailure {
         validation,
     TResult Function(int? retryAfter, String? message)? rateLimited,
     TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult Function(String? message)? cache,
     TResult Function(String? message)? unknown,
     required TResult orElse(),
@@ -2328,8 +2140,6 @@ class _$ServerFailureImpl implements ServerFailure {
     required TResult Function(ValidationFailure value) validation,
     required TResult Function(RateLimitedFailure value) rateLimited,
     required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
     required TResult Function(CacheFailure value) cache,
     required TResult Function(UnknownFailure value) unknown,
   }) {
@@ -2348,8 +2158,6 @@ class _$ServerFailureImpl implements ServerFailure {
     TResult? Function(ValidationFailure value)? validation,
     TResult? Function(RateLimitedFailure value)? rateLimited,
     TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
     TResult? Function(CacheFailure value)? cache,
     TResult? Function(UnknownFailure value)? unknown,
   }) {
@@ -2368,8 +2176,6 @@ class _$ServerFailureImpl implements ServerFailure {
     TResult Function(ValidationFailure value)? validation,
     TResult Function(RateLimitedFailure value)? rateLimited,
     TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
     TResult Function(CacheFailure value)? cache,
     TResult Function(UnknownFailure value)? unknown,
     required TResult orElse(),
@@ -2404,543 +2210,6 @@ abstract class ServerFailure implements Failure {
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$ServerFailureImplCopyWith<_$ServerFailureImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class _$$ClockSkewFailureImplCopyWith<$Res>
-    implements $FailureCopyWith<$Res> {
-  factory _$$ClockSkewFailureImplCopyWith(_$ClockSkewFailureImpl value,
-          $Res Function(_$ClockSkewFailureImpl) then) =
-      __$$ClockSkewFailureImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({int serverTimeUtc, int driftMs, String? message});
-}
-
-/// @nodoc
-class __$$ClockSkewFailureImplCopyWithImpl<$Res>
-    extends _$FailureCopyWithImpl<$Res, _$ClockSkewFailureImpl>
-    implements _$$ClockSkewFailureImplCopyWith<$Res> {
-  __$$ClockSkewFailureImplCopyWithImpl(_$ClockSkewFailureImpl _value,
-      $Res Function(_$ClockSkewFailureImpl) _then)
-      : super(_value, _then);
-
-  /// Create a copy of Failure
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? serverTimeUtc = null,
-    Object? driftMs = null,
-    Object? message = freezed,
-  }) {
-    return _then(_$ClockSkewFailureImpl(
-      serverTimeUtc: null == serverTimeUtc
-          ? _value.serverTimeUtc
-          : serverTimeUtc // ignore: cast_nullable_to_non_nullable
-              as int,
-      driftMs: null == driftMs
-          ? _value.driftMs
-          : driftMs // ignore: cast_nullable_to_non_nullable
-              as int,
-      message: freezed == message
-          ? _value.message
-          : message // ignore: cast_nullable_to_non_nullable
-              as String?,
-    ));
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$ClockSkewFailureImpl implements ClockSkewFailure {
-  const _$ClockSkewFailureImpl(
-      {required this.serverTimeUtc,
-      required this.driftMs,
-      this.message,
-      final String? $type})
-      : $type = $type ?? 'clockSkew';
-
-  factory _$ClockSkewFailureImpl.fromJson(Map<String, dynamic> json) =>
-      _$$ClockSkewFailureImplFromJson(json);
-
-  @override
-  final int serverTimeUtc;
-  @override
-  final int driftMs;
-  @override
-  final String? message;
-
-  @JsonKey(name: 'runtimeType')
-  final String $type;
-
-  @override
-  String toString() {
-    return 'Failure.clockSkew(serverTimeUtc: $serverTimeUtc, driftMs: $driftMs, message: $message)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$ClockSkewFailureImpl &&
-            (identical(other.serverTimeUtc, serverTimeUtc) ||
-                other.serverTimeUtc == serverTimeUtc) &&
-            (identical(other.driftMs, driftMs) || other.driftMs == driftMs) &&
-            (identical(other.message, message) || other.message == message));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(runtimeType, serverTimeUtc, driftMs, message);
-
-  /// Create a copy of Failure
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$ClockSkewFailureImplCopyWith<_$ClockSkewFailureImpl> get copyWith =>
-      __$$ClockSkewFailureImplCopyWithImpl<_$ClockSkewFailureImpl>(
-          this, _$identity);
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String? message) network,
-    required TResult Function(String? message) timeout,
-    required TResult Function(String? message) unauthorized,
-    required TResult Function(String? message) forbidden,
-    required TResult Function(String? message) notFound,
-    required TResult Function(String? message) conflict,
-    required TResult Function(Map<String, List<String>> fields, String? message)
-        validation,
-    required TResult Function(int? retryAfter, String? message) rateLimited,
-    required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
-    required TResult Function(String? message) cache,
-    required TResult Function(String? message) unknown,
-  }) {
-    return clockSkew(serverTimeUtc, driftMs, message);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String? message)? network,
-    TResult? Function(String? message)? timeout,
-    TResult? Function(String? message)? unauthorized,
-    TResult? Function(String? message)? forbidden,
-    TResult? Function(String? message)? notFound,
-    TResult? Function(String? message)? conflict,
-    TResult? Function(Map<String, List<String>> fields, String? message)?
-        validation,
-    TResult? Function(int? retryAfter, String? message)? rateLimited,
-    TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
-    TResult? Function(String? message)? cache,
-    TResult? Function(String? message)? unknown,
-  }) {
-    return clockSkew?.call(serverTimeUtc, driftMs, message);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String? message)? network,
-    TResult Function(String? message)? timeout,
-    TResult Function(String? message)? unauthorized,
-    TResult Function(String? message)? forbidden,
-    TResult Function(String? message)? notFound,
-    TResult Function(String? message)? conflict,
-    TResult Function(Map<String, List<String>> fields, String? message)?
-        validation,
-    TResult Function(int? retryAfter, String? message)? rateLimited,
-    TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
-    TResult Function(String? message)? cache,
-    TResult Function(String? message)? unknown,
-    required TResult orElse(),
-  }) {
-    if (clockSkew != null) {
-      return clockSkew(serverTimeUtc, driftMs, message);
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(NetworkFailure value) network,
-    required TResult Function(TimeoutFailure value) timeout,
-    required TResult Function(UnauthorizedFailure value) unauthorized,
-    required TResult Function(ForbiddenFailure value) forbidden,
-    required TResult Function(NotFoundFailure value) notFound,
-    required TResult Function(ConflictFailure value) conflict,
-    required TResult Function(ValidationFailure value) validation,
-    required TResult Function(RateLimitedFailure value) rateLimited,
-    required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
-    required TResult Function(CacheFailure value) cache,
-    required TResult Function(UnknownFailure value) unknown,
-  }) {
-    return clockSkew(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(NetworkFailure value)? network,
-    TResult? Function(TimeoutFailure value)? timeout,
-    TResult? Function(UnauthorizedFailure value)? unauthorized,
-    TResult? Function(ForbiddenFailure value)? forbidden,
-    TResult? Function(NotFoundFailure value)? notFound,
-    TResult? Function(ConflictFailure value)? conflict,
-    TResult? Function(ValidationFailure value)? validation,
-    TResult? Function(RateLimitedFailure value)? rateLimited,
-    TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
-    TResult? Function(CacheFailure value)? cache,
-    TResult? Function(UnknownFailure value)? unknown,
-  }) {
-    return clockSkew?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(NetworkFailure value)? network,
-    TResult Function(TimeoutFailure value)? timeout,
-    TResult Function(UnauthorizedFailure value)? unauthorized,
-    TResult Function(ForbiddenFailure value)? forbidden,
-    TResult Function(NotFoundFailure value)? notFound,
-    TResult Function(ConflictFailure value)? conflict,
-    TResult Function(ValidationFailure value)? validation,
-    TResult Function(RateLimitedFailure value)? rateLimited,
-    TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
-    TResult Function(CacheFailure value)? cache,
-    TResult Function(UnknownFailure value)? unknown,
-    required TResult orElse(),
-  }) {
-    if (clockSkew != null) {
-      return clockSkew(this);
-    }
-    return orElse();
-  }
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$ClockSkewFailureImplToJson(
-      this,
-    );
-  }
-}
-
-abstract class ClockSkewFailure implements Failure {
-  const factory ClockSkewFailure(
-      {required final int serverTimeUtc,
-      required final int driftMs,
-      final String? message}) = _$ClockSkewFailureImpl;
-
-  factory ClockSkewFailure.fromJson(Map<String, dynamic> json) =
-      _$ClockSkewFailureImpl.fromJson;
-
-  int get serverTimeUtc;
-  int get driftMs;
-  @override
-  String? get message;
-
-  /// Create a copy of Failure
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$ClockSkewFailureImplCopyWith<_$ClockSkewFailureImpl> get copyWith =>
-      throw _privateConstructorUsedError;
-}
-
-/// @nodoc
-abstract class _$$DeviceLimitFailureImplCopyWith<$Res>
-    implements $FailureCopyWith<$Res> {
-  factory _$$DeviceLimitFailureImplCopyWith(_$DeviceLimitFailureImpl value,
-          $Res Function(_$DeviceLimitFailureImpl) then) =
-      __$$DeviceLimitFailureImplCopyWithImpl<$Res>;
-  @override
-  @useResult
-  $Res call({int limit, List<SignedInDevice> devices, String? message});
-}
-
-/// @nodoc
-class __$$DeviceLimitFailureImplCopyWithImpl<$Res>
-    extends _$FailureCopyWithImpl<$Res, _$DeviceLimitFailureImpl>
-    implements _$$DeviceLimitFailureImplCopyWith<$Res> {
-  __$$DeviceLimitFailureImplCopyWithImpl(_$DeviceLimitFailureImpl _value,
-      $Res Function(_$DeviceLimitFailureImpl) _then)
-      : super(_value, _then);
-
-  /// Create a copy of Failure
-  /// with the given fields replaced by the non-null parameter values.
-  @pragma('vm:prefer-inline')
-  @override
-  $Res call({
-    Object? limit = null,
-    Object? devices = null,
-    Object? message = freezed,
-  }) {
-    return _then(_$DeviceLimitFailureImpl(
-      limit: null == limit
-          ? _value.limit
-          : limit // ignore: cast_nullable_to_non_nullable
-              as int,
-      devices: null == devices
-          ? _value._devices
-          : devices // ignore: cast_nullable_to_non_nullable
-              as List<SignedInDevice>,
-      message: freezed == message
-          ? _value.message
-          : message // ignore: cast_nullable_to_non_nullable
-              as String?,
-    ));
-  }
-}
-
-/// @nodoc
-@JsonSerializable()
-class _$DeviceLimitFailureImpl implements DeviceLimitFailure {
-  const _$DeviceLimitFailureImpl(
-      {required this.limit,
-      required final List<SignedInDevice> devices,
-      this.message,
-      final String? $type})
-      : _devices = devices,
-        $type = $type ?? 'deviceLimit';
-
-  factory _$DeviceLimitFailureImpl.fromJson(Map<String, dynamic> json) =>
-      _$$DeviceLimitFailureImplFromJson(json);
-
-  @override
-  final int limit;
-  final List<SignedInDevice> _devices;
-  @override
-  List<SignedInDevice> get devices {
-    if (_devices is EqualUnmodifiableListView) return _devices;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_devices);
-  }
-
-  @override
-  final String? message;
-
-  @JsonKey(name: 'runtimeType')
-  final String $type;
-
-  @override
-  String toString() {
-    return 'Failure.deviceLimit(limit: $limit, devices: $devices, message: $message)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is _$DeviceLimitFailureImpl &&
-            (identical(other.limit, limit) || other.limit == limit) &&
-            const DeepCollectionEquality().equals(other._devices, _devices) &&
-            (identical(other.message, message) || other.message == message));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(runtimeType, limit,
-      const DeepCollectionEquality().hash(_devices), message);
-
-  /// Create a copy of Failure
-  /// with the given fields replaced by the non-null parameter values.
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  @pragma('vm:prefer-inline')
-  _$$DeviceLimitFailureImplCopyWith<_$DeviceLimitFailureImpl> get copyWith =>
-      __$$DeviceLimitFailureImplCopyWithImpl<_$DeviceLimitFailureImpl>(
-          this, _$identity);
-
-  @override
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>({
-    required TResult Function(String? message) network,
-    required TResult Function(String? message) timeout,
-    required TResult Function(String? message) unauthorized,
-    required TResult Function(String? message) forbidden,
-    required TResult Function(String? message) notFound,
-    required TResult Function(String? message) conflict,
-    required TResult Function(Map<String, List<String>> fields, String? message)
-        validation,
-    required TResult Function(int? retryAfter, String? message) rateLimited,
-    required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
-    required TResult Function(String? message) cache,
-    required TResult Function(String? message) unknown,
-  }) {
-    return deviceLimit(limit, devices, message);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>({
-    TResult? Function(String? message)? network,
-    TResult? Function(String? message)? timeout,
-    TResult? Function(String? message)? unauthorized,
-    TResult? Function(String? message)? forbidden,
-    TResult? Function(String? message)? notFound,
-    TResult? Function(String? message)? conflict,
-    TResult? Function(Map<String, List<String>> fields, String? message)?
-        validation,
-    TResult? Function(int? retryAfter, String? message)? rateLimited,
-    TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
-    TResult? Function(String? message)? cache,
-    TResult? Function(String? message)? unknown,
-  }) {
-    return deviceLimit?.call(limit, devices, message);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>({
-    TResult Function(String? message)? network,
-    TResult Function(String? message)? timeout,
-    TResult Function(String? message)? unauthorized,
-    TResult Function(String? message)? forbidden,
-    TResult Function(String? message)? notFound,
-    TResult Function(String? message)? conflict,
-    TResult Function(Map<String, List<String>> fields, String? message)?
-        validation,
-    TResult Function(int? retryAfter, String? message)? rateLimited,
-    TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
-    TResult Function(String? message)? cache,
-    TResult Function(String? message)? unknown,
-    required TResult orElse(),
-  }) {
-    if (deviceLimit != null) {
-      return deviceLimit(limit, devices, message);
-    }
-    return orElse();
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>({
-    required TResult Function(NetworkFailure value) network,
-    required TResult Function(TimeoutFailure value) timeout,
-    required TResult Function(UnauthorizedFailure value) unauthorized,
-    required TResult Function(ForbiddenFailure value) forbidden,
-    required TResult Function(NotFoundFailure value) notFound,
-    required TResult Function(ConflictFailure value) conflict,
-    required TResult Function(ValidationFailure value) validation,
-    required TResult Function(RateLimitedFailure value) rateLimited,
-    required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
-    required TResult Function(CacheFailure value) cache,
-    required TResult Function(UnknownFailure value) unknown,
-  }) {
-    return deviceLimit(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>({
-    TResult? Function(NetworkFailure value)? network,
-    TResult? Function(TimeoutFailure value)? timeout,
-    TResult? Function(UnauthorizedFailure value)? unauthorized,
-    TResult? Function(ForbiddenFailure value)? forbidden,
-    TResult? Function(NotFoundFailure value)? notFound,
-    TResult? Function(ConflictFailure value)? conflict,
-    TResult? Function(ValidationFailure value)? validation,
-    TResult? Function(RateLimitedFailure value)? rateLimited,
-    TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
-    TResult? Function(CacheFailure value)? cache,
-    TResult? Function(UnknownFailure value)? unknown,
-  }) {
-    return deviceLimit?.call(this);
-  }
-
-  @override
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>({
-    TResult Function(NetworkFailure value)? network,
-    TResult Function(TimeoutFailure value)? timeout,
-    TResult Function(UnauthorizedFailure value)? unauthorized,
-    TResult Function(ForbiddenFailure value)? forbidden,
-    TResult Function(NotFoundFailure value)? notFound,
-    TResult Function(ConflictFailure value)? conflict,
-    TResult Function(ValidationFailure value)? validation,
-    TResult Function(RateLimitedFailure value)? rateLimited,
-    TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
-    TResult Function(CacheFailure value)? cache,
-    TResult Function(UnknownFailure value)? unknown,
-    required TResult orElse(),
-  }) {
-    if (deviceLimit != null) {
-      return deviceLimit(this);
-    }
-    return orElse();
-  }
-
-  @override
-  Map<String, dynamic> toJson() {
-    return _$$DeviceLimitFailureImplToJson(
-      this,
-    );
-  }
-}
-
-abstract class DeviceLimitFailure implements Failure {
-  const factory DeviceLimitFailure(
-      {required final int limit,
-      required final List<SignedInDevice> devices,
-      final String? message}) = _$DeviceLimitFailureImpl;
-
-  factory DeviceLimitFailure.fromJson(Map<String, dynamic> json) =
-      _$DeviceLimitFailureImpl.fromJson;
-
-  int get limit;
-  List<SignedInDevice> get devices;
-  @override
-  String? get message;
-
-  /// Create a copy of Failure
-  /// with the given fields replaced by the non-null parameter values.
-  @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$DeviceLimitFailureImplCopyWith<_$DeviceLimitFailureImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
 
@@ -3032,11 +2301,6 @@ class _$CacheFailureImpl implements CacheFailure {
         validation,
     required TResult Function(int? retryAfter, String? message) rateLimited,
     required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
     required TResult Function(String? message) cache,
     required TResult Function(String? message) unknown,
   }) {
@@ -3056,10 +2320,6 @@ class _$CacheFailureImpl implements CacheFailure {
         validation,
     TResult? Function(int? retryAfter, String? message)? rateLimited,
     TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult? Function(String? message)? cache,
     TResult? Function(String? message)? unknown,
   }) {
@@ -3079,10 +2339,6 @@ class _$CacheFailureImpl implements CacheFailure {
         validation,
     TResult Function(int? retryAfter, String? message)? rateLimited,
     TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult Function(String? message)? cache,
     TResult Function(String? message)? unknown,
     required TResult orElse(),
@@ -3105,8 +2361,6 @@ class _$CacheFailureImpl implements CacheFailure {
     required TResult Function(ValidationFailure value) validation,
     required TResult Function(RateLimitedFailure value) rateLimited,
     required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
     required TResult Function(CacheFailure value) cache,
     required TResult Function(UnknownFailure value) unknown,
   }) {
@@ -3125,8 +2379,6 @@ class _$CacheFailureImpl implements CacheFailure {
     TResult? Function(ValidationFailure value)? validation,
     TResult? Function(RateLimitedFailure value)? rateLimited,
     TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
     TResult? Function(CacheFailure value)? cache,
     TResult? Function(UnknownFailure value)? unknown,
   }) {
@@ -3145,8 +2397,6 @@ class _$CacheFailureImpl implements CacheFailure {
     TResult Function(ValidationFailure value)? validation,
     TResult Function(RateLimitedFailure value)? rateLimited,
     TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
     TResult Function(CacheFailure value)? cache,
     TResult Function(UnknownFailure value)? unknown,
     required TResult orElse(),
@@ -3271,11 +2521,6 @@ class _$UnknownFailureImpl implements UnknownFailure {
         validation,
     required TResult Function(int? retryAfter, String? message) rateLimited,
     required TResult Function(int status, String? message) server,
-    required TResult Function(int serverTimeUtc, int driftMs, String? message)
-        clockSkew,
-    required TResult Function(
-            int limit, List<SignedInDevice> devices, String? message)
-        deviceLimit,
     required TResult Function(String? message) cache,
     required TResult Function(String? message) unknown,
   }) {
@@ -3295,10 +2540,6 @@ class _$UnknownFailureImpl implements UnknownFailure {
         validation,
     TResult? Function(int? retryAfter, String? message)? rateLimited,
     TResult? Function(int status, String? message)? server,
-    TResult? Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult? Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult? Function(String? message)? cache,
     TResult? Function(String? message)? unknown,
   }) {
@@ -3318,10 +2559,6 @@ class _$UnknownFailureImpl implements UnknownFailure {
         validation,
     TResult Function(int? retryAfter, String? message)? rateLimited,
     TResult Function(int status, String? message)? server,
-    TResult Function(int serverTimeUtc, int driftMs, String? message)?
-        clockSkew,
-    TResult Function(int limit, List<SignedInDevice> devices, String? message)?
-        deviceLimit,
     TResult Function(String? message)? cache,
     TResult Function(String? message)? unknown,
     required TResult orElse(),
@@ -3344,8 +2581,6 @@ class _$UnknownFailureImpl implements UnknownFailure {
     required TResult Function(ValidationFailure value) validation,
     required TResult Function(RateLimitedFailure value) rateLimited,
     required TResult Function(ServerFailure value) server,
-    required TResult Function(ClockSkewFailure value) clockSkew,
-    required TResult Function(DeviceLimitFailure value) deviceLimit,
     required TResult Function(CacheFailure value) cache,
     required TResult Function(UnknownFailure value) unknown,
   }) {
@@ -3364,8 +2599,6 @@ class _$UnknownFailureImpl implements UnknownFailure {
     TResult? Function(ValidationFailure value)? validation,
     TResult? Function(RateLimitedFailure value)? rateLimited,
     TResult? Function(ServerFailure value)? server,
-    TResult? Function(ClockSkewFailure value)? clockSkew,
-    TResult? Function(DeviceLimitFailure value)? deviceLimit,
     TResult? Function(CacheFailure value)? cache,
     TResult? Function(UnknownFailure value)? unknown,
   }) {
@@ -3384,8 +2617,6 @@ class _$UnknownFailureImpl implements UnknownFailure {
     TResult Function(ValidationFailure value)? validation,
     TResult Function(RateLimitedFailure value)? rateLimited,
     TResult Function(ServerFailure value)? server,
-    TResult Function(ClockSkewFailure value)? clockSkew,
-    TResult Function(DeviceLimitFailure value)? deviceLimit,
     TResult Function(CacheFailure value)? cache,
     TResult Function(UnknownFailure value)? unknown,
     required TResult orElse(),

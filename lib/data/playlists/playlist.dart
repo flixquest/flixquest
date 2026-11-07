@@ -5,8 +5,6 @@ import '../../models/genre_ids.dart';
 import '../../models/movie.dart';
 import '../../models/tv.dart';
 
-/// Limits Laravel enforces; checked here first so an edit it would refuse is
-/// never queued.
 abstract final class PlaylistLimits {
   static const lists = 200;
   static const items = 2500;
@@ -83,7 +81,6 @@ class PlaylistEntry {
 
   final String playlistId;
 
-  /// `movie` or `tv`, as Laravel names them.
   final String mediaType;
   final int mediaId;
   final int position;
@@ -93,7 +90,6 @@ class PlaylistEntry {
   final double? voteAverage;
   final String? releaseDate;
 
-  /// Kept so a title opened from a list is placed in the right ad policy.
   final List<int> genreIds;
   final String? addedAt;
 
@@ -176,7 +172,6 @@ class PlaylistRecord {
       sourceId: source is Map ? source['id']?.toString() : null,
       createdAt: json['created_at'] as String?,
       shareCode: json['share_code'] as String?,
-      // Laravel sends the address only while the list is public.
       shareUrl:
           json['visibility'] == 'public' ? json['share_url'] as String? : null,
     );
@@ -194,7 +189,6 @@ class PlaylistRecord {
         shareUrl: row['share_url'] as String?,
       );
 
-  /// A UUID the device made, so a list exists before Laravel hears of it.
   final String id;
   final String name;
   final String? description;
@@ -271,7 +265,6 @@ class Playlist {
       playlistEntryKey(playlistMediaType(item.kind), item.id);
 }
 
-/// One edit, queued until Laravel has answered it.
 class PlaylistOperation {
   const PlaylistOperation({
     required this.id,
@@ -304,11 +297,8 @@ class PlaylistOperation {
   final String playlistId;
   final Map<String, Object?> fields;
 
-  /// When it was made on this device, for a new list's date and a new
-  /// entry's added date until Laravel's arrive.
   final String? createdAt;
 
-  /// The body Laravel receives.
   Map<String, Object?> toJson() => <String, Object?>{
         'operation_id': id,
         'action': action,

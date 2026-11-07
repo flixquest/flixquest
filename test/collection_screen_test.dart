@@ -8,7 +8,6 @@ import 'package:flixquest/models/tv.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,7 +28,6 @@ MediaCollection _collection(MediaKind kind, List<int> requested) =>
 
 void main() {
   setUp(() async {
-    dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://example.com');
     SharedPreferences.setMockInitialValues(<String, Object>{});
     sharedPrefsSingleton = await SharedPreferences.getInstance();
   });

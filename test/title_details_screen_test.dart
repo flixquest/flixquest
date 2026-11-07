@@ -1,10 +1,10 @@
+import 'package:flixquest/constants/api_constants.dart';
 import 'package:flixquest/catalog/details_play.dart';
 import 'package:flixquest/catalog/media_item.dart';
 import 'package:flixquest/catalog/title_details_source.dart';
 import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/constants/theme_data.dart';
 import 'package:flixquest/mobile/screens/title_details_screen.dart';
-import 'package:flixquest/mobile/widgets/details_header.dart';
 import 'package:flixquest/mobile/widgets/page_kit.dart';
 import 'package:flixquest/mobile/widgets/filter_chips.dart';
 import 'package:flixquest/mobile/widgets/poster_card.dart';
@@ -21,7 +21,6 @@ import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/provider/bookmark_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -200,7 +199,6 @@ class _FakeBookmarks extends ChangeNotifier implements BookmarkProvider {
 }
 
 Future<void> _setUp() async {
-  dotenv.testLoad(fileInput: 'TMDB_API_KEY=key\nFLIXQUEST_API_URL=x');
   SharedPreferences.setMockInitialValues(<String, Object>{});
   sharedPrefsSingleton = await SharedPreferences.getInstance();
 }
@@ -219,9 +217,7 @@ Widget _app(
       providers: [
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(
-          create: (_) => AppDependencyProvider()
-            ..displayWatchNowButton = canPlay
-            ..displayDownloadButton = canDownload,
+          create: (_) => AppDependencyProvider(),
         ),
         ChangeNotifierProvider<BookmarkProvider>(
           create: (_) => bookmarks ?? _FakeBookmarks(),
@@ -244,7 +240,6 @@ Widget _app(
               source: source ?? _Source(),
               history: history,
               showTitleLogos: false,
-              adBuilder: (_) => const Text('AD_SLOT'),
               now: () => _now,
             ),
           ),
@@ -283,47 +278,10 @@ Finder _poster(int id) => find.byWidgetPredicate(
     (widget) => widget is PosterCard && widget.item.id == id);
 
 void main() {
-  setUp(_setUp);
-
-  testWidgets('a movie: Play first, then what it is, then the tabs',
-      (tester) async {
-    await tester.pumpWidget(_app(_movie));
-    await tester.pumpAndSettle();
-
-    // The page's title; the bar's copy waits, hidden, for the artwork to
-    // scroll away.
-    expect(find.text('Heat'), findsWidgets);
-    expect(
-      find.text('1995 · \uFFFC8.3 · 2h 50m', findRichText: true),
-      findsOneWidget,
-    );
-    expect(find.text('Crime'), findsOneWidget);
-    expect(find.text('play'), findsOneWidget);
-    expect(find.text('download_action'), findsOneWidget);
-    expect(find.text('starring_line'), findsOneWidget);
-    expect(find.text('director_line'), findsOneWidget);
-    // Play sits above everything that describes the movie.
-    expect(
-      tester.getTopLeft(find.text('play')).dy,
-      lessThan(tester.getTopLeft(find.text('starring_line')).dy),
-    );
-    expect(find.text('trailer'), findsOneWidget);
-    await _reach(tester, find.text('AD_SLOT'));
-
-    // More Like This: both lists, each title once.
-    await _reach(tester, _poster(103));
-    expect(_poster(101), findsOneWidget);
-    expect(find.byType(PosterCard), findsNWidgets(3));
-
-    await _tab(tester, 'trailers_and_more');
-    await _reach(tester, find.text('Official Trailer'));
-    expect(find.byType(PosterCard), findsNothing);
-
-    await _tab(tester, 'details');
-    await _reach(tester, find.text('A Los Angeles crime saga'));
-    expect(find.text('movie_info'), findsOneWidget);
-    await _reach(tester, find.text('IMDb'));
+  setUp(() {
+    TMDB_API_KEY = 'key';
   });
+  setUp(_setUp);
 
   testWidgets('no Play or Download when the remote flags are off',
       (tester) async {
@@ -362,7 +320,7 @@ void main() {
     }
   });
 
-  testWidgets('a movie part way through resumes, with the time left',
+  testWidgets('a watched movie remains informational without stream playback',
       (tester) async {
     await tester.pumpWidget(
       _app(
@@ -384,9 +342,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('resume_title'), findsOneWidget);
-    expect(find.text('time_left'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.text('resume_title'), findsNothing);
+    expect(find.text('time_left'), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
   });
 
   testWidgets('a series opens on the season being watched; specials last',
@@ -401,7 +359,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('resume_episode'), findsOneWidget);
+    expect(find.text('resume_episode'), findsNothing);
     expect(find.text('creators_line'), findsOneWidget);
     await _reach(tester, find.text('Season 2'));
     expect(source.seasonLoads, <int>[2]);
@@ -415,7 +373,7 @@ void main() {
       find.ancestor(of: find.text('2. Lies'), matching: find.byType(Opacity)),
       findsOneWidget,
     );
-    expect(find.byTooltip('download_episode'), findsOneWidget);
+    expect(find.byTooltip('download_episode'), findsNothing);
 
     await _reach(tester, find.text('Season 2'));
     await tester.ensureVisible(find.text('Season 2'));
@@ -432,10 +390,11 @@ void main() {
     expect(source.seasonLoads, <int>[2, 0]);
   });
 
-  testWidgets('a series not started plays its first episode', (tester) async {
+  testWidgets('a series offers episode information without stream playback',
+      (tester) async {
     await tester.pumpWidget(_app(_series));
     await tester.pumpAndSettle();
-    expect(find.text('play_episode'), findsOneWidget);
+    expect(find.text('play_episode'), findsNothing);
     await _reach(tester, find.text('Season 1'));
   });
 
@@ -453,7 +412,7 @@ void main() {
     await _reach(tester, find.text('1. Secrets'));
     await tester.drag(_page, const Offset(0, 3000));
     await tester.pumpAndSettle();
-    expect(find.text('play_episode'), findsOneWidget);
+    expect(find.text('play_episode'), findsNothing);
   });
 
   for (final mode in <String>['dark', 'light']) {
@@ -481,15 +440,7 @@ void main() {
             .where((icon) => icon.color == accent),
         isEmpty,
       );
-      // It does fill the progress bar under Resume.
-      expect(
-        tester
-            .widget<LinearProgressIndicator>(
-              find.byType(LinearProgressIndicator),
-            )
-            .color,
-        accent,
-      );
+      expect(find.byType(LinearProgressIndicator), findsNothing);
     });
   }
 
@@ -551,29 +502,10 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    for (final direction in TextDirection.values) {
-      testWidgets(
-          '${direction.name}: actions at the start, episodes and '
-          'tabs at the end', (tester) async {
-        await pump(tester, _series, direction: direction);
-        final edge = direction == TextDirection.ltr ? 512.0 : 1280 - 512.0;
-        bool atStart(Finder finder) {
-          final x = tester.getCenter(finder).dx;
-          return direction == TextDirection.ltr ? x < edge : x > edge;
-        }
-
-        expect(atStart(find.byType(DetailsPlayButton)), isTrue);
-        expect(atStart(find.text('AD_SLOT')), isTrue);
-        expect(atStart(find.text('episodes')), isFalse);
-        expect(atStart(find.byType(FilterChips)), isFalse);
-        expect(tester.takeException(), isNull);
-      });
-    }
-
     testWidgets('the tabs scroll on their own, the actions stay',
         (tester) async {
       await pump(tester, _movie);
-      final playTop = tester.getTopLeft(find.text('play')).dy;
+      final playTop = tester.getTopLeft(find.text('my_list')).dy;
       await tester.scrollUntilVisible(
         _poster(103),
         200,
@@ -584,7 +516,7 @@ void main() {
             )
             .first,
       );
-      expect(tester.getTopLeft(find.text('play')).dy, playTop);
+      expect(tester.getTopLeft(find.text('my_list')).dy, playTop);
       expect(_poster(103), findsOneWidget);
     });
 

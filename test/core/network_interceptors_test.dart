@@ -19,7 +19,7 @@ void main() {
       ..enqueueError()
       ..enqueueJson({}, statusCode: 503)
       ..enqueueJson({'ok': true});
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    final dio = createPublicDio(const AppEnvironment(),
         debugLogging: false,
         retryDelay: (duration) async => delays.add(duration));
     dio.httpClientAdapter = adapter;
@@ -43,7 +43,7 @@ void main() {
   ]) {
     test('legacy ${error.runtimeType} failures still retry', () async {
       var calls = 0;
-      final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+      final dio = createPublicDio(const AppEnvironment(),
           debugLogging: false, retryDelay: (_) async {});
       dio.httpClientAdapter = CallbackDioAdapter((request) async {
         calls++;
@@ -67,7 +67,7 @@ void main() {
           headers: {
             'retry-after': ['60']
           });
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    final dio = createPublicDio(const AppEnvironment(),
         debugLogging: false, retryDelay: (_) async => fail('Unexpected retry'));
     dio.httpClientAdapter = adapter;
     addTearDown(dio.close);
@@ -85,8 +85,7 @@ void main() {
   test('logs omit API keys, bearer tokens, signed queries and payloads',
       () async {
     final logs = <String>[];
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
-        debugLogging: false);
+    final dio = createPublicDio(const AppEnvironment(), debugLogging: false);
     dio.interceptors.add(LoggingInterceptor(log: logs.add));
     dio.httpClientAdapter = FakeDioAdapter()
       ..enqueueJson({'secret': 'response-secret'});
@@ -102,17 +101,16 @@ void main() {
   test('resends a POST only when it is marked safe to resend', () async {
     Future<int> attempts(Map<String, dynamic> extra) async {
       var calls = 0;
-      final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+      final dio = createPublicDio(const AppEnvironment(),
           debugLogging: false, retryDelay: (_) async {});
       dio.httpClientAdapter = CallbackDioAdapter((request) async {
         calls++;
         throw DioException(
-            requestOptions: request,
-            error: const SocketException('offline'));
+            requestOptions: request, error: const SocketException('offline'));
       });
       addTearDown(dio.close);
       await expectLater(
-        dio.post<Object>('https://scraper.example/api/v3/stream-movie',
+        dio.post<Object>('https://service.example/items',
             options: Options(extra: extra)),
         throwsA(anything),
       );
@@ -127,11 +125,10 @@ void main() {
       'public defaults preserve custom Accept headers; proxies only affect TMDB',
       () async {
     final adapter = FakeDioAdapter()..enqueueJson({});
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
-        debugLogging: false);
+    final dio = createPublicDio(const AppEnvironment(), debugLogging: false);
     dio.httpClientAdapter = adapter;
     addTearDown(dio.close);
-    await dio.get<Object>('https://scraper.example/api/v2/providers',
+    await dio.get<Object>('https://service.example/items',
         options: Options(
           headers: {'accept': 'application/custom'},
           extra: {
@@ -140,7 +137,7 @@ void main() {
           },
         ));
     final request = adapter.requests.single;
-    expect(request.uri.host, 'scraper.example');
+    expect(request.uri.host, 'service.example');
     expect(request.headers['accept'], 'application/custom');
     expect(request.headers.keys.where((key) => key.toLowerCase() == 'accept'),
         hasLength(1));

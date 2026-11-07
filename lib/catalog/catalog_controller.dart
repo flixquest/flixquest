@@ -1,6 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
 import '../api/endpoints.dart';
-import '../data/ads/content_ads.dart';
 import '../controllers/bookmark_database_controller.dart';
 import '../functions/network.dart';
 import '../models/genres.dart';
@@ -71,18 +70,12 @@ class MediaCollection {
     required this.kicker,
     required this.loadPage,
     this.logoAsset,
-    this.adPlacement,
-    this.adFree = false,
   });
 
   final String id;
   final String title;
 
   /// The hosted ad placement the collection's page reports, if it shows one.
-  final String? adPlacement;
-
-  /// A Kids or Family genre: its page shows no ads, Plus or not.
-  final bool adFree;
 
   /// What kind of collection it is, shown above the title.
   final String kicker;
@@ -281,10 +274,6 @@ class CatalogController {
     return MediaCollection(
       id: '${kind.name}-genre-${genre.genreID}',
       title: genre.genreName!,
-      adFree: FamilyGenres.includes(
-        series: !isMovie,
-        genreIds: <int>[genre.genreID!],
-      ),
       kicker: tr(isMovie ? 'tv_movie_genre' : 'tv_series_genre').toUpperCase(),
       loadPage: (page) => _fetchPage(
         page,
@@ -312,13 +301,11 @@ class CatalogController {
     required String kicker,
     required SettingsProvider settings,
     required AppDependencyProvider dependencies,
-    String? adPlacement,
   }) {
     return MediaCollection(
       id: id,
       title: title,
       kicker: kicker,
-      adPlacement: adPlacement,
       loadPage: (page) => _fetchPage(page, () {
         final uri = Uri.parse(url);
         return _fetch(

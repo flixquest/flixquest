@@ -14,7 +14,6 @@ import '/provider/settings_provider.dart';
 import '/provider/app_dependency_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'player_settings.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../mobile/widgets/page_kit.dart';
@@ -84,8 +83,7 @@ class _SettingsState extends State<Settings> {
             ),
           ),
           child: DecoratedBox(
-            decoration:
-                BoxDecoration(color: color, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             child: Center(
               child: iconOverride ??
                   (selected
@@ -212,16 +210,7 @@ class _SettingsState extends State<Settings> {
                       appDependencies.occasionalEffectsEnabled = value;
                     },
                   ),
-                ListRow(
-                  icon: PhosphorIcons.play(),
-                  label: tr('player_settings'),
-                  onTap: () {
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: ((context) {
-                      return const PlayerSettings();
-                    })));
-                  },
-                ),
+                const SizedBox.shrink(),
                 if (!isBelow33)
                   SwitchRow(
                     subtitle: tr('android_12'),
@@ -294,8 +283,7 @@ class _SettingsState extends State<Settings> {
                       ],
                       Text(
                         languageName ?? settingsValues.appLanguage,
-                        style:
-                            AppType.body.copyWith(color: palette.mutedText),
+                        style: AppType.body.copyWith(color: palette.mutedText),
                       ),
                     ],
                   ),
@@ -353,8 +341,8 @@ class _SettingsState extends State<Settings> {
                   width: double.infinity,
                   height: 68,
                   child: ListView(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     scrollDirection: Axis.horizontal,
                     children: [
                       ...appColors

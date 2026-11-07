@@ -210,14 +210,7 @@ class WellnessViewingSession {
         'synced': synced ? 1 : 0,
       };
 
-  Map<String, dynamic> toLaravelMap() => {
-    ...toCloudMap()..remove('updatedAtUtc')..remove('deletedAtUtc'),
-    'id': id,
-    'updated_at_utc': updatedAtUtc.millisecondsSinceEpoch > 0 ? updatedAtUtc.millisecondsSinceEpoch : 1,
-    'deleted_at_utc': deletedAtUtc?.millisecondsSinceEpoch,
-  };
-
-  Map<String, dynamic> toCloudMap() => <String, dynamic>{
+  Map<String, dynamic> toExportMap() => <String, dynamic>{
         'schemaVersion': 1,
         'deviceId': deviceId,
         'mediaType': mediaType.name,
@@ -331,8 +324,8 @@ class WellnessViewingSession {
       genres: decodeStrings(map['genres_json'] ?? map['genres']),
       languages: decodeStrings(map['languages_json'] ?? map['languages']),
       countries: decodeStrings(map['countries_json'] ?? map['countries']),
-      networkBytes: ((map['network_bytes'] ?? map['networkBytes']) as num?)
-          ?.toInt(),
+      networkBytes:
+          ((map['network_bytes'] ?? map['networkBytes']) as num?)?.toInt(),
       updatedAtUtc: DateTime.fromMillisecondsSinceEpoch(
         integer('updated_at_utc', 'updatedAtUtc'),
         isUtc: true,
@@ -346,7 +339,8 @@ class WellnessViewingSession {
 }
 
 class WellnessPlaybackTracker {
-  WellnessPlaybackTracker({required this.id, DateTime? createdAt, this.libraryGeneration})
+  WellnessPlaybackTracker(
+      {required this.id, DateTime? createdAt, this.libraryGeneration})
       : createdAtUtc = (createdAt ?? DateTime.now()).toUtc();
 
   final String id;

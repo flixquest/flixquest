@@ -42,8 +42,7 @@ void main() {
   test('every TMDB request through the shared Dio client carries the flag',
       () async {
     final adapter = FakeDioAdapter()..enqueueJson({'results': []});
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
-        debugLogging: false);
+    final dio = createPublicDio(const AppEnvironment(), debugLogging: false);
     dio.httpClientAdapter = adapter;
     addTearDown(dio.close);
 
@@ -56,8 +55,7 @@ void main() {
 
   test('the flag travels inside the destination through the proxy', () async {
     final adapter = FakeDioAdapter()..enqueueJson({'results': []});
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
-        debugLogging: false);
+    final dio = createPublicDio(const AppEnvironment(), debugLogging: false);
     dio.httpClientAdapter = adapter;
     addTearDown(dio.close);
 

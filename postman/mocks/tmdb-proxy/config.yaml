@@ -1,8 +1,0 @@
-version: 1
-protocol: http
-name: TMDB proxy connectivity
-interceptRequests: true
-scenarios:
-  - name: default
-    path: ./default.js
-    default: true

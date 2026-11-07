@@ -30,8 +30,6 @@ Future<void> openGenreCollection(
           id: collection.id,
           title: collection.title,
           kicker: tr(movie ? 'movie_genres' : 'series_genres').toUpperCase(),
-          adPlacement: movie ? 'genre_movies' : 'genre_tv',
-          adFree: collection.adFree,
           loadPage: collection.loadPage,
         ),
       ),

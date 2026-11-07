@@ -13,7 +13,7 @@ void main() {
   test('repeat TMDB metadata requests use the HTTP cache', () async {
     final cache = HttpCache(MemCacheStore());
     final adapter = FakeDioAdapter()..enqueueJson({'title': 'Example'});
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    final dio = createPublicDio(const AppEnvironment(),
         httpCache: cache, debugLogging: false);
     dio.httpClientAdapter = adapter;
     addTearDown(dio.close);
@@ -32,13 +32,17 @@ void main() {
     // TMDB's CDN sends Vary twice; reading it as one value used to throw.
     final cache = HttpCache(MemCacheStore());
     final adapter = FakeDioAdapter()
-      ..enqueueJson({'title': 'Example'}, headers: {
+      ..enqueueJson({
+        'title': 'Example'
+      }, headers: {
         'vary': ['Origin', 'Accept-Encoding']
       })
-      ..enqueueJson({'title': 'Uncached'}, headers: {
+      ..enqueueJson({
+        'title': 'Uncached'
+      }, headers: {
         'vary': ['Origin', 'Accept-Encoding, *']
       });
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    final dio = createPublicDio(const AppEnvironment(),
         httpCache: cache, debugLogging: false);
     dio.httpClientAdapter = adapter;
     addTearDown(dio.close);
@@ -66,7 +70,7 @@ void main() {
         'etag': ['"v1"']
       })
       ..enqueueJson(null, statusCode: 304);
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    final dio = createPublicDio(const AppEnvironment(),
         httpCache: cache, debugLogging: false);
     dio.httpClientAdapter = adapter;
     addTearDown(dio.close);

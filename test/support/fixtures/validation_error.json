@@ -1,9 +1,0 @@
-{
-  "success": false,
-  "message": "The email field is required.",
-  "errors": {
-    "email": [
-      "The email field is required."
-    ]
-  }
-}

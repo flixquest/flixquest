@@ -4,10 +4,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../data/playlists/playlist.dart';
-import '../../data/repositories/playlist_repository.dart';
 import '../../provider/playlist_provider.dart';
 import '../../provider/recently_watched_provider.dart';
 import '../app/tv_design.dart';
@@ -22,7 +20,6 @@ import '../widgets/tv_dialog.dart';
 import '../widgets/tv_playlist_picker.dart';
 import '../widgets/tv_shortcut_tile.dart';
 import '../widgets/tv_state_panel.dart';
-import 'tv_playlist_import_screen.dart';
 import 'tv_playlist_name_screen.dart';
 
 /// My List as a browse page: saved movies and series, then what is being
@@ -152,11 +149,6 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
       content: Text(playlistSummaryForTv(list)),
       actions: <TvDialogAction>[
         TvDialogAction(
-          label: tr('share'),
-          autofocus: true,
-          onPressed: () => Navigator.of(context).pop('share'),
-        ),
-        TvDialogAction(
           label: tr('tv_playlist_rename'),
           onPressed: () => Navigator.of(context).pop('rename'),
         ),
@@ -171,9 +163,7 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
       ],
     );
     if (!mounted) return;
-    if (action == 'share') {
-      await _shareList(list);
-    } else if (action == 'rename') {
+    if (action == 'rename') {
       final name = await TvPlaylistNameScreen.open(
         context,
         title: tr('tv_playlist_rename'),
@@ -204,95 +194,6 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
       if (confirmed == true) await playlists.delete(list.id);
     }
   }
-
-  /// Makes the list public if it is not yet, then shows its link as text and
-  /// as a QR code to open on a phone, with Stop sharing beside Done.
-  Future<void> _shareList(Playlist list) async {
-    final playlists = context.read<PlaylistProvider>();
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    var url = list.shareUrl;
-    if (url == null) {
-      final confirmed = await showTvDialog<bool>(
-        context: context,
-        title: tr('playlist_share_title'),
-        content: Text(tr('playlist_share_explainer')),
-        actions: <TvDialogAction>[
-          TvDialogAction(
-            label: tr('share'),
-            isPrimary: true,
-            autofocus: true,
-            onPressed: () => Navigator.of(context).pop(true),
-          ),
-          TvDialogAction(
-            label: tr('cancel'),
-            onPressed: () => Navigator.of(context).pop(false),
-          ),
-        ],
-      );
-      if (confirmed != true || !mounted) return;
-      try {
-        url = await playlists.setPublic(list.id, true);
-      } on PlaylistEditException catch (error) {
-        messenger?.showSnackBar(
-            SnackBar(content: Text(tvPlaylistEditMessage(error.error))));
-        return;
-      } on PlaylistImportException {
-        messenger?.showSnackBar(
-            SnackBar(content: Text(tr('playlist_share_failed'))));
-        return;
-      }
-      if (url == null || !mounted) return;
-    }
-    final link = url;
-    final stop = await showTvDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      title: list.name,
-      content: Row(
-        children: <Widget>[
-          QrImageView(
-            data: link,
-            size: 180,
-            backgroundColor: Colors.white,
-            padding: const EdgeInsets.all(14),
-          ),
-          const SizedBox(width: 24),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(tr('tv_playlist_share_scan')),
-                const SizedBox(height: 12),
-                SelectableText(link),
-              ],
-            ),
-          ),
-        ],
-      ),
-      actions: <TvDialogAction>[
-        TvDialogAction(
-          label: tr('done'),
-          isPrimary: true,
-          autofocus: true,
-          onPressed: () => Navigator.of(context).pop(false),
-        ),
-        TvDialogAction(
-          label: tr('playlist_share_stop'),
-          onPressed: () => Navigator.of(context).pop(true),
-        ),
-      ],
-    );
-    if (stop != true || !mounted) return;
-    try {
-      await playlists.setPublic(list.id, false);
-    } on Exception {
-      messenger?.showSnackBar(
-          SnackBar(content: Text(tr('playlist_share_failed'))));
-    }
-  }
-
-  void _importList() => Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => const TvPlaylistImportScreen()));
 
   @override
   Widget build(BuildContext context) {
@@ -444,21 +345,14 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
                   description: tr('tv_playlist_new_description'),
                   onActivate: () => tvCreatePlaylist(context),
                 ),
-                TvBrowseShortcut(
-                  id: 'import-list',
-                  title: tr('playlist_import'),
-                  icon: PhosphorIcons.downloadSimple(),
-                  description: tr('tv_playlist_import_description'),
-                  onActivate: _importList,
-                ),
                 for (final list in lists)
                   TvBrowseShortcut(
                     id: 'list-${list.id}',
                     title: list.name,
                     icon: PhosphorIcons.listBullets(),
                     facts: <String>[playlistSummaryForTv(list)],
-                    description: list.description ??
-                        tr('tv_playlist_hold_to_manage'),
+                    description:
+                        list.description ?? tr('tv_playlist_hold_to_manage'),
                     onActivate: () {
                       if (widget.onOpenCollection case final open?) {
                         open(_listCollection(list));
@@ -475,6 +369,6 @@ class _TvLibraryScreenState extends State<TvLibraryScreen> {
 }
 
 /// "12 titles", the line a TV tile shows under a list's name.
-String playlistSummaryForTv(Playlist list) => plural(
-    'playlist_title_count', list.entries.length,
-    namedArgs: {'count': '${list.entries.length}'});
+String playlistSummaryForTv(Playlist list) =>
+    plural('playlist_title_count', list.entries.length,
+        namedArgs: {'count': '${list.entries.length}'});

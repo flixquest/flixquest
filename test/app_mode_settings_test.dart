@@ -1,3 +1,4 @@
+import 'package:flixquest/constants/api_constants.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -13,7 +14,6 @@ import 'package:flixquest/mobile/widgets/settings_kit.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -54,16 +54,14 @@ Future<void> _pumpSettings(
 }
 
 void main() {
+  setUp(() {
+    TMDB_API_KEY = 'test';
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     await EasyLocalization.ensureInitialized();
-    dotenv.testLoad(fileInput: '''
-      TMDB_API_KEY=test
-      MIXPANEL_API_KEY=test
-      FLIXQUEST_API_URL=https://example.com
-    ''');
   });
 
   setUp(() async {

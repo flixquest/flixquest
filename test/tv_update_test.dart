@@ -1,3 +1,4 @@
+import 'package:flixquest/constants/api_constants.dart';
 import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
@@ -7,7 +8,6 @@ import 'package:flixquest/tv/widgets/tv_update_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_download_manager/flutter_download_manager.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -16,6 +16,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'support/tv_localization.dart';
 
 void main() {
+  setUp(() {
+    TMDB_API_KEY = 'test';
+  });
   initializeTvTranslations();
   TestWidgetsFlutterBinding.ensureInitialized();
   late AppDependencyProvider config;
@@ -50,11 +53,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  setUpAll(() {
-    dotenv.testLoad(
-        fileInput:
-            'TMDB_API_KEY=test\nMIXPANEL_API_KEY=test\nFLIXQUEST_API_URL=https://example.com');
-  });
+  setUpAll(() {});
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     sharedPrefsSingleton = await SharedPreferences.getInstance();

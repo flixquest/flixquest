@@ -1,12 +1,10 @@
 import 'package:easy_localization/easy_localization.dart';
-import '../../presentation/session/auth_runtime.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../catalog/home_feed_controller.dart';
 import '../../catalog/media_item.dart';
-import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../mobile/my_list.dart';
@@ -15,10 +13,6 @@ import '../../mobile/widgets/pill_button.dart';
 import '../../mobile/widgets/poster_grid.dart';
 import '../../mobile/widgets/skeletons.dart';
 import '../../provider/bookmark_provider.dart';
-import '../../services/bookmark_sync_service.dart';
-import '../../services/globle_method.dart';
-import '/screens/common/sync_screen.dart';
-import '../../widgets/hosted_ads_banner.dart';
 
 class BookmarkScreen extends StatefulWidget {
   const BookmarkScreen({this.embedded = false, super.key});
@@ -38,13 +32,8 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
     _triggerAutoSync();
   }
 
-  void _triggerAutoSync() async {
-    if (BookmarkSyncService.instance.canSync) {
-      await BookmarkSyncService.instance.autoSyncIfSignedIn();
-      if (mounted) {
-        context.read<BookmarkProvider>().fetchBookmarks();
-      }
-    }
+  void _triggerAutoSync() {
+    context.read<BookmarkProvider>().fetchBookmarks();
   }
 
   @override
@@ -111,9 +100,7 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
               ),
             ),
             const SizedBox(height: AppSpace.xs),
-            RemoteHostedAdsBanner(
-              placement: 'bookmarks',
-            ),
+            const SizedBox.shrink(),
             Expanded(
               child: IndexedStack(
                 index: _selectedKind,
@@ -137,28 +124,8 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
     );
   }
 
-  void _syncBookmarks() {
-    if (AuthRuntime.maybeSession?.user == null) {
-      GlobalMethods.showCustomScaffoldMessage(
-        SnackBar(
-          content: Text(
-            tr('bookmark_feature_notice'),
-            style: kTextVerySmallBodyStyle,
-            maxLines: 6,
-          ),
-        ),
-        context,
-      );
-      return;
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const SyncScreen()),
-    ).then((_) {
-      if (!mounted) return;
+  Future<void> _syncBookmarks() =>
       context.read<BookmarkProvider>().fetchBookmarks();
-    });
-  }
 }
 
 /// One kind of saved titles: the browse grid while there are any, its

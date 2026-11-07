@@ -12,7 +12,6 @@ import '../../design/app_tokens.dart';
 import '../../design/skeleton.dart';
 import '../../functions/network.dart';
 import '../../mobile/playback.dart';
-import '../../mobile/screens/home_screen.dart' show HomeAdSlot;
 import '../../mobile/widgets/details_header.dart';
 import '../../mobile/widgets/details_parts.dart';
 import '../../mobile/widgets/media_art.dart';
@@ -23,7 +22,6 @@ import '../../models/recently_watched.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/recently_watched_provider.dart';
 import '../../provider/settings_provider.dart';
-import '../../widgets/hosted_ads_banner.dart' show HostedBannerVariant;
 
 /// A movie collection's page: its backdrop, its name and how many films it
 /// holds over which years, Play for the next one in order, the synopsis,
@@ -114,10 +112,7 @@ class CollectionDetailsWidgetState extends State<CollectionDetailsWidget>
             ],
           ),
           SliverToBoxAdapter(
-            child: HomeAdSlot(
-              placement: 'collection_detail',
-              variant: HostedBannerVariant.tall,
-            ),
+            child: const SizedBox.shrink(),
           ),
           SliverReadableWidth(
             slivers: [

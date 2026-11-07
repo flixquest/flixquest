@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flixquest/models/custom_exceptions.dart';
 import 'package:flutter/foundation.dart';
 import '/models/images.dart';
 import '/models/person.dart';
@@ -18,8 +17,8 @@ import '/models/movie.dart';
 Future<Map<String, dynamic>> _tmdbJson(
     String api, bool isProxyEnabled, String proxyUrl) async {
   final result = await NetworkRuntime.tmdb.getJson(api, proxyUrl: proxyUrl);
-  return result.when(ok: (data) => data,
-      err: (failure) => throw FailureException(failure));
+  return result.when(
+      ok: (data) => data, err: (failure) => throw FailureException(failure));
 }
 
 /// TMDB's answer as it came, for a reader that needs fields the models drop,
@@ -185,7 +184,8 @@ Future<BelongsToCollection> fetchCollectionSummary(
 
 Future<String> getVttFileAsString(String url) async {
   final response = await NetworkRuntime.publicDio.get<List<int>>(url,
-      options: Options(responseType: ResponseType.bytes,
+      options: Options(
+          responseType: ResponseType.bytes,
           receiveTimeout: const Duration(seconds: 15),
           validateStatus: (_) => true,
           extra: {'cachePolicy': CachePolicy.noStore}));
@@ -193,44 +193,3 @@ Future<String> getVttFileAsString(String url) async {
   final decoded = utf8.decode(response.data ?? []);
   return decoded.startsWith('<') ? '' : decoded;
 }
-
-const Map<String, String> _vixSrcHeaders = {
-  'accept': '*/*',
-  'origin': 'https://vixsrc.to',
-  'referer': 'https://vixsrc.to/',
-  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-      '(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-};
-
-Future<Response<String>> _vixResponse(String api) =>
-    NetworkRuntime.publicDio.get<String>(api,
-        options: Options(responseType: ResponseType.plain,
-            headers: _vixSrcHeaders,
-            receiveTimeout: const Duration(seconds: 30),
-            validateStatus: (_) => true,
-            extra: {'cachePolicy': CachePolicy.noStore, 'retryLimit': 0}));
-
-Future<String> getVixSrcEmbedSrc(String api) async {
-  final response = await _vixResponse(api);
-  final data = jsonDecode(response.data ?? '');
-  if (response.statusCode != 200 || data is! Map<String, dynamic> ||
-      data['src'] == null || data['src'].toString().isEmpty) {
-    throw NotFoundException();
-  }
-  return data['src'].toString();
-}
-
-Future<String?> getVixSrcEmbedHtml(String api) async {
-  final response = await _vixResponse(api);
-  if (response.statusCode == 410) return null;
-  if (response.statusCode != 200) throw ServerDownException();
-  return response.data ?? '';
-}
-
-Future<String> getVixSrcPlaylist(String api) async {
-  final response = await _vixResponse(api);
-  if (response.statusCode != 200) throw ServerDownException();
-  return response.data ?? '';
-}
-
-// ===================== ANIMEKAI FUNCTIONS =====================

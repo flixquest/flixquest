@@ -48,7 +48,6 @@ void main() {
       }),
       Failure.rateLimited(retryAfter: 30),
       Failure.server(status: 503),
-      Failure.clockSkew(serverTimeUtc: 1700000000000, driftMs: 86400000),
       Failure.cache(),
       Failure.unknown(),
     ];

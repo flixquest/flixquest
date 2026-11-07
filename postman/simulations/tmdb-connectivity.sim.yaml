@@ -1,9 +1,0 @@
-simulation: TMDB connectivity
-routing: path
-mocks:
-  - name: TMDB direct connectivity
-    routeKey: direct
-    path: ../mocks/tmdb-direct/config.yaml
-  - name: TMDB proxy connectivity
-    routeKey: proxy
-    path: ../mocks/tmdb-proxy/config.yaml

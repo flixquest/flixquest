@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../catalog/details_controller.dart';
-import '../../data/ads/content_ads.dart';
 import '../../catalog/details_play.dart';
 import '../../catalog/media_item.dart';
 import '../../catalog/season_source.dart';
@@ -13,7 +12,6 @@ import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../design/skeleton.dart';
 import '../../models/credits.dart';
-import '../../models/genres.dart';
 import '../../models/images.dart';
 import '../../models/tv.dart';
 import '../../provider/app_dependency_provider.dart';
@@ -22,7 +20,6 @@ import '../../provider/settings_provider.dart';
 import '../../screens/common/photoview.dart';
 import '../../services/ambient_theme_service.dart';
 import '../../services/media_link.dart';
-import '../episode_playback.dart';
 import '../playback.dart';
 import '../widgets/details_header.dart';
 import '../widgets/details_parts.dart';
@@ -31,8 +28,6 @@ import '../widgets/media_art.dart';
 import '../widgets/page_kit.dart' show ReadableWidth;
 import '../widgets/section_header.dart';
 import 'credits_screen.dart';
-import '../../widgets/hosted_ads_banner.dart' show HostedBannerVariant;
-import 'home_screen.dart' show HomeAdSlot;
 
 /// An episode's page: its still, its name and facts, Play (or Resume) and
 /// Download, the synopsis and who made it, the rest of its season to move
@@ -45,7 +40,6 @@ class EpisodeScreen extends StatefulWidget {
     this.seasons,
     this.source,
     this.history,
-    this.adBuilder,
     this.now,
     super.key,
   });
@@ -65,7 +59,6 @@ class EpisodeScreen extends StatefulWidget {
 
   /// What the viewer has watched; the recently watched store by default.
   final WatchHistory? history;
-  final WidgetBuilder? adBuilder;
   final DateTime Function()? now;
 
   @override
@@ -76,8 +69,7 @@ class _EpisodeScreenState extends State<EpisodeScreen>
     with CollapsingHeader<EpisodeScreen> {
   late SeasonSource _source;
   late EpisodeList _episode = widget.episode;
-  late Future<TVDetails> _series;
-  late Future<List<Genres>> _genres;
+
   late Future<List<EpisodeList>> _season;
   late Future<EpisodeList> _details;
   late Future<Credits> _credits;
@@ -86,7 +78,7 @@ class _EpisodeScreenState extends State<EpisodeScreen>
   final ScrollController _seasonScroll = ScrollController();
   bool _seasonPlaced = false;
   bool _started = false;
-  bool _starting = false;
+
   bool _overviewOpen = false;
 
   int get _seriesId => widget.series.id;
@@ -103,8 +95,6 @@ class _EpisodeScreenState extends State<EpisodeScreen>
           settings: context.read<SettingsProvider>(),
           dependencies: context.read<AppDependencyProvider>(),
         );
-    _series = _source.series(_seriesId)..ignore();
-    _genres = _source.genres(_seriesId)..ignore();
     final given = widget.seasonEpisodes;
     final season = _seasonNumber;
     _season = given != null && given.isNotEmpty
@@ -170,45 +160,6 @@ class _EpisodeScreenState extends State<EpisodeScreen>
     );
   }
 
-  Future<T?> _quietly<T>(Future<T> future) async {
-    try {
-      return await future;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _run(Future<void> Function() action) async {
-    if (_starting) return;
-    setState(() => _starting = true);
-    try {
-      await action();
-    } finally {
-      if (mounted) setState(() => _starting = false);
-    }
-  }
-
-  Future<void> _play({bool download = false}) async {
-    final episode = _episode;
-    final series = await _quietly(_series);
-    final genres = await _quietly(_genres) ?? const <Genres>[];
-    final seasonEpisodes = await _quietly(_season) ?? <EpisodeList>[episode];
-    if (!mounted) return;
-    await playEpisode(
-      context,
-      series: widget.series,
-      episode: episode,
-      seasonEpisodes: seasonEpisodes,
-      allSeasons: widget.seasons ?? series?.seasons,
-      insights: insightsMetadata(
-        genres: genres.map((genre) => genre.genreName ?? '').toList(),
-        series: series,
-        originalLanguage: widget.series.series?.originalLanguage,
-      ),
-      download: download,
-    );
-  }
-
   Future<void> _share() async {
     context.read<SettingsProvider>().analytics.trackShare(
           shareType: 'Episode',
@@ -239,12 +190,8 @@ class _EpisodeScreenState extends State<EpisodeScreen>
     return season == null || number == null ? null : 'S$season:E$number';
   }
 
-  /// A Kids or Family series' pages show no ads.
   @override
-  Widget build(BuildContext context) => ContentAdGate(
-        content: AdContent.of(widget.series),
-        child: Builder(builder: _page),
-      );
+  Widget build(BuildContext context) => Builder(builder: _page);
 
   Widget _page(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -252,11 +199,7 @@ class _EpisodeScreenState extends State<EpisodeScreen>
     final title = (_episode.name ?? '').trim().isEmpty
         ? (_label ?? widget.series.title)
         : _episode.name!.trim();
-    final ad = widget.adBuilder?.call(context) ??
-        HomeAdSlot(
-          placement: 'episode_detail',
-          variant: HostedBannerVariant.tall,
-        );
+    final ad = const SizedBox.shrink();
     if (AppBreakpoints.isTablet(context) &&
         MediaQuery.sizeOf(context).width >= AppBreakpoints.wide) {
       // A wide tablet: the episode beside the rest of its season.
@@ -332,11 +275,7 @@ class _EpisodeScreenState extends State<EpisodeScreen>
     final airDate = DateTime.tryParse(_episode.airDate ?? '');
     final canPlay = (dependencies?.displayWatchNowButton ?? true) && aired;
     final canDownload = (dependencies?.displayDownloadButton ?? false) && aired;
-    final resume = episodeResume(
-      history.episodes,
-      seriesId: _seriesId,
-      episode: _episode,
-    );
+
     return Padding(
       padding: EdgeInsetsDirectional.fromSTEB(gutter, 0, gutter, AppSpace.lg),
       child: Column(
@@ -376,20 +315,8 @@ class _EpisodeScreenState extends State<EpisodeScreen>
             },
           ),
           if (canPlay || canDownload) const SizedBox(height: AppSpace.lg),
-          if (canPlay)
-            DetailsPlayButton(
-              label: resume == null ? tr('play') : tr('resume_title'),
-              resume: resume,
-              busy: _starting,
-              onPressed: () => _run(_play),
-            ),
-          if (canDownload)
-            DetailsSecondaryButton(
-              label: tr('download_action'),
-              icon: PhosphorIcons.downloadSimple(),
-              onPressed:
-                  _starting ? null : () => _run(() => _play(download: true)),
-            ),
+          if (canPlay) const SizedBox.shrink(),
+          if (canDownload) const SizedBox.shrink(),
           if ((_episode.overview ?? '').trim().isNotEmpty) ...<Widget>[
             const SizedBox(height: AppSpace.lg),
             Semantics(

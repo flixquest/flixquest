@@ -13,7 +13,6 @@ import '../../catalog/media_search.dart';
 import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
-import '../../design/flix_ai_mark.dart';
 import '../../design/skeleton.dart';
 import '../../models/genres.dart';
 import '../../models/person.dart';
@@ -25,7 +24,6 @@ import '../app/mobile_tabs.dart';
 import '../collections.dart';
 import '../playback.dart';
 import 'discover_screen.dart';
-import 'flix_ai_screen.dart';
 import '../widgets/category_section.dart';
 import '../widgets/filter_chips.dart';
 import '../widgets/media_art.dart';
@@ -312,60 +310,7 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
           ),
-          if (!typed)
-            SliverToBoxAdapter(
-                child: Padding(
-              padding: EdgeInsets.symmetric(
-                  horizontal: AppSpace.gutter(context), vertical: AppSpace.sm),
-              child: Material(
-                color: palette.surface,
-                borderRadius: BorderRadius.circular(AppRadii.hero),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: () => Navigator.of(context).push<void>(
-                      MaterialPageRoute(
-                          settings: const RouteSettings(name: '/flix-ai'),
-                          builder: (_) => const FlixAiScreen())),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(children: <Widget>[
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                            color: palette.idleFill, shape: BoxShape.circle),
-                        alignment: Alignment.center,
-                        child: FlixAiMark(
-                            height: 22, color: palette.foreground),
-                      ),
-                      const SizedBox(width: AppSpace.md),
-                      Expanded(
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text('FlixAI',
-                                  style: AppType.cardTitle.copyWith(
-                                      fontSize: 15,
-                                      color: palette.foreground)),
-                              const SizedBox(height: 2),
-                              Text(tr('flix_ai_search_cta'),
-                                  style: AppType.metadata.copyWith(
-                                      fontSize: 13,
-                                      color: palette.mutedText)),
-                            ]),
-                      ),
-                      const SizedBox(width: AppSpace.sm),
-                      Icon(
-                          Directionality.of(context) == TextDirection.rtl
-                              ? PhosphorIcons.caretLeft()
-                              : PhosphorIcons.caretRight(),
-                          size: 16,
-                          color: palette.mutedText),
-                    ]),
-                  ),
-                ),
-              ),
-            )),
+          if (!typed) const SliverToBoxAdapter(),
           ...content,
           SliverToBoxAdapter(
             child: SizedBox(height: media.padding.bottom + AppSpace.xxl),

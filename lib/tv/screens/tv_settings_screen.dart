@@ -1,16 +1,13 @@
-import 'package:better_player_plus/better_player_plus.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../functions/function.dart';
-import '../../functions/language_names.dart';
 import '../../models/app_colors.dart';
 import '../../models/app_mode.dart';
 import '../../screens/common/language_choose.dart' show appLanguageChoices;
 import '../../screens/common/update_screen.dart';
-import '../../functions/subtitle_style.dart';
 import '../../provider/settings_provider.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../app/tv_design.dart';
@@ -19,8 +16,6 @@ import '../focus/tv_focusable.dart';
 import '../widgets/tv_dialog.dart';
 import '../widgets/tv_list_row.dart';
 import '../widgets/tv_page_header.dart';
-import '../widgets/tv_provider_order_dialog.dart';
-import 'tv_server_status_screen.dart';
 
 class TvSettingsScreen extends StatelessWidget {
   const TvSettingsScreen({
@@ -141,136 +136,6 @@ class TvSettingsScreen extends StatelessWidget {
             icon: PhosphorIcons.image(),
             onActivate: () => _showImageQualityPicker(context, settings),
           ),
-          _TvSettingTile(
-            key: const ValueKey<String>('auto-load-sources'),
-            label: tr('auto_load_sources'),
-            value: settings.autoLoadSources ? tr('tv_on') : tr('player_off'),
-            icon: PhosphorIcons.lightning(),
-            onActivate: () =>
-                settings.autoLoadSources = !settings.autoLoadSources,
-          ),
-          _TvSettingTile(
-            key: const ValueKey<String>('provider-order'),
-            label: tr('tv_video_provider_order'),
-            value: tr('tv_choose_source_priority'),
-            icon: PhosphorIcons.arrowsDownUp(),
-            onActivate: () => showTvProviderOrderDialog(context),
-          ),
-        ];
-        final playbackTiles = <Widget>[
-          _TvSettingTile(
-            key: const ValueKey<String>('video-resolution'),
-            label: tr('tv_default_video_resolution'),
-            value: settings.defaultVideoResolution == 0
-                ? tr('auto')
-                : '${settings.defaultVideoResolution}p',
-            icon: PhosphorIcons.filmStrip(),
-            onActivate: () => _showPlaybackChoice<int>(
-              context,
-              title: tr('tv_default_video_resolution'),
-              description: tr(
-                  'tv_choose_a_preferred_quality_for_new_playback_the_player_uses_an_available_quality_if_this_one_is_missing'),
-              value: settings.defaultVideoResolution,
-              options: {
-                0: tr('auto'),
-                360: '360p',
-                480: '480p',
-                720: '720p',
-                1080: '1080p'
-              },
-              onChanged: (value) => settings.defaultVideoResolution = value,
-            ),
-          ),
-          _TvSettingTile(
-            key: const ValueKey<String>('seek-interval'),
-            label: tr('tv_seek_interval'),
-            value: _seconds(settings.defaultSeekDuration),
-            icon: PhosphorIcons.arrowsClockwise(),
-            onActivate: () => _showPlaybackChoice<int>(
-              context,
-              title: tr('tv_seek_interval'),
-              description:
-                  tr('tv_how_far_rewind_and_forward_move_through_a_video'),
-              value: settings.defaultSeekDuration,
-              options: {
-                for (final seconds in const [5, 10, 15, 20, 30])
-                  seconds: _seconds(seconds)
-              },
-              onChanged: (value) => settings.defaultSeekDuration = value,
-            ),
-          ),
-          _TvSettingTile(
-            key: const ValueKey<String>('buffer-duration'),
-            label: tr('tv_buffer_duration'),
-            value: _seconds(
-                settings.defaultMaxBufferDuration.clamp(15000, 60000) ~/ 1000),
-            icon: PhosphorIcons.hourglassMedium(),
-            onActivate: () => _showPlaybackChoice<int>(
-              context,
-              title: tr('tv_buffer_duration'),
-              description: tr(
-                  'tv_how_much_video_to_keep_ahead_of_playback_tv_supports_up_to_60_seconds_applies_to_new_playback'),
-              value: settings.defaultMaxBufferDuration.clamp(15000, 60000),
-              options: {
-                for (final seconds in const [15, 30, 45, 60])
-                  seconds * 1000: _seconds(seconds)
-              },
-              onChanged: (value) => settings.defaultMaxBufferDuration = value,
-            ),
-          ),
-          _TvSettingTile(
-            key: const ValueKey<String>('player-time-display'),
-            label: tr('player_time_display'),
-            value: settings.playerTimeDisplay ==
-                    BetterPlayerControlsConfiguration.timeModeTotal
-                ? tr('elapsed_total')
-                : tr('elapsed_remaining'),
-            icon: PhosphorIcons.clock(),
-            showsNext: false,
-            onActivate: () => settings.playerTimeDisplay =
-                settings.playerTimeDisplay ==
-                        BetterPlayerControlsConfiguration.timeModeTotal
-                    ? BetterPlayerControlsConfiguration.timeModeRemaining
-                    : BetterPlayerControlsConfiguration.timeModeTotal,
-          ),
-          _TvSettingTile(
-            key: const ValueKey<String>('next-episode'),
-            label: tr('tv_show_next_episode'),
-            value: settings.enableNextEpisodeButton
-                ? tr('tv_on')
-                : tr('player_off'),
-            icon: PhosphorIcons.skipForward(),
-            showsNext: false,
-            onActivate: () => settings.enableNextEpisodeButton =
-                !settings.enableNextEpisodeButton,
-          ),
-          _TvSettingTile(
-            key: const ValueKey<String>('introdb-skip-buttons'),
-            label: tr('enable_skip_buttons'),
-            value: settings.enableIntroDbSkipButtons
-                ? tr('tv_on')
-                : tr('player_off'),
-            icon: PhosphorIcons.fastForward(),
-            showsNext: false,
-            onActivate: () => settings.enableIntroDbSkipButtons =
-                !settings.enableIntroDbSkipButtons,
-          ),
-        ];
-        final subtitleTiles = <Widget>[
-          _TvSettingTile(
-            key: const ValueKey<String>('subtitle-language'),
-            label: tr('tv_default_subtitle_language'),
-            value: _subtitleLanguageLabel(settings.defaultSubtitleLanguage),
-            icon: PhosphorIcons.translate(),
-            onActivate: () => _showSubtitleLanguagePicker(context),
-          ),
-          _TvSettingTile(
-            key: const ValueKey<String>('subtitle-settings'),
-            label: tr('tv_subtitle_settings'),
-            value: _subtitleSummary(settings),
-            icon: PhosphorIcons.closedCaptioning(),
-            onActivate: () => _showSubtitleSettings(context, settings),
-          ),
         ];
         final aboutTiles = <Widget>[
           _TvSettingTile(
@@ -282,17 +147,6 @@ class TvSettingsScreen extends StatelessWidget {
               MaterialPageRoute<void>(
                 builder: (_) =>
                     const UpdateScreen(isForced: false, television: true),
-              ),
-            ),
-          ),
-          _TvSettingTile(
-            key: const ValueKey<String>('server-status'),
-            label: tr('tv_server_status'),
-            value: tr('tv_server_status_detail'),
-            icon: PhosphorIcons.pulse(),
-            onActivate: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const TvServerStatusScreen(),
               ),
             ),
           ),
@@ -343,19 +197,7 @@ class TvSettingsScreen extends StatelessWidget {
                             children: sourceTiles,
                           ),
                           const SizedBox(height: 22),
-                          _TvSettingsSection(
-                            title: tr('tv_playback'),
-                            subtitle: tr(
-                                'tv_video_quality_seeking_buffering_and_episode_controls'),
-                            children: playbackTiles,
-                          ),
                           const SizedBox(height: 22),
-                          _TvSettingsSection(
-                            title: tr('tv_subtitles'),
-                            subtitle:
-                                tr('tv_preferred_language_and_text_appearance'),
-                            children: subtitleTiles,
-                          ),
                           const SizedBox(height: 22),
                           _TvSettingsSection(
                             title: tr('tv_storage'),
@@ -380,37 +222,6 @@ class TvSettingsScreen extends StatelessWidget {
       },
     );
   }
-
-  static Future<void> _showPlaybackChoice<T>(
-    BuildContext context, {
-    required String title,
-    required String description,
-    required T value,
-    required Map<T, String> options,
-    required ValueChanged<T> onChanged,
-  }) async {
-    final selected = await showTvDialog<T>(
-      context: context,
-      title: title,
-      content: Text(description),
-      actions: <TvDialogAction>[
-        for (final option in options.entries)
-          TvDialogAction(
-            label: option.value,
-            autofocus: value == option.key,
-            isPrimary: value == option.key,
-            onPressed: () => Navigator.of(context).pop(option.key),
-          ),
-      ],
-    );
-    if (selected != null) onChanged(selected);
-  }
-
-  static String _seconds(int seconds) =>
-      tr('tv_seconds', namedArgs: {'seconds': '$seconds'});
-
-  static String _pixels(int size) =>
-      tr('tv_pixels', namedArgs: {'size': '$size'});
 
   static String _appLanguageLabel(String code) {
     for (final language in appLanguageChoices()) {
@@ -438,31 +249,6 @@ class TvSettingsScreen extends StatelessWidget {
     if (selected == null || !context.mounted) return;
     settings.appLanguage = selected;
     await context.setLocale(Locale(selected));
-  }
-
-  static String _subtitleLanguageLabel(String code) {
-    if (code.isEmpty) return tr('any');
-    for (final language in appLanguages) {
-      if (language.code == code) {
-        return tr(language.translationKey);
-      }
-    }
-    return code;
-  }
-
-  static Future<void> _showSubtitleLanguagePicker(BuildContext context) {
-    return showTvDialog<void>(
-      context: context,
-      title: tr('tv_default_subtitle_language'),
-      content: const _TvSubtitleLanguagePicker(),
-      autofocusFirstAction: false,
-      actions: <TvDialogAction>[
-        TvDialogAction(
-          label: tr('cancel'),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ],
-    );
   }
 
   static String _themeLabel(String value) {
@@ -650,162 +436,6 @@ class TvSettingsScreen extends StatelessWidget {
       ],
     );
   }
-
-  static String _subtitleSummary(SettingsProvider settings) {
-    final textColor = parseStoredSubtitleColor(
-      settings.subtitleForegroundColor,
-      fallback: Colors.white,
-    );
-    final style = normalizeSubtitleTextStyle(settings.subtitleTextStyle);
-    final weight = switch (style) {
-      'light' => tr('tv_font_weight_light'),
-      'bold' => tr('bold'),
-      _ => tr('regular'),
-    };
-    return tr('tv_subtitle_summary', namedArgs: {
-      'size': _pixels(settings.subtitleFontSize),
-      'weight': weight,
-      'color': _colorName(textColor)
-    });
-  }
-
-  static String _colorName(Color color) {
-    for (final entry in _subtitleTextColors.entries) {
-      if (entry.value.toARGB32() == color.toARGB32()) return entry.key;
-    }
-    for (final entry in _subtitleBackgroundColors.entries) {
-      if (entry.value.toARGB32() == color.toARGB32()) return entry.key;
-    }
-    return tr('tv_custom');
-  }
-
-  static Map<String, Color> get _subtitleTextColors => <String, Color>{
-        tr('tv_white'): Colors.white,
-        tr('tv_yellow'): Colors.yellow,
-        tr('tv_cyan'): Colors.cyan,
-        tr('tv_green'): Colors.greenAccent,
-        tr('tv_magenta'): Colors.pinkAccent,
-      };
-
-  static Map<String, Color> get _subtitleBackgroundColors => <String, Color>{
-        tr('tv_transparent'): Colors.transparent,
-        tr('tv_black_45'): Colors.black45,
-        tr('tv_black_70'): Color(0xB3000000),
-        tr('tv_black'): Colors.black,
-      };
-
-  static Future<void> _showSubtitleSettings(
-    BuildContext context,
-    SettingsProvider settings,
-  ) {
-    return showTvDialog<void>(
-      context: context,
-      title: tr('tv_subtitle_settings'),
-      content: const _TvSubtitleSettingsContent(),
-      autofocusFirstAction: false,
-      actions: <TvDialogAction>[
-        TvDialogAction(
-          label: tr('tv_done'),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ],
-    );
-  }
-
-  static Future<void> _showSubtitleFontSizePicker(
-    BuildContext context,
-    SettingsProvider settings,
-  ) {
-    final options = <int>[for (var size = 5; size <= 30; size += 5) size];
-    if (!options.contains(settings.subtitleFontSize)) {
-      options.add(settings.subtitleFontSize);
-      options.sort();
-    }
-    return showTvDialog<void>(
-      context: context,
-      title: tr('tv_subtitle_font_size'),
-      content: Text(tr('tv_choose_the_subtitle_text_size')),
-      actions: <TvDialogAction>[
-        for (final size in options)
-          TvDialogAction(
-            label: _pixels(size),
-            autofocus: settings.subtitleFontSize == size,
-            isPrimary: settings.subtitleFontSize == size,
-            onPressed: () {
-              settings.subtitleFontSize = size;
-              Navigator.of(context).pop();
-            },
-          ),
-      ],
-    );
-  }
-
-  static Future<void> _showSubtitleColorPicker(
-    BuildContext context,
-    SettingsProvider settings, {
-    required bool foreground,
-  }) {
-    final current = parseStoredSubtitleColor(
-      foreground
-          ? settings.subtitleForegroundColor
-          : settings.subtitleBackgroundColor,
-      fallback: foreground ? Colors.white : Colors.black45,
-    );
-    final palette =
-        foreground ? _subtitleTextColors : _subtitleBackgroundColors;
-    return showTvDialog<void>(
-      context: context,
-      title: foreground
-          ? tr('tv_subtitle_text_color')
-          : tr('tv_subtitle_background_color'),
-      content: Text(tr('tv_choose_a_color_for_subtitles')),
-      actions: <TvDialogAction>[
-        for (final entry in palette.entries)
-          TvDialogAction(
-            label: entry.key,
-            autofocus: current.toARGB32() == entry.value.toARGB32(),
-            isPrimary: current.toARGB32() == entry.value.toARGB32(),
-            onPressed: () {
-              final value = serializeSubtitleColor(entry.value);
-              if (foreground) {
-                settings.subtitleForegroundColor = value;
-              } else {
-                settings.subtitleBackgroundColor = value;
-              }
-              Navigator.of(context).pop();
-            },
-          ),
-      ],
-    );
-  }
-
-  static Future<void> _showSubtitleWeightPicker(
-    BuildContext context,
-    SettingsProvider settings,
-  ) {
-    final options = <String, String>{
-      'light': tr('tv_font_weight_light'),
-      'regular': tr('regular'),
-      'bold': tr('bold'),
-    };
-    return showTvDialog<void>(
-      context: context,
-      title: tr('tv_subtitle_text_weight'),
-      content: Text(tr('tv_choose_the_subtitle_font_weight')),
-      actions: <TvDialogAction>[
-        for (final option in options.entries)
-          TvDialogAction(
-            label: option.value,
-            autofocus: settings.subtitleTextStyle == option.key,
-            isPrimary: settings.subtitleTextStyle == option.key,
-            onPressed: () {
-              settings.subtitleTextStyle = option.key;
-              Navigator.of(context).pop();
-            },
-          ),
-      ],
-    );
-  }
 }
 
 class _TvAppLanguagePicker extends StatelessWidget {
@@ -835,46 +465,6 @@ class _TvAppLanguagePicker extends StatelessWidget {
             autofocus: language.languageCode == selected ||
                 (!hasSelection && language == languages.first),
             onActivate: () => Navigator.of(context).pop(language.languageCode),
-          ),
-      ],
-    );
-  }
-}
-
-class _TvSubtitleLanguagePicker extends StatelessWidget {
-  const _TvSubtitleLanguagePicker();
-
-  @override
-  Widget build(BuildContext context) {
-    // Rebuild translated labels when the app locale changes.
-    Localizations.localeOf(context);
-    final settings = context.watch<SettingsProvider>();
-    final codes = <String>[
-      '',
-      for (final language in appLanguages) language.code
-    ];
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Text(tr(
-            'tv_prefer_this_language_when_subtitles_are_available_choose_any_to_leave_the_language_selection_automatic')),
-        const SizedBox(height: 18),
-        for (final code in codes)
-          TvListRow(
-            key: ValueKey<String>('subtitle-language-$code'),
-            label: TvSettingsScreen._subtitleLanguageLabel(code),
-            value: settings.defaultSubtitleLanguage == code
-                ? tr('tv_selected')
-                : null,
-            showsNext: false,
-            autofocus: settings.defaultSubtitleLanguage == code ||
-                (code.isEmpty &&
-                    !codes.contains(settings.defaultSubtitleLanguage)),
-            onActivate: () {
-              settings.defaultSubtitleLanguage = code;
-              Navigator.of(context).pop();
-            },
           ),
       ],
     );
@@ -937,156 +527,6 @@ class _TvClearCacheTileState extends State<_TvClearCacheTile> {
         showsNext: false,
         onActivate: _clear,
       );
-}
-
-class _TvSubtitleSettingsContent extends StatelessWidget {
-  const _TvSubtitleSettingsContent();
-
-  @override
-  Widget build(BuildContext context) {
-    // Rebuild translated labels when the app locale changes.
-    Localizations.localeOf(context);
-    final settings = context.watch<SettingsProvider>();
-    final foreground = parseStoredSubtitleColor(
-      settings.subtitleForegroundColor,
-      fallback: Colors.white,
-    );
-    final background = parseStoredSubtitleColor(
-      settings.subtitleBackgroundColor,
-      fallback: Colors.black45,
-    );
-    final weight =
-        switch (normalizeSubtitleTextStyle(settings.subtitleTextStyle)) {
-      'light' => tr('tv_font_weight_light'),
-      'bold' => tr('bold'),
-      _ => tr('regular'),
-    };
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        _TvSubtitleOption(
-          label: tr('tv_font_size'),
-          value: TvSettingsScreen._pixels(settings.subtitleFontSize),
-          autofocus: true,
-          onActivate: () => TvSettingsScreen._showSubtitleFontSizePicker(
-            context,
-            settings,
-          ),
-        ),
-        _TvSubtitleOption(
-          label: tr('text_color'),
-          value: TvSettingsScreen._colorName(foreground),
-          color: foreground,
-          onActivate: () => TvSettingsScreen._showSubtitleColorPicker(
-            context,
-            settings,
-            foreground: true,
-          ),
-        ),
-        _TvSubtitleOption(
-          label: tr('background_color'),
-          value: TvSettingsScreen._colorName(background),
-          color: background,
-          onActivate: () => TvSettingsScreen._showSubtitleColorPicker(
-            context,
-            settings,
-            foreground: false,
-          ),
-        ),
-        _TvSubtitleOption(
-          label: tr('text_weight'),
-          value: weight,
-          onActivate: () => TvSettingsScreen._showSubtitleWeightPicker(
-            context,
-            settings,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _TvSubtitleOption extends StatelessWidget {
-  const _TvSubtitleOption({
-    required this.label,
-    required this.value,
-    required this.onActivate,
-    this.color,
-    this.autofocus = false,
-  });
-
-  final String label;
-  final String value;
-  final VoidCallback onActivate;
-  final Color? color;
-  final bool autofocus;
-
-  @override
-  Widget build(BuildContext context) {
-    // Rebuild translated labels when the app locale changes.
-    Localizations.localeOf(context);
-    final palette = TvPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: TvFocusable(
-        semanticLabel: '$label, $value',
-        autofocus: autofocus,
-        onActivate: onActivate,
-        focusScale: 1,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 64),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          decoration: BoxDecoration(
-            color: TvDesign.surfaceFor(context, emphasis: 0.012),
-            borderRadius: BorderRadius.circular(5),
-            border: Border.all(color: palette.hairline),
-          ),
-          child: Row(
-            children: <Widget>[
-              if (color != null) ...<Widget>[
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: palette.foreground.withValues(alpha: 0.4),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-              ],
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: palette.foreground,
-                    fontFamily: 'FigtreeSB',
-                    fontSize: 21,
-                  ),
-                ),
-              ),
-              Text(
-                value,
-                style: TextStyle(
-                  color: palette.mutedText,
-                  fontSize: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Icon(
-                PhosphorIcons.caretRight(),
-                color: palette.mutedText,
-                size: 20,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _TvSettingsFocusEntry extends StatefulWidget {
