@@ -94,26 +94,6 @@ CacheManager cacheProp() => _sharedImageCache;
 
 enum MediaType { movie, tvShow }
 
-/// Stream and scraper hosts often serve broken chains, so their certificates
-/// are not enforced. [verifiedHosts] carry passwords and session tokens and
-/// are always verified.
-class MyHttpOverrides extends HttpOverrides {
-  MyHttpOverrides({Set<String> verifiedHosts = const {}})
-      : verifiedHosts = {for (final host in verifiedHosts) host.toLowerCase()};
-  final Set<String> verifiedHosts;
-
-  bool acceptsBadCertificate(String host) =>
-      !verifiedHosts.contains(host.toLowerCase());
-
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback =
-          (X509Certificate cert, String host, int port) =>
-              acceptsBadCertificate(host);
-  }
-}
-
 late SharedPreferences sharedPrefsSingleton;
 
 /// easy localization run command

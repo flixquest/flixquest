@@ -33,25 +33,18 @@
         android:banner="@drawable/tv_banner"
         android:requestLegacyExternalStorage="true"
         android:usesCleartextTraffic="true">    
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_notification" />
-        <meta-data
-            android:name="vn.hunghd.flutterdownloader.NOTIFICATION_ICON"
-            android:resource="@drawable/ic_notification" />
-        <!-- Replace the default receiver ID after registering cast_receiver/. -->
-        <meta-data
-            android:name="uz.shs.better_player_plus.CAST_RECEIVER_APPLICATION_ID"
-            android:value="CC1AD845" />
-        <service
-            android:name=".playback.StreamingDndConditionProvider"
-            android:label="@string/streaming_dnd_rule_name"
-            android:permission="android.permission.BIND_CONDITION_PROVIDER_SERVICE"
+        <!-- Android TV doesn't show the splash icon, so TV launches open here and hand over to
+             MainActivity. noHistory removes it once the app covers it. -->
+        <activity
+            android:name=".TvLaunchActivity"
+            android:theme="@style/TvLaunchTheme"
+            android:noHistory="true"
             android:exported="true">
             <intent-filter>
-                <action android:name="android.service.notification.ConditionProviderService" />
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-        </service>
+        </activity>
         <activity
             android:name=".MainActivity"
             android:supportsPictureInPicture="true"
@@ -79,10 +72,6 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
             <intent-filter>
                 <action android:name="es.antonborri.home_widget.action.LAUNCH" />
@@ -209,38 +198,16 @@
                 android:resource="@xml/widget_my_list" />
         </receiver>
         
-        <provider
-            android:name="vn.hunghd.flutterdownloader.DownloadedFileProvider"
-            android:authorities="${applicationId}.flutter_downloader.provider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/provider_paths"/>
-        </provider>
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.offline_files"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/offline_file_paths" />
-        </provider>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        <service
-            android:name=".downloads.StreamDownloadService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync">
-            <intent-filter>
-                <action android:name="androidx.media3.exoplayer.downloadService.action.RESTART" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </service>
+        <provider android:name="vn.hunghd.flutterdownloader.DownloadedFileProvider"
+            android:authorities="${applicationId}.flutter_downloader.provider"
+            android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/provider_paths" />
+        </provider>
     </application>
 
 </manifest>

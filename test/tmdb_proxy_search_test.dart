@@ -19,13 +19,11 @@ import 'package:flixquest/services/tmdb_connectivity.dart';
 
 import 'support/tmdb_routing_client.dart';
 import 'package:dio_cache_interceptor/dio_cache_interceptor.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   setUp(() async {
-    dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://example.com');
     TMDB_API_KEY = 'proxy-search-test-key';
     SharedPreferences.setMockInitialValues(<String, Object>{});
     sharedPrefsSingleton = await SharedPreferences.getInstance();
@@ -114,7 +112,7 @@ void main() {
         routingClient.close();
       });
       final cache = HttpCache(MemCacheStore());
-      final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+      final dio = createPublicDio(const AppEnvironment(),
           httpCache: cache, debugLogging: false, retryDelay: (_) async {});
       dio.httpClientAdapter = TmdbRoutingDioAdapter(routingClient.directBase);
       NetworkRuntime.configure(publicDio: dio, httpCache: cache);

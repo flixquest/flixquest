@@ -1,3 +1,4 @@
+import 'package:flixquest/constants/api_constants.dart';
 import 'package:flixquest/catalog/catalog_controller.dart';
 import 'package:flixquest/catalog/discover_query.dart';
 import 'package:flixquest/catalog/media_item.dart';
@@ -7,7 +8,6 @@ import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,8 +15,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 Map<String, String> _params(String url) => Uri.parse(url).queryParameters;
 
 void main() {
+  setUp(() {
+    TMDB_API_KEY = 'key';
+  });
   setUp(() async {
-    dotenv.testLoad(fileInput: 'TMDB_API_KEY=key\nFLIXQUEST_API_URL=x');
     SharedPreferences.setMockInitialValues(<String, Object>{});
     sharedPrefsSingleton = await SharedPreferences.getInstance();
   });
@@ -226,7 +228,6 @@ void main() {
     await tester.tap(find.text('show_titles'));
     await tester.pumpAndSettle();
     final results = opened.single;
-    expect(results.adPlacement, 'discover_movies');
     expect(results.title, 'discover_movies');
     expect(results.id, contains('with_genres=35'));
     expect(results.id, contains('vote_count.gte=1000'));

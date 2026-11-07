@@ -14,7 +14,6 @@ import 'package:flixquest/tv/widgets/tv_list_row.dart';
 import 'package:flixquest/tv/widgets/tv_search_keyboard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -84,7 +83,6 @@ void main() {
   setUpAll(() async {
     SharedPreferences.setMockInitialValues({});
     await EasyLocalization.ensureInitialized();
-    dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://example.com');
   });
 
   setUp(() async {
@@ -105,9 +103,6 @@ void main() {
         'settings',
         'tv_appearance',
         'tv_content_sources',
-        'tv_playback',
-        'tv_seek_interval',
-        'tv_default_subtitle_language',
         'tv_storage',
       ]) {
         expect(find.text(tr(key)), findsOneWidget, reason: '$locale: $key');

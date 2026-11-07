@@ -1,46 +1,26 @@
-import 'presentation/session/firebase_session_bridge.dart';
-import 'presentation/session/session_view_model.dart';
-import 'presentation/billing/plus_controller.dart';
-import 'widgets/plus/plus_celebration.dart';
-import 'widgets/plus/plus_coupon_prompt.dart';
-import 'presentation/notifications/notification_controller.dart';
-import 'data/sync/sync_runtime.dart';
-import 'services/bookmark_sync_service.dart';
-import 'data/ads/ad_events_controller.dart';
 import 'dart:async';
-
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flixquest/models/app_colors.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'constants/theme_data.dart';
-import 'functions/function.dart';
+import 'models/app_colors.dart';
 import 'provider/app_dependency_provider.dart';
+import 'provider/bookmark_provider.dart';
 import 'provider/recently_watched_provider.dart';
 import 'provider/settings_provider.dart';
-import 'screens/user/user_state.dart';
-import 'widgets/ad_block_warmup.dart';
-import 'widgets/occasional_effect_overlay.dart';
-import 'widgets/app_presentation.dart';
-import 'provider/bookmark_provider.dart';
-import 'provider/offline_download_provider.dart';
 import 'provider/wellness_provider.dart';
-import 'services/in_app_messaging_service.dart';
+import 'services/app_navigation.dart';
 import 'services/deep_link_dispatcher.dart';
 import 'services/home_widget_service.dart';
-import 'services/recently_watched_sync_service.dart';
-import 'services/tmdb_connectivity.dart';
-import 'services/firebase_config_controller.dart';
-import 'services/firebase_backend_config_controller.dart';
-import 'presentation/config/refresh_controller.dart';
+import 'screens/user/user_state.dart';
+import 'widgets/app_presentation.dart';
+import 'widgets/occasional_effect_overlay.dart';
 import 'mobile/app/mobile_shell.dart';
 import 'mobile/app/mobile_update_gate.dart';
-import 'tv/platform/device_presentation.dart';
 import 'tv/navigation/tv_back_key_guard.dart';
+import 'tv/platform/device_presentation.dart';
 import 'tv/widgets/tv_update_gate.dart';
 
 class FlixQuest extends StatefulWidget {
@@ -50,190 +30,34 @@ class FlixQuest extends StatefulWidget {
       required this.bookmarkProvider,
       required this.appDependencyProvider,
       required this.devicePresentation,
-      this.configController,
-      this.backendConfigController,
-      this.adsController,
-      this.notifications,
-      this.firebaseSession,
       super.key});
-
   final SettingsProvider settingsProvider;
   final RecentProvider recentProvider;
   final BookmarkProvider bookmarkProvider;
   final AppDependencyProvider appDependencyProvider;
   final DevicePresentation devicePresentation;
-  final ConfigLifecycle? configController;
-  final FirebaseBackendConfigController? backendConfigController;
-  final AdEventsController? adsController;
-  final NotificationController? notifications;
-  final FirebaseSessionBridge? firebaseSession;
-
   @override
   State<FlixQuest> createState() => _FlixQuestState();
 }
 
-class _FlixQuestState extends State<FlixQuest>
-    with ChangeNotifier, WidgetsBindingObserver {
-  FirebaseConfigController? _firebaseConfig;
-  Timer? _widgetRefreshDebounce;
-  StreamSubscription<List<ConnectivityResult>>? _tmdbNetworkSubscription;
-  final Connectivity _connectivity = Connectivity();
-
-  Future<void> _initConfig() async {
-    final controller = widget.configController;
-    if (controller != null) {
-      await controller.boot();
-    } else {
-      final firebase = FirebaseConfigController(widget.appDependencyProvider);
-      _firebaseConfig = firebase;
-      if (WidgetsBinding.instance.lifecycleState != null &&
-          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
-        firebase.pause();
-      }
-      await firebase.start();
-    }
-    if (mounted) {
-      // The first check can run before config supplies the proxy URL.
-      unawaited(_checkTmdb());
-      await requestNotificationPermissions();
-      if (mounted) await widget.notifications?.devices.onResume();
-    }
-  }
-
-  @override
-  void reassemble() {
-    super.reassemble();
-    if (kDebugMode) unawaited(_refreshConfigAfterReload());
-  }
-
-  Future<void> _refreshConfigAfterReload() async {
-    try {
-      await widget.backendConfigController?.refresh();
-      final controller = widget.configController;
-      if (controller != null) {
-        await controller.onResume();
-      } else {
-        await _firebaseConfig?.refresh();
-      }
-    } catch (error) {
-      if (kDebugMode) {
-        debugPrint('[PlaybackAdConfig] reload refresh failed: $error');
-      }
-    }
-  }
-
+class _FlixQuestState extends State<FlixQuest> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (WidgetsBinding.instance.lifecycleState != null &&
-        WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
-      widget.backendConfigController?.pause();
-    }
-    WellnessProvider.instance.addListener(_scheduleLocalWidgetRefresh);
-    widget.bookmarkProvider.addListener(_scheduleLocalWidgetRefresh);
-    TmdbConnectivity.instance.proxyUrlSource =
-        () => widget.appDependencyProvider.tmdbProxy;
-    unawaited(_checkTmdb());
-    _tmdbNetworkSubscription = _connectivity.onConnectivityChanged.listen(
-      (results) {
-        final available =
-            results.any((result) => result != ConnectivityResult.none);
-        TmdbConnectivity.instance.updateNetworkAvailability(available);
-        if (available) unawaited(_checkTmdb());
-      },
-      onError: (Object _) {},
-    );
-    _initConfig();
-    unawaited(widget.adsController?.boot());
-    fileDelete();
-    InAppMessagingService.initialize(
-        onConfigHint: widget.configController?.onPushData,
-        messages: widget.notifications?.messages,
-        messaging: widget.notifications?.messaging,
-        onMessage: widget.notifications?.receive);
-    unawaited(widget.notifications?.boot());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       DeepLinkDispatcher.onAppReady();
-      unawaited(widget.notifications?.messages.onReady());
-      unawaited(_refreshHomeWidgets());
     });
   }
-
-  Future<void> _checkTmdb({bool networkChanged = false}) =>
-      TmdbConnectivity.instance.check(
-        widget.appDependencyProvider.tmdbProxy,
-        networkChanged: networkChanged,
-      );
-
-  void _scheduleLocalWidgetRefresh() {
-    _widgetRefreshDebounce?.cancel();
-    _widgetRefreshDebounce = Timer(const Duration(seconds: 3), () {
-      unawaited(HomeWidgetService.instance.refreshLocal(
-        wellness: WellnessProvider.instance,
-        bookmarks: widget.bookmarkProvider,
-      ));
-    });
-  }
-
-  Future<void> _refreshHomeWidgets() => HomeWidgetService.instance.refreshAll(
-        settings: widget.settingsProvider,
-        dependencies: widget.appDependencyProvider,
-        wellness: WellnessProvider.instance,
-        bookmarks: widget.bookmarkProvider,
-      );
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) {
-      widget.backendConfigController?.pause();
-      _firebaseConfig?.pause();
-      if (state == AppLifecycleState.paused) {
-        context.read<PlusController?>()?.onPause();
-      }
-      // Leaving the app is the last chance to hand off progress saved by the
-      // player, so push it now instead of waiting out the debounce.
-      unawaited(RecentlyWatchedSyncService.instance.flushPending());
-      if (SyncRuntime.enabled) {
-        unawaited(WellnessProvider.instance.flushPending());
-      }
-      return;
-    }
-    DeepLinkDispatcher.onAppReady();
-    unawaited(_checkTmdb());
-    unawaited(widget.backendConfigController?.resume());
-    unawaited(widget.configController?.onResume());
-    unawaited(_firebaseConfig?.resume());
-    unawaited(widget.adsController?.onResume());
-    unawaited(widget.notifications?.onResume());
-    unawaited(widget.firebaseSession?.run());
-    // An offline guest gets its tracked account once the network is back.
-    unawaited(context.read<SessionViewModel?>()?.ensureGuestAccount());
-    // Back from a payment page or another device: Plus may have changed.
-    context.read<PlusController?>()?.onResume();
-    unawaited(_refreshHomeWidgets());
-    unawaited(RecentlyWatchedSyncService.instance.autoSyncIfSignedIn());
-    if (SyncRuntime.enabled) {
-      unawaited(BookmarkSyncService.instance.autoSyncIfSignedIn());
-      unawaited(SyncRuntime.coordinator?.playlists.autoSync());
-      unawaited(WellnessProvider.instance.autoSyncIfSignedIn());
-    }
+    if (state == AppLifecycleState.resumed) DeepLinkDispatcher.onAppReady();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    WellnessProvider.instance.removeListener(_scheduleLocalWidgetRefresh);
-    widget.bookmarkProvider.removeListener(_scheduleLocalWidgetRefresh);
-    _widgetRefreshDebounce?.cancel();
-    _tmdbNetworkSubscription?.cancel();
-    TmdbConnectivity.instance.proxyUrlSource = null;
-    _firebaseConfig?.dispose();
-    widget.backendConfigController?.dispose();
-    widget.configController?.dispose();
-    unawaited(widget.adsController?.dispose());
-    InAppMessagingService.dispose();
-    widget.notifications?.dispose();
     super.dispose();
   }
 
@@ -258,9 +82,6 @@ class _FlixQuestState extends State<FlixQuest>
           ChangeNotifierProvider(create: (_) {
             return widget.appDependencyProvider;
           }),
-          ChangeNotifierProvider(
-            create: (_) => OfflineDownloadProvider()..initialize(),
-          ),
           ChangeNotifierProvider.value(value: WellnessProvider.instance),
         ],
         child:
@@ -270,7 +91,7 @@ class _FlixQuestState extends State<FlixQuest>
           return AppPresentation(
             settings: settingsProvider,
             detectedPresentation: widget.devicePresentation,
-            navigatorKey: InAppMessagingService.navigatorKey,
+            navigatorKey: AppNavigation.navigatorKey,
             builder: (context, devicePresentation) => DynamicColorBuilder(
               builder: (lightDynamic, darkDynamic) {
                 final isDarkTheme = settingsProvider.appTheme == 'dark' ||
@@ -302,7 +123,7 @@ class _FlixQuestState extends State<FlixQuest>
                 );
                 final app = MaterialApp(
                   restorationScopeId: 'flixquest',
-                  navigatorKey: InAppMessagingService.navigatorKey,
+                  navigatorKey: AppNavigation.navigatorKey,
                   localizationsDelegates: context.localizationDelegates,
                   supportedLocales: context.supportedLocales,
                   locale: context.locale,
@@ -324,14 +145,6 @@ class _FlixQuestState extends State<FlixQuest>
                         else
                           MobileUpdateGate(
                               child: child ?? const SizedBox.shrink()),
-                        PlusCelebration(
-                          television: devicePresentation ==
-                              DevicePresentation.television,
-                        ),
-                        PlusCouponPrompt(
-                          television: devicePresentation ==
-                              DevicePresentation.television,
-                        ),
                         OccasionalEffectOverlay(
                           theme: appDependencyProvider.activeOccasionalTheme,
                           television: devicePresentation ==
@@ -346,11 +159,9 @@ class _FlixQuestState extends State<FlixQuest>
                     ),
                   ),
                   theme: appTheme,
-                  home: AdBlockWarmup(
-                    child: UserState(
-                      key: ValueKey<DevicePresentation>(devicePresentation),
-                      devicePresentation: devicePresentation,
-                    ),
+                  home: UserState(
+                    key: ValueKey<DevicePresentation>(devicePresentation),
+                    devicePresentation: devicePresentation,
                   ),
                 );
                 // Wraps the app itself: it has to hear about system Backs
@@ -367,39 +178,8 @@ class _FlixQuestState extends State<FlixQuest>
   }
 }
 
-/// The phone and tablet app, under its bottom bar.
 class FlixQuestHomePage extends StatelessWidget {
-  const FlixQuestHomePage({
-    super.key,
-  });
-
+  const FlixQuestHomePage({super.key});
   @override
   Widget build(BuildContext context) => const MobileShell();
 }
-
-/*
-
-String? appVersion = widget.appDependencyProvider.latestAppVersion;
-      SharedPreferences sharedPrefsSingleton = await SharedPreferences.getInstance();
-      String? ignoreVersion = sharedPrefsSingleton.getString('ignore_version') ?? '';
-      if (mounted &&
-          appVersion != currentAppVersion &&
-          (ignoreVersion == '' || ignoreVersion != currentAppVersion)) {
-        showBottomSheet(
-          context: context,
-          builder: (context) {
-            return Builder(
-              builder: (BuildContext innerContext) {
-                return UpdateBottom(
-                  appVersion: appVersion,
-                  ignoreVersion: ignoreVersion,
-                  sharedPrefsSingleton: sharedPrefsSingleton,
-                );
-              },
-            );
-          },
-        );
-      }
-
-
-*/

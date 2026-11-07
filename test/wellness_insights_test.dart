@@ -234,7 +234,8 @@ void main() {
         insights.hourOfWeekMs[6][9],
         const Duration(minutes: 30).inMilliseconds,
       );
-      expect(insights.peakHourOfWeek, (0, 21, const Duration(hours: 1).inMilliseconds));
+      expect(insights.peakHourOfWeek,
+          (0, 21, const Duration(hours: 1).inMilliseconds));
     });
 
     test('splits the day into morning, afternoon, evening and late night', () {
@@ -311,8 +312,10 @@ void main() {
         period: period,
       );
 
-      expect(insights.weekdayWatchedMs, const Duration(hours: 1).inMilliseconds);
-      expect(insights.weekendWatchedMs, const Duration(hours: 3).inMilliseconds);
+      expect(
+          insights.weekdayWatchedMs, const Duration(hours: 1).inMilliseconds);
+      expect(
+          insights.weekendWatchedMs, const Duration(hours: 3).inMilliseconds);
       expect(insights.busiestDay?.$1, DateTime(2026, 8, 22));
       expect(insights.busiestDay?.$2, const Duration(hours: 3).inMilliseconds);
     });
@@ -499,14 +502,14 @@ void main() {
         123456789,
       );
       expect(
-        WellnessViewingSession.fromMap(session.toCloudMap()).networkBytes,
+        WellnessViewingSession.fromMap(session.toExportMap()).networkBytes,
         123456789,
       );
       expect(session.copyWith(synced: true).networkBytes, 123456789);
     });
 
     test('reads records written before it was tracked as unmeasured', () {
-      final legacy = session.toCloudMap()..remove('networkBytes');
+      final legacy = session.toExportMap()..remove('networkBytes');
       final legacyRow = session.toMap()..remove('network_bytes');
 
       expect(WellnessViewingSession.fromMap(legacy).networkBytes, isNull);
@@ -522,7 +525,7 @@ void main() {
         end: DateTime.utc(2026, 8, 18, 21),
       );
 
-      expect(unmeasured.toCloudMap().containsKey('networkBytes'), isFalse);
+      expect(unmeasured.toExportMap().containsKey('networkBytes'), isFalse);
     });
   });
 }

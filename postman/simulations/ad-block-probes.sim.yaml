@@ -1,6 +1,0 @@
-simulation: FlixQuest ad blocking detection
-routing: path
-mocks:
-  - name: Non-billing HTTPS probes and public DNS
-    routeKey: probes
-    path: ../mocks/ad-block-probes/config.yaml

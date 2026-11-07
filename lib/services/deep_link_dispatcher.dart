@@ -1,6 +1,5 @@
+import 'package:flixquest/services/app_navigation.dart';
 import 'package:flutter/widgets.dart';
-
-import 'in_app_messaging_service.dart';
 
 /// What to do about a link, once there is a navigator to do it with.
 typedef LinkAction = void Function(NavigatorState navigator);
@@ -32,7 +31,7 @@ class DeepLinkDispatcher {
   /// recent link is held: if two turn up before the app is ready, the later one is what was asked for.
   static void submit({required String key, required LinkAction open}) {
     if (_isRepeat(key)) return;
-    final navigator = InAppMessagingService.navigatorKey.currentState;
+    final navigator = AppNavigation.navigatorKey.currentState;
     if (navigator == null) {
       _pendingKey = key;
       _pendingAction = open;
@@ -52,7 +51,7 @@ class DeepLinkDispatcher {
     final key = _pendingKey;
     final action = _pendingAction;
     if (key == null || action == null) return;
-    if (InAppMessagingService.navigatorKey.currentState == null) {
+    if (AppNavigation.navigatorKey.currentState == null) {
       _scheduleDelivery();
       return;
     }

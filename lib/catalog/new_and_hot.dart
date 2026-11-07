@@ -8,8 +8,6 @@ import 'media_item.dart';
 
 enum HotSegment { comingSoon, everyoneWatching, topMovies, topSeries }
 
-/// The requests used by New & Hot. A fake source can feed the same logic in
-/// tests without using TMDB, Firebase, or the app's proxy.
 abstract class NewAndHotSource {
   Future<List<MediaItem>> upcomingMovies();
   Future<List<MediaItem>> seriesPremieres(DateTime today);

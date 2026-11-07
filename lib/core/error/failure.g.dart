@@ -137,44 +137,6 @@ Map<String, dynamic> _$$ServerFailureImplToJson(_$ServerFailureImpl instance) =>
       'runtimeType': instance.$type,
     };
 
-_$ClockSkewFailureImpl _$$ClockSkewFailureImplFromJson(
-        Map<String, dynamic> json) =>
-    _$ClockSkewFailureImpl(
-      serverTimeUtc: (json['serverTimeUtc'] as num).toInt(),
-      driftMs: (json['driftMs'] as num).toInt(),
-      message: json['message'] as String?,
-      $type: json['runtimeType'] as String?,
-    );
-
-Map<String, dynamic> _$$ClockSkewFailureImplToJson(
-        _$ClockSkewFailureImpl instance) =>
-    <String, dynamic>{
-      'serverTimeUtc': instance.serverTimeUtc,
-      'driftMs': instance.driftMs,
-      'message': instance.message,
-      'runtimeType': instance.$type,
-    };
-
-_$DeviceLimitFailureImpl _$$DeviceLimitFailureImplFromJson(
-        Map<String, dynamic> json) =>
-    _$DeviceLimitFailureImpl(
-      limit: (json['limit'] as num).toInt(),
-      devices: (json['devices'] as List<dynamic>)
-          .map((e) => SignedInDevice.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      message: json['message'] as String?,
-      $type: json['runtimeType'] as String?,
-    );
-
-Map<String, dynamic> _$$DeviceLimitFailureImplToJson(
-        _$DeviceLimitFailureImpl instance) =>
-    <String, dynamic>{
-      'limit': instance.limit,
-      'devices': instance.devices.map((e) => e.toJson()).toList(),
-      'message': instance.message,
-      'runtimeType': instance.$type,
-    };
-
 _$CacheFailureImpl _$$CacheFailureImplFromJson(Map<String, dynamic> json) =>
     _$CacheFailureImpl(
       message: json['message'] as String?,

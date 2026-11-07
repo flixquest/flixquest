@@ -8,7 +8,8 @@ import '../models/wellness.dart';
 
 class WellnessDatabaseController {
   WellnessDatabaseController._();
-  WellnessDatabaseController.forDatabase(Database database) : _database = database;
+  WellnessDatabaseController.forDatabase(Database database)
+      : _database = database;
 
   static final WellnessDatabaseController instance =
       WellnessDatabaseController._();
@@ -23,7 +24,8 @@ class WellnessDatabaseController {
   }
 
   Future<Database> initializeDatabase({String? databasePath}) async {
-    final path = databasePath ?? join(await getDatabasesPath(), 'flixquest_wellness_v1.db');
+    final path = databasePath ??
+        join(await getDatabasesPath(), 'flixquest_wellness_v1.db');
     return openDatabase(
       path,
       // Columns added since version 1 are nullable and added in [onOpen]
@@ -369,7 +371,7 @@ class WellnessDatabaseController {
       'exportedAtUtc': DateTime.now().toUtc().toIso8601String(),
       'sessions': sessions
           .where((session) => !session.isDeleted)
-          .map((session) => session.toCloudMap())
+          .map((session) => session.toExportMap())
           .toList(growable: false),
     });
   }

@@ -1,6 +1,0 @@
-simulation: FlixQuest DLHD browser loader
-routing: header
-mocks:
-  - name: DLHD catalog, embed and signed media
-    routeKey: dlhd
-    path: ../mocks/dlhd-loader/config.yaml

@@ -84,7 +84,7 @@ void main() {
       () {
     final start = DateTime.utc(2026, 8, 31, 23);
     final straddling = _session('straddling', start: start, minutes: 120);
-    final delayed = WellnessViewingSession.fromMap(straddling.toCloudMap()
+    final delayed = WellnessViewingSession.fromMap(straddling.toExportMap()
       ..['id'] = 'delayed'
       ..['contentId'] = 'delayed'
       ..['watchedMs'] = 3600000

@@ -1,4 +1,3 @@
-import 'package:flixquest/services/adsterra_playback_ads_service.dart';
 import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
@@ -9,7 +8,6 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../catalog/details_controller.dart';
-import '../../data/ads/content_ads.dart';
 import '../../catalog/details_play.dart';
 import '../../catalog/episode_choice.dart';
 import '../../catalog/media_item.dart';
@@ -21,12 +19,10 @@ import '../../design/app_tokens.dart';
 import '../../design/media_badge.dart';
 import '../../design/skeleton.dart';
 import '../../design/title_logo.dart';
-import '../../functions/function.dart';
 import '../../models/credits.dart';
 import '../../models/genres.dart';
 import '../../models/images.dart';
 import '../../models/movie.dart';
-import '../../models/movie_stream_metadata.dart';
 import '../../models/tv.dart';
 import '../../models/videos.dart';
 import '../../provider/app_dependency_provider.dart';
@@ -35,12 +31,10 @@ import '../../provider/settings_provider.dart';
 import '../../screens/common/photoview.dart';
 import '../../screens/movie/collection_detail.dart';
 import '../../screens/movie/movie_castandcrew.dart';
-import '../../screens/movie/movie_video_loader.dart';
 import '../../screens/tv/tvdetail_castandcrew.dart';
 import '../../services/ambient_theme_service.dart';
 import '../../services/media_link.dart';
 import '../collections.dart';
-import '../episode_playback.dart';
 import '../../provider/playlist_provider.dart';
 import '../my_list.dart';
 import '../playlists.dart';
@@ -53,8 +47,6 @@ import '../widgets/pill_button.dart';
 import '../widgets/poster_card.dart';
 import '../widgets/section_header.dart';
 import 'episode_screen.dart';
-import '../../widgets/hosted_ads_banner.dart' show HostedBannerVariant;
-import 'home_screen.dart' show HomeAdSlot;
 import 'season_screen.dart';
 
 enum DetailsTab { moreLikeThis, trailers, about }
@@ -68,7 +60,6 @@ class TitleDetailsScreen extends StatefulWidget {
     this.source,
     this.history,
     this.showTitleLogos = true,
-    this.adBuilder,
     this.now,
     super.key,
   });
@@ -81,7 +72,6 @@ class TitleDetailsScreen extends StatefulWidget {
   /// What the viewer has watched; the recently watched store by default.
   final WatchHistory? history;
   final bool showTitleLogos;
-  final WidgetBuilder? adBuilder;
   final DateTime Function()? now;
 
   @override
@@ -114,7 +104,6 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
   bool _started = false;
   bool _collapsed = false;
   bool _synopsisOpen = false;
-  bool _starting = false;
 
   MediaItem get _item => widget.item;
   bool get _isMovie => _item.kind == MediaKind.movie;
@@ -265,158 +254,6 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
 
   // --- Actions -------------------------------------------------------------
 
-  Future<bool> _online() async {
-    if (await checkConnection()) return true;
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('check_connection'))),
-      );
-    }
-    return false;
-  }
-
-  /// Genres, languages and countries for Viewing Insights.
-  Future<
-      ({
-        List<String> genres,
-        List<String> languages,
-        List<String> countries
-      })> _insights() async {
-    Future<T?> quietly<T>(Future<T>? future) async {
-      try {
-        return await future;
-      } catch (_) {
-        return null;
-      }
-    }
-
-    final genres = await quietly(_genres) ?? const <Genres>[];
-    return insightsMetadata(
-      genres: genres.map((genre) => genre.genreName ?? '').toList(),
-      movie: await quietly(_movie),
-      series: await quietly(_series),
-      originalLanguage:
-          _item.movie?.originalLanguage ?? _item.series?.originalLanguage,
-    );
-  }
-
-  Future<void> _run(Future<void> Function() action) async {
-    if (_starting) return;
-    setState(() => _starting = true);
-    try {
-      await action();
-    } finally {
-      if (mounted) setState(() => _starting = false);
-    }
-  }
-
-  Future<void> _playMovie({int? elapsed, bool download = false}) async {
-    debugPrint(
-      '[MovieRecommendationsDebug][PHONE_DETAILS_PLAY] '
-      'movieId=${_item.id} title=${_item.title} download=$download '
-      'recommendationsProvided=false (fetched by MovieVideoLoader)',
-    );
-    if (!await _online() || !mounted) return;
-    final insights = await _insights();
-    if (!mounted) return;
-    final item = _item;
-    final metadata = MovieStreamMetadata(
-      backdropPath: item.backdropPath,
-      elapsed: elapsed,
-      movieId: item.id,
-      movieName: item.title,
-      posterPath: item.posterPath,
-      releaseYear: int.tryParse(item.year ?? '') ?? 0,
-      isAdult: item.movie?.adult,
-      releaseDate: item.releaseDate,
-      genres: insights.genres,
-      genreIds: item.genreIds,
-      languages: insights.languages,
-      countries: insights.countries,
-    );
-    if (!await AdsterraPlaybackAdsService.instance.beforeLoader(context,
-            download: download, content: AdContent.of(item)) ||
-        !mounted) {
-      return;
-    }
-    final queued = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => MovieVideoLoader(
-          download: download,
-          metadata: metadata,
-        ),
-      ),
-    );
-    if (download && queued == true && mounted) _addedToDownloads();
-  }
-
-  void _addedToDownloads() => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('added_to_downloads'))),
-      );
-
-  /// Plays the series from where the viewer stands, by the same rules as
-  /// the button's label.
-  Future<void> _playSeries(WatchHistory history) async {
-    final details = await _series;
-    if (details == null || !mounted) return;
-    try {
-      final next = upNextFor(
-        _item,
-        episodes: history.episodes,
-        upNext: history.upNext,
-      );
-      final choice = await chooseEpisode(
-        seasons: _orderedSeasons(details),
-        resume: next != null
-            ? null
-            : ResumePoint.forItem(
-                _item,
-                movies: history.movies,
-                episodes: history.episodes,
-              ),
-        upNext: next,
-        loadSeason: _seasonEpisodes,
-        now: widget.now?.call(),
-      );
-      if (choice == null) return;
-      await _playEpisode(
-        choice.episode,
-        choice.seasonEpisodes,
-        elapsed: choice.elapsed,
-      );
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr('episodes_load_failed'))),
-        );
-      }
-    }
-  }
-
-  Future<void> _playEpisode(
-    EpisodeList episode,
-    List<EpisodeList> seasonEpisodes, {
-    int? elapsed,
-    bool download = false,
-  }) async {
-    final insights = await _insights();
-    TVDetails? details;
-    try {
-      details = await _series;
-    } catch (_) {}
-    if (!mounted) return;
-    await playEpisode(
-      context,
-      series: _item,
-      episode: episode,
-      seasonEpisodes: seasonEpisodes,
-      allSeasons: details?.seasons,
-      insights: insights,
-      elapsed: elapsed,
-      download: download,
-    );
-  }
-
   void _openEpisode(EpisodeList episode, List<EpisodeList> seasonEpisodes) {
     unawaited(() async {
       TVDetails? details;
@@ -553,7 +390,6 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
               slivers: <Widget>[
                 _header(context),
                 SliverToBoxAdapter(child: _summary(context, history)),
-                SliverToBoxAdapter(child: _adSlot()),
                 if (!_isMovie)
                   SliverToBoxAdapter(child: _episodes(context, history)),
                 _tabsHeader(palette),
@@ -563,20 +399,10 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
             ),
     );
     // A Kids or Family title's page, and the loader it opens, show no ads.
-    return ContentAdGate(
-      content: AdContent.of(_item),
-      child: widget.showTitleLogos
-          ? TitleLogoScope(logos: _logosFor(context), child: page)
-          : page,
-    );
+    return widget.showTitleLogos
+        ? TitleLogoScope(logos: _logosFor(context), child: page)
+        : page;
   }
-
-  Widget _adSlot() =>
-      widget.adBuilder?.call(context) ??
-      HomeAdSlot(
-        placement: _isMovie ? 'movie_detail' : 'tv_detail',
-        variant: HostedBannerVariant.tall,
-      );
 
   Widget _tabsHeader(AppPalette palette) => SliverPersistentHeader(
         pinned: true,
@@ -606,7 +432,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
           size: ArtSize.backdrop,
           alignment: Alignment.topCenter,
         ),
-        start: <Widget>[_summary(context, history), _adSlot()],
+        start: <Widget>[_summary(context, history)],
         end: <Widget>[
           if (!_isMovie) SliverToBoxAdapter(child: _episodes(context, history)),
           _tabsHeader(AppPalette.of(context)),
@@ -769,80 +595,10 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
     );
   }
 
-  Widget _playButton(BuildContext context, WatchHistory history) {
-    final dependencies = context.watch<AppDependencyProvider?>();
-    if (!(dependencies?.displayWatchNowButton ?? true)) {
-      return const SizedBox.shrink();
-    }
-    if (_isMovie) {
-      // A movie with no release date isn't out, and isn't offered.
-      if (DateTime.tryParse(_item.releaseDate ?? '') == null) {
-        return const SizedBox.shrink();
-      }
-      final plan = detailsPlayFor(_item, history);
-      return DetailsPlayButton(
-        label: _playLabel(plan),
-        resume: plan.resume,
-        busy: _starting,
-        onPressed: () => _run(() => _playMovie(elapsed: plan.resume?.elapsed)),
-      );
-    }
-    return FutureBuilder<TVDetails>(
-      future: _series,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const SkeletonBlock(height: 48, radius: AppRadii.button);
-        }
-        final details = snapshot.data;
-        final seasons =
-            details == null ? const <Seasons>[] : _orderedSeasons(details);
-        if (seasons.isEmpty) return const SizedBox.shrink();
-        final plan = detailsPlayFor(
-          _item,
-          history,
-          firstSeason: seasons.first.seasonNumber,
-        );
-        return DetailsPlayButton(
-          label: _playLabel(plan),
-          resume: plan.resume,
-          busy: _starting,
-          onPressed: () => _run(() => _playSeries(history)),
-        );
-      },
-    );
-  }
+  Widget _playButton(BuildContext context, WatchHistory history) =>
+      const SizedBox.shrink();
 
-  String _playLabel(DetailsPlay plan) {
-    final episode = <String, String>{'episode': plan.episode ?? ''};
-    return switch (plan.kind) {
-      DetailsPlayKind.play => tr('play'),
-      DetailsPlayKind.resume => tr('resume_title'),
-      DetailsPlayKind.playEpisode => tr('play_episode', namedArgs: episode),
-      DetailsPlayKind.resumeEpisode => tr('resume_episode', namedArgs: episode),
-      DetailsPlayKind.nextEpisode => tr('next_episode'),
-    };
-  }
-
-  Widget _downloadButton(BuildContext context) {
-    final dependencies = context.watch<AppDependencyProvider?>();
-    final released = DateTime.tryParse(_item.releaseDate ?? '') != null;
-    if (!(dependencies?.displayDownloadButton ?? false) || !released) {
-      return const SizedBox.shrink();
-    }
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpace.sm),
-      child: SizedBox(
-        width: double.infinity,
-        child: PillButton(
-          label: tr('download_action'),
-          icon: PhosphorIcons.downloadSimple(),
-          height: 48,
-          onPressed:
-              _starting ? null : () => _run(() => _playMovie(download: true)),
-        ),
-      ),
-    );
-  }
+  Widget _downloadButton(BuildContext context) => const SizedBox.shrink();
 
   Widget _synopsis(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -914,11 +670,9 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
 
   Widget _actions(BuildContext context) {
     final saved = MyList.contains(context, _item);
-    final inList = context
-            .watch<PlaylistProvider?>()
-            ?.listsContaining(_item)
-            .isNotEmpty ??
-        false;
+    final inList =
+        context.watch<PlaylistProvider?>()?.listsContaining(_item).isNotEmpty ??
+            false;
     return FutureBuilder<Videos>(
       future: _videos,
       builder: (context, snapshot) {
@@ -1012,12 +766,8 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
             watched: history.episodes,
             canPlay: dependencies?.displayWatchNowButton ?? true,
             canDownload: dependencies?.displayDownloadButton ?? false,
-            onPlay: (episode, episodes) =>
-                _run(() => _playEpisode(episode, episodes)),
-            onDownload: (episode) => _run(() async {
-              final episodes = await _seasonEpisodes(episode.seasonNumber ?? 0);
-              await _playEpisode(episode, episodes, download: true);
-            }),
+            onPlay: _openEpisode,
+            onDownload: (episode) => _openEpisode(episode, const []),
             onOpen: _openEpisode,
             onSeasonInfo: _openSeason,
             now: widget.now,

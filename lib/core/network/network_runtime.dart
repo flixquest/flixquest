@@ -15,9 +15,8 @@ class NetworkRuntime {
   static TmdbRepository? _tmdb;
   static HttpCache get httpCache =>
       _cache ??= HttpCache(MemCacheStore(maxSize: 16 * 1024 * 1024));
-  static Dio get publicDio => _dio ??= createPublicDio(
-      AppEnvironment.resolve(defineUrl: 'http://localhost', isDebug: false),
-      httpCache: httpCache);
+  static Dio get publicDio =>
+      _dio ??= createPublicDio(const AppEnvironment(), httpCache: httpCache);
   static TmdbRepository get tmdb =>
       _tmdb ??= TmdbRepository(TmdbApi(publicDio));
 

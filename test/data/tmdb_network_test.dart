@@ -10,6 +10,7 @@ import 'package:flixquest/core/config/app_environment.dart';
 import 'package:flixquest/core/network/dio_factory.dart';
 import 'package:flixquest/core/network/network_runtime.dart';
 import 'package:flixquest/functions/network.dart';
+import 'package:flixquest/functions/tmdb_request.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../support/fake_dio.dart';
 
@@ -35,7 +36,7 @@ void main() {
           },
         ]
       });
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    final dio = createPublicDio(const AppEnvironment(),
         httpCache: cache, debugLogging: false);
     dio.httpClientAdapter = adapter;
     NetworkRuntime.configure(publicDio: dio, httpCache: cache);
@@ -59,7 +60,7 @@ void main() {
     const url = 'https://api.themoviedb.org/3/movie/popular';
     final firstCache = HttpCache(
         await ResponseCacheStore.open(factory: databaseFactoryFfi, path: path));
-    final firstDio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    final firstDio = createPublicDio(const AppEnvironment(),
         httpCache: firstCache, debugLogging: false);
     firstDio.httpClientAdapter = FakeDioAdapter()
       ..enqueueJson({
@@ -78,7 +79,9 @@ void main() {
       });
     NetworkRuntime.configure(publicDio: firstDio, httpCache: firstCache);
     expect((await fetchMovies(url, false, '')).single.id, 7);
-    final key = normalizedCacheKey(RequestOptions(path: url), scope: 'tmdb');
+    final key = normalizedCacheKey(
+        RequestOptions(path: tmdbUrlWithAdultFlag(url)),
+        scope: 'tmdb');
     final cached = (await firstCache.store.get(key))!;
     final old = DateTime.now().subtract(const Duration(hours: 1));
     await firstCache.store
@@ -87,7 +90,7 @@ void main() {
     await firstCache.close();
     final cache = HttpCache(
         await ResponseCacheStore.open(factory: databaseFactoryFfi, path: path));
-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    final dio = createPublicDio(const AppEnvironment(),
         httpCache: cache, debugLogging: false, retryDelay: (_) async {});
     dio.httpClientAdapter = FakeDioAdapter()
       ..enqueueError()

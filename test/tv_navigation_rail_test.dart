@@ -3,14 +3,11 @@ import 'package:flixquest/tv/widgets/tv_navigation_rail.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  setUpAll(() {
-    dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://example.com');
-  });
+  setUpAll(() {});
 
   testWidgets('compact navigation rail scrolls instead of overflowing',
       (tester) async {

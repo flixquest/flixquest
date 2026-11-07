@@ -1,4 +1,3 @@
-import 'package:better_player_plus/better_player_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -68,7 +67,7 @@ class ImageViewerChrome extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      BetterPlayerControlButton(
+                      _ImageButton(
                         icon: PhosphorIcons.arrowLeft(),
                         label:
                             MaterialLocalizations.of(context).backButtonTooltip,
@@ -91,7 +90,7 @@ class ImageViewerChrome extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: AppSpace.md),
-                      BetterPlayerControlButton(
+                      _ImageButton(
                         icon: PhosphorIcons.downloadSimple(),
                         label: downloadLabel,
                         onPressed: onDownload,
@@ -131,7 +130,7 @@ class ImageViewerCounter extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: BetterPlayerColors.idle,
+        color: const Color(0x99000000),
         borderRadius: BorderRadius.circular(99),
       ),
       child: Padding(
@@ -148,4 +147,18 @@ class ImageViewerCounter extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ImageButton extends StatelessWidget {
+  const _ImageButton(
+      {required this.icon, required this.label, required this.onPressed});
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  @override
+  Widget build(BuildContext context) => IconButton.filledTonal(
+      tooltip: label,
+      onPressed: onPressed,
+      icon: Icon(icon, color: Colors.white),
+      style: IconButton.styleFrom(backgroundColor: const Color(0x99000000)));
 }

@@ -22,7 +22,7 @@ void main() {
   setUp(() {
     cache = HttpCache(MemCacheStore());
     adapter = FakeDioAdapter();
-    dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    dio = createPublicDio(const AppEnvironment(),
         httpCache: cache, debugLogging: false, retryDelay: (_) async {});
     dio.httpClientAdapter = adapter;
   });
@@ -123,69 +123,6 @@ void main() {
     await response.data!.stream.drain<void>();
     expect(await cache.sizeBytes(), 0);
     expect(adapter.requests, hasLength(4));
-  });
-
-  test('query order, proxy wrapper and API key rotation share one cache key',
-      () async {
-    adapter.enqueueJson({'title': 'saved'});
-    await dio.get<Object>('$url?language=en&page=1&api_key=one',
-        options: Options(extra: {
-          'tmdbProxyEnabled': true,
-          'tmdbProxyUrl': 'https://proxy.example/proxy?mode=tmdb'
-        }));
-    final destination =
-        adapter.requests.single.uri.queryParameters['destination'];
-    expect(destination, '$url?language=en&page=1&api_key=one');
-    expect(adapter.requests.single.uri.queryParameters['mode'], 'tmdb');
-    final repeat = await dio.get<Object>('$url?api_key=two&page=1&language=en');
-    expect(repeat.extra['cache'], 'hit');
-    expect(adapter.requests, hasLength(1));
-    // Non-TMDB api_key is significant; pages/languages are never stripped.
-    expect(
-        normalizedCacheKey(
-            RequestOptions(path: 'https://scraper.example/providers?api_key=a'),
-            scope: 'scraper'),
-        isNot(normalizedCacheKey(
-            RequestOptions(path: 'https://scraper.example/providers?api_key=b'),
-            scope: 'scraper')));
-  });
-
-  test('Laravel users have separate cache entries and logout clearing',
-      () async {
-    final client = createLaravelDio(
-        AppEnvironment.resolve(defineUrl: 'http://backend.test'),
-        httpCache: cache,
-        debugLogging: false);
-    client.httpClientAdapter = adapter;
-    addTearDown(client.close);
-    Options owner(String id) => Options(
-        headers: {'Authorization': 'Bearer secret'},
-        extra: {'authScope': 'user:$id'});
-    adapter.enqueueJson({'owner': 'a'});
-    adapter.enqueueJson({'owner': 'b'});
-    expect(
-        (await client.get<Map<String, dynamic>>('ads', options: owner('a')))
-            .data!['owner'],
-        'a');
-    expect(
-        (await client.get<Map<String, dynamic>>('ads', options: owner('b')))
-            .data!['owner'],
-        'b');
-    expect(
-        (await client.get<Map<String, dynamic>>('ads', options: owner('a')))
-            .data!['owner'],
-        'a');
-    await cache.clearScope('user:a');
-    expect(
-        (await client.get<Map<String, dynamic>>('ads', options: owner('b')))
-            .data!['owner'],
-        'b');
-    await cache.clearScope('user');
-    expect(await cache.sizeBytes(), 0);
-    adapter.enqueueJson({'owner': 'unscoped'});
-    await client.get<Object>('ads',
-        options: Options(headers: {'Authorization': 'Bearer secret'}));
-    expect(await cache.sizeBytes(), 0);
   });
 
   test(
@@ -350,7 +287,7 @@ void main() {
       () async {
     final slow = SlowCacheStore();
     final localCache = HttpCache(slow);
-    final client = createPublicDio(AppEnvironment.resolve(isDebug: true),
+    final client = createPublicDio(const AppEnvironment(),
         httpCache: localCache, debugLogging: false);
     client.httpClientAdapter = FakeDioAdapter()
       ..enqueueJson({'title': 'saved'});

@@ -2,8 +2,6 @@ plugins {
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
-    id "com.google.gms.google-services"
-    id "com.google.firebase.crashlytics"
 }
 
 def localProperties = new Properties()
@@ -30,6 +28,7 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+
 android {
     namespace 'dev.beamlak.flixquest_v2'
     compileSdk 36
@@ -55,13 +54,14 @@ android {
     }
 
     defaultConfig {
-        applicationId "dev.beamlak.flixquest_v2"
+        applicationId "dev.beamlak.flixquest.publicapp"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
     }
+
 
     flavorDimensions "environment"
     productFlavors {
@@ -71,8 +71,6 @@ android {
         }
         dev {
             dimension "environment"
-            // Reuse the registered Firebase package; a suffix would require
-            // another Firebase Android app and matching Google services file.
             manifestPlaceholders = [appLabel: "FlixQuest Dev"]
         }
     }
@@ -88,7 +86,7 @@ android {
    
    buildTypes {
        release {
-           signingConfig signingConfigs.release
+           signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
            shrinkResources true
            minifyEnabled true
        }
@@ -113,14 +111,6 @@ flutter {
 dependencies {
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.14.1'
-    def media3Version = '1.8.0'
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
     implementation 'androidx.multidex:multidex:2.0.1'
-    implementation "androidx.media3:media3-database:$media3Version"
-    implementation "androidx.media3:media3-datasource:$media3Version"
-    implementation "androidx.media3:media3-exoplayer:$media3Version"
-    implementation "androidx.media3:media3-exoplayer-dash:$media3Version"
-    implementation "androidx.media3:media3-exoplayer-hls:$media3Version"
-    implementation "androidx.media3:media3-ui:$media3Version"
-    implementation "androidx.media3:media3-transformer:$media3Version"
 }

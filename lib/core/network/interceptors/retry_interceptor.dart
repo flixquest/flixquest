@@ -30,7 +30,9 @@ class RetryInterceptor extends Interceptor {
     final status = error.response?.statusCode;
     final retryable =
         isTransportFailure(error) || (status != null && status >= 500);
-    if (request.method.toUpperCase() != 'GET' ||
+    final safeToResend = request.method.toUpperCase() == 'GET' ||
+        request.extra['retrySafe'] == true;
+    if (!safeToResend ||
         attempt >= limit ||
         !retryable ||
         request.cancelToken?.isCancelled == true ||

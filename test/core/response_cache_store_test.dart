@@ -105,58 +105,6 @@ void main() {
     expect(await store.sizeBytes(), rowBytes);
   });
 
-  test('scope and user clearing preserve unrelated public/private entries',
-      () async {
-    final store = await open();
-    final tmdb = key('tmdb');
-    final scraper = key('scraper', scope: 'scraper');
-    final a = key('a', scope: 'laravel', owner: 'user:a');
-    final b = key('b', scope: 'laravel', owner: 'user:b');
-    for (final k in [tmdb, scraper, a, b]) {
-      await store.put(entry(k));
-    }
-    await store.clearScope('tmdb');
-    expect(await store.get(tmdb), isNull);
-    expect(await store.get(scraper), isNotNull);
-    await store.clearScope('user:a');
-    expect(await store.get(a), isNull);
-    expect(await store.get(b), isNotNull);
-    await store.clearScope('user');
-    expect(await store.get(b), isNull);
-    expect(await store.get(scraper), isNotNull);
-    await store.clearAll();
-    expect(await store.sizeBytes(), 0);
-  });
-
-  test('pruning honors deadlines, while bootstrap can survive indefinitely',
-      () async {
-    final store = await open();
-    final now = DateTime.now();
-    await store.put(entry(key('expired'))
-        .copyWith(maxStale: now.subtract(const Duration(seconds: 1))));
-    final sample = entry(key('bootstrap', scope: 'laravel'));
-    await store.put(CacheResponse(
-        key: sample.key,
-        url: sample.url,
-        statusCode: 200,
-        cacheControl: sample.cacheControl,
-        content: sample.content,
-        headers: sample.headers,
-        requestDate: now,
-        responseDate: now,
-        priority: sample.priority,
-        date: null,
-        expires: null,
-        eTag: null,
-        lastModified: null,
-        maxStale: null));
-    await store.pruneExpired();
-    expect(await store.get(key('expired')), isNull);
-    expect(await store.get(sample.key), isNotNull);
-    expect(await store.sizeBytes(),
-        sample.content!.length + sample.headers!.length);
-  });
-
   test(
       'touch refreshes timestamps/deadline; non-200 and no-store never persist',
       () async {

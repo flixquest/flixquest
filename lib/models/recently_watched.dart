@@ -86,48 +86,6 @@ class RecentMovie {
     posterPath = map['poster_path'];
     backdropPath = map['backdrop_path'];
   }
-
-  Map<String, dynamic> toLaravelMap() => {...toMap()..remove('synced'),
-    'movie_id': id, 'elapsed': elapsed ?? 0, 'remaining': remaining ?? 0,
-    'updated_at_utc': updatedAtUtc > 0 ? updatedAtUtc : 1};
-
-  factory RecentMovie.fromLaravelMap(Map<String, dynamic> map) {
-    final row = RecentMovie.fromMapObject({...map, 'id': map['movie_id'] ?? map['id'],
-      'updated_at_utc': _asInt(map['updated_at_utc']) ?? 0});
-    row.syncRevision = _asInt(map['sync_revision']);
-    row.syncedAtUtc = _asInt(map['synced_at_utc']);
-    row.synced = true;
-    return row;
-  }
-
-  /// Firestore payload. Deleted rows keep their metadata so a tombstone still
-  /// renders nothing but can be reconciled against a stale device.
-  Map<String, dynamic> toCloudMap() => <String, dynamic>{
-        'id': id,
-        'title': title,
-        'releaseYear': releaseYear,
-        'elapsed': elapsed,
-        'remaining': remaining,
-        'dateWatched': dateTime,
-        'posterPath': posterPath,
-        'backdropPath': backdropPath,
-        'updatedAtUtc': updatedAtUtc,
-        'deletedAtUtc': deletedAtUtc,
-      };
-
-  factory RecentMovie.fromCloudMap(Map<String, dynamic> map, {int? id}) =>
-      RecentMovie(
-        id: _asInt(map['id']) ?? id,
-        title: map['title'] as String?,
-        releaseYear: _asInt(map['releaseYear']),
-        elapsed: _asInt(map['elapsed']),
-        remaining: _asInt(map['remaining']),
-        dateTime: map['dateWatched'] as String?,
-        posterPath: map['posterPath'] as String?,
-        backdropPath: map['backdropPath'] as String?,
-        updatedAtUtc: _asInt(map['updatedAtUtc']) ?? 0,
-        deletedAtUtc: _asInt(map['deletedAtUtc']),
-      );
 }
 
 class RecentEpisode {
@@ -211,50 +169,4 @@ class RecentEpisode {
     seriesId = map['series_id'];
     backdropPath = map['backdrop_path'];
   }
-
-  Map<String, dynamic> toLaravelMap() => {...toMap()..remove('synced'),
-    'episode_id': id, 'elapsed': elapsed ?? 0, 'remaining': remaining ?? 0,
-    'updated_at_utc': updatedAtUtc > 0 ? updatedAtUtc : 1, 'episode_num': episodeNum ?? 0, 'season_num': seasonNum ?? 0, 'series_id': seriesId ?? 0};
-
-  factory RecentEpisode.fromLaravelMap(Map<String, dynamic> map) {
-    final row = RecentEpisode.fromMapObject({...map, 'id': map['episode_id'] ?? map['id'],
-      'updated_at_utc': _asInt(map['updated_at_utc']) ?? 0});
-    row.syncRevision = _asInt(map['sync_revision']);
-    row.syncedAtUtc = _asInt(map['synced_at_utc']);
-    row.synced = true;
-    return row;
-  }
-
-  Map<String, dynamic> toCloudMap() => <String, dynamic>{
-        'id': id,
-        'seriesId': seriesId,
-        'seriesName': seriesName,
-        'episodeName': episodeName,
-        'episodeNum': episodeNum,
-        'seasonNum': seasonNum,
-        'posterPath': posterPath,
-        'backdropPath': backdropPath,
-        'elapsed': elapsed,
-        'remaining': remaining,
-        'dateAdded': dateTime,
-        'updatedAtUtc': updatedAtUtc,
-        'deletedAtUtc': deletedAtUtc,
-      };
-
-  factory RecentEpisode.fromCloudMap(Map<String, dynamic> map, {int? id}) =>
-      RecentEpisode(
-        id: _asInt(map['id']) ?? id,
-        seriesId: _asInt(map['seriesId']),
-        seriesName: map['seriesName'] as String?,
-        episodeName: map['episodeName'] as String?,
-        episodeNum: _asInt(map['episodeNum']),
-        seasonNum: _asInt(map['seasonNum']),
-        posterPath: map['posterPath'] as String?,
-        backdropPath: map['backdropPath'] as String?,
-        elapsed: _asInt(map['elapsed']),
-        remaining: _asInt(map['remaining']),
-        dateTime: map['dateAdded'] as String?,
-        updatedAtUtc: _asInt(map['updatedAtUtc']) ?? 0,
-        deletedAtUtc: _asInt(map['deletedAtUtc']),
-      );
 }

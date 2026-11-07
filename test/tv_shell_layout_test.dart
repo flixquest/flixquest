@@ -8,7 +8,6 @@ import 'package:flixquest/tv/widgets/tv_content_grid.dart';
 import 'package:flixquest/tv/widgets/tv_navigation_rail.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -86,9 +85,7 @@ Future<void> _press(WidgetTester tester, LogicalKeyboardKey key) async {
 }
 
 void main() {
-  setUpAll(() {
-    dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://example.com');
-  });
+  setUpAll(() {});
 
   testWidgets('up on the first rail item stays on the rail', (tester) async {
     final layout = await _pumpLayout(tester);

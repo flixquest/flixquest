@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FlixQuest animated splash icon (Android 12+ SplashScreen API).
+  Goes in: android/app/src/main/res/drawable/splash_fq_animated.xml
+
+  The F mark (assets/images/fq_mark.svg, same paths as flixquest_widget_mark.xml) builds band by
+  band, matching the end card of the marketing videos: each band slides in from the left with a
+  small overshoot while it fades in. A 250 ms lead-in keeps the build from being spent while the
+  launcher is still zooming the window open. Bands then start 133 ms apart; done at 967 ms, inside
+  the 1000 ms Android allows.
+
+  Canvas: 288 x 288 dp, the size Android 12 uses for a splash icon with no icon background. Only
+  the central 192 dp circle is shown. The mark is scaled to 0.32 (about 138 dp tall) and centred;
+  its farthest corner sits about 82 dp from the centre, inside the 96 dp radius.
+
+  Colour: FlixQuest orange #F57C00 (the brand token fq-orange). Works on both the light and
+  the dark splash background, so one drawable serves values-v31 and values-night-v31.
+-->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="288dp"
+            android:height="288dp"
+            android:viewportWidth="288"
+            android:viewportHeight="288">
+            <group
+                android:translateX="97.74"
+                android:translateY="73.18"
+                android:scaleX="0.32"
+                android:scaleY="0.32">
+
+                <group
+                    android:name="band_top"
+                    android:translateX="-100">
+                    <path
+                        android:name="band_top_fill"
+                        android:fillAlpha="0"
+                        android:fillColor="#FFF57C00"
+                        android:pathData="M6,118 L200,6 L283.1,54 L6,214 Z" />
+                </group>
+
+                <group
+                    android:name="band_middle"
+                    android:translateX="-100">
+                    <path
+                        android:name="band_middle_fill"
+                        android:fillAlpha="0"
+                        android:fillColor="#FFF57C00"
+                        android:pathData="M6,250 L162,159.9 L245.1,207.9 L6,346 Z" />
+                </group>
+
+                <group
+                    android:name="wedge"
+                    android:translateX="-100">
+                    <path
+                        android:name="wedge_fill"
+                        android:fillAlpha="0"
+                        android:fillColor="#FFF57C00"
+                        android:pathData="M6,380 L104,323.4 L104,436.6 Z" />
+                </group>
+
+            </group>
+        </vector>
+    </aapt:attr>
+
+    <!-- Top band: starts after the 250 ms lead-in -->
+    <target android:name="band_top">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="450"
+                android:interpolator="@android:interpolator/overshoot"
+                android:propertyName="translateX"
+                android:startOffset="250"
+                android:valueFrom="-100"
+                android:valueTo="0"
+                android:valueType="floatType" />
+        </aapt:attr>
+    </target>
+    <target android:name="band_top_fill">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="180"
+                android:interpolator="@android:interpolator/linear"
+                android:propertyName="fillAlpha"
+                android:startOffset="250"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:valueType="floatType" />
+        </aapt:attr>
+    </target>
+
+    <!-- Middle band: 133 ms later (4 frames at 30 fps in the video) -->
+    <target android:name="band_middle">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="450"
+                android:interpolator="@android:interpolator/overshoot"
+                android:propertyName="translateX"
+                android:startOffset="383"
+                android:valueFrom="-100"
+                android:valueTo="0"
+                android:valueType="floatType" />
+        </aapt:attr>
+    </target>
+    <target android:name="band_middle_fill">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="180"
+                android:interpolator="@android:interpolator/linear"
+                android:propertyName="fillAlpha"
+                android:startOffset="383"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:valueType="floatType" />
+        </aapt:attr>
+    </target>
+
+    <!-- Wedge: 267 ms after the top band (8 frames at 30 fps in the video) -->
+    <target android:name="wedge">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="450"
+                android:interpolator="@android:interpolator/overshoot"
+                android:propertyName="translateX"
+                android:startOffset="517"
+                android:valueFrom="-100"
+                android:valueTo="0"
+                android:valueType="floatType" />
+        </aapt:attr>
+    </target>
+    <target android:name="wedge_fill">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="180"
+                android:interpolator="@android:interpolator/linear"
+                android:propertyName="fillAlpha"
+                android:startOffset="517"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:valueType="floatType" />
+        </aapt:attr>
+    </target>
+
+</animated-vector>

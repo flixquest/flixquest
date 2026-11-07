@@ -6,15 +6,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../../constants/app_constants.dart';
-import '../../functions/function.dart';
-import '../../models/movie_stream_metadata.dart';
-import '../../models/tv_stream_metadata.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/settings_provider.dart';
-import '../../screens/movie/movie_video_loader.dart';
-import '../../screens/tv/tv_video_loader.dart';
 import '../../services/app_session_state_store.dart';
-import '../../services/live_channel_focus.dart';
 import '../focus/tv_focus_memory.dart';
 import '../focus/tv_screen_focus_controller.dart';
 import '../models/tv_media_item.dart';
@@ -26,10 +20,8 @@ import '../screens/tv_collection_screen.dart';
 import '../screens/tv_discover_screen.dart';
 import '../screens/tv_home_screen.dart';
 import '../screens/tv_library_screen.dart';
-import '../screens/tv_live_screen.dart';
 import '../screens/tv_media_details_screen.dart';
 import '../screens/tv_new_and_hot_screen.dart';
-import '../screens/tv_profile_screen.dart';
 import '../screens/tv_search_screen.dart';
 import '../screens/tv_settings_screen.dart';
 import '../screens/tv_wellness_screen.dart';
@@ -87,11 +79,6 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
             icon: PhosphorIcons.compass(),
             selectedIcon: PhosphorIcons.compass(PhosphorIconsStyle.fill)),
         TvNavigationDestination(
-            id: 'live',
-            label: tr('live_tv'),
-            icon: PhosphorIcons.broadcast(),
-            selectedIcon: PhosphorIcons.broadcast(PhosphorIconsStyle.fill)),
-        TvNavigationDestination(
             id: 'library',
             label: tr('my_list'),
             icon: PhosphorIcons.bookmarkSimple(),
@@ -102,11 +89,6 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
             label: tr('tv_insights'),
             icon: PhosphorIcons.chartDonut(),
             selectedIcon: PhosphorIcons.chartDonut(PhosphorIconsStyle.fill)),
-        TvNavigationDestination(
-            id: 'profile',
-            label: tr('profile'),
-            icon: PhosphorIcons.user(),
-            selectedIcon: PhosphorIcons.user(PhosphorIconsStyle.fill)),
         TvNavigationDestination(
             id: 'settings',
             label: tr('settings'),
@@ -162,7 +144,6 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
     _selectedDestinationId = RestorableString(
       _sessionState.televisionDestination ?? 'home',
     );
-    LiveChannelFocus.pending.addListener(_showRequestedChannel);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<SettingsProvider>().analytics.trackNavigation(
@@ -171,16 +152,7 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
             source: 'restored',
           );
       // A link can be what started the app, before there was a shell to hear it.
-      _showRequestedChannel();
     });
-  }
-
-  /// Opens Live TV for a link to one of its channels. The destination then finds the channel in its
-  /// list and focuses it; this only gets it on screen, and only while Live TV is not switched off.
-  void _showRequestedChannel() {
-    if (!mounted || LiveChannelFocus.pending.value == null) return;
-    if (!context.read<AppDependencyProvider>().displayLiveTV) return;
-    _selectDestination(_liveDestinationId);
   }
 
   @override
@@ -197,7 +169,6 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
 
   @override
   void dispose() {
-    LiveChannelFocus.pending.removeListener(_showRequestedChannel);
     _selectedDestinationId.dispose();
     _shellFocusScope.dispose();
     _titleLogos?.dispose();
@@ -281,82 +252,7 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
     if (mounted) _restoreFocusAfterRoute(previousFocus);
   }
 
-  Future<void> _continueWatching(TvMediaItem item) async {
-    final previousFocus = FocusManager.instance.primaryFocus;
-    final recentMovie = item.recentMovie;
-    final recentEpisode = item.recentEpisode;
-    Widget? loader;
-
-    if (recentMovie?.id != null) {
-      final movie = recentMovie!;
-      debugPrint(
-        '[MovieRecommendationsDebug][TV_CONTINUE_PLAY] '
-        'movieId=${movie.id} title=${movie.title} '
-        'recommendationsProvided=false (fetched by MovieVideoLoader)',
-      );
-      loader = MovieVideoLoader(
-        download: false,
-        useTvPlayer: true,
-        onTvPlayerExit: () {
-          if (!mounted) return;
-          setState(() => _libraryRevision++);
-          _restoreFocusAfterRoute(previousFocus);
-        },
-        metadata: MovieStreamMetadata(
-          backdropPath: movie.backdropPath,
-          elapsed: movie.elapsed,
-          movieId: movie.id,
-          movieName: movie.title,
-          posterPath: movie.posterPath,
-          releaseYear: movie.releaseYear,
-          isAdult: null,
-          releaseDate: null,
-        ),
-      );
-    } else if (recentEpisode?.id != null &&
-        recentEpisode?.seriesId != null &&
-        recentEpisode?.seasonNum != null &&
-        recentEpisode?.episodeNum != null) {
-      loader = TVVideoLoader(
-        download: false,
-        useTvPlayer: true,
-        onTvPlayerExit: () {
-          if (!mounted) return;
-          setState(() => _libraryRevision++);
-          _restoreFocusAfterRoute(previousFocus);
-        },
-        metadata: TVStreamMetadata(
-          elapsed: recentEpisode!.elapsed,
-          episodeId: recentEpisode.id,
-          episodeName: recentEpisode.episodeName,
-          episodeNumber: recentEpisode.episodeNum,
-          posterPath: recentEpisode.posterPath,
-          backdropPath: recentEpisode.backdropPath,
-          seasonNumber: recentEpisode.seasonNum,
-          seriesName: recentEpisode.seriesName,
-          tvId: recentEpisode.seriesId,
-          airDate: null,
-        ),
-      );
-    }
-
-    if (loader == null) {
-      await _openMedia(item);
-      return;
-    }
-    if (!await checkConnection()) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr('tv_check_your_internet_connection'))),
-        );
-      }
-      return;
-    }
-    if (!mounted) return;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => loader!),
-    );
-  }
+  Future<void> _continueWatching(TvMediaItem item) => _openMedia(item);
 
   /// Drops the Live TV destination while the Remote Config toggle is off.
   List<TvNavigationDestination> _visibleDestinations({
@@ -477,10 +373,6 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
           onOpenMedia: _openMedia,
           focusController: focusController,
         ),
-      _liveDestinationId => TvLiveScreen(
-          metrics: metrics,
-          focusController: focusController,
-        ),
       'library' => TvLibraryScreen(
           metrics: metrics,
           onOpenMedia: _openMedia,
@@ -490,10 +382,6 @@ class _TvHomeShellState extends State<TvHomeShell> with RestorationMixin {
           focusController: focusController,
         ),
       'wellness' => TvWellnessScreen(
-          metrics: metrics,
-          focusController: focusController,
-        ),
-      'profile' => TvProfileScreen(
           metrics: metrics,
           focusController: focusController,
         ),

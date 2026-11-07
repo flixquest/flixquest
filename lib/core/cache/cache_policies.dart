@@ -32,41 +32,6 @@ class CachePolicies {
           fresh: Duration(days: 1),
           maxStale: Duration(days: 30));
     }
-    if (scope == 'scraper') {
-      return switch (path) {
-        'providers' => const CachePolicy(
-            scope: 'scraper',
-            fresh: Duration(minutes: 5),
-            maxStale: Duration(days: 1),
-            validators: false),
-        'providers/status' => const CachePolicy(
-            scope: 'scraper',
-            fresh: Duration(seconds: 60),
-            maxStale: Duration(minutes: 10),
-            validators: false),
-        'subtitles/search' => const CachePolicy(
-            scope: 'scraper',
-            fresh: Duration(days: 1),
-            maxStale: Duration(days: 7),
-            validators: false),
-        _ => CachePolicy.noStore,
-      };
-    }
-    if (scope == 'laravel') {
-      return switch (path) {
-        'config/bootstrap' => const CachePolicy(
-            scope: 'laravel', fresh: Duration.zero, maxStale: null),
-        'ads' => const CachePolicy(
-            scope: 'laravel',
-            fresh: Duration(minutes: 5),
-            maxStale: Duration(hours: 24)),
-        'messages/active' => const CachePolicy(
-            scope: 'laravel',
-            fresh: Duration(minutes: 15),
-            maxStale: Duration(days: 7)),
-        _ => CachePolicy.noStore,
-      };
-    }
     return CachePolicy.noStore;
   }
 }

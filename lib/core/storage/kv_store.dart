@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:flixquest/singleton/sharedpreferences_singleton.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Migration preferences use a separate namespace from legacy Firebase state.
+/// Local preferences use their own namespace.
 class KvStore {
-  KvStore(this._preferences, {this.namespace = 'flixquest.laravel.v1.'}) {
+  KvStore(this._preferences, {this.namespace = 'flixquest.public.v1.'}) {
     if (namespace.isEmpty) throw ArgumentError('A namespace is required.');
   }
 

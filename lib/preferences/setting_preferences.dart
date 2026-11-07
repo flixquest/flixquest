@@ -214,44 +214,6 @@ class SettingsPreferences {
   }
 
   static const STREAM_PROVIDER_ORDER = 'stream_provider_order_v1';
-  static const _LEGACY_PROVIDER_PRECEDENCE = 'providerPrecedence-v14';
-
-  Future<void> setStreamProviderOrder(List<String> providerCodes) async {
-    await sharedPrefsSingleton.setStringList(
-      STREAM_PROVIDER_ORDER,
-      providerCodes,
-    );
-  }
-
-  Future<List<String>> getStreamProviderOrder() async {
-    final saved = sharedPrefsSingleton.getStringList(STREAM_PROVIDER_ORDER);
-    if (saved != null) return _uniqueNonEmpty(saved);
-
-    // Preserve the former static-provider preference on upgrade. Old entries
-    // were stored as "code-displayName" tokens, while dynamic providers use
-    // namespaced stable codes.
-    final legacy = sharedPrefsSingleton.getString(_LEGACY_PROVIDER_PRECEDENCE);
-    if (legacy == null || legacy.trim().isEmpty) return const [];
-
-    final migrated = _uniqueNonEmpty(
-      legacy.trim().split(RegExp(r'\s+')).map((entry) {
-        final oldCode = entry.split('-').first.trim();
-        if (oldCode.isEmpty) return '';
-        return oldCode == 'vixsrc' ? 'direct:vixsrc' : 'scraper:$oldCode';
-      }),
-    );
-    await setStreamProviderOrder(migrated);
-    return migrated;
-  }
-
-  List<String> _uniqueNonEmpty(Iterable<String> values) {
-    final unique = <String>{};
-    for (final value in values) {
-      final normalized = value.trim();
-      if (normalized.isNotEmpty) unique.add(normalized);
-    }
-    return unique.toList(growable: false);
-  }
 
   static const PLAYER_STYLE_INDEX = 'playerStyleIndex';
 

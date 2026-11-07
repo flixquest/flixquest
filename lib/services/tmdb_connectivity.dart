@@ -202,7 +202,8 @@ class TmdbConnectivity extends ChangeNotifier {
           {http.Client? client, Duration? timeout}) =>
       route<http.Response>(
         proxyUrl,
-        (proxied, proxyUrl) => _send(tmdbRequestUri(url, proxied, proxyUrl),
+        (proxied, proxyUrl) => _send(
+            tmdbRequestUri(tmdbUrlWithAdultFlag(url), proxied, proxyUrl),
             client: client, timeout: timeout ?? requestTimeout),
         blocked: (response) => looksBlocked(response.statusCode, response.body),
         routeFailure: (error) =>

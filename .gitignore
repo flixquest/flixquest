@@ -49,11 +49,10 @@ app.*.map.json
 # API keys 
 /lib/api/api_keys.dart
 
-# Google firebase
-/android/app/google-services.json
-android/app/google-services.json
-"/android/app/google-services.json"
-"android/app/google-services.json"
+# Local service registrations and native build output
+**/google-services.json
+**/GoogleService-Info.plist
+/android/app/.cxx/
 
 # Keystore files
 *.jks

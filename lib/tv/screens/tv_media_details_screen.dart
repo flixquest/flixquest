@@ -1,3 +1,4 @@
+import 'package:flixquest/services/video_launcher.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -8,27 +9,19 @@ import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:provider/provider.dart';
 
-import '../../catalog/episode_choice.dart';
 import '../../catalog/title_people.dart';
 import '../../constants/api_constants.dart';
 import '../../constants/app_constants.dart';
-import '../../data/ads/content_ads.dart';
 import '../../design/outline_mark.dart';
 import '../../functions/function.dart';
 import '../../models/credits.dart';
 import '../../widgets/playback_action.dart';
-import '../../models/movie_stream_metadata.dart';
 import '../../models/tv.dart';
-import '../../models/tv_stream_metadata.dart';
 import '../../models/videos.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/playlist_provider.dart';
 import '../../provider/recently_watched_provider.dart';
 import '../../provider/settings_provider.dart';
-import '../../screens/movie/movie_video_loader.dart';
-import '../../screens/tv/tv_video_loader.dart';
-import '../../services/video_launcher.dart';
-import '../../widgets/hosted_ads_banner.dart';
 import '../app/tv_design.dart';
 import '../controllers/tv_media_details_controller.dart';
 import '../controllers/tv_title_logos.dart';
@@ -44,20 +37,6 @@ import '../widgets/tv_person_card.dart';
 import '../widgets/tv_spotlight.dart';
 import 'tv_person_screen.dart';
 
-/// A title's page, laid out like the browse pages: its backdrop fills the
-/// screen, the logo, facts and actions sit bottom left, and the episodes, the
-/// cast and crew, the videos and a "More like this" grid wait below.
-///
-/// The page opens straight away from what the card already knows; details,
-/// seasons, videos and recommendations fill in as they load, each on its own.
-///
-/// Down and Up step between the actions, the seasons, the episodes, the
-/// cast and crew, the videos and the recommendations, each returning to
-/// where it was left. A face opens that person's page.
-/// Back from below the actions returns to them; Back from the actions leaves
-/// the page.
-///
-/// A Kids or Family title's page, and everything it plays, shows no ads.
 class TvMediaDetailsScreen extends StatefulWidget {
   const TvMediaDetailsScreen({
     required this.item,
@@ -229,9 +208,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
   void _settleAfterVideos({bool retried = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (retried &&
-          !_focusStop(_Stop.videos) &&
-          !_focusStop(_Stop.similar)) {
+      if (retried && !_focusStop(_Stop.videos) && !_focusStop(_Stop.similar)) {
         _focusStop(_Stop.actions);
       }
       if (_stop != _Stop.actions) _scheduleShift();
@@ -477,16 +454,6 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
     });
   }
 
-  Future<bool> _online() async {
-    if (await checkConnection()) return true;
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('tv_check_your_internet_connection'))),
-      );
-    }
-    return false;
-  }
-
   Future<void> _openRecommendation(TvMediaItem item) async {
     final previousFocus = FocusManager.instance.primaryFocus;
     final logos = TvTitleLogoScope.maybeOf(context);
@@ -526,184 +493,24 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
     _restoreFocus(previousFocus);
   }
 
-  Future<void> _playMovie({int? elapsed}) async {
-    final movie = _item.movie;
-    if (movie == null || movie.id == null) return;
-    debugPrint(
-      '[MovieRecommendationsDebug][TV_DETAILS_PLAY] '
-      'movieId=${movie.id} title=${movie.title} '
-      'recommendationsProvided=false (fetched by MovieVideoLoader)',
-    );
-    if (!await _online() || !mounted) return;
-    final previousFocus = FocusManager.instance.primaryFocus;
-    final metadata = MovieStreamMetadata(
-      backdropPath: movie.backdropPath,
-      elapsed: elapsed,
-      movieId: movie.id,
-      movieName: movie.title,
-      posterPath: movie.posterPath,
-      releaseYear: int.tryParse(_item.year ?? '') ?? 0,
-      isAdult: movie.adult,
-      releaseDate: movie.releaseDate,
-      genreIds: _item.genreIds,
-    );
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => MovieVideoLoader(
-          download: false,
-          useTvPlayer: true,
-          onTvPlayerExit: () => _restoreFocus(previousFocus),
-          metadata: metadata,
-        ),
-      ),
-    );
-  }
-
-  /// Plays the series from where it stands: the episode in progress, the one
-  /// after a finished episode, or the very first.
-  Future<void> _playSeries({bool fromStart = false}) async {
-    final data = await _details?.then((data) => data, onError: (_) => null);
-    if (data == null || !mounted) return;
-    try {
-      final recent = context.read<RecentProvider?>();
-      // A finished episode's successor, when that's newer than any episode
-      // in progress.
-      final next = fromStart || recent == null
-          ? null
-          : upNextFor(
-              _item,
-              episodes: recent.episodes,
-              upNext: recent.upNext,
-            );
-      final choice = await chooseEpisode(
-        seasons: data.seasons,
-        resume: fromStart || next != null ? null : _resume(),
-        loadSeason: _episodesOf,
-        upNext: next,
-      );
-      if (choice == null) return;
-      await _playEpisode(
-        choice.episode,
-        choice.seasonEpisodes,
-        elapsed: choice.elapsed,
-      );
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr('tv_episodes_could_not_be_loaded'))),
-        );
-      }
-    }
-  }
-
-  Future<void> _playEpisode(
-    EpisodeList episode,
-    List<EpisodeList> seasonEpisodes, {
-    int? elapsed,
-  }) async {
-    if (!await _online() || !mounted) return;
-    final previousFocus = FocusManager.instance.primaryFocus;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => TVVideoLoader(
-          download: false,
-          useTvPlayer: true,
-          onTvPlayerExit: () => _restoreFocus(previousFocus),
-          metadata: TVStreamMetadata(
-            elapsed: elapsed,
-            episodeId: episode.episodeId,
-            episodeName: episode.name,
-            episodeNumber: episode.episodeNumber,
-            posterPath: _item.posterPath,
-            backdropPath: episode.stillPath ?? _item.backdropPath,
-            seasonNumber: episode.seasonNumber,
-            seriesName: _item.title,
-            tvId: _item.id,
-            airDate: episode.airDate,
-            genreIds: _item.genreIds,
-            seasonEpisodes: seasonEpisodes
-                .where((item) => item.episodeId != null)
-                .map(EpisodeMetadata.fromEpisodeList)
-                .toList(growable: false),
-            allSeasons: _loaded?.seriesDetails?.seasons
-                ?.where((season) => season.seasonNumber != null)
-                .map(SeasonMetadata.fromSeason)
-                .toList(growable: false),
-          ),
-        ),
-      ),
-    );
-  }
-
-  bool _canPlay(EpisodeList episode) =>
-      episode.episodeId != null &&
-      hasAired(episode) &&
-      context.read<AppDependencyProvider>().displayWatchNowButton;
-
   Future<void> _activateEpisode(
-      EpisodeList episode, List<EpisodeList> season) async {
-    if (_canPlay(episode)) {
-      final resume = _resume();
-      final watched = resume?.episode;
-      final resuming = watched != null &&
-          !resume!.finished &&
-          watched.seasonNum == episode.seasonNumber &&
-          watched.episodeNum == episode.episodeNumber;
-      await _playEpisode(episode, season,
-          elapsed: resuming ? resume.elapsed : null);
-    } else {
-      await _showEpisode(episode, season);
-    }
-  }
+          EpisodeList episode, List<EpisodeList> season) =>
+      _showEpisode(episode, season);
 
   Future<void> _showEpisode(
-    EpisodeList episode,
-    List<EpisodeList> season,
-  ) async {
-    final canPlay = _canPlay(episode);
-    final facts = <String>[
-      if (episode.seasonNumber != null && episode.episodeNumber != null)
-        'S${episode.seasonNumber}:E${episode.episodeNumber}',
-      if (_airLabel(episode) case final aired?) aired,
-      if (episode.voteAverage case final rating? when rating > 0)
-        '★ ${rating.toStringAsFixed(1)}',
-    ].join('   ');
-    final play = await showTvDialog<bool>(
-      context: context,
-      title: episode.name ?? tr('tv_episode_information'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          if (facts.isNotEmpty) ...<Widget>[
-            Text(facts),
-            const SizedBox(height: 13),
-          ],
-          Text(
-            episode.overview?.trim().isNotEmpty ?? false
-                ? episode.overview!
-                : tr('tv_no_episode_overview_is_available'),
-            maxLines: 6,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-      actions: <TvDialogAction>[
-        if (canPlay)
+      EpisodeList episode, List<EpisodeList> season) async {
+    await showTvDialog<void>(
+        context: context,
+        title: episode.name ?? tr('tv_episode_information'),
+        content: Text(episode.overview?.trim().isNotEmpty == true
+            ? episode.overview!
+            : tr('tv_no_episode_overview_is_available')),
+        actions: [
           TvDialogAction(
-            label: tr('tv_play_episode'),
-            autofocus: true,
-            isPrimary: true,
-            onPressed: () => Navigator.of(context).pop(true),
-          ),
-        TvDialogAction(
-          label: tr('close'),
-          autofocus: !canPlay,
-          onPressed: () => Navigator.of(context).pop(false),
-        ),
-      ],
-    );
-    if (play == true && mounted) await _playEpisode(episode, season);
+              label: tr('close'),
+              autofocus: true,
+              onPressed: () => Navigator.of(context).pop())
+        ]);
   }
 
   // Layout.
@@ -715,10 +522,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => ContentAdGate(
-        content: AdContent.of(_item),
-        child: Builder(builder: _page),
-      );
+  Widget build(BuildContext context) => Builder(builder: _page);
 
   Widget _page(BuildContext context) {
     Localizations.localeOf(context);
@@ -826,10 +630,7 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
                           .toDouble(),
                       child: Visibility(
                         visible: !browsing,
-                        child: const BannerAdSlot(
-                          placement: 'title_detail',
-                          variant: HostedBannerVariant.standard,
-                        ),
+                        child: const SizedBox.shrink(),
                       ),
                     ),
                   ],
@@ -966,41 +767,10 @@ class _TvMediaDetailsScreenState extends State<TvMediaDetailsScreen> {
     final canWatch =
         context.watch<AppDependencyProvider>().displayWatchNowButton;
     final resuming = resume != null && !resume.finished;
-    final firstSeason = _loaded?.seasons.firstOrNull?.seasonNumber ?? 1;
-    final playLabel = switch ((_isMovie, resume)) {
-      (_, final point?) when !point.finished => point.episodeLabel == null
-          ? tr('resume_title')
-          : tr('tv_resume_episode',
-              namedArgs: {'episode': point.episodeLabel!}),
-      (false, final point?) when point.finished => tr('tv_next_episode'),
-      (true, _) => tr('play'),
-      (false, _) =>
-        tr('tv_play_first_episode', namedArgs: {'season': '$firstSeason'}),
-    };
+
     final buttons = <Widget>[
-      if (canWatch)
-        _DetailButton(
-          focusNode: _actionNode('play'),
-          label: playLabel,
-          icon: PhosphorIcons.play(PhosphorIconsStyle.fill),
-          autofocus: true,
-          onFocused: () => _lastActionId = 'play',
-          onActivate: () => _isMovie
-              ? _playMovie(elapsed: resuming ? resume.elapsed : null)
-              : _playSeries(),
-        ),
-      if (canWatch && resuming)
-        _DetailButton(
-          focusNode: _actionNode('restart'),
-          label: _isMovie
-              ? tr('tv_play_from_start')
-              : tr('tv_play_from_first_episode',
-                  namedArgs: {'season': '$firstSeason'}),
-          icon: PhosphorIcons.arrowCounterClockwise(),
-          onFocused: () => _lastActionId = 'restart',
-          onActivate: () =>
-              _isMovie ? _playMovie() : _playSeries(fromStart: true),
-        ),
+      if (canWatch) const SizedBox.shrink(),
+      if (canWatch && resuming) const SizedBox.shrink(),
       if (!_isMovie && (_loaded?.seasons.isNotEmpty ?? false))
         _DetailButton(
           focusNode: _actionNode('episodes'),

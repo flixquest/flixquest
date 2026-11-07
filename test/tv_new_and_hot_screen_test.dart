@@ -1,3 +1,4 @@
+import 'package:flixquest/constants/api_constants.dart';
 import 'package:flixquest/catalog/new_and_hot.dart';
 import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/models/genres.dart';
@@ -14,7 +15,6 @@ import 'package:flixquest/tv/screens/tv_new_and_hot_screen.dart';
 import 'package:flixquest/tv/widgets/tv_media_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -171,10 +171,11 @@ Future<_Harness> _pump(WidgetTester tester, {_Source? source}) async {
 }
 
 void main() {
-  initializeTvTranslations();
-  setUpAll(() {
-    dotenv.testLoad(fileInput: 'TMDB_API_KEY=key\nFLIXQUEST_API_URL=x');
+  setUp(() {
+    TMDB_API_KEY = 'key';
   });
+  initializeTvTranslations();
+  setUpAll(() {});
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(<String, Object>{});

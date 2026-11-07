@@ -8,16 +8,13 @@ import 'package:flixquest/tv/widgets/tv_navigation_rail.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
 import 'support/tv_localization.dart';
 
 void main() {
   initializeTvTranslations();
-  setUpAll(() {
-    dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://example.com');
-  });
+  setUpAll(() {});
   const metrics = TvShellMetrics(
     compact: true,
     safeInset: 16,

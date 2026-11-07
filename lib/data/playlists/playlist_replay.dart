@@ -1,16 +1,5 @@
 import 'playlist.dart';
 
-/// The lists as this device should show them: what Laravel last confirmed,
-/// with every edit still waiting for it applied on top, by the same rules
-/// Laravel applies them.
-///
-/// Keeping the two apart is what lets a sync land without losing an edit made
-/// while it was on its way: the confirmed state is replaced and the waiting
-/// edits are simply replayed over the new one. An edit Laravel would refuse
-/// (a rename against an old version, a title for a deleted list) is skipped
-/// here too, so the screen never shows what will not stick.
-///
-/// Lists come newest first; titles in their list's order.
 List<Playlist> replayPlaylists(
   Iterable<PlaylistRecord> records,
   Iterable<PlaylistEntry> entries,

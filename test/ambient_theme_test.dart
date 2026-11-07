@@ -1,24 +1,20 @@
+import 'package:flixquest/constants/api_constants.dart';
 import 'package:flixquest/models/occasional_theme.dart';
 import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/services/ambient_theme_service.dart';
 import 'package:flixquest/singleton/sharedpreferences_singleton.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    TMDB_API_KEY = 'test';
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() async {
-    dotenv.testLoad(
-      fileInput: '''
-        TMDB_API_KEY=test
-        MIXPANEL_API_KEY=test
-        FLIXQUEST_API_URL=https://example.com
-      ''',
-    );
     SharedPreferences.setMockInitialValues(<String, Object>{});
     sharedPrefsSingleton = await SharedPreferencesSingleton.getInstance();
   });

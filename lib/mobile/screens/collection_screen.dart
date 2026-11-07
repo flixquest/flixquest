@@ -2,12 +2,10 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../catalog/catalog_controller.dart';
-import '../../data/ads/content_ads.dart';
 import '../../catalog/media_item.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../design/skeleton.dart';
-import '../../widgets/hosted_ads_banner.dart';
 import '../widgets/filter_chips.dart';
 import '../widgets/pill_button.dart';
 import '../widgets/poster_card.dart';
@@ -182,12 +180,8 @@ class _CollectionGridState extends State<_CollectionGrid> {
     return false;
   }
 
-  /// A Kids or Family genre's titles show no ads, nor do the ones they open
-  /// from the grid's sheets.
   @override
-  Widget build(BuildContext context) => widget.collection.adFree
-      ? ContentAdScope(adFree: true, child: Builder(builder: _grid))
-      : _grid(context);
+  Widget build(BuildContext context) => Builder(builder: _grid);
 
   Widget _grid(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -197,12 +191,6 @@ class _CollectionGridState extends State<_CollectionGrid> {
       onNotification: _onScroll,
       child: CustomScrollView(
         slivers: <Widget>[
-          if (widget.collection.adPlacement case final placement?)
-            SliverToBoxAdapter(
-              child: RemoteHostedAdsBanner(
-                placement: placement,
-              ),
-            ),
           SliverPadding(
             padding: EdgeInsets.fromLTRB(gutter, AppSpace.sm, gutter, 0),
             sliver: SliverGrid.builder(

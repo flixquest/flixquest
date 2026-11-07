@@ -1,3 +1,4 @@
+import 'package:flixquest/constants/api_constants.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
 import 'package:flixquest/constants/app_constants.dart';
@@ -8,10 +9,8 @@ import 'package:flixquest/tv/focus/tv_focus_memory.dart';
 import 'package:flixquest/tv/focus/tv_screen_focus_controller.dart';
 import 'package:flixquest/tv/screens/tv_settings_screen.dart';
 import 'package:flixquest/tv/widgets/tv_content_grid.dart';
-import 'package:flixquest/tv/widgets/tv_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,6 +18,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'support/tv_localization.dart';
 
 void main() {
+  setUp(() {
+    TMDB_API_KEY = 'test';
+  });
   initializeTvTranslations();
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -33,15 +35,7 @@ void main() {
     mediaCardWidth: 220,
   );
 
-  setUpAll(() {
-    dotenv.testLoad(
-      fileInput: '''
-        TMDB_API_KEY=test
-        MIXPANEL_API_KEY=test
-        FLIXQUEST_API_URL=https://example.com
-      ''',
-    );
-  });
+  setUpAll(() {});
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -263,96 +257,6 @@ void main() {
     expect(settings.appMode, AppMode.automatic);
     expect(sharedPrefsSingleton.getString(SettingsPreferences.APP_MODE),
         'automatic');
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('subtitle settings are D-pad navigable and persist choices',
-      (tester) async {
-    tester.view.physicalSize = const Size(960, 540);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    final settings = SettingsProvider();
-    final focusController = TvScreenFocusController()..requestFocus();
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-          ChangeNotifierProvider(create: (_) => AppDependencyProvider()),
-        ],
-        child: MaterialApp(
-          home: Scaffold(
-            body: TvSettingsScreen(
-              metrics: metrics,
-              focusController: focusController,
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
-
-    for (var index = 0;
-        index < 20 &&
-            !(FocusManager.instance.primaryFocus?.debugLabel
-                    ?.startsWith('Subtitle settings,') ??
-                false);
-        index++) {
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-      await tester.pumpAndSettle();
-    }
-    expect(
-      FocusManager.instance.primaryFocus?.debugLabel,
-      'Subtitle settings, 17px, Regular, White',
-    );
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.select);
-    await tester.pumpAndSettle();
-    expect(find.text('Subtitle settings'), findsNWidgets(2));
-    expect(find.text('Font size'), findsOneWidget);
-    final dialogBounds = tester.getRect(find.byType(TvDialog));
-    for (final label in [
-      'Font size',
-      '17px',
-      'Background color',
-      'Black 45%'
-    ]) {
-      final bounds = tester.getRect(find.text(label));
-      expect(bounds.left, greaterThan(dialogBounds.left));
-      expect(bounds.right, lessThan(dialogBounds.right));
-    }
-
-    expect(find.text('Text color'), findsOneWidget);
-    expect(find.text('Background color'), findsOneWidget);
-    expect(find.text('Text weight'), findsOneWidget);
-    expect(
-      FocusManager.instance.primaryFocus?.debugLabel,
-      'Font size, 17px',
-    );
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.select);
-    await tester.pumpAndSettle();
-    expect(find.text('Subtitle font size'), findsOneWidget);
-    expect(FocusManager.instance.primaryFocus?.debugLabel, '17px');
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-    await tester.pump();
-    expect(FocusManager.instance.primaryFocus?.debugLabel, '20px');
-    await tester.sendKeyEvent(LogicalKeyboardKey.select);
-    await tester.pumpAndSettle();
-    expect(settings.subtitleFontSize, 20);
-    expect(find.text('Subtitle font size'), findsNothing);
-
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pumpAndSettle();
-    expect(find.text('Subtitle settings'), findsOneWidget);
-    expect(find.text('20px, Regular, White'), findsOneWidget);
-    expect(
-      FocusManager.instance.primaryFocus?.debugLabel,
-      'Subtitle settings, 17px, Regular, White',
-    );
     expect(tester.takeException(), isNull);
   });
 }

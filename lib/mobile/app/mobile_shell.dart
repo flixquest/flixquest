@@ -8,7 +8,6 @@ import '../../constants/app_constants.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../provider/settings_provider.dart';
-import '../../services/adsterra_playback_ads_service.dart';
 import '../../services/app_session_state_store.dart';
 import '../screens/discover_screen.dart';
 import '../screens/home_screen.dart';
@@ -78,9 +77,6 @@ class _MobileShellState extends State<MobileShell>
             surface: 'standard',
             source: 'restored',
           );
-      // A player-exit popup owed by a session closed from the player.
-      unawaited(AdsterraPlaybackAdsService.instance
-          .showOwedPlayerExitOnLaunch(context));
     });
   }
 

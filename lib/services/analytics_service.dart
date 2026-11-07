@@ -31,6 +31,7 @@ class AnalyticsService {
   static Future<AnalyticsService> init() async {
     if (_instance != null && _instance!.isInitialized) return _instance!;
     _instance = AnalyticsService._();
+    if (mixpanelKey.isEmpty) return _instance!;
     try {
       _instance!._mixpanel = await Mixpanel.init(
         mixpanelKey,

@@ -14,19 +14,15 @@ import '../../catalog/media_item.dart';
 import '../../catalog/title_logos.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
-import '../../design/flix_ai_mark.dart';
 import '../../models/genres.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/recently_watched_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../screens/common/bookmark_screen.dart';
-import '../../screens/common/downloads_screen.dart';
-import '../../screens/common/live_tv_screen.dart';
 import '../../services/ambient_theme_service.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/common_widgets.dart'
     show AppStreamingService, appStreamingServices;
-import '../../widgets/hosted_ads_banner.dart';
 import '../app/mobile_tabs.dart';
 import '../collections.dart';
 import '../my_list.dart';
@@ -38,10 +34,8 @@ import '../widgets/hero_card.dart';
 import '../widgets/media_art.dart';
 import '../widgets/media_rows.dart';
 import '../widgets/page_kit.dart' show EmptyState;
-import '../widgets/plus_card.dart';
 import '../widgets/skeletons.dart';
 import 'collection_screen.dart';
-import 'flix_ai_screen.dart';
 
 /// Finds a colour to tint the top of Home with, from an image URL.
 typedef TintFinder = Future<Color?> Function(String imageUrl);
@@ -261,16 +255,13 @@ class _HomeScreenState extends State<HomeScreen>
 
   MediaCollection _translated(
     MediaCollection collection,
-    String kicker, {
-    String? adPlacement,
-  }) =>
+    String kicker,
+  ) =>
       MediaCollection(
         id: collection.id,
         title: collection.title,
         kicker: kicker.toUpperCase(),
         logoAsset: collection.logoAsset,
-        adPlacement: adPlacement ?? collection.adPlacement,
-        adFree: collection.adFree,
         loadPage: collection.loadPage,
       );
 
@@ -300,7 +291,6 @@ class _HomeScreenState extends State<HomeScreen>
         settings: settings,
         dependencies: dependencies,
         // The placements of the old Movies and Series list pages.
-        adPlacement: kind == MediaKind.movie ? 'movie_list' : 'tv_list',
       ),
     );
   }
@@ -327,9 +317,6 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                   tr('streaming_services'),
                   // The placements of the old streaming service pages.
-                  adPlacement: kind == MediaKind.movie
-                      ? 'streaming_movies'
-                      : 'streaming_tv',
                 ),
               ),
           ],
@@ -391,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen>
       );
       // Now and then, a Plus invitation a few rows down (never the top).
       if (_filter == HomeFilter.all && rows.length > 3) {
-        rows.insert(3, const HomeOptionalRow(child: PlusSpotlight()));
+        rows.insert(3, const HomeOptionalRow(child: SizedBox.shrink()));
       }
       content = <Widget>[
         SliverFadeTransition(
@@ -474,11 +461,6 @@ class _HomeScreenState extends State<HomeScreen>
                   reduceMotion: media.disableAnimations,
                   chips: _chips(feed),
                   onSearch: () => _tabs?.select(MobileTab.search),
-                  onDownloads: () => Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const DownloadsScreen(),
-                    ),
-                  ),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: AppSpace.md)),
@@ -503,8 +485,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   List<FilterChipSpec> _chips(HomeFeed? feed) {
-    final showLiveTv =
-        context.watch<AppDependencyProvider?>()?.displayLiveTV ?? false;
     return <FilterChipSpec>[
       FilterChipSpec(
         label: tr('filter_all'),
@@ -521,14 +501,6 @@ class _HomeScreenState extends State<HomeScreen>
         selected: _filter == HomeFilter.series,
         onTap: () => _select(HomeFilter.series),
       ),
-      if (showLiveTv)
-        FilterChipSpec(
-          label: tr('live_tv'),
-          icon: PhosphorIcons.broadcast(),
-          onTap: () => Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(builder: (_) => const ChannelList()),
-          ),
-        ),
       FilterChipSpec(
         label: tr('categories'),
         dropdown: true,
@@ -548,7 +520,6 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.reduceMotion,
     required this.chips,
     required this.onSearch,
-    required this.onDownloads,
   });
 
   final double topInset;
@@ -556,7 +527,6 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   final bool reduceMotion;
   final List<FilterChipSpec> chips;
   final VoidCallback onSearch;
-  final VoidCallback onDownloads;
 
   /// Scrolled this far, the bar is fully solid.
   static const _solidAfter = 80.0;
@@ -578,7 +548,6 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
       topInset: topInset,
       chips: chips,
       onSearch: onSearch,
-      onDownloads: onDownloads,
     );
     final background = ColoredBox(
       color: palette.scrim(solid * (reduceMotion ? 1 : .94)),
@@ -616,13 +585,11 @@ class _HomeHeader extends StatelessWidget {
     required this.topInset,
     required this.chips,
     required this.onSearch,
-    required this.onDownloads,
   });
 
   final double topInset;
   final List<FilterChipSpec> chips;
   final VoidCallback onSearch;
-  final VoidCallback onDownloads;
 
   static const _appBarHeight = 52.0;
   static const barHeight = _appBarHeight + FilterChips.height + 12;
@@ -686,21 +653,8 @@ class _HomeHeader extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  IconButton(
-                    tooltip: tr('downloads'),
-                    color: palette.foreground,
-                    onPressed: onDownloads,
-                    icon: Icon(PhosphorIcons.downloadSimple(), size: 24),
-                  ),
-                  IconButton(
-                    tooltip: 'FlixAI',
-                    color: palette.foreground,
-                    onPressed: () => Navigator.of(context).push<void>(
-                        MaterialPageRoute(
-                            settings: const RouteSettings(name: '/flix-ai'),
-                            builder: (_) => const FlixAiScreen())),
-                    icon: const FlixAiMark(height: 22),
-                  ),
+                  const SizedBox.shrink(),
+                  const SizedBox.shrink(),
                   // Search last, at the bar's far end.
                   IconButton(
                     tooltip: tr('search'),
@@ -732,14 +686,6 @@ String? _releaseBadge(BuildContext context, MediaItem item) {
   }
 }
 
-/// Home's rows for a loaded feed, top to bottom: the hero, then what to
-/// watch next. Under All each chart comes as a pair, movies then series, so
-/// no catalogue row mixes the two; only the viewer's own rows (Continue
-/// Watching, My List) hold both. Three ads are spread down the page: a
-/// banner directly under the hero, a medium rectangle after Trending (the
-/// size advertisers bid on most) and a banner before the genre rows. Each
-/// Home tab reports its own placement ids (`home_all_*`, `home_movies_*`,
-/// `home_series_*`), shared by the remote banner placement catalog.
 @visibleForTesting
 List<Widget> homeRows(
   BuildContext context, {
@@ -797,15 +743,7 @@ List<Widget> homeRows(
       );
 
   // One ad unit per Home tab so each tab's slots report separately.
-  final adBase = switch (filter) {
-    HomeFilter.all => 'home_all',
-    HomeFilter.movies => 'home_movies',
-    HomeFilter.series => 'home_series',
-  };
-  HomeAdSlot adSlot(String slot, {bool tall = false}) => HomeAdSlot(
-        placement: '${adBase}_$slot',
-        variant: tall ? HostedBannerVariant.tall : HostedBannerVariant.standard,
-      );
+
   return <Widget>[
     // The update notice is a fixed Home slot above these feed rows.
     if (heroes.isNotEmpty)
@@ -816,7 +754,6 @@ List<Widget> homeRows(
         onShown: onHeroShown,
       ),
     // Directly below the hero.
-    adSlot('hero'),
     if (shownContinue.isNotEmpty)
       ContinueRow(title: tr('continue_watching'), items: shownContinue),
     for (final kind in kinds)
@@ -833,7 +770,6 @@ List<Widget> homeRows(
           titled(kind, 'trending_movies_week', 'trending_series_week'),
           trending[kind]!,
         ),
-    adSlot('trending', tall: true),
     if (shownMyList.isNotEmpty)
       PosterRow(
         title: tr('my_list'),
@@ -892,7 +828,6 @@ List<Widget> homeRows(
         feed.of(MediaKind.movie).upcoming,
         badgeFor: (item) => _releaseBadge(context, item),
       ),
-    adSlot('genres'),
     // FlixQuest's categorized feed: a few genres at random, each laid out its
     // own way, labelled with its kind where both are on show.
     for (final category in feed.categories)
@@ -920,35 +855,6 @@ class HomeOptionalRow extends StatelessWidget {
       _GapBelowIfShown(gap: AppSpace.rowGap, child: child);
 }
 
-/// A hosted ad between Home's rows.
-class HomeAdSlot extends HomeOptionalRow {
-  HomeAdSlot({
-    required this.placement,
-    this.variant = HostedBannerVariant.standard,
-    super.key,
-  }) : super(
-          child: _HostedAd(placement: placement, variant: variant),
-        );
-
-  final String placement;
-  final HostedBannerVariant variant;
-}
-
-class _HostedAd extends StatelessWidget {
-  const _HostedAd({required this.placement, required this.variant});
-
-  final String placement;
-  final HostedBannerVariant variant;
-
-  @override
-  Widget build(BuildContext context) => RemoteHostedAdsBanner(
-        placement: placement,
-        variant: variant,
-      );
-}
-
-/// Puts [gap] under [child] only when the child takes up room, so an ad slot
-/// with no ad leaves no hole between rows.
 class _GapBelowIfShown extends SingleChildRenderObjectWidget {
   const _GapBelowIfShown({required this.gap, super.child});
 

@@ -1,3 +1,4 @@
+import 'package:flixquest/services/video_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +13,6 @@ import '../../models/credits.dart';
 import '../../models/movie.dart';
 import '../../models/videos.dart';
 import '../../screens/person/cast_detail.dart';
-import '../../services/video_launcher.dart';
 import 'media_art.dart';
 import 'pill_button.dart';
 import 'poster_card.dart';

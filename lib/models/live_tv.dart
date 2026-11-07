@@ -193,8 +193,6 @@ class LiveStreamVariant {
   final String? logo;
 }
 
-/// Resolves additional servers only after content advances, or on demand when
-/// the current server fails before playback. Results retain advertised order.
 class LiveStreamDiscovery {
   LiveStreamDiscovery({
     required LiveStreamVariant initial,

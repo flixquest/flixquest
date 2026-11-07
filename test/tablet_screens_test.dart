@@ -1,3 +1,4 @@
+import 'package:flixquest/constants/api_constants.dart';
 import 'package:flixquest/catalog/details_play.dart';
 import 'package:flixquest/catalog/media_item.dart';
 import 'package:flixquest/catalog/season_source.dart';
@@ -16,7 +17,6 @@ import 'package:flixquest/provider/app_dependency_provider.dart';
 import 'package:flixquest/provider/bookmark_provider.dart';
 import 'package:flixquest/provider/settings_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -155,7 +155,6 @@ Widget _season() => SeasonScreen(
       seasonNumber: 1,
       source: _Source(),
       history: const WatchHistory(),
-      adBuilder: (_) => const SizedBox(height: 60, child: Text('AD_SLOT')),
       now: () => DateTime(2026, 9, 27),
     );
 
@@ -166,7 +165,6 @@ Widget _episode() => EpisodeScreen(
       seasons: _seasons,
       source: _Source(),
       history: const WatchHistory(),
-      adBuilder: (_) => const SizedBox(height: 60, child: Text('AD_SLOT')),
       now: () => DateTime(2026, 9, 27),
     );
 
@@ -189,8 +187,10 @@ Future<void> _sweep(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(() {
+    TMDB_API_KEY = 'key';
+  });
   setUp(() async {
-    dotenv.testLoad(fileInput: 'TMDB_API_KEY=key\nFLIXQUEST_API_URL=x');
     SharedPreferences.setMockInitialValues(<String, Object>{});
     sharedPrefsSingleton = await SharedPreferences.getInstance();
   });

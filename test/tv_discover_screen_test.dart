@@ -1,3 +1,4 @@
+import 'package:flixquest/constants/api_constants.dart';
 import 'package:flixquest/catalog/discover_query.dart';
 import 'package:flixquest/constants/app_constants.dart';
 import 'package:flixquest/provider/app_dependency_provider.dart';
@@ -10,7 +11,6 @@ import 'package:flixquest/tv/models/tv_media_item.dart';
 import 'package:flixquest/tv/screens/tv_discover_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -127,10 +127,11 @@ Future<_FakeCatalog> _pumpDiscover(
 }
 
 void main() {
-  initializeTvTranslations();
-  setUpAll(() {
-    dotenv.testLoad(fileInput: 'TMDB_API_KEY=key\nFLIXQUEST_API_URL=x');
+  setUp(() {
+    TMDB_API_KEY = 'key';
   });
+  initializeTvTranslations();
+  setUpAll(() {});
 
   testWidgets('opens on Movies, with the filters below and results beside',
       (tester) async {

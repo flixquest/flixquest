@@ -1,22 +1,10 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-
-import '../mobile/screens/playlist_import_screen.dart';
-import '../mobile/screens/shared_playlist_screen.dart';
-import '../provider/app_dependency_provider.dart';
-import '../tv/screens/tv_playlist_import_screen.dart';
-import '../tv/screens/tv_shared_playlist_screen.dart';
-import '../screens/common/live_tv_screen.dart';
-import 'daddylive_service.dart';
 
 import 'deep_link_dispatcher.dart';
 import 'deep_link_routes.dart';
-import 'live_channel_focus.dart';
 import 'media_link.dart';
-import 'plus_navigation.dart';
-import 'device_presentation_service.dart';
 import 'home_widget_navigation_service.dart';
 
 /// Opens the TMDB, IMDb and flix.quest addresses the platform hands over.
@@ -69,62 +57,18 @@ class MediaLinkNavigationService {
   /// and wants it treated exactly as one arriving from outside.
   static void handle(String value) {
     final target = MediaLink.parse(value);
-    if (target == null) {
+    if (target == null ||
+        target is LiveChannelLink ||
+        target is CouponLink ||
+        target is SharedListLink ||
+        target is TmdbListLink ||
+        target is ImdbListLink) {
       _reportUnreadable(value);
       return;
     }
     DeepLinkDispatcher.submit(
       key: value,
-      open: (navigator) => switch (target) {
-        LiveChannelLink() => _openChannel(navigator, target),
-        CouponLink() => openCouponLink(navigator, target.code),
-        SharedListLink() => navigator.push(
-            MaterialPageRoute<void>(
-              builder: (_) => DevicePresentationService.instance.isTelevision
-                  ? TvSharedPlaylistScreen(code: target.code)
-                  : SharedPlaylistScreen(code: target.code),
-            ),
-          ),
-        TmdbListLink() || ImdbListLink() => navigator.push(
-            MaterialPageRoute<void>(
-              builder: (_) => DevicePresentationService.instance.isTelevision
-                  ? TvPlaylistImportScreen(initialUrl: value)
-                  : PlaylistImportScreen(initialUrl: value),
-            ),
-          ),
-        _ => navigator.push(_route(target)),
-      },
-    );
-  }
-
-  /// A live channel is shown in the Live TV channel list, scrolled to and focused, and left for the
-  /// person to play. It is refused while live TV is switched off remotely, as the tab is.
-  ///
-  /// On a television the list is the Live TV destination of the home shell, so the link only asks for
-  /// the channel and drops any screen open over the shell; the shell and that destination do the rest.
-  static void _openChannel(NavigatorState navigator, LiveChannelLink target) {
-    final dependencies = navigator.context.read<AppDependencyProvider?>();
-    if (!(dependencies?.displayLiveTV ?? false)) {
-      ScaffoldMessenger.maybeOf(navigator.context)?.showSnackBar(
-        const SnackBar(
-          duration: Duration(seconds: 4),
-          content: Text(
-            liveTvUnavailableMessage,
-            style: TextStyle(fontFamily: 'Figtree'),
-          ),
-        ),
-      );
-      return;
-    }
-    if (DevicePresentationService.instance.isTelevision) {
-      navigator.popUntil((route) => route.isFirst);
-      LiveChannelFocus.request(target.channelId);
-      return;
-    }
-    navigator.push(
-      MaterialPageRoute<void>(
-        builder: (_) => ChannelList(initialChannelId: target.channelId),
-      ),
+      open: (navigator) => navigator.push(_route(target)),
     );
   }
 
@@ -161,7 +105,9 @@ class MediaLinkNavigationService {
         LiveChannelLink() =>
           throw StateError('Live channels open via _openChannel'),
         CouponLink() => throw StateError('Codes open via openCouponLink'),
-        TmdbListLink() || ImdbListLink() || SharedListLink() =>
+        TmdbListLink() ||
+        ImdbListLink() ||
+        SharedListLink() =>
           throw StateError('Lists open their own screens'),
       };
 

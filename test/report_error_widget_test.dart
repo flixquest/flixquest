@@ -1,20 +1,18 @@
 import 'package:flixquest/widgets/common_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 void main() {
-  setUpAll(() {
-    dotenv.testLoad(fileInput: 'FLIXQUEST_API_URL=https://example.com');
-  });
+  setUpAll(() {});
 
   const longError =
       'This TV episode could not be found on our servers, try another one :(';
 
   // The `.icon` constructors build private subclasses, so match on the base
   // type rather than the exact runtime type.
-  final retryButton = find.byWidgetPredicate((widget) => widget is FilledButton);
+  final retryButton =
+      find.byWidgetPredicate((widget) => widget is FilledButton);
   final reportButton =
       find.byWidgetPredicate((widget) => widget is OutlinedButton);
 

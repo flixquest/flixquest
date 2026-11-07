@@ -19,7 +19,6 @@ import '../widgets/tv_browse_skeleton.dart';
 import '../widgets/tv_browse_view.dart';
 import '../widgets/tv_continue_watching_menu.dart';
 import '../widgets/tv_media_card.dart' show TvMediaBadge;
-import '../widgets/tv_plus_reminder.dart';
 import '../widgets/tv_state_panel.dart';
 
 class TvHomeScreen extends StatefulWidget {
@@ -92,7 +91,7 @@ class _TvHomeScreenState extends State<TvHomeScreen> {
       ),
       Padding(
         padding: insets.copyWith(bottom: 0, top: 0),
-        child: const TvPlusReminder(),
+        child: const SizedBox.shrink(),
       ),
       Expanded(child: _buildFeed(context, insets)),
     ]);

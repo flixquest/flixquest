@@ -1,3 +1,4 @@
+import 'package:flixquest/constants/api_constants.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flixquest/catalog/media_item.dart';
 import 'package:flixquest/catalog/new_and_hot.dart';
@@ -14,7 +15,6 @@ import 'package:flixquest/provider/settings_provider.dart';
 import 'package:flixquest/translations/codegen_loader.g.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -75,7 +75,6 @@ Future<void> _setUp() async {
   SharedPreferences.setMockInitialValues(<String, Object>{});
   sharedPrefsSingleton = await SharedPreferences.getInstance();
   await EasyLocalization.ensureInitialized();
-  dotenv.testLoad(fileInput: 'TMDB_API_KEY=key\nFLIXQUEST_API_URL=x');
 }
 
 Widget _app({
@@ -88,7 +87,7 @@ Widget _app({
     providers: [
       ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ChangeNotifierProvider(
-        create: (_) => AppDependencyProvider()..displayWatchNowButton = canPlay,
+        create: (_) => AppDependencyProvider(),
       ),
     ],
     child: Builder(
@@ -115,7 +114,6 @@ Widget _app({
             source: source,
             now: () => DateTime(2026, 9, 27),
             showTitleLogos: false,
-            adBuilder: (_) => const Text('AD_SLOT'),
           ),
         ),
       ),
@@ -160,6 +158,9 @@ Future<void> _tapSegment(WidgetTester tester, String label,
 }
 
 void main() {
+  setUp(() {
+    TMDB_API_KEY = 'key';
+  });
   setUp(_setUp);
 
   testWidgets('loads Coming Soon first; pills show one segment at a time',
@@ -206,18 +207,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Movie 10'), findsOneWidget);
     expect(source.movieCalls, 2);
-  });
-
-  testWidgets('ad is after the third date group', (tester) async {
-    await tester.pumpWidget(_app(source: _Source()));
-    await tester.pumpAndSettle();
-    final scroll = find.byWidgetPredicate(
-        (w) => w is Scrollable && w.axisDirection == AxisDirection.down);
-    expect(find.text('Movie 1'), findsOneWidget);
-    expect(find.text('AD_SLOT'), findsNothing);
-    await tester.scrollUntilVisible(find.text('AD_SLOT'), 200,
-        scrollable: scroll);
-    expect(find.text('AD_SLOT'), findsOneWidget);
   });
 
   for (final mode in <String>['dark', 'light']) {
