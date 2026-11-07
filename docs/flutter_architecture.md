@@ -60,15 +60,17 @@ providers/health/subtitle searches cache; streams/size requests never do, with
 
 ## Deployment configuration
 
-`LARAVEL_API_URL` resolves from `--dart-define` first, then loaded `.env`, then the
+`LARAVEL_API_URL` resolves from `--dart-define` first, then compiled `.env`, then the
 debug-only Android emulator default `http://10.0.2.2:8000`. An unconfigured release
 fails configuration construction. A host URL or an existing `/api/v1` URL is accepted;
 the normalized base URL ends with `/api/v1/`. Endpoints use relative paths such as
 `auth/login`, without a leading slash.
 
-`.env.example` lists existing environment keys with empty/public sample values.
-The bundled `.env` retains its existing values and adds the development Laravel URL.
-Use public configuration only; Sanctum tokens are never bundled into assets.
+`.env.example` lists the environment keys with empty/public sample values. `.env` is
+not bundled: `lib/core/config/app_secrets.dart` compiles its values in with
+obfuscation, so run `build_runner clean` and then `build` after editing it. Obfuscation
+only slows extraction, so don't treat these values as private. Sanctum tokens are never
+bundled.
 `--dart-define=FLIXQUEST_MIGRATION=auth,config,ads,sync,notifications,telemetry` selects
 future feature cutovers. All flags default off and F0 does not consume them in UI.
 

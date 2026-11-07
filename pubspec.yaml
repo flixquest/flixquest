@@ -103,7 +103,6 @@ flutter:
     - assets/images/profiles/
     - assets/translations/
     - assets/ca/
-    - .env
 
   fonts:
     - family: Figtree

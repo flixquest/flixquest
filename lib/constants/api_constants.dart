@@ -7,7 +7,7 @@ String? _remoteTmdbApiKey;
 
 /// The TMDB API key used across all metadata and search endpoints.
 ///
-/// Initially falls back to `dotenv.env['TMDB_API_KEY']` (from the local `.env`).
+/// Initially falls back to `dotenv.env['TMDB_API_KEY']` (compiled from `.env`).
 /// If a non-empty key is fetched from Firebase Remote Config (`tmdb_api_key`),
 /// it overrides this value at runtime.
 String get TMDB_API_KEY =>

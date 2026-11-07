@@ -114,7 +114,7 @@
 
 ## ⚙️ Environment Variables & API Keys
 
-FlixQuest uses `flutter_dotenv` to load environment variables. Create a `.env` file in the root directory of the project:
+Environment values are compiled into the app with obfuscation by `lib/core/config/app_secrets.dart`. `.env` is never bundled as a file. Create a `.env` file in the root directory of the project, then generate the Dart values:
 
 ```env
 # Required: TMDB API Key for movie and TV show metadata
@@ -222,6 +222,7 @@ better_player_plus:
 
    ```bash
    cp .env.example .env # or create a new .env file with your keys
+   dart run build_runner build --delete-conflicting-outputs
    ```
 
 4. **Install Dependencies**:
@@ -299,6 +300,10 @@ better_player_plus:
    dart run tool/scraper_key.dart init
    dart run build_runner build --delete-conflicting-outputs
    ```
+
+   **After editing `.env` or `.env.scraper`, run `dart run build_runner clean`
+   before that build.** A plain build keeps the old values without warning, and
+   `test/core/app_secrets_test.dart` fails if that happens.
 
    Android builds fail without `.env.scraper`. Back it up privately: losing it
    means releasing a new key.

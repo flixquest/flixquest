@@ -56,7 +56,8 @@ Do these in order before releasing the app.
    deployment, and `.env.example` names `scraper-1.flixquest.app`, which doesn't
    resolve. Render had no v3 when checked: the request timed out. A device that
    hasn't loaded remote config yet falls back to the bundled URL, and stream lookups
-   would fail. Point it at `https://scraper.flix.quest`. Also confirm
+   would fail. Point it at `https://scraper.flix.quest`, then run
+   `build_runner clean` and `build`. Also confirm
    `flixquest_api_url_v2` and the API instances in remote config only list scrapers
    with v3, because the app doesn't fall back to v2.
 
@@ -264,10 +265,15 @@ scraper's copy.
 
 ## Setting up a new machine
 
-1. Restore `.env.scraper` from the private backup into the Flutter repo root.
+1. Restore `.env` and `.env.scraper` from the private backup into the Flutter repo
+   root.
 2. Run `fvm dart run build_runner build --delete-conflicting-outputs`.
 
-Android builds fail without `.env.scraper`. Only run `tool/scraper_key.dart init`
+Android builds fail without `.env.scraper`, and code generation fails without `.env`.
+
+**After editing either file on any machine, run `fvm dart run build_runner clean`
+before that build.** A plain build reports success but keeps the old values.
+`test/core/app_secrets_test.dart` fails if the compiled values are stale. Only run `tool/scraper_key.dart init`
 if no key exists anywhere, because new inputs mean a new key and a new release.
 
 Debug certificate hash, for dev keys:
@@ -279,7 +285,7 @@ keytool -list -v -keystore ~/.android/debug.keystore -storepass android | grep S
 ## Replacing a key
 
 1. Change `KID` and `FRAGMENT` for that mode in `.env.scraper`, then run
-   `build_runner`.
+   `build_runner clean` followed by `build_runner build`.
 2. Generate the new value with `server-key`.
 3. Add it to `SCRAPER_V3_KEYS` next to the old one, separated by a comma.
 4. Release the app.
@@ -294,8 +300,9 @@ Changing `SCRAPER_NATIVE_SECRET` affects both the prod and dev keys.
 - **Keep the `asm` barrier in `fq_core.cpp`.** Without it the compiler folds the
   mask away and stores the plain secret in the binary. This really happened.
   After native changes, confirm the secret bytes aren't in `libfqcore.so`.
-- **Never list `.env.scraper` in `pubspec.yaml` assets.** The regular `.env` ships
-  in the APK as plain text.
+- **Never list `.env` or `.env.scraper` in `pubspec.yaml` assets.** Anything there
+  ships in the APK as a readable file. Both are compiled in with obfuscation instead,
+  through `app_secrets.dart` and `scraper_secrets.dart`.
 - **Express 5's `req.query` is getter-only.** `v3.ts` uses
   `Object.defineProperty` because plain assignment throws.
 - **v3 mounts ahead of v2's global middleware,** which reads the plain query
@@ -376,6 +383,13 @@ Most serious first. None are fixed.
    `POST /providers/:id/toggle`. Caddy returns 403 for them on
    `scraper.flix.quest` (checked), so this only matters for deployments without
    Caddy, such as Render.
+
+6. **API keys already shipped in plain text.** Published APKs include
+   `assets/flutter_assets/.env`, readable by anyone. Builds from now on don't, but
+   old APKs stay out there, so obfuscation can't protect those values. Consider
+   replacing `TMDB_API_KEY` and `OPENSUBTITLES_API_KEY`. `TMDB_API_KEY` can be
+   overridden through remote config (`tmdb_api_key`), but released apps with no
+   override stop working if the old key is revoked, so set the new value there first.
 
 Checked and fine: `STREAM_PROXY_SECRET` is set in production, so signing doesn't
 fall back to the TMDB key.

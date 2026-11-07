@@ -58,6 +58,7 @@ android/app/google-services.json
 # Scraper key inputs and the obfuscated values generated from them
 .env.scraper
 /lib/core/config/scraper_secrets.g.dart
+/lib/core/config/app_secrets.g.dart
 /android/app/.cxx/
 
 # Keystore files
