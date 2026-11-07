@@ -8,6 +8,19 @@ Map<String, dynamic> bootstrapFixture() => (jsonDecode(
     as Map<String, dynamic>)['data'] as Map<String, dynamic>;
 
 void main() {
+  test('ignores unity keys that older backends and configs still send', () {
+    final json = bootstrapFixture();
+    final ads = Map<String, dynamic>.from(json['ads'] as Map)
+      ..addAll({
+        'unity_game_id_android': '1',
+        'unity_banner_placement_id': 'Banner_Android',
+        'unity_test_mode': true,
+      });
+    final config = BootstrapConfig.fromJson({...json, 'ads': ads});
+    expect(config.ads.hostedBannerMode, 'stack');
+    expect(jsonEncode(config.ads.toJson()), isNot(contains('unity')));
+  });
+
   test('backend bootstrap contract supplies typed settings and custom theme',
       () {
     final config = BootstrapConfig.fromJson(bootstrapFixture());

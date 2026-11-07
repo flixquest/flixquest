@@ -441,7 +441,6 @@ void main() {
     expect(config.features.enableStream, isTrue);
     expect(config.branding.cinemaxLogo, 'Legacy logo');
     expect(config.ads.bannerAdNetwork, 'adsterra');
-    expect(config.ads.unityGameIdAndroid, '5445375');
     expect(
         firebaseConfigSnapshot(
                 {'enable_live_tv': 'true', 'enable_ott': 'false'})

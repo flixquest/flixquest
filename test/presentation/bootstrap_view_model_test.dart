@@ -50,7 +50,6 @@ void main() {
           'ads': {
             'banner_ad_network': 'clickadu',
             'hosted_banner_mode': 'priority',
-            'unity_test_mode': true,
           },
           'banners': [
             {

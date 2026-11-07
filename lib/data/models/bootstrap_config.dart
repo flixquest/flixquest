@@ -87,13 +87,6 @@ class AdsConfig with _$AdsConfig {
     @JsonKey(name: 'hosted_banner_mode')
     @Default('stack')
     String hostedBannerMode,
-    @JsonKey(name: 'unity_game_id_android')
-    @Default('5445375')
-    String unityGameIdAndroid,
-    @JsonKey(name: 'unity_banner_placement_id')
-    @Default('Banner_Android')
-    String unityBannerPlacementId,
-    @JsonKey(name: 'unity_test_mode') @Default(false) bool unityTestMode,
   }) = _AdsConfig;
   factory AdsConfig.fromJson(Map<String, dynamic> json) =>
       _$AdsConfigFromJson(_adsConfigJson(json));
@@ -323,12 +316,9 @@ Map<String, dynamic> _networkConfigJson(Map<String, dynamic> json) {
 
 Map<String, dynamic> _adsConfigJson(Map<String, dynamic> json) => _normalize(
       json,
-      booleans: {'unity_test_mode': false},
       strings: {
         'banner_ad_network': 'adsterra',
         'hosted_banner_mode': 'stack',
-        'unity_game_id_android': '5445375',
-        'unity_banner_placement_id': 'Banner_Android',
       },
     );
 

@@ -79,19 +79,12 @@ _$AdsConfigImpl _$$AdsConfigImplFromJson(Map<String, dynamic> json) =>
     _$AdsConfigImpl(
       bannerAdNetwork: json['banner_ad_network'] as String? ?? 'adsterra',
       hostedBannerMode: json['hosted_banner_mode'] as String? ?? 'stack',
-      unityGameIdAndroid: json['unity_game_id_android'] as String? ?? '5445375',
-      unityBannerPlacementId:
-          json['unity_banner_placement_id'] as String? ?? 'Banner_Android',
-      unityTestMode: json['unity_test_mode'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$AdsConfigImplToJson(_$AdsConfigImpl instance) =>
     <String, dynamic>{
       'banner_ad_network': instance.bannerAdNetwork,
       'hosted_banner_mode': instance.hostedBannerMode,
-      'unity_game_id_android': instance.unityGameIdAndroid,
-      'unity_banner_placement_id': instance.unityBannerPlacementId,
-      'unity_test_mode': instance.unityTestMode,
     };
 
 _$ThemeEffectImpl _$$ThemeEffectImplFromJson(Map<String, dynamic> json) =>

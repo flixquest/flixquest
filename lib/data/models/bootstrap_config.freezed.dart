@@ -965,12 +965,6 @@ mixin _$AdsConfig {
   String get bannerAdNetwork => throw _privateConstructorUsedError;
   @JsonKey(name: 'hosted_banner_mode')
   String get hostedBannerMode => throw _privateConstructorUsedError;
-  @JsonKey(name: 'unity_game_id_android')
-  String get unityGameIdAndroid => throw _privateConstructorUsedError;
-  @JsonKey(name: 'unity_banner_placement_id')
-  String get unityBannerPlacementId => throw _privateConstructorUsedError;
-  @JsonKey(name: 'unity_test_mode')
-  bool get unityTestMode => throw _privateConstructorUsedError;
 
   /// Serializes this AdsConfig to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -989,10 +983,7 @@ abstract class $AdsConfigCopyWith<$Res> {
   @useResult
   $Res call(
       {@JsonKey(name: 'banner_ad_network') String bannerAdNetwork,
-      @JsonKey(name: 'hosted_banner_mode') String hostedBannerMode,
-      @JsonKey(name: 'unity_game_id_android') String unityGameIdAndroid,
-      @JsonKey(name: 'unity_banner_placement_id') String unityBannerPlacementId,
-      @JsonKey(name: 'unity_test_mode') bool unityTestMode});
+      @JsonKey(name: 'hosted_banner_mode') String hostedBannerMode});
 }
 
 /// @nodoc
@@ -1012,9 +1003,6 @@ class _$AdsConfigCopyWithImpl<$Res, $Val extends AdsConfig>
   $Res call({
     Object? bannerAdNetwork = null,
     Object? hostedBannerMode = null,
-    Object? unityGameIdAndroid = null,
-    Object? unityBannerPlacementId = null,
-    Object? unityTestMode = null,
   }) {
     return _then(_value.copyWith(
       bannerAdNetwork: null == bannerAdNetwork
@@ -1025,18 +1013,6 @@ class _$AdsConfigCopyWithImpl<$Res, $Val extends AdsConfig>
           ? _value.hostedBannerMode
           : hostedBannerMode // ignore: cast_nullable_to_non_nullable
               as String,
-      unityGameIdAndroid: null == unityGameIdAndroid
-          ? _value.unityGameIdAndroid
-          : unityGameIdAndroid // ignore: cast_nullable_to_non_nullable
-              as String,
-      unityBannerPlacementId: null == unityBannerPlacementId
-          ? _value.unityBannerPlacementId
-          : unityBannerPlacementId // ignore: cast_nullable_to_non_nullable
-              as String,
-      unityTestMode: null == unityTestMode
-          ? _value.unityTestMode
-          : unityTestMode // ignore: cast_nullable_to_non_nullable
-              as bool,
     ) as $Val);
   }
 }
@@ -1051,10 +1027,7 @@ abstract class _$$AdsConfigImplCopyWith<$Res>
   @useResult
   $Res call(
       {@JsonKey(name: 'banner_ad_network') String bannerAdNetwork,
-      @JsonKey(name: 'hosted_banner_mode') String hostedBannerMode,
-      @JsonKey(name: 'unity_game_id_android') String unityGameIdAndroid,
-      @JsonKey(name: 'unity_banner_placement_id') String unityBannerPlacementId,
-      @JsonKey(name: 'unity_test_mode') bool unityTestMode});
+      @JsonKey(name: 'hosted_banner_mode') String hostedBannerMode});
 }
 
 /// @nodoc
@@ -1072,9 +1045,6 @@ class __$$AdsConfigImplCopyWithImpl<$Res>
   $Res call({
     Object? bannerAdNetwork = null,
     Object? hostedBannerMode = null,
-    Object? unityGameIdAndroid = null,
-    Object? unityBannerPlacementId = null,
-    Object? unityTestMode = null,
   }) {
     return _then(_$AdsConfigImpl(
       bannerAdNetwork: null == bannerAdNetwork
@@ -1085,18 +1055,6 @@ class __$$AdsConfigImplCopyWithImpl<$Res>
           ? _value.hostedBannerMode
           : hostedBannerMode // ignore: cast_nullable_to_non_nullable
               as String,
-      unityGameIdAndroid: null == unityGameIdAndroid
-          ? _value.unityGameIdAndroid
-          : unityGameIdAndroid // ignore: cast_nullable_to_non_nullable
-              as String,
-      unityBannerPlacementId: null == unityBannerPlacementId
-          ? _value.unityBannerPlacementId
-          : unityBannerPlacementId // ignore: cast_nullable_to_non_nullable
-              as String,
-      unityTestMode: null == unityTestMode
-          ? _value.unityTestMode
-          : unityTestMode // ignore: cast_nullable_to_non_nullable
-              as bool,
     ));
   }
 }
@@ -1106,12 +1064,7 @@ class __$$AdsConfigImplCopyWithImpl<$Res>
 class _$AdsConfigImpl implements _AdsConfig {
   const _$AdsConfigImpl(
       {@JsonKey(name: 'banner_ad_network') this.bannerAdNetwork = 'adsterra',
-      @JsonKey(name: 'hosted_banner_mode') this.hostedBannerMode = 'stack',
-      @JsonKey(name: 'unity_game_id_android')
-      this.unityGameIdAndroid = '5445375',
-      @JsonKey(name: 'unity_banner_placement_id')
-      this.unityBannerPlacementId = 'Banner_Android',
-      @JsonKey(name: 'unity_test_mode') this.unityTestMode = false});
+      @JsonKey(name: 'hosted_banner_mode') this.hostedBannerMode = 'stack'});
 
   factory _$AdsConfigImpl.fromJson(Map<String, dynamic> json) =>
       _$$AdsConfigImplFromJson(json);
@@ -1122,19 +1075,10 @@ class _$AdsConfigImpl implements _AdsConfig {
   @override
   @JsonKey(name: 'hosted_banner_mode')
   final String hostedBannerMode;
-  @override
-  @JsonKey(name: 'unity_game_id_android')
-  final String unityGameIdAndroid;
-  @override
-  @JsonKey(name: 'unity_banner_placement_id')
-  final String unityBannerPlacementId;
-  @override
-  @JsonKey(name: 'unity_test_mode')
-  final bool unityTestMode;
 
   @override
   String toString() {
-    return 'AdsConfig(bannerAdNetwork: $bannerAdNetwork, hostedBannerMode: $hostedBannerMode, unityGameIdAndroid: $unityGameIdAndroid, unityBannerPlacementId: $unityBannerPlacementId, unityTestMode: $unityTestMode)';
+    return 'AdsConfig(bannerAdNetwork: $bannerAdNetwork, hostedBannerMode: $hostedBannerMode)';
   }
 
   @override
@@ -1145,24 +1089,13 @@ class _$AdsConfigImpl implements _AdsConfig {
             (identical(other.bannerAdNetwork, bannerAdNetwork) ||
                 other.bannerAdNetwork == bannerAdNetwork) &&
             (identical(other.hostedBannerMode, hostedBannerMode) ||
-                other.hostedBannerMode == hostedBannerMode) &&
-            (identical(other.unityGameIdAndroid, unityGameIdAndroid) ||
-                other.unityGameIdAndroid == unityGameIdAndroid) &&
-            (identical(other.unityBannerPlacementId, unityBannerPlacementId) ||
-                other.unityBannerPlacementId == unityBannerPlacementId) &&
-            (identical(other.unityTestMode, unityTestMode) ||
-                other.unityTestMode == unityTestMode));
+                other.hostedBannerMode == hostedBannerMode));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      bannerAdNetwork,
-      hostedBannerMode,
-      unityGameIdAndroid,
-      unityBannerPlacementId,
-      unityTestMode);
+  int get hashCode =>
+      Object.hash(runtimeType, bannerAdNetwork, hostedBannerMode);
 
   /// Create a copy of AdsConfig
   /// with the given fields replaced by the non-null parameter values.
@@ -1182,13 +1115,9 @@ class _$AdsConfigImpl implements _AdsConfig {
 
 abstract class _AdsConfig implements AdsConfig {
   const factory _AdsConfig(
-      {@JsonKey(name: 'banner_ad_network') final String bannerAdNetwork,
-      @JsonKey(name: 'hosted_banner_mode') final String hostedBannerMode,
-      @JsonKey(name: 'unity_game_id_android') final String unityGameIdAndroid,
-      @JsonKey(name: 'unity_banner_placement_id')
-      final String unityBannerPlacementId,
-      @JsonKey(name: 'unity_test_mode')
-      final bool unityTestMode}) = _$AdsConfigImpl;
+          {@JsonKey(name: 'banner_ad_network') final String bannerAdNetwork,
+          @JsonKey(name: 'hosted_banner_mode') final String hostedBannerMode}) =
+      _$AdsConfigImpl;
 
   factory _AdsConfig.fromJson(Map<String, dynamic> json) =
       _$AdsConfigImpl.fromJson;
@@ -1199,15 +1128,6 @@ abstract class _AdsConfig implements AdsConfig {
   @override
   @JsonKey(name: 'hosted_banner_mode')
   String get hostedBannerMode;
-  @override
-  @JsonKey(name: 'unity_game_id_android')
-  String get unityGameIdAndroid;
-  @override
-  @JsonKey(name: 'unity_banner_placement_id')
-  String get unityBannerPlacementId;
-  @override
-  @JsonKey(name: 'unity_test_mode')
-  bool get unityTestMode;
 
   /// Create a copy of AdsConfig
   /// with the given fields replaced by the non-null parameter values.

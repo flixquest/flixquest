@@ -93,9 +93,6 @@ BootstrapConfig firebaseConfigSnapshot(Map<String, dynamic> published) {
     'ads': section([
       'banner_ad_network',
       'hosted_banner_mode',
-      'unity_game_id_android',
-      'unity_banner_placement_id',
-      'unity_test_mode',
     ]),
     'banners': jsonValue('banners'),
     'occasional_theme': jsonValue('occasional_theme'),

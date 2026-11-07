@@ -30,10 +30,7 @@
     },
     "ads": {
       "banner_ad_network": "native",
-      "hosted_banner_mode": "stack",
-      "unity_game_id_android": "5445375",
-      "unity_banner_placement_id": "Banner_Android",
-      "unity_test_mode": false
+      "hosted_banner_mode": "stack"
     },
     "banners": [],
     "occasional_theme": {

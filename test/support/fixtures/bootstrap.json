@@ -28,10 +28,7 @@
       "tmdb_proxy": ""
     },
     "ads": {
-      "banner_ad_network": "native",
-      "unity_game_id_android": "",
-      "unity_banner_placement_id": "Banner_Android",
-      "unity_test_mode": false
+      "banner_ad_network": "native"
     },
     "banners": [],
     "occasional_theme": {
